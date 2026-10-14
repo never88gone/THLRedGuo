@@ -1,0 +1,24 @@
+PODS:
+  - Alamofire (5.12.0)
+  - Kingfisher (8.11.0)
+  - SwiftUIIntrospect (26.0.0)
+
+DEPENDENCIES:
+  - Alamofire
+  - Kingfisher
+  - SwiftUIIntrospect
+
+SPEC REPOS:
+  trunk:
+    - Alamofire
+    - Kingfisher
+    - SwiftUIIntrospect
+
+SPEC CHECKSUMS:
+  Alamofire: ddb8d5201667b256dbc225f3fc6e835a0753186f
+  Kingfisher: ee4ff4936d5b399164b6d01a0dfc0388583287b6
+  SwiftUIIntrospect: 74b21afe4589aa3979192844ac1cbba381712e61
+
+PODFILE CHECKSUM: c2dc4a3cdd4da4cab6494188ec66c8f31f1fc6a6
+
+COCOAPODS: 1.17.0

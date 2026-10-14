@@ -1,0 +1,5 @@
+app_identifier(ENV["APP_BUNDLE_ID"] || "com.never88gone.redlook")
+apple_id(ENV["FASTLANE_APPLE_ID"] || "")
+
+itc_team_id(ENV["APP_STORE_CONNECT_TEAM_ID"] || "876385K952")
+team_id(ENV["DEVELOPER_PORTAL_TEAM_ID"] || "876385K952")

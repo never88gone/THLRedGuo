@@ -1,0 +1,75 @@
+def find_project_root
+  dir = File.dirname(File.expand_path(__FILE__))
+  while dir != "/" && !File.exist?(File.join(dir, "pubspec.yaml"))
+    dir = File.dirname(dir)
+  end
+  dir
+end
+
+PROJECT_ROOT = find_project_root
+
+# Custom methods
+def get_version_from_pubspec
+  pubspec_path = File.join(PROJECT_ROOT, "pubspec.yaml")
+  return "1.0.0" unless File.exist?(pubspec_path)
+  pubspec_content = File.read(pubspec_path)
+  version_line = pubspec_content.match(/version:\s*(\d+\.\d+\.\d+)/)
+  version_line ? version_line[1] : "1.0.0"
+end
+
+def get_build_number_from_pubspec
+  Time.now.strftime("%y%j%H%M")
+end
+
+default_platform(:android)
+
+platform :android do
+  desc "Build Android release APK"
+  lane :build_apk do |options|
+    ver = options.fetch(:version_number, get_version_from_pubspec)
+    build_num = options.fetch(:build_number, get_build_number_from_pubspec)
+
+    sh("cd #{PROJECT_ROOT} && python3 scripts/build_native.py --platform android --abi arm64-v8a 2>/dev/null || true")
+    sh("cd #{PROJECT_ROOT} && #{ENV['FVM_PREFIX'] || 'fvm '}flutter build apk --release --build-name=#{ver} --build-number=#{build_num}")
+
+    output_dir = File.join(PROJECT_ROOT, "build/app/outputs/flutter-apk")
+    if File.exist?("#{output_dir}/app-release.apk")
+      FileUtils.cp("#{output_dir}/app-release.apk", "#{output_dir}/redlook-release.apk")
+      UI.success("APK successfully generated: #{output_dir}/redlook-release.apk")
+    end
+  end
+
+  desc "Build Android release App Bundle (AAB)"
+  lane :build_bundle do |options|
+    ver = options.fetch(:version_number, get_version_from_pubspec)
+    build_num = options.fetch(:build_number, get_build_number_from_pubspec)
+
+    sh("cd #{PROJECT_ROOT} && python3 scripts/build_native.py --platform android --abi arm64-v8a 2>/dev/null || true")
+    sh("cd #{PROJECT_ROOT} && #{ENV['FVM_PREFIX'] || 'fvm '}flutter build appbundle --release --build-name=#{ver} --build-number=#{build_num}")
+
+    output_dir = File.join(PROJECT_ROOT, "build/app/outputs/bundle/release")
+    if File.exist?("#{output_dir}/app-release.aab")
+      FileUtils.cp("#{output_dir}/app-release.aab", "#{output_dir}/redlook-release.aab")
+      UI.success("AAB successfully generated: #{output_dir}/redlook-release.aab")
+    end
+  end
+
+  desc "Release to Google Play Store"
+  lane :release_play_store do |options|
+    build_bundle(options)
+
+    if ENV["GOOGLE_PLAY_JSON_FILE"] && File.exist?(ENV["GOOGLE_PLAY_JSON_FILE"])
+      supply(
+        track: 'internal',
+        aab: File.join(PROJECT_ROOT, "build/app/outputs/bundle/release/app-release.aab"),
+        json_key: ENV["GOOGLE_PLAY_JSON_FILE"],
+        skip_upload_metadata: true,
+        skip_upload_changelogs: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true
+      )
+    else
+      UI.message("GOOGLE_PLAY_JSON_FILE not configured, skipping store upload.")
+    end
+  end
+end

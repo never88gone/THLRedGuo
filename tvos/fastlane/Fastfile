@@ -1,0 +1,178 @@
+ENV["LC_ALL"] ||= "en_US.UTF-8"
+ENV["LANG"] ||= "en_US.UTF-8"
+
+# Fastfile for Apple TV (tvOS) - 对齐 thldytv 项目配置
+default_platform(:tvos)
+
+platform :tvos do
+  desc "初始化 App Store Connect API Key"
+  private_lane :setup_api_key do
+    if ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"] && ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"] && ENV["APP_STORE_CONNECT_API_KEY_KEY"]
+      app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+        key_content: ENV["APP_STORE_CONNECT_API_KEY_KEY"],
+        is_key_content_base64: true,
+        in_house: false
+      )
+    else
+      nil
+    end
+  end
+
+  desc "安装 fastlane 目录下的 tvOS 生产描述文件"
+  lane :install_profiles do |options|
+    profile_filename = options[:profile] || "thlredlook_tvOS_dis.mobileprovision"
+    candidates = [
+      File.expand_path("../../fastlane/#{profile_filename}"),
+      File.expand_path("../fastlane/#{profile_filename}"),
+      File.expand_path(profile_filename)
+    ]
+    matched = candidates.find { |p| File.exist?(p) }
+    UI.user_error!("未找到描述文件: #{profile_filename}") unless matched
+
+    UI.message("正在安装描述文件: #{matched}")
+    install_provisioning_profile(path: matched)
+  end
+
+  desc "配置 tvOS Xcode 工程代码签名设置"
+  lane :setup_signing do |options|
+    profile_name = options[:profile_name] || "thlredlook_tvOS_dis"
+    install_profiles(profile: "#{profile_name}.mobileprovision")
+
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "THLRedLook.xcodeproj",
+      team_id: "876385K952",
+      bundle_identifier: "com.never88gone.redlook",
+      profile_name: profile_name,
+      code_sign_identity: "Apple Distribution",
+      build_configurations: ["Release"]
+    )
+  end
+
+  desc "打包 Apple TV (tvOS) 独立应用 IPA (本地或导出)"
+  lane :build_ipa do |options|
+    export_method = options[:export_method] || "app-store"
+    profile_name = export_method == "development" ? "thlredlook_tvOS_dev" : "thlredlook_tvOS_dis"
+
+    # 动态生成北京时间年月日时分秒编译号 (YYYYMMDDHHMMSS) 并通过 agvtool 注入
+    beijing_build = options[:build_number] || Time.now.getlocal("+08:00").strftime("%Y%m%d%H%M%S")
+    UI.message("🚀 动态注入北京时间编译号 (Build Number): #{beijing_build}")
+    increment_build_number(
+      build_number: beijing_build,
+      xcodeproj: "THLRedLook.xcodeproj"
+    )
+
+    setup_signing(profile_name: profile_name)
+
+    output_dir = File.expand_path("../../build/tvos/ipa")
+    FileUtils.mkdir_p(output_dir)
+
+    export_options_file = File.exist?("ExportOptions_appstore.plist") ? "ExportOptions_appstore.plist" : nil
+
+    gym(
+      workspace: "THLRedLook.xcworkspace",
+      scheme: "THLRedLook",
+      configuration: "Release",
+      destination: "generic/platform=tvOS",
+      clean: true,
+      export_method: export_method,
+      xcargs: "CURRENT_PROJECT_VERSION=#{beijing_build}",
+      export_options: export_options_file || {
+        method: export_method,
+        teamID: "876385K952",
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "com.never88gone.redlook" => profile_name
+        }
+      },
+      output_directory: output_dir,
+      output_name: "THLRedLook.ipa",
+      disable_xcpretty: false
+    )
+
+    UI.success("Apple TV (tvOS) IPA 打包完成: #{output_dir}/THLRedLook.ipa")
+  end
+
+  desc "发布 tvOS Beta 版本到 TestFlight (对齐 thldytv)"
+  lane :beta do |options|
+    api_key = setup_api_key
+    build_ipa(options)
+
+    if api_key
+      upload_to_testflight(
+        api_key: api_key,
+        app_identifier: "com.never88gone.redlook",
+        app_platform: "appletvos",
+        skip_waiting_for_build_processing: true,
+        skip_submission: true,
+        distribute_external: false,
+        notify_external_testers: false,
+        changelog: options[:changelog] || "Apple TV 版本更新测试",
+        uses_non_exempt_encryption: false,
+        ipa: File.expand_path("../../build/tvos/ipa/THLRedLook.ipa")
+      )
+    else
+      UI.important("⚠️ 未检测到 App Store Connect API Key，跳过 TestFlight 上传，IPA 已生成至 build/tvos/ipa/THLRedLook.ipa")
+    end
+  end
+
+  desc "编译并上传 App Store 正式版本 (对齐 thldytv)"
+  lane :upload_appstore do |options|
+    api_key = setup_api_key
+    build_ipa(options)
+
+    if api_key
+      deliver(
+        api_key: api_key,
+        app_identifier: "com.never88gone.redlook",
+        platform: "appletvos",
+        skip_screenshots: true,
+        skip_metadata: true,
+        force: true,
+        run_precheck_before_submit: false,
+        ipa: File.expand_path("../../build/tvos/ipa/THLRedLook.ipa")
+      )
+
+      # 自动将最新上传的构建版本绑定到当前版本的 App Store 准备提交列表
+      begin
+        app = Spaceship::ConnectAPI::App.find("com.never88gone.redlook")
+        tv_ver = app.get_app_store_versions.find { |v| v.platform == "TV_OS" }
+        if tv_ver
+          build = app.get_builds.first
+          if build
+            tv_ver.select_build(build_id: build.id)
+            UI.success("已自动将构建版本 #{build.version} 关联至 tvOS #{tv_ver.version_string} 版本！")
+          end
+        end
+      rescue => e
+        UI.important("自动关联构建版本至 App Store 版本提示: #{e.message}")
+      end
+    else
+      UI.important("⚠️ 未检测到 App Store Connect API Key，跳过 App Store 上传，IPA 已生成至 build/tvos/ipa/THLRedLook.ipa")
+    end
+  end
+
+  desc "编译 tvOS 模拟器版本（适用于自动化验证与无证书环境）"
+  lane :build_simulator do
+    xcodebuild(
+      project: "THLRedLook.xcodeproj",
+      scheme: "THLRedLook",
+      configuration: "Debug",
+      destination: "generic/platform=tvOS Simulator",
+      action: "clean build",
+      code_signing_allowed: false
+    )
+  end
+
+  desc "发布 tvOS 到 TestFlight (兼容 release_app_store 命名)"
+  lane :release_app_store do |options|
+    beta(options)
+  end
+
+  desc "发布 tvOS 到 TestFlight (别名)"
+  lane :upload_testflight do |options|
+    beta(options)
+  end
+end

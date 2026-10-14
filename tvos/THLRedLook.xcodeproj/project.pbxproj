@@ -1,0 +1,616 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		6A2238549A7893510B3D7A7C /* Pods_THLRedLook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */; };
+		A10000012C00000100000001 /* THLRedLookApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000012C00000100000001 /* THLRedLookApp.swift */; };
+		A10000022C00000100000001 /* SourceSite.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022C00000100000001 /* SourceSite.swift */; };
+		A10000032C00000100000001 /* Drama.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000032C00000100000001 /* Drama.swift */; };
+		A10000042C00000100000001 /* Episode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000042C00000100000001 /* Episode.swift */; };
+		A10000052C00000100000001 /* PlaybackPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000052C00000100000001 /* PlaybackPlan.swift */; };
+		A10000062C00000100000001 /* WatchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000062C00000100000001 /* WatchEntry.swift */; };
+		A10000072C00000100000001 /* DownloadJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000072C00000100000001 /* DownloadJob.swift */; };
+		A10000082C00000100000001 /* RankingBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000082C00000100000001 /* RankingBoard.swift */; };
+		A10000092C00000100000001 /* LanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000092C00000100000001 /* LanModels.swift */; };
+		A10000102C00000100000001 /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000102C00000100000001 /* LocalStore.swift */; };
+		A10000112C00000100000001 /* NativeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000112C00000100000001 /* NativeBridge.swift */; };
+		A10000122C00000100000001 /* NativeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000122C00000100000001 /* NativeRepository.swift */; };
+		A10000132C00000100000001 /* LanSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000132C00000100000001 /* LanSyncService.swift */; };
+		A10000142C00000100000001 /* DownloadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000142C00000100000001 /* DownloadService.swift */; };
+		A10000152C00000100000001 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000152C00000100000001 /* HomeViewModel.swift */; };
+		A10000162C00000100000001 /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000162C00000100000001 /* SearchViewModel.swift */; };
+		A10000172C00000100000001 /* DetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000172C00000100000001 /* DetailViewModel.swift */; };
+		A10000182C00000100000001 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000182C00000100000001 /* PlayerViewModel.swift */; };
+		A10000192C00000100000001 /* RankingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000192C00000100000001 /* RankingsViewModel.swift */; };
+		A10000202C00000100000001 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000202C00000100000001 /* LibraryViewModel.swift */; };
+		A10000212C00000100000001 /* DramaCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000212C00000100000001 /* DramaCardView.swift */; };
+		A10000452C00000100000001 /* TVBlankStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000452C00000100000001 /* TVBlankStateView.swift */; };
+		A10000222C00000100000001 /* FilterSortSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000222C00000100000001 /* FilterSortSheet.swift */; };
+		A10000232C00000100000001 /* CatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000232C00000100000001 /* CatalogView.swift */; };
+		A10000242C00000100000001 /* TVDanmakuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000242C00000100000001 /* TVDanmakuView.swift */; };
+		A10000252C00000100000001 /* TVPlayerControlsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000252C00000100000001 /* TVPlayerControlsOverlay.swift */; };
+		A10000262C00000100000001 /* TVPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000262C00000100000001 /* TVPlayerView.swift */; };
+		A10000272C00000100000001 /* DramaDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000272C00000100000001 /* DramaDetailView.swift */; };
+		A10000282C00000100000001 /* SearchRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000282C00000100000001 /* SearchRootView.swift */; };
+		A10000292C00000100000001 /* RankingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000292C00000100000001 /* RankingsView.swift */; };
+		A10000302C00000100000001 /* SavedLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000302C00000100000001 /* SavedLibraryView.swift */; };
+		A10000312C00000100000001 /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000312C00000100000001 /* DownloadsView.swift */; };
+		A10000322C00000100000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000322C00000100000001 /* SettingsView.swift */; };
+		A10000332C00000100000001 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000332C00000100000001 /* MainTabView.swift */; };
+		A10000352C00000100000001 /* TVTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000352C00000100000001 /* TVTheme.swift */; };
+		A10000382C00000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000382C00000100000001 /* Assets.xcassets */; };
+		A10000392C00000100000001 /* AVPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000392C00000100000001 /* AVPlayerView.swift */; };
+		A10000982C00000100000001 /* CENCMP4Decryptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000982C00000100000001 /* CENCMP4Decryptor.swift */; };
+		A10000992C00000100000001 /* PlatformProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000992C00000100000001 /* PlatformProtocols.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLook.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		3311D255B0226B0543DC9491 /* Pods-THLRedLook.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLook.debug.xcconfig"; path = "Target Support Files/Pods-THLRedLook/Pods-THLRedLook.debug.xcconfig"; sourceTree = "<group>"; };
+		B10000002C00000100000001 /* THLRedLook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = THLRedLook.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000012C00000100000001 /* THLRedLookApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = THLRedLookApp.swift; sourceTree = "<group>"; };
+		B10000022C00000100000001 /* SourceSite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceSite.swift; sourceTree = "<group>"; };
+		B10000032C00000100000001 /* Drama.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Drama.swift; sourceTree = "<group>"; };
+		B10000042C00000100000001 /* Episode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Episode.swift; sourceTree = "<group>"; };
+		B10000052C00000100000001 /* PlaybackPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackPlan.swift; sourceTree = "<group>"; };
+		B10000062C00000100000001 /* WatchEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchEntry.swift; sourceTree = "<group>"; };
+		B10000072C00000100000001 /* DownloadJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadJob.swift; sourceTree = "<group>"; };
+		B10000082C00000100000001 /* RankingBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingBoard.swift; sourceTree = "<group>"; };
+		B10000092C00000100000001 /* LanModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanModels.swift; sourceTree = "<group>"; };
+		B10000102C00000100000001 /* LocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStore.swift; sourceTree = "<group>"; };
+		B10000112C00000100000001 /* NativeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBridge.swift; sourceTree = "<group>"; };
+		B10000122C00000100000001 /* NativeRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRepository.swift; sourceTree = "<group>"; };
+		B10000132C00000100000001 /* LanSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanSyncService.swift; sourceTree = "<group>"; };
+		B10000142C00000100000001 /* DownloadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadService.swift; sourceTree = "<group>"; };
+		B10000152C00000100000001 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		B10000162C00000100000001 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
+		B10000172C00000100000001 /* DetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailViewModel.swift; sourceTree = "<group>"; };
+		B10000182C00000100000001 /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
+		B10000192C00000100000001 /* RankingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingsViewModel.swift; sourceTree = "<group>"; };
+		B10000202C00000100000001 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
+		B10000212C00000100000001 /* DramaCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DramaCardView.swift; sourceTree = "<group>"; };
+		B10000452C00000100000001 /* TVBlankStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVBlankStateView.swift; sourceTree = "<group>"; };
+		B10000222C00000100000001 /* FilterSortSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterSortSheet.swift; sourceTree = "<group>"; };
+		B10000232C00000100000001 /* CatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogView.swift; sourceTree = "<group>"; };
+		B10000242C00000100000001 /* TVDanmakuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVDanmakuView.swift; sourceTree = "<group>"; };
+		B10000252C00000100000001 /* TVPlayerControlsOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVPlayerControlsOverlay.swift; sourceTree = "<group>"; };
+		B10000262C00000100000001 /* TVPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVPlayerView.swift; sourceTree = "<group>"; };
+		B10000272C00000100000001 /* DramaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DramaDetailView.swift; sourceTree = "<group>"; };
+		B10000282C00000100000001 /* SearchRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchRootView.swift; sourceTree = "<group>"; };
+		B10000292C00000100000001 /* RankingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingsView.swift; sourceTree = "<group>"; };
+		B10000302C00000100000001 /* SavedLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedLibraryView.swift; sourceTree = "<group>"; };
+		B10000312C00000100000001 /* DownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadsView.swift; sourceTree = "<group>"; };
+		B10000322C00000100000001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B10000332C00000100000001 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		B10000342C00000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B10000352C00000100000001 /* TVTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVTheme.swift; sourceTree = "<group>"; };
+		B10000382C00000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B10000392C00000100000001 /* AVPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerView.swift; sourceTree = "<group>"; };
+		B10000402C00000100000001 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		B10000982C00000100000001 /* CENCMP4Decryptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CENCMP4Decryptor.swift; sourceTree = "<group>"; };
+		B10000992C00000100000001 /* PlatformProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformProtocols.swift; sourceTree = "<group>"; };
+		EA0AC74BAC1238FE7FC98B9C /* Pods-THLRedLook.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLook.release.xcconfig"; path = "Target Support Files/Pods-THLRedLook/Pods-THLRedLook.release.xcconfig"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C10000012C00000100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A2238549A7893510B3D7A7C /* Pods_THLRedLook.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		60221B46C52FED984663019F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8252C3BA2257AD604EA74E22 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				3311D255B0226B0543DC9491 /* Pods-THLRedLook.debug.xcconfig */,
+				EA0AC74BAC1238FE7FC98B9C /* Pods-THLRedLook.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		D10000012C00000100000001 = {
+			isa = PBXGroup;
+			children = (
+				D10000022C00000100000001 /* THLRedLook */,
+				D10000032C00000100000001 /* Products */,
+				8252C3BA2257AD604EA74E22 /* Pods */,
+				60221B46C52FED984663019F /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		D10000022C00000100000001 /* THLRedLook */ = {
+			isa = PBXGroup;
+			children = (
+				G10000012C00000100000001 /* App */,
+				G10000022C00000100000001 /* Models */,
+				G10000032C00000100000001 /* Core */,
+				G10000042C00000100000001 /* ViewModels */,
+				G10000052C00000100000001 /* Views */,
+				B10000382C00000100000001 /* Assets.xcassets */,
+			);
+			path = THLRedLook;
+			sourceTree = "<group>";
+		};
+		D10000032C00000100000001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B10000002C00000100000001 /* THLRedLook.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		G10000012C00000100000001 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B10000012C00000100000001 /* THLRedLookApp.swift */,
+				B10000342C00000100000001 /* Info.plist */,
+				B10000402C00000100000001 /* LaunchScreen.storyboard */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		G10000022C00000100000001 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B10000022C00000100000001 /* SourceSite.swift */,
+				B10000032C00000100000001 /* Drama.swift */,
+				B10000042C00000100000001 /* Episode.swift */,
+				B10000052C00000100000001 /* PlaybackPlan.swift */,
+				B10000062C00000100000001 /* WatchEntry.swift */,
+				B10000072C00000100000001 /* DownloadJob.swift */,
+				B10000082C00000100000001 /* RankingBoard.swift */,
+				B10000092C00000100000001 /* LanModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G10000032C00000100000001 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				B10000102C00000100000001 /* LocalStore.swift */,
+				B10000112C00000100000001 /* NativeBridge.swift */,
+				B10000122C00000100000001 /* NativeRepository.swift */,
+				B10000982C00000100000001 /* CENCMP4Decryptor.swift */,
+				B10000992C00000100000001 /* PlatformProtocols.swift */,
+				B10000132C00000100000001 /* LanSyncService.swift */,
+				B10000142C00000100000001 /* DownloadService.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		G10000042C00000100000001 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				B10000152C00000100000001 /* HomeViewModel.swift */,
+				B10000162C00000100000001 /* SearchViewModel.swift */,
+				B10000172C00000100000001 /* DetailViewModel.swift */,
+				B10000182C00000100000001 /* PlayerViewModel.swift */,
+				B10000192C00000100000001 /* RankingsViewModel.swift */,
+				B10000202C00000100000001 /* LibraryViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		G10000052C00000100000001 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B10000332C00000100000001 /* MainTabView.swift */,
+				B10000352C00000100000001 /* TVTheme.swift */,
+				G10000072C00000100000001 /* Components */,
+				G10000082C00000100000001 /* Home */,
+				G10000092C00000100000001 /* Detail */,
+				G10000102C00000100000001 /* Player */,
+				G10000112C00000100000001 /* Search */,
+				G10000122C00000100000001 /* Rankings */,
+				G10000132C00000100000001 /* Library */,
+				G10000142C00000100000001 /* Downloads */,
+				G10000152C00000100000001 /* Settings */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G10000072C00000100000001 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				B10000212C00000100000001 /* DramaCardView.swift */,
+				B10000452C00000100000001 /* TVBlankStateView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		G10000082C00000100000001 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				B10000232C00000100000001 /* CatalogView.swift */,
+				B10000222C00000100000001 /* FilterSortSheet.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		G10000092C00000100000001 /* Detail */ = {
+			isa = PBXGroup;
+			children = (
+				B10000272C00000100000001 /* DramaDetailView.swift */,
+			);
+			path = Detail;
+			sourceTree = "<group>";
+		};
+		G10000102C00000100000001 /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				B10000262C00000100000001 /* TVPlayerView.swift */,
+				B10000252C00000100000001 /* TVPlayerControlsOverlay.swift */,
+				B10000242C00000100000001 /* TVDanmakuView.swift */,
+				B10000392C00000100000001 /* AVPlayerView.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+		G10000112C00000100000001 /* Search */ = {
+			isa = PBXGroup;
+			children = (
+				B10000282C00000100000001 /* SearchRootView.swift */,
+			);
+			path = Search;
+			sourceTree = "<group>";
+		};
+		G10000122C00000100000001 /* Rankings */ = {
+			isa = PBXGroup;
+			children = (
+				B10000292C00000100000001 /* RankingsView.swift */,
+			);
+			path = Rankings;
+			sourceTree = "<group>";
+		};
+		G10000132C00000100000001 /* Library */ = {
+			isa = PBXGroup;
+			children = (
+				B10000302C00000100000001 /* SavedLibraryView.swift */,
+			);
+			path = Library;
+			sourceTree = "<group>";
+		};
+		G10000142C00000100000001 /* Downloads */ = {
+			isa = PBXGroup;
+			children = (
+				B10000312C00000100000001 /* DownloadsView.swift */,
+			);
+			path = Downloads;
+			sourceTree = "<group>";
+		};
+		G10000152C00000100000001 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				B10000322C00000100000001 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E10000012C00000100000001 /* THLRedLook */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F10000012C00000100000001 /* Build configuration list for PBXNativeTarget "THLRedLook" */;
+			buildPhases = (
+				9F739B8A8652E55E2B80BBA1 /* [CP] Check Pods Manifest.lock */,
+				E10000992C00000100000001 /* Modity buildNumber */,
+				C10000022C00000100000001 /* Sources */,
+				C10000012C00000100000001 /* Frameworks */,
+				C10000032C00000100000001 /* Resources */,
+				82A94FFB5E822811A5345159 /* [CP] Embed Pods Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = THLRedLook;
+			productName = THLRedLook;
+			productReference = B10000002C00000100000001 /* THLRedLook.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		010000012C00000100000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					E10000012C00000100000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 010000022C00000100000001 /* Build configuration list for PBXProject "THLRedLook" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = zh_CN;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				zh_CN,
+				Base,
+			);
+			mainGroup = D10000012C00000100000001;
+			productRefGroup = D10000032C00000100000001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E10000012C00000100000001 /* THLRedLook */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C10000032C00000100000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000382C00000100000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		82A94FFB5E822811A5345159 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-THLRedLook/Pods-THLRedLook-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-THLRedLook/Pods-THLRedLook-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-THLRedLook/Pods-THLRedLook-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		9F739B8A8652E55E2B80BBA1 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-THLRedLook-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E10000992C00000100000001 /* Modity buildNumber */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Modity buildNumber";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\n#!/bin/bash\nbuildNumber=${BUILD_NUMBER:-$(date +%Y%m%d%H%M%S)}\nif [ \"$CONFIGURATION\" == \"Release\" ] || [ -n \"$BUILD_NUMBER\" ] || [ \"$FORCE_BUMP_BUILD\" == \"1\" ]; then\n    echo \"Bumping build number to $buildNumber...\"\n    target_plist=\"${SRCROOT}/${INFOPLIST_FILE}\"\n    if [ -f \"$target_plist\" ]; then\n        /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $buildNumber\" \"$target_plist\"\n    fi\n    if [ -n \"$TARGET_BUILD_DIR\" ] && [ -n \"$INFOPLIST_PATH\" ] && [ -f \"$TARGET_BUILD_DIR/$INFOPLIST_PATH\" ]; then\n        /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $buildNumber\" \"$TARGET_BUILD_DIR/$INFOPLIST_PATH\" || true\n    fi\nelse\n    echo \"$CONFIGURATION build - Keep current build number.\"\nfi\n\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C10000022C00000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000012C00000100000001 /* THLRedLookApp.swift in Sources */,
+				A10000022C00000100000001 /* SourceSite.swift in Sources */,
+				A10000032C00000100000001 /* Drama.swift in Sources */,
+				A10000042C00000100000001 /* Episode.swift in Sources */,
+				A10000052C00000100000001 /* PlaybackPlan.swift in Sources */,
+				A10000062C00000100000001 /* WatchEntry.swift in Sources */,
+				A10000072C00000100000001 /* DownloadJob.swift in Sources */,
+				A10000082C00000100000001 /* RankingBoard.swift in Sources */,
+				A10000092C00000100000001 /* LanModels.swift in Sources */,
+				A10000102C00000100000001 /* LocalStore.swift in Sources */,
+				A10000112C00000100000001 /* NativeBridge.swift in Sources */,
+				A10000122C00000100000001 /* NativeRepository.swift in Sources */,
+				A10000982C00000100000001 /* CENCMP4Decryptor.swift in Sources */,
+				A10000992C00000100000001 /* PlatformProtocols.swift in Sources */,
+				A10000132C00000100000001 /* LanSyncService.swift in Sources */,
+				A10000142C00000100000001 /* DownloadService.swift in Sources */,
+				A10000152C00000100000001 /* HomeViewModel.swift in Sources */,
+				A10000162C00000100000001 /* SearchViewModel.swift in Sources */,
+				A10000172C00000100000001 /* DetailViewModel.swift in Sources */,
+				A10000182C00000100000001 /* PlayerViewModel.swift in Sources */,
+				A10000192C00000100000001 /* RankingsViewModel.swift in Sources */,
+				A10000202C00000100000001 /* LibraryViewModel.swift in Sources */,
+				A10000212C00000100000001 /* DramaCardView.swift in Sources */,
+				A10000452C00000100000001 /* TVBlankStateView.swift in Sources */,
+				A10000222C00000100000001 /* FilterSortSheet.swift in Sources */,
+				A10000232C00000100000001 /* CatalogView.swift in Sources */,
+				A10000242C00000100000001 /* TVDanmakuView.swift in Sources */,
+				A10000252C00000100000001 /* TVPlayerControlsOverlay.swift in Sources */,
+				A10000262C00000100000001 /* TVPlayerView.swift in Sources */,
+				A10000392C00000100000001 /* AVPlayerView.swift in Sources */,
+				A10000272C00000100000001 /* DramaDetailView.swift in Sources */,
+				A10000282C00000100000001 /* SearchRootView.swift in Sources */,
+				A10000292C00000100000001 /* RankingsView.swift in Sources */,
+				A10000302C00000100000001 /* SavedLibraryView.swift in Sources */,
+				A10000312C00000100000001 /* DownloadsView.swift in Sources */,
+				A10000322C00000100000001 /* SettingsView.swift in Sources */,
+				A10000332C00000100000001 /* MainTabView.swift in Sources */,
+				A10000352C00000100000001 /* TVTheme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		010000032C00000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				"EXCLUDED_ARCHS[sdk=appletvsimulator*]" = x86_64;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = appletvos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Debug;
+		};
+		010000042C00000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				MTL_FAST_MATH = YES;
+				SDKROOT = appletvos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F10000022C00000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3311D255B0226B0543DC9491 /* Pods-THLRedLook.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 20261005205413;
+				DEVELOPMENT_TEAM = 876385K952;
+				"EXCLUDED_ARCHS[sdk=appletvsimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = THLRedLook/App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.2;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+			};
+			name = Debug;
+		};
+		F10000032C00000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = EA0AC74BAC1238FE7FC98B9C /* Pods-THLRedLook.release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 20261005205413;
+				DEVELOPMENT_TEAM = 876385K952;
+				"EXCLUDED_ARCHS[sdk=appletvsimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = THLRedLook/App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.2;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = thlredlook_tvOS_dis;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		010000022C00000100000001 /* Build configuration list for PBXProject "THLRedLook" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				010000032C00000100000001 /* Debug */,
+				010000042C00000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F10000012C00000100000001 /* Build configuration list for PBXNativeTarget "THLRedLook" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F10000022C00000100000001 /* Debug */,
+				F10000032C00000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 010000012C00000100000001 /* Project object */;
+}

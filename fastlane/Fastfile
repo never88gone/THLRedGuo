@@ -1,0 +1,312 @@
+ENV["LC_ALL"] ||= "en_US.UTF-8"
+ENV["LANG"] ||= "en_US.UTF-8"
+
+PROJECT_ROOT = File.expand_path("..", File.dirname(__FILE__))
+
+default_platform(:ios)
+
+def get_version_from_pubspec
+  pubspec_path = File.join(PROJECT_ROOT, "pubspec.yaml")
+  return "1.0.0" unless File.exist?(pubspec_path)
+  pubspec_content = File.read(pubspec_path)
+  match = pubspec_content.match(/version:\s*(\d+\.\d+\.\d+)/)
+  match ? match[1] : "1.0.0"
+end
+
+def get_build_number_from_pubspec
+  Time.now.strftime("%y%j%H%M")
+end
+
+def setup_app_store_api_key
+  if ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"] && ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"] && ENV["APP_STORE_CONNECT_API_KEY_KEY"]
+    app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_API_KEY_KEY"],
+      is_key_content_base64: true,
+      in_house: false
+    )
+  end
+end
+
+platform :ios do
+  desc "安装 iOS 生产发布证书描述文件"
+  lane :install_profiles do
+    profile_path = File.join(PROJECT_ROOT, "fastlane/thlredlook_iOS_dis.mobileprovision")
+    install_provisioning_profile(path: profile_path) if File.exist?(profile_path)
+  end
+
+  desc "配置 iOS Xcode 项目签名设置"
+  lane :setup_signing do
+    install_profiles
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: File.join(PROJECT_ROOT, "ios/Runner.xcodeproj"),
+      team_id: "876385K952",
+      bundle_identifier: "com.never88gone.redlook",
+      profile_name: "thlredlook_iOS_dis",
+      code_sign_identity: "Apple Distribution",
+      build_configurations: ["Release"]
+    )
+  end
+
+  desc "打包 iOS IPA (App Store / TestFlight 签名)"
+  lane :build_ipa do |options|
+    version_number = options.fetch(:version_number, get_version_from_pubspec)
+    build_number = options.fetch(:build_number, get_build_number_from_pubspec)
+
+    setup_signing
+
+    sh("cd #{PROJECT_ROOT} && python3 scripts/build_ios.py --core-only 2>/dev/null || true")
+
+    output_dir = File.join(PROJECT_ROOT, "build/ios/ipa")
+    FileUtils.mkdir_p(output_dir)
+
+    begin
+      sh("cd #{PROJECT_ROOT} && #{ENV['FVM_PREFIX'] || 'fvm '}flutter build ipa --release --build-name=#{version_number} --build-number=#{build_number} --export-options-plist=fastlane/export_options_ios.plist")
+    rescue => ex
+      UI.important("Flutter build ipa 执行异常，使用 gym 进行归档打包: #{ex.message}")
+      gym(
+        workspace: File.join(PROJECT_ROOT, "ios/Runner.xcworkspace"),
+        scheme: "Runner",
+        configuration: "Release",
+        clean: true,
+        output_directory: output_dir,
+        output_name: "redlook-release.ipa",
+        export_method: "app-store",
+        export_options: {
+          method: "app-store",
+          teamID: "876385K952",
+          signingStyle: "manual",
+          provisioningProfiles: {
+            "com.never88gone.redlook" => "thlredlook_iOS_dis"
+          }
+        }
+      )
+    end
+  end
+
+  desc "发布 iOS 应用到 App Store / TestFlight"
+  lane :release_app_store do |options|
+    setup_app_store_api_key
+    build_ipa(options)
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      ipa: File.join(PROJECT_ROOT, "build/ios/ipa/redlook-release.ipa")
+    )
+  end
+end
+
+platform :mac do
+  desc "安装 macOS 生产发布证书描述文件"
+  lane :install_profiles do
+    profile_path = File.join(PROJECT_ROOT, "fastlane/thlredlook_macOS_dis.provisionprofile")
+    install_provisioning_profile(path: profile_path) if File.exist?(profile_path)
+  end
+
+  desc "配置 macOS Xcode 项目签名设置"
+  lane :setup_signing do
+    install_profiles
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: File.join(PROJECT_ROOT, "macos/Runner.xcodeproj"),
+      team_id: "876385K952",
+      bundle_identifier: "com.never88gone.redlook",
+      profile_name: "thlredlook_macOS_dis",
+      code_sign_identity: "Apple Distribution",
+      build_configurations: ["Release"]
+    )
+  end
+
+  desc "打包 macOS 归档与 pkg"
+  lane :build_pkg do |options|
+    version_number = options.fetch(:version_number, get_version_from_pubspec)
+    build_number = options.fetch(:build_number, get_build_number_from_pubspec)
+
+    setup_signing
+
+    sh("cd #{PROJECT_ROOT} && python3 scripts/build_native.py --platform darwin 2>/dev/null || true")
+    sh("cd #{PROJECT_ROOT} && #{ENV['FVM_PREFIX'] || 'fvm '}flutter build macos --release --build-name=#{version_number} --build-number=#{build_number}")
+
+    output_dir = File.join(PROJECT_ROOT, "build/macos/pkg")
+    FileUtils.mkdir_p(output_dir)
+
+    gym(
+      workspace: File.join(PROJECT_ROOT, "macos/Runner.xcworkspace"),
+      scheme: "Runner",
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store",
+      output_directory: output_dir,
+      output_name: "redlook-macos",
+      export_options: {
+        method: "app-store",
+        teamID: "876385K952",
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "com.never88gone.redlook" => "thlredlook_macOS_dis"
+        }
+      }
+    )
+  end
+
+  desc "发布 macOS 应用到 App Store / TestFlight"
+  lane :release_app_store do |options|
+    setup_app_store_api_key
+    build_pkg(options)
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      app_platform: "osx",
+      uses_non_exempt_encryption: false,
+      pkg: File.join(PROJECT_ROOT, "build/macos/pkg/redlook-macos.pkg")
+    )
+  end
+end
+
+platform :tvos do
+  desc "安装 Apple TV (tvOS) 生产发布证书描述文件"
+  lane :install_profiles do
+    profile_path = File.join(PROJECT_ROOT, "fastlane/thlredlook_tvOS_dis.mobileprovision")
+    install_provisioning_profile(path: profile_path) if File.exist?(profile_path)
+  end
+
+  desc "配置 tvOS Xcode 项目签名设置"
+  lane :setup_signing do
+    install_profiles
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: File.join(PROJECT_ROOT, "tvos/THLRedLook.xcodeproj"),
+      team_id: "876385K952",
+      bundle_identifier: "com.never88gone.redlook",
+      profile_name: "thlredlook_tvOS_dis",
+      code_sign_identity: "Apple Distribution",
+      build_configurations: ["Release"]
+    )
+  end
+
+  desc "打包 Apple TV (tvOS) IPA"
+  lane :build_ipa do |options|
+    beijing_build = options[:build_number] || Time.now.getlocal("+08:00").strftime("%Y%m%d%H%M%S")
+    UI.message("🚀 动态注入北京时间编译号 (Build Number): #{beijing_build}")
+    increment_build_number(
+      build_number: beijing_build,
+      xcodeproj: File.join(PROJECT_ROOT, "tvos/THLRedLook.xcodeproj")
+    )
+
+    setup_signing
+    output_dir = File.join(PROJECT_ROOT, "build/tvos/ipa")
+    sh("cd #{File.join(PROJECT_ROOT, 'tvos')} && pod install")
+
+    workspace_path = File.join(PROJECT_ROOT, "tvos/THLRedLook.xcworkspace")
+    gym_args = {
+      scheme: "THLRedLook",
+      configuration: "Release",
+      destination: "generic/platform=tvOS",
+      clean: true,
+      export_method: "app-store",
+      xcargs: "CURRENT_PROJECT_VERSION=#{beijing_build}",
+      output_directory: output_dir,
+      output_name: "THLRedLook.ipa",
+      disable_xcpretty: true,
+      export_options: {
+        method: "app-store",
+        teamID: "876385K952",
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "com.never88gone.redlook" => "thlredlook_tvOS_dis"
+        }
+      }
+    }
+    if File.exist?(workspace_path)
+      gym_args[:workspace] = workspace_path
+    else
+      gym_args[:project] = File.join(PROJECT_ROOT, "tvos/THLRedLook.xcodeproj")
+    end
+
+    gym(gym_args)
+  end
+
+  desc "发布 tvOS 应用到 App Store / TestFlight"
+  lane :release_app_store do |options|
+    api_key = setup_app_store_api_key
+    build_ipa(options)
+    ipa_path = File.join(PROJECT_ROOT, "build/tvos/ipa/THLRedLook.ipa")
+
+    if api_key
+      upload_to_testflight(
+        api_key: api_key,
+        app_identifier: "com.never88gone.redlook",
+        app_platform: "appletvos",
+        skip_waiting_for_build_processing: true,
+        skip_submission: true,
+        distribute_external: false,
+        notify_external_testers: false,
+        changelog: options[:changelog] || "Apple TV 版本更新测试",
+        uses_non_exempt_encryption: false,
+        ipa: ipa_path
+      )
+
+      # 自动将最新上传的构建版本绑定到当前版本的 App Store 准备提交列表
+      begin
+        app = Spaceship::ConnectAPI::App.find("com.never88gone.redlook")
+        tv_ver = app.get_app_store_versions.find { |v| v.platform == "TV_OS" }
+        if tv_ver
+          build = app.get_builds.first
+          if build
+            tv_ver.select_build(build_id: build.id)
+            UI.success("已自动将构建版本 #{build.version} 关联至 tvOS #{tv_ver.version_string} 版本！")
+          end
+        end
+      rescue => e
+        UI.important("自动关联构建版本至 App Store 版本提示: #{e.message}")
+      end
+    else
+      UI.user_error!("未检测到 App Store Connect API Key，无法上传至 TestFlight！")
+    end
+  end
+
+  desc "发布 tvOS Beta 到 TestFlight (别名)"
+  lane :beta do |options|
+    release_app_store(options)
+  end
+
+  desc "发布 tvOS 到 TestFlight"
+  lane :upload_testflight do |options|
+    release_app_store(options)
+  end
+
+  desc "发布 tvOS 到 App Store (别名)"
+  lane :upload_appstore do |options|
+    release_app_store(options)
+  end
+end
+
+platform :android do
+  desc "打包 Android APK"
+  lane :build_apk do |options|
+    version_number = options.fetch(:version_number, get_version_from_pubspec)
+    build_number = options.fetch(:build_number, get_build_number_from_pubspec)
+
+    sh("cd #{PROJECT_ROOT} && python3 scripts/build_native.py --platform android --abi arm64-v8a 2>/dev/null || true")
+    sh("cd #{PROJECT_ROOT} && #{ENV['FVM_PREFIX'] || 'fvm '}flutter build apk --release --build-name=#{version_number} --build-number=#{build_number}")
+    output_dir = File.join(PROJECT_ROOT, "build/app/outputs/flutter-apk")
+    if File.exist?("#{output_dir}/app-release.apk")
+      FileUtils.cp("#{output_dir}/app-release.apk", "#{output_dir}/redlook-release.apk")
+      UI.success("Android APK 构建完成: #{output_dir}/redlook-release.apk")
+    end
+  end
+
+  desc "打包 Android App Bundle (AAB)"
+  lane :build_bundle do |options|
+    version_number = options.fetch(:version_number, get_version_from_pubspec)
+    build_number = options.fetch(:build_number, get_build_number_from_pubspec)
+
+    sh("cd #{PROJECT_ROOT} && python3 scripts/build_native.py --platform android --abi arm64-v8a 2>/dev/null || true")
+    sh("cd #{PROJECT_ROOT} && #{ENV['FVM_PREFIX'] || 'fvm '}flutter build appbundle --release --build-name=#{version_number} --build-number=#{build_number}")
+    output_dir = File.join(PROJECT_ROOT, "build/app/outputs/bundle/release")
+    if File.exist?("#{output_dir}/app-release.aab")
+      FileUtils.cp("#{output_dir}/app-release.aab", "#{output_dir}/redlook-release.aab")
+      UI.success("Android AAB 构建完成: #{output_dir}/redlook-release.aab")
+    end
+  end
+end

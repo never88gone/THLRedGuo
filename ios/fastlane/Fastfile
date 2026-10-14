@@ -1,0 +1,183 @@
+def find_project_root
+  dir = File.dirname(File.expand_path(__FILE__))
+  while dir != "/" && !File.exist?(File.join(dir, "pubspec.yaml"))
+    dir = File.dirname(dir)
+  end
+  dir
+end
+
+PROJECT_ROOT = find_project_root
+IOS_DIR = File.join(PROJECT_ROOT, "ios")
+
+# Custom methods
+def get_version_from_pubspec
+  pubspec_path = File.join(PROJECT_ROOT, "pubspec.yaml")
+  return "1.0.0" unless File.exist?(pubspec_path)
+  pubspec_content = File.read(pubspec_path)
+  match = pubspec_content.match(/version:\s*(\d+\.\d+\.\d+)/)
+  match ? match[1] : "1.0.0"
+end
+
+def get_build_number_from_pubspec
+  Time.now.strftime("%y%j%H%M")
+end
+
+default_platform(:ios)
+
+platform :ios do
+  private_lane :authenticate_apple_store do
+    if ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"] && ENV["APP_STORE_CONNECT_API_KEY_KEY"]
+      app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
+        key_content: ENV["APP_STORE_CONNECT_API_KEY_KEY"],
+        is_key_content_base64: true,
+        in_house: false
+      )
+    end
+  end
+
+  desc "Build Flutter iOS IPA bundle"
+  lane :build_ipa do |options|
+    authenticate_apple_store
+
+    if is_ci
+      # setup_ci
+    end
+
+    system("find #{PROJECT_ROOT} -name '._*' -delete 2>/dev/null || true")
+    system("find #{File.expand_path('~/.pub-cache')} -name '._*' -delete 2>/dev/null || true")
+
+    ver = options.fetch(:version_number, get_version_from_pubspec)
+    build_num = options.fetch(:build_number, get_build_number_from_pubspec)
+
+    sh("cd #{PROJECT_ROOT} && #{ENV['FVM_PREFIX'] || 'fvm '}flutter build ipa --release --build-name=#{ver} --build-number=#{build_num}")
+  end
+
+  desc "Build and export Release App Store IPA using fastlane/thlredlook_iOS_dis.mobileprovision"
+  lane :build_app_store_ipa do |options|
+    authenticate_apple_store
+
+    if is_ci
+      # setup_ci
+    end
+
+    system("find #{PROJECT_ROOT} -name '._*' -delete 2>/dev/null || true")
+    system("find #{File.expand_path('~/.pub-cache')} -name '._*' -delete 2>/dev/null || true")
+
+    ver = options.fetch(:version_number, get_version_from_pubspec)
+    build_num = options.fetch(:build_number, get_build_number_from_pubspec)
+
+    profile_path = File.join(PROJECT_ROOT, "fastlane/thlredlook_iOS_dis.mobileprovision")
+    if File.exist?(profile_path)
+      UI.message("Installing provisioning profile: #{profile_path}")
+      install_provisioning_profile(path: profile_path)
+    else
+      UI.user_error!("Provisioning profile not found at #{profile_path}")
+    end
+
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: File.join(IOS_DIR, "Runner.xcodeproj"),
+      team_id: "876385K952",
+      profile_name: "thlredlook_iOS_dis",
+      build_configurations: ["Release"]
+    )
+
+    sh("cd #{PROJECT_ROOT} && python3 scripts/build_ios.py --core-only 2>/dev/null || true")
+    sh("cd #{PROJECT_ROOT} && #{ENV['FVM_PREFIX'] || 'fvm '}flutter build ios --release --no-codesign --build-name=#{ver} --build-number=#{build_num}")
+
+    output_dir = File.join(PROJECT_ROOT, "build/ios/ipa")
+    FileUtils.mkdir_p(output_dir)
+
+    build_app(
+      workspace: File.join(IOS_DIR, "Runner.xcworkspace"),
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "app-store",
+      export_options: {
+        method: "app-store",
+        provisioningProfiles: {
+          (ENV["APP_BUNDLE_ID"] || "com.never88gone.redlook") => "thlredlook_iOS_dis"
+        }
+      },
+      output_directory: output_dir,
+      output_name: "redlook-release.ipa"
+    )
+  end
+
+  desc "Build and export Development IPA using fastlane/thlredlool_iOS_dev.mobileprovision"
+  lane :build_dev_ipa do |options|
+    authenticate_apple_store
+
+    if is_ci
+      # setup_ci
+    end
+
+    system("find #{PROJECT_ROOT} -name '._*' -delete 2>/dev/null || true")
+    system("find #{File.expand_path('~/.pub-cache')} -name '._*' -delete 2>/dev/null || true")
+
+    ver = options.fetch(:version_number, get_version_from_pubspec)
+    build_num = options.fetch(:build_number, get_build_number_from_pubspec)
+
+    profile_path = File.join(PROJECT_ROOT, "fastlane/thlredlool_iOS_dev.mobileprovision")
+    if File.exist?(profile_path)
+      UI.message("Installing development provisioning profile: #{profile_path}")
+      install_provisioning_profile(path: profile_path)
+    else
+      UI.user_error!("Development provisioning profile not found at #{profile_path}")
+    end
+
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: File.join(IOS_DIR, "Runner.xcodeproj"),
+      team_id: "876385K952",
+      profile_name: "thlredlool_iOS_dev",
+      build_configurations: ["Debug", "Release"]
+    )
+
+    sh("cd #{PROJECT_ROOT} && python3 scripts/build_ios.py --core-only 2>/dev/null || true")
+    sh("cd #{PROJECT_ROOT} && #{ENV['FVM_PREFIX'] || 'fvm '}flutter build ios --release --no-codesign --build-name=#{ver} --build-number=#{build_num}")
+
+    output_dir = File.join(PROJECT_ROOT, "build/ios/ipa")
+    FileUtils.mkdir_p(output_dir)
+
+    build_app(
+      workspace: File.join(IOS_DIR, "Runner.xcworkspace"),
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "development",
+      export_options: {
+        method: "development",
+        signingStyle: "manual",
+        teamID: "876385K952",
+        provisioningProfiles: {
+          (ENV["APP_BUNDLE_ID"] || "com.never88gone.redlook") => "thlredlool_iOS_dev"
+        }
+      },
+      output_directory: output_dir,
+      output_name: "redlook-dev.ipa"
+    )
+  end
+
+  desc "Release a new build to Apple Store / TestFlight"
+  lane :release_app_store do |options|
+    authenticate_apple_store
+
+    build_app_store_ipa(options)
+
+    ipa_path = Actions.lane_context[SharedValues::IPA_OUTPUT_PATH] || File.join(PROJECT_ROOT, "build/ios/ipa/redlook-release.ipa")
+    if File.exist?(ipa_path.to_s)
+      upload_to_testflight(
+        skip_waiting_for_build_processing: true,
+        uses_non_exempt_encryption: false,
+        ipa: ipa_path
+      )
+    else
+      upload_to_testflight(
+        skip_waiting_for_build_processing: true,
+        uses_non_exempt_encryption: false
+      )
+    end
+  end
+end
