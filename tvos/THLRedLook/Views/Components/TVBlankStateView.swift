@@ -27,7 +27,7 @@ public struct TVSourceBlankStateView: View {
                     .font(.system(size: 40, weight: .bold))
                     .foregroundColor(.white)
 
-                Text("遵循纯净模式，本应用不预装任何数据源。\n请添加网络订阅链接导入 JS 插件以开启短剧体验。")
+                Text("当前未激活数据源，可直接一键导入官方红果短剧源\n或添加自定义 JS 插件网络订阅。")
                     .font(.system(size: 22))
                     .foregroundColor(.white.opacity(0.65))
                     .multilineTextAlignment(.center)
@@ -35,10 +35,24 @@ public struct TVSourceBlankStateView: View {
             }
 
             HStack(spacing: 24) {
-                TVButton(title: "添加网络订阅链接", icon: "link.badge.plus", isProminent: true) {
-                    showingImportAlert = true
+                TVButton(title: "导入官方红果数据源", icon: "sparkles.tv.fill", isProminent: true) {
+                    Task {
+                        isImporting = true
+                        let success = await jsService.importBuiltInHongguoSource(autoSelect: true)
+                        isImporting = false
+                        if success {
+                            onImportSuccess?()
+                        } else {
+                            alertMessage = "导入红果数据源失败，请重试。"
+                        }
+                    }
                 }
                 .frame(width: 320)
+
+                TVButton(title: "网络链接导入", icon: "link.badge.plus") {
+                    showingImportAlert = true
+                }
+                .frame(width: 240)
             }
             .padding(.top, 20)
 
@@ -88,7 +102,19 @@ public struct TVSourceBlankStateView: View {
                         showingImportAlert = false
                     }
 
-                    TVButton(title: "导入", icon: "arrow.down.doc", isProminent: true) {
+                    TVButton(title: "直接导入内置红果源", icon: "sparkles.tv.fill") {
+                        Task {
+                            isImporting = true
+                            let success = await jsService.importBuiltInHongguoSource(autoSelect: true)
+                            isImporting = false
+                            showingImportAlert = false
+                            if success {
+                                onImportSuccess?()
+                            }
+                        }
+                    }
+
+                    TVButton(title: "从 URL 导入", icon: "arrow.down.doc", isProminent: true) {
                         importPlugin()
                     }
                 }
@@ -105,7 +131,7 @@ public struct TVSourceBlankStateView: View {
         isImporting = true
         Task {
             do {
-                let success = try await jsService.importFromURL(trimmed)
+                let success = try await jsService.importFromURL(trimmed, autoSelect: true)
                 await MainActor.run {
                     isImporting = false
                     if success {

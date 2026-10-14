@@ -365,14 +365,24 @@ public actor NativeBridge {
         case "jsSource.saveAndLoad":
             let script = payload["script"] as? String ?? ""
             let fileName = payload["fileName"] as? String ?? "custom.js"
+            let autoSelect = (payload["autoSelect"] as? Bool) ?? true
             guard !script.isEmpty else {
                 throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "脚本内容为空"])
             }
             let targetFile = sourcesDirURL.appendingPathComponent(fileName)
             try script.write(to: targetFile, atomically: true, encoding: .utf8)
             scanSourcesDirectory()
-            if let meta = installedSources.values.first(where: { ($0["id"] as? String) == fileName.replacingOccurrences(of: ".js", with: "") }) {
-                activeSourceId = meta["id"] as? String ?? activeSourceId
+            let fileId = fileName.replacingOccurrences(of: ".js", with: "")
+            if let targetMeta = installedSources.values.first(where: {
+                let sid = ($0["id"] as? String) ?? ""
+                return sid == "hongguo" || sid == fileId
+            }) {
+                let targetId = targetMeta["id"] as? String ?? activeSourceId
+                if autoSelect || targetId == "hongguo" || activeSourceId.isEmpty {
+                    activeSourceId = targetId
+                }
+            } else if autoSelect, let meta = installedSources[fileId] {
+                activeSourceId = fileId
             }
             return ["ok": true, "active": activeSourceId]
 

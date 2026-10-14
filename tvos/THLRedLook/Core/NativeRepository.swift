@@ -239,8 +239,8 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
         return resp["active"] as? String ?? ""
     }
 
-    public func jsSourceSaveAndLoad(script: String, fileName: String) async throws -> Bool {
-        let resp = try await bridge.request(action: "jsSource.saveAndLoad", payload: ["script": script, "fileName": fileName])
+    public func jsSourceSaveAndLoad(script: String, fileName: String, autoSelect: Bool = true) async throws -> Bool {
+        let resp = try await bridge.request(action: "jsSource.saveAndLoad", payload: ["script": script, "fileName": fileName, "autoSelect": autoSelect])
         return resp["ok"] as? Bool ?? false
     }
 

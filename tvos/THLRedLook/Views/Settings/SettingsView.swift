@@ -197,12 +197,34 @@ public struct SettingsView: View {
     // MARK: - 1. 站源管理与导入面板
     private var sourcesPanel: some View {
         VStack(alignment: .leading, spacing: 32) {
-            panelHeader(title: "站源管理", desc: "配置并选择当前要使用的影视数据源。您可以导入自定义的 JS 插件扩展媒体库。")
+            panelHeader(title: "站源管理", desc: "配置并选择当前要使用的影视数据源。内置支持官方标准红果短剧源，也可导入自定义 JS 插件。")
             
-            HStack {
-                TVButton(title: "导入站源", icon: "plus.app.fill", isProminent: true) {
+            // 顶部操作栏
+            HStack(spacing: 20) {
+                let isHongguoInstalled = jsService.sources.contains(where: { ($0["id"] as? String) == "hongguo" })
+                let isHongguoActive = jsService.activeSourceId == "hongguo"
+
+                TVButton(
+                    title: isHongguoInstalled ? (isHongguoActive ? "红果官方源 (已激活)" : "设为默认红果源") : "导入官方红果数据源",
+                    icon: isHongguoActive ? "checkmark.circle.fill" : "sparkles.tv.fill",
+                    isProminent: true
+                ) {
+                    Task {
+                        isImporting = true
+                        let success = await jsService.importBuiltInHongguoSource(autoSelect: true)
+                        isImporting = false
+                        if success {
+                            saveNotice = "已成功导入红果免费短剧官方源，并默认设为当前激活源！"
+                        } else {
+                            saveNotice = "导入红果数据源失败，请重试。"
+                        }
+                    }
+                }
+
+                TVButton(title: "网络链接导入", icon: "plus.app.fill") {
                     showingImportAlert = true
                 }
+
                 Spacer()
             }
             .padding(.bottom, 16)
@@ -212,9 +234,27 @@ public struct SettingsView: View {
                 .foregroundColor(.white.opacity(0.8))
             
             if jsService.sources.isEmpty {
-                Text("暂无任何数据源，请先导入插件。")
-                    .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.5))
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("暂无任何数据源。推荐立即导入官方标准红果短剧源，即刻开启全量短剧在线播放体验。")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.6))
+
+                    TVButton(title: "立即导入官方红果数据源", icon: "sparkles.tv.fill", isProminent: true) {
+                        Task {
+                            isImporting = true
+                            let success = await jsService.importBuiltInHongguoSource(autoSelect: true)
+                            isImporting = false
+                            if success {
+                                saveNotice = "已成功导入红果免费短剧官方源，并默认设为当前激活源！"
+                            }
+                        }
+                    }
+                }
+                .padding(24)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(red: 0.14, green: 0.14, blue: 0.18))
+                )
             } else {
                 VStack(spacing: 18) {
                     ForEach(jsService.sources.indices, id: \.self) { index in
@@ -259,6 +299,10 @@ public struct SettingsView: View {
                     .frame(width: 600)
                     .font(.system(size: 24))
                 
+                Text("提示：导入红果数据源时将默认自动选中并激活")
+                    .font(.system(size: 16))
+                    .foregroundColor(.white.opacity(0.6))
+
                 if isImporting {
                     ProgressView()
                 }
@@ -267,8 +311,20 @@ public struct SettingsView: View {
                     TVButton(title: "取消", icon: "xmark") {
                         showingImportAlert = false
                     }
+
+                    TVButton(title: "直接导入内置红果源", icon: "sparkles.tv.fill") {
+                        Task {
+                            isImporting = true
+                            let success = await jsService.importBuiltInHongguoSource(autoSelect: true)
+                            isImporting = false
+                            showingImportAlert = false
+                            if success {
+                                saveNotice = "已成功导入红果免费短剧官方源，并默认设为当前激活源！"
+                            }
+                        }
+                    }
                     
-                    TVButton(title: "导入", icon: "arrow.down.doc", isProminent: true) {
+                    TVButton(title: "从 URL 导入", icon: "arrow.down.doc", isProminent: true) {
                         importPlugin()
                     }
                 }
@@ -284,13 +340,13 @@ public struct SettingsView: View {
         isImporting = true
         Task {
             do {
-                let success = try await jsService.importFromURL(importURLString)
+                let success = try await jsService.importFromURL(importURLString, autoSelect: true)
                 if success {
                     await MainActor.run {
                         isImporting = false
                         showingImportAlert = false
                         importURLString = ""
-                        saveNotice = "插件导入成功并生效！"
+                        saveNotice = "插件导入成功，已默认选择激活！"
                     }
                 }
             } catch {

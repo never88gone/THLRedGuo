@@ -214,6 +214,14 @@ public final class JSSourceService: ObservableObject {
     public func initialize() async {
         _ = try? await repository.jsSourceScan()
         await refresh()
+        
+        // 核心：tvOS 上默认可以导入红果的数据源，若尚未存在任何源或无红果源，默认自动导入并默认选择红果
+        if self.sources.isEmpty || !self.sources.contains(where: { ($0["id"] as? String) == "hongguo" }) {
+            _ = await importBuiltInHongguoSource(autoSelect: true)
+        } else if self.activeSourceId.isEmpty {
+            // 红果数据源存在但未选择活跃源时，默认选择红果
+            await setActiveSource("hongguo")
+        }
     }
 
     public func refresh() async {
@@ -229,6 +237,9 @@ public final class JSSourceService: ObservableObject {
             if self.sources.contains(where: { ($0["id"] as? String) == active }) {
                 self.activeSourceId = active
                 LocalStore.shared.setSource(active)
+            } else if self.sources.contains(where: { ($0["id"] as? String) == "hongguo" }) {
+                self.activeSourceId = "hongguo"
+                LocalStore.shared.setSource("hongguo")
             } else if let firstId = self.sources.first?["id"] as? String {
                 self.activeSourceId = firstId
                 LocalStore.shared.setSource(firstId)
@@ -236,6 +247,10 @@ public final class JSSourceService: ObservableObject {
                 self.activeSourceId = ""
                 LocalStore.shared.setSource("")
             }
+        } else if self.sources.contains(where: { ($0["id"] as? String) == "hongguo" }) {
+            // 优先默认激活红果源
+            self.activeSourceId = "hongguo"
+            LocalStore.shared.setSource("hongguo")
         } else if let firstId = self.sources.first?["id"] as? String {
             self.activeSourceId = firstId
             LocalStore.shared.setSource(firstId)
@@ -254,7 +269,21 @@ public final class JSSourceService: ObservableObject {
         }
     }
 
-    public func importFromURL(_ urlString: String) async throws -> Bool {
+    /// 导入官方规范的内置红果免费短剧数据源，导入时默认选中该数据源
+    @discardableResult
+    public func importBuiltInHongguoSource(autoSelect: Bool = true) async -> Bool {
+        let script = BuiltInHongguoJSContent
+        let ok = (try? await repository.jsSourceSaveAndLoad(script: script, fileName: "hongguo.js", autoSelect: autoSelect)) ?? false
+        if ok {
+            await refresh()
+            if autoSelect || self.activeSourceId.isEmpty {
+                await setActiveSource("hongguo")
+            }
+        }
+        return ok
+    }
+
+    public func importFromURL(_ urlString: String, autoSelect: Bool = true) async throws -> Bool {
         guard let url = URL(string: urlString) else {
             throw NSError(domain: "JSSource", code: 400, userInfo: [NSLocalizedDescriptionKey: "无效的 URL 链接"])
         }
@@ -269,13 +298,17 @@ public final class JSSourceService: ObservableObject {
         }
         
         let fileName = url.lastPathComponent.isEmpty ? "imported_plugin.js" : url.lastPathComponent
-        let ok = try await repository.jsSourceSaveAndLoad(script: script, fileName: fileName)
+        let ok = try await repository.jsSourceSaveAndLoad(script: script, fileName: fileName, autoSelect: autoSelect)
         
         if ok {
             await refresh()
-            // 如果只有这一个插件，自动激活它
-            if sources.count == 1, let firstId = sources.first?["id"] as? String {
-                await setActiveSource(firstId)
+            let fileId = fileName.replacingOccurrences(of: ".js", with: "")
+            // 红果数据源导入时默认选择，或者当 autoSelect 开启 / 当前活跃源为空时自动选择
+            if autoSelect || fileId == "hongguo" || self.activeSourceId.isEmpty {
+                let targetId = self.sources.contains(where: { ($0["id"] as? String) == fileId }) ? fileId : (self.sources.contains(where: { ($0["id"] as? String) == "hongguo" }) ? "hongguo" : (sources.first?["id"] as? String ?? ""))
+                if !targetId.isEmpty {
+                    await setActiveSource(targetId)
+                }
             }
         }
         return ok
@@ -286,34 +319,25 @@ public final class JSSourceService: ObservableObject {
         await refresh()
     }
 }
-public let BuiltInHongguoJSContent = """
+public let BuiltInHongguoJSContent = #"""
 /**
- * 红果免费短剧 数据源扩展 (hongguo.js)
- * 适配标准 JS 数据源协议规范 v1.0.1
+ * 红果免费短剧 CatPawOpen Spider (hongguo.js)
+ * 适配 CatPawOpen / CatVodOpen 标准规范 v1.0.3
  */
 
 const meta = {
   id: "hongguo",
   name: "红果免费短剧",
-  version: "1.0.1",
-  description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠、古装穿越等优质短剧",
-  author: "真果鉴团队",
+  version: "1.0.3",
+  description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
+  author: "社区开发者",
   type: "video",
   icon: "",
-  features: ["search", "suggestions", "categories"]
+  features: ["search", "categories"]
 };
 
 const BASE_URL = "https://hongguoduanju.com";
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-
-function getCategories() {
-  return [
-    { id: "real-drama", name: "真人剧" },
-    { id: "comic-drama", name: "漫剧" },
-    { id: "ai-drama", name: "AI剧" },
-    { id: "comic", name: "动漫" }
-  ];
-}
 
 function cleanText(text) {
   if (!text) return "";
@@ -321,251 +345,368 @@ function cleanText(text) {
 }
 
 function parseJsonFromHtml(body) {
-  const match = body.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\\s\\S]*?)<\\/script>/) ||
-                body.match(/<script[^>]*>window\\.__INITIAL_STATE__\\s*=\\s*(\\{[\\s\\S]*?\\});<\\/script>/) ||
-                body.match(/window\\.__ROUTER_DATA__\\s*=\\s*(\\{[\\s\\S]*?\\});/);
-  if (match && match[1]) {
-    try {
-      return JSON.parse(match[1]);
-    } catch (e) {
-      console.warn("JSON parse error:", e);
+  if (!body) return null;
+  const marker = /(?:window\.)?_ROUTER_DATA\s*=\s*(\{)/.exec(body);
+  if (marker) {
+    const startIdx = marker.index + marker[0].length - 1;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = startIdx; i < body.length; i++) {
+      const ch = body[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) {
+            try {
+              return JSON.parse(body.slice(startIdx, i + 1));
+            } catch (e) {
+              break;
+            }
+          }
+        }
+      }
     }
+  }
+  const nextMatch = body.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (nextMatch && nextMatch[1]) {
+    try { return JSON.parse(nextMatch[1]); } catch (e) {}
   }
   return null;
 }
 
-function getCatalog(category, page, pageSize) {
-  page = page || 1;
-  const route = category || "real-drama";
-  const url = BASE_URL + "/category/" + route + "?page=" + page;
+async function init(ext) {
+  return true;
+}
 
-  const resp = fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      "Referer": BASE_URL + "/"
-    }
-  });
+async function home(filter) {
+  return {
+    class: [
+      { type_id: "real-drama", type_name: "真人剧" },
+      { type_id: "comic-drama", type_name: "漫剧" },
+      { type_id: "ai-drama", type_name: "AI剧" },
+      { type_id: "comic", type_name: "动漫" }
+    ],
+    filters: {}
+  };
+}
 
-  if (resp.status !== 200) {
-    return { items: [], total: 0, hasMore: false };
-  }
+async function category(tid, pg, filter, extend) {
+  pg = pg || 1;
+  const route = (!tid || tid === "short_play" || tid === "all") ? "real-drama" : tid;
+  const url = BASE_URL + "/category/" + route + (pg > 1 ? ("?page=" + pg) : "");
+  let items = [];
 
-  const items = [];
-  const body = resp.body;
-
-  // 1. 尝试从内联数据提取
-  const routerData = parseJsonFromHtml(body);
-  if (routerData) {
-    let list = [];
-    if (routerData.props && routerData.props.pageProps && routerData.props.pageProps.recommendList) {
-      list = routerData.props.pageProps.recommendList;
-    } else if (routerData.loaderData) {
-      const keys = Object.keys(routerData.loaderData);
-      for (let i = 0; i < keys.length; i++) {
-        const item = routerData.loaderData[keys[i]];
-        if (item && item.recommendList) {
-          list = item.recommendList;
-          break;
-        }
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        "Referer": BASE_URL + "/"
       }
-    }
-
-    if (Array.isArray(list) && list.length > 0) {
-      for (let i = 0; i < list.length; i++) {
-        const dr = list[i];
-        const id = dr.series_id || dr.book_id || dr.id;
-        if (!id) continue;
-        items.push({
-          id: String(id),
-          title: cleanText(dr.title || dr.series_title || dr.book_name),
-          cover: dr.cover || dr.thumb_url || dr.cover_url || "",
-          desc: cleanText(dr.intro || dr.abstract || dr.desc),
-          episodes: Number(dr.episode_cnt || dr.total_episode || 0),
-          category: route,
-          tags: dr.tags || []
-        });
-      }
-      return { items: items, total: items.length, hasMore: items.length >= 20 };
-    }
-  }
-
-  // 2. 备用从 HTML 节点提取
-  const doc = html.parse(body);
-  const cards = doc.find(".drama-card, .book-item, a[href*='/detail/']");
-  for (let i = 0; i < cards.length; i++) {
-    const el = cards.eq(i);
-    const href = el.attr("href") || "";
-    const idMatch = href.match(/\\/detail\\/(\\d+)/);
-    if (!idMatch) continue;
-    const id = idMatch[1];
-    const title = cleanText(el.find(".title, h3, .name").text());
-    const cover = el.find("img").attr("src") || el.find("img").attr("data-src") || "";
-    const desc = cleanText(el.find(".desc, .intro, p").text());
-
-    items.push({
-      id: id,
-      title: title,
-      cover: cover,
-      desc: desc,
-      category: route,
-      tags: []
     });
-  }
 
-  return {
-    items: items,
-    total: items.length,
-    hasMore: items.length >= 10
-  };
-}
-
-function getSuggestions(query) {
-  if (!query) return [];
-  const url = BASE_URL + "/incent_resource/suggestion?app_id=8662&query=" + encodeURIComponent(query) + "&count=15";
-  const resp = fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      "Referer": BASE_URL + "/"
-    }
-  });
-
-  if (resp.status !== 200) return [];
-  try {
-    const json = JSON.parse(resp.body);
-    const list = json.suggest_list || (json.data && json.data.suggest_list) || [];
-    const suggestions = [];
-    for (let i = 0; i < list.length; i++) {
-      if (list[i] && list[i].name) {
-        suggestions.push(list[i].name);
+    if (resp && resp.status === 200 && resp.body) {
+      const body = resp.body;
+      const routerData = parseJsonFromHtml(body);
+      if (routerData && routerData.loaderData) {
+        for (const k of Object.keys(routerData.loaderData)) {
+          const lData = routerData.loaderData[k];
+          if (lData && Array.isArray(lData.recommendList) && lData.recommendList.length > 0) {
+            for (let i = 0; i < lData.recommendList.length; i++) {
+              const dr = lData.recommendList[i];
+              const vd = dr.video_data || dr;
+              const id = vd.series_id_str || vd.series_id || dr.series_id_str || dr.series_id || dr.book_id || dr.id;
+              if (!id) continue;
+              const name = cleanText(vd.series_title || vd.series_name || vd.title || dr.series_name || dr.series_title || dr.title || dr.book_name || dr.name);
+              const pic = vd.series_cover || vd.cover || vd.thumb_url || vd.cover_url || dr.series_cover || dr.cover || "";
+              const epCnt = vd.episode_cnt || dr.episode_cnt || 0;
+              const remark = vd.episode_right_text || dr.episode_right_text || (epCnt ? ("全" + epCnt + "集") : "");
+              const intro = cleanText(vd.series_intro || vd.video_desc || vd.intro || vd.abstract || vd.desc || dr.series_intro || dr.intro || dr.desc);
+              if (name) {
+                items.push({
+                  vod_id: String(id),
+                  vod_name: name,
+                  vod_pic: pic,
+                  vod_remarks: remark,
+                  vod_content: intro || name,
+                  vod_tag: (vd.tags || dr.tags || []).join(","),
+                  vod_year: "2024"
+                });
+              }
+            }
+            if (items.length > 0) break;
+          }
+        }
       }
-    }
-    return suggestions;
-  } catch (e) {
-    return [];
-  }
-}
 
-function search(query, page) {
-  if (!query) return [];
-  const url = BASE_URL + "/incent_resource/suggestion?app_id=8662&query=" + encodeURIComponent(query) + "&count=30";
-  const resp = fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      "Referer": BASE_URL + "/"
-    }
-  });
+      if (items.length === 0 && typeof html !== 'undefined' && html.parse) {
+        const doc = html.parse(body);
+        if (doc) {
+          const cards = doc.find("a[href*='detail'], .pc-card-DQXf3W, .m-card-V7QopP, .drama-card, .book-item");
+          for (let i = 0; i < cards.length; i++) {
+            const el = cards.eq(i);
+            const href = el.attr("href") || "";
+            const idMatch = href.match(/(?:series_id=|\/detail\/|id=)(\d+)/);
+            if (!idMatch) continue;
+            const id = idMatch[1];
 
-  if (resp.status !== 200) return [];
-  try {
-    const json = JSON.parse(resp.body);
-    const list = json.suggest_list || (json.data && json.data.suggest_list) || [];
-    const dramas = [];
-    for (let i = 0; i < list.length; i++) {
-      const item = list[i];
-      const videoData = item.video_data || {};
-      const id = videoData.series_id_str || videoData.series_id;
-      if (id) {
-        dramas.push({
-          id: String(id),
-          title: cleanText(item.name || videoData.title || item.keyword),
-          cover: videoData.cover_url || videoData.cover || "",
-          desc: cleanText(videoData.intro || videoData.abstract || ""),
-          episodes: Number(videoData.episode_cnt || 0),
-          category: "短剧",
-          tags: []
-        });
-      }
-    }
-    return dramas;
-  } catch (e) {
-    return [];
-  }
-}
+            const imgEl = el.find("img");
+            let title = cleanText(el.find("p[class*='title'], .title, h3, .name").text());
+            if (!title && imgEl.length > 0) {
+              title = cleanText(imgEl.attr("alt"));
+            }
 
-function getDetail(id) {
-  const url = BASE_URL + "/detail/" + id;
-  const resp = fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      "Referer": BASE_URL + "/"
-    }
-  });
+            let cover = imgEl.attr("src") || imgEl.attr("data-src") || "";
+            if (!cover) {
+              const srcSet = el.find("source").attr("srcSet") || "";
+              if (srcSet) cover = srcSet.split(" ")[0];
+            }
 
-  if (resp.status !== 200) return null;
-  const body = resp.body;
-  const routerData = parseJsonFromHtml(body);
+            const epText = el.find("p[class*='episode'], .episode").text() || "";
+            const epMatch = epText.match(/(\d+)/);
+            const episodes = epMatch ? parseInt(epMatch[1]) : 0;
+            const desc = cleanText(el.find(".desc, .intro, p").text());
 
-  if (routerData) {
-    let detailData = null;
-    if (routerData.props && routerData.props.pageProps && routerData.props.pageProps.videoDetail) {
-      detailData = routerData.props.pageProps.videoDetail;
-    } else if (routerData.loaderData) {
-      const keys = Object.keys(routerData.loaderData);
-      for (let i = 0; i < keys.length; i++) {
-        const item = routerData.loaderData[keys[i]];
-        if (item && (item.videoDetail || item.series_info)) {
-          detailData = item.videoDetail || item.series_info;
-          break;
+            if (id && title) {
+              items.push({
+                vod_id: String(id),
+                vod_name: title,
+                vod_pic: cover,
+                vod_remarks: episodes ? ("全" + episodes + "集") : "",
+                vod_content: desc || (title + (episodes ? (" · 全" + episodes + "集") : "")),
+                vod_year: "2024"
+              });
+            }
+          }
         }
       }
     }
-
-    if (detailData) {
-      const title = detailData.title || detailData.series_title || "";
-      const cover = detailData.cover || detailData.cover_url || "";
-      const desc = detailData.intro || detailData.abstract || "";
-      const rawEps = detailData.episode_list || detailData.episodes || [];
-      const episodes = [];
-
-      for (let i = 0; i < rawEps.length; i++) {
-        const ep = rawEps[i];
-        episodes.push({
-          id: String(ep.episode_id || ep.id || (i + 1)),
-          title: ep.title || ("第 " + (i + 1) + " 集"),
-          index: i + 1,
-          url: ep.video_id || ep.item_id || ""
-        });
-      }
-
-      return {
-        id: id,
-        title: title,
-        cover: cover,
-        desc: desc,
-        episodes: episodes
-      };
-    }
-  }
-
-  // 备用 HTML 解析
-  const doc = html.parse(body);
-  const title = cleanText(doc.find("h1, .detail-title").text());
-  const cover = doc.find(".detail-cover img").attr("src") || "";
-  const desc = cleanText(doc.find(".detail-intro, .desc").text());
+  } catch (e) {}
 
   return {
-    id: id,
-    title: title,
-    cover: cover,
-    desc: desc,
-    episodes: []
+    page: pg,
+    pagecount: items.length > 0 ? 99 : 1,
+    limit: 20,
+    total: items.length,
+    list: items
   };
 }
 
-function getPlayUrl(episodeId, extra) {
-  // 红果播放地址由底层原生模块支持无水印签名与多清晰度提取
-  return null;
+async function detail(id) {
+  let title = "";
+  let cover = "";
+  let desc = "";
+  let vidList = [];
+
+  try {
+    const url = BASE_URL + "/detail?series_id=" + id;
+    const resp = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        "Referer": BASE_URL + "/"
+      }
+    });
+
+    if (resp && resp.status === 200 && resp.body) {
+      const body = resp.body;
+      const routerData = parseJsonFromHtml(body);
+      if (routerData && routerData.loaderData) {
+        for (const k of Object.keys(routerData.loaderData)) {
+          const lData = routerData.loaderData[k];
+          const sDetail = lData && (lData.seriesDetail || lData.videoDetail || lData.series_info);
+          if (sDetail) {
+            const sTitle = cleanText(sDetail.series_name || sDetail.series_title || sDetail.title || sDetail.name);
+            if (sTitle) title = sTitle;
+            const sCover = sDetail.series_cover || sDetail.cover || sDetail.cover_url || "";
+            if (sCover) cover = sCover;
+            const sDesc = cleanText(sDetail.series_intro || sDetail.intro || sDetail.abstract || sDetail.desc);
+            if (sDesc) desc = sDesc;
+            if (Array.isArray(sDetail.vid_list) && sDetail.vid_list.length > 0) {
+              vidList = sDetail.vid_list;
+            }
+            break;
+          }
+        }
+      }
+
+      const ldMatch = body.match(/<script[^>]*type=[\x27\x22]application\/ld\+json[\x27\x22][^>]*>([\s\S]*?)<\/script>/);
+      if (ldMatch && ldMatch[1]) {
+        try {
+          const ld = JSON.parse(ldMatch[1]);
+          if (ld && ld["@graph"] && Array.isArray(ld["@graph"])) {
+            for (let i = 0; i < ld["@graph"].length; i++) {
+              const node = ld["@graph"][i];
+              if (node.name) title = cleanText(node.name);
+              if (node.description) desc = cleanText(node.description);
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (typeof html !== 'undefined' && html.parse) {
+        const doc = html.parse(body);
+        if (doc) {
+          const domTitle = cleanText(doc.find("h1, .detail-title, p[class*='title']").text());
+          if (domTitle && !title) title = domTitle;
+          const domCover = doc.find(".detail-cover img, img[class*='image']").attr("src") || "";
+          if (domCover && !cover) cover = domCover;
+          const domDesc = cleanText(doc.find(".detail-intro, .desc, meta[name='description']").text() || doc.find("meta[name='description']").attr("content") || "");
+          if (domDesc && !desc) desc = domDesc;
+        }
+      }
+    }
+  } catch (e) {}
+
+  const epUrls = [];
+  if (vidList.length > 0) {
+    for (let i = 0; i < vidList.length; i++) {
+      epUrls.push("第" + (i + 1) + "集$" + BASE_URL + "/player/" + id + "/" + vidList[i]);
+    }
+  }
+
+  if (!title && epUrls.length === 0) {
+    return { list: [] };
+  }
+
+  return {
+    list: [
+      {
+        vod_id: String(id),
+        vod_name: title || ("短剧 " + id),
+        vod_pic: cover,
+        vod_content: desc,
+        vod_remarks: epUrls.length > 0 ? ("全" + epUrls.length + "集") : "",
+        vod_play_from: "红果直链",
+        vod_play_url: epUrls.join("#")
+      }
+    ]
+  };
 }
 
-var source = {
+async function play(flag, id, flags) {
+  let playTarget = id || "";
+  let realStreamUrl = "";
+
+  try {
+    let playPageUrl = playTarget;
+    if (!playPageUrl.startsWith("http")) {
+      playPageUrl = BASE_URL + (playTarget.startsWith("/") ? playTarget : ("/player/" + playTarget));
+    }
+
+    const resp = await fetch(playPageUrl, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        "Referer": BASE_URL + "/"
+      }
+    });
+
+    if (resp && resp.status === 200 && resp.body) {
+      const body = resp.body;
+      const m = body.match(/"main_url"\s*:\s*"([^"]+)"/);
+      if (m && m[1]) {
+        realStreamUrl = m[1].replace(/\\u0026/g, "&").replace(/\\u002F/g, "/").replace(/\\\//g, "/");
+      }
+      if (!realStreamUrl) {
+        const m3u8Match = body.match(/https?:\/\/[^"'\s<>\\]+\.(?:m3u8|mp4)(?:\?[^"'\s<>\\]*)?/);
+        if (m3u8Match) realStreamUrl = m3u8Match[0];
+      }
+    }
+  } catch (e) {}
+
+  if (!realStreamUrl && playTarget.startsWith("http") && (playTarget.includes(".mp4") || playTarget.includes(".m3u8"))) {
+    realStreamUrl = playTarget;
+  }
+
+  if (!realStreamUrl) {
+    return {
+      parse: 0,
+      url: "",
+      header: {}
+    };
+  }
+
+  return {
+    parse: 0,
+    url: realStreamUrl,
+    header: {
+      "User-Agent": USER_AGENT,
+      "Referer": BASE_URL + "/"
+    }
+  };
+}
+
+async function search(wd, quick, pg) {
+  pg = pg || 1;
+  if (!wd) return { page: pg, list: [] };
+  const dramas = [];
+
+  try {
+    const url = BASE_URL + "/incent_resource/suggestion?app_id=8662&query=" + encodeURIComponent(wd) + "&count=30";
+    const resp = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        "Referer": BASE_URL + "/"
+      }
+    });
+
+    if (resp && resp.status === 200 && resp.body) {
+      const json = JSON.parse(resp.body);
+      const list = json.suggest_list || (json.data && json.data.suggest_list) || [];
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i];
+        const videoData = item.video_data || item;
+        const id = videoData.series_id_str || videoData.series_id || item.series_id || item.id;
+        if (id) {
+          const rawPic = videoData.series_cover || videoData.cover_url || videoData.cover || videoData.thumb_url || item.series_cover || item.cover_url || item.cover || item.thumb_url || "";
+          let pic = String(rawPic).trim();
+          if (pic.startsWith("//")) pic = "https:" + pic;
+
+          dramas.push({
+            vod_id: String(id),
+            vod_name: cleanText(item.name || videoData.title || item.keyword),
+            vod_pic: pic,
+            vod_remarks: videoData.episode_cnt ? ("全" + videoData.episode_cnt + "集") : "",
+            vod_content: cleanText(videoData.intro || videoData.abstract || ""),
+            vod_year: "2024"
+          });
+        }
+      }
+    }
+  } catch (e) {}
+
+  return {
+    page: pg,
+    pagecount: 1,
+    limit: 20,
+    total: dramas.length,
+    list: dramas
+  };
+}
+
+var spider = {
   meta: meta,
-  getCategories: getCategories,
-  getCatalog: getCatalog,
-  search: search,
-  getSuggestions: getSuggestions,
-  getDetail: getDetail,
-  getPlayUrl: getPlayUrl
+  init: init,
+  home: home,
+  category: category,
+  detail: detail,
+  play: play,
+  search: search
 };
 
-
-"""
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = spider;
+}
+"""#
