@@ -195,28 +195,7 @@ class _SourcesScreenState extends State<SourcesScreen> {
                       child: Text('当前用户没有可用站源'),
                     ),
                   for (final group in SourceGroup.fromSources(sources))
-                    if (group.id == 'huangguo')
-                      Card(
-                        clipBehavior: Clip.antiAlias,
-                        child: ExpansionTile(
-                          key: const PageStorageKey('source-group-huangguo'),
-                          initiallyExpanded: group.sources.any(
-                            (source) => source.id == widget.initialSource,
-                          ),
-                          leading: const Icon(Icons.hub_outlined),
-                          title: const Text('黄果'),
-                          subtitle: Text(
-                            '${group.sources.length} 个入口 · ${group.sources.fold<int>(0, (count, source) => count + (_statuses[source.id]?.count ?? 0))} 部',
-                          ),
-                          childrenPadding: const EdgeInsets.all(8),
-                          children: [
-                            for (final source in group.sources)
-                              _sourceCard(source),
-                          ],
-                        ),
-                      )
-                    else
-                      for (final source in group.sources) _sourceCard(source),
+                    for (final source in group.sources) _sourceCard(source),
                 ],
               ),
             ),

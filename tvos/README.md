@@ -9,7 +9,7 @@
 | 模块 | Flutter 版实现 | tvOS 原生版复刻实现 |
 | :--- | :--- | :--- |
 | **开发语言与 UI** | Flutter 3.47 / Dart | Swift 6.0 / SwiftUI (Apple TV HIG 焦点引擎) |
-| **站源体系** | 红果、韩小圈、鬼片、青空 + 密码锁隐藏源 | `SourceSite.swift`、站源选择与密码锁解锁体系 |
+| **站源体系** | 红果免费短剧官方开源站源 | `SourceSite.swift` 原生解析与驱动体系 |
 | **首页与分类** | 横向切类、连载/完结筛选、排序、无限滚动 | `CatalogView.swift`、`HomeViewModel.swift`、大屏 6 列卡片 |
 | **推荐专区** | 红果推荐（真人剧、漫剧、AI 剧），记住位置 | `RecommendationsView.swift`、子分类缓存与记忆 |
 | **排行榜** | 热播榜、新剧榜、好评榜 | `RankingsView.swift`、金银铜徽章排行卡片 |
@@ -106,22 +106,3 @@ tvos/
 ```bash
 python3 scripts/build_tvos.py
 ```
-
-### 方式 3：自动化 UI 巡检与 4K 截图测试
-运行 `scripts/test_tvos_ui.py`，将在模拟器上确定性地拉起并测试全部 12 个功能页面，并做严格的 MD5 唯一性差异断言校验：
-```bash
-python3 scripts/test_tvos_ui.py
-```
-覆盖的独立页面包含：
-1. `tvos_01_catalog_home`：发现首页瀑布流与分类胶囊条
-2. `tvos_02_card_focused`：海报卡片获焦放大与主题色高亮边框（无白底）
-3. `tvos_03_drama_detail`：剧集详情页（海报、简介、操作按钮与选集网格）
-4. `tvos_04_player_fullscreen`：AVPlayerLayer 纯净全屏秒开播放
-5. `tvos_05_player_controls`：播放器悬浮控制条（播放键获焦高光与进度条）
-6. `tvos_06_recommendations`：推荐专区（真人剧、漫剧、AI剧推荐）
-7. `tvos_07_rankings`：排行榜单专区（热播榜、飙升榜、好评榜金银铜卡片）
-8. `tvos_08_search_view`：搜索中心（搜索框、热搜词云与历史搜索记录）
-9. `tvos_09_saved_library`：追剧与历史（观看进度条、续播记录与收藏列表）
-10. `tvos_10_downloads_view`：下载管理（离线任务进度、已完成任务与本地播放）
-11. `tvos_11_lan_sync_view`：局域网互联（Bonjour 服务广播与设备同步接续）
-12. `tvos_12_settings_view`：系统设置（站源门禁密码锁、网络代理与关于信息）

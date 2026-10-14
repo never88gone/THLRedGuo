@@ -131,7 +131,7 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
             if let items = resp["items"] as? [[String: Any]] {
                 let data = try JSONSerialization.data(withJSONObject: items)
                 let allBoards = (try? JSONDecoder().decode([RankingBoard].self, from: data)) ?? []
-                // tvOS 平台安全防护：严格过滤 18 禁/黄果等不适合客厅大屏的榜单
+                // tvOS 平台安全防护：严格过滤不适合客厅大屏的榜单
                 let boards = RankingBoard.filterForTV(allBoards)
                 if !boards.isEmpty {
                     return boards
@@ -145,8 +145,7 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
 
     public func loadRankings(board: String, page: Int = 1) async throws -> [Drama] {
         let lowerBoard = board.lowercased()
-        let blockedTokens = ["huangguo", "huangju", "guipian", "sorani", "cloudfront"]
-        if blockedTokens.contains(where: { lowerBoard.contains($0) }) {
+        if !lowerBoard.hasPrefix("hongguo") {
             return []
         }
 

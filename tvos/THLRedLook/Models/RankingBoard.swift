@@ -44,18 +44,7 @@ public struct RankingBoard: Identifiable, Hashable, Codable {
     }
 
     public var isAllowedOnTV: Bool {
-        let lowerId = id.lowercased()
-        let lowerSource = source.lowercased()
-        let blockedTokens = ["huangguo", "huangju", "guipian", "sorani", "cloudfront"]
-        for token in blockedTokens {
-            if lowerId.contains(token) || lowerSource.contains(token) {
-                return false
-            }
-        }
-        if name.contains("黄果") || description.contains("黄果") || name.contains("黄剧") || name.contains("剧果") {
-            return false
-        }
-        return true
+        source.lowercased() == "hongguo" || id.lowercased().hasPrefix("hongguo")
     }
 
     /// 过滤出适宜在 tvOS 呈现的榜单列表

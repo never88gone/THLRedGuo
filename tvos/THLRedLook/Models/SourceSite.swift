@@ -37,10 +37,9 @@ public struct SourceSite: Identifiable, Hashable, Codable {
 
     public static let hongguo = SourceSite(id: "hongguo", name: "红果免费短剧", description: "短剧 · 漫剧 · AI 剧")
 
-    /// 检查是否为 tvOS 禁止的 18 禁/黄果源
+    /// 检查是否为 tvOS 支持的站源（仅支持红果）
     public static func isAdultOrProhibitedOnTV(_ id: String) -> Bool {
-        let lower = id.lowercased()
-        return lower.contains("huangguo") || lower == "cloudfront" || lower != "hongguo"
+        id.lowercased() != "hongguo"
     }
 
     /// 默认公开站源：tvOS 仅支持红果免费短剧

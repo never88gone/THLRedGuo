@@ -92,9 +92,6 @@ public final class RankingsViewModel: ObservableObject {
             let loaded = try await repository.loadRankings(board: board.id)
             let sanitized = loaded.filter { drama in
                 let s = drama.source.lowercased()
-                if s.contains("huangguo") || s == "cloudfront" {
-                    return false
-                }
                 // 确保剧集源严格属于当前数据源或榜单本身对应的数据源，防止跨源混杂
                 if !s.isEmpty && s != currentSource && s != board.source.lowercased() {
                     return false
@@ -175,7 +172,6 @@ public final class RecommendationsViewModel: ObservableObject {
             }
             let sanitized = loaded.filter { drama in
                 let s = drama.source.lowercased()
-                if s.contains("huangguo") || s == "cloudfront" { return false }
                 return s.isEmpty || s == target
             }
             items = sanitized
