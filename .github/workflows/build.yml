@@ -106,6 +106,8 @@ jobs:
           cache: true
       - name: 开启 Windows 桌面支持
         run: flutter config --enable-windows-desktop
+      - name: 检查 Windows 构建环境
+        run: flutter doctor -v
       - name: 构建 Windows 便携包
         run: python scripts/build_windows.py
       - name: 上传 Windows 安装包
@@ -227,6 +229,15 @@ jobs:
             printf '%s\n' "### 🔒 安全校验与哈希"
             printf '%s\n' "全部发布产物的完整性哈希已记录于 \`SHA256SUMS.txt\`。"
           } > notes.md
+
+          # 清理所有历史 Release 与 Tags，只保留最新打包版本
+          echo "正在清理历史打包 Releases..."
+          for old_tag in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
+            if [ "$old_tag" != "$tag" ]; then
+              echo "删除历史 Release 及其 Tag: $old_tag"
+              gh release delete "$old_tag" --cleanup-tag --yes || true
+            fi
+          done
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release/* --clobber

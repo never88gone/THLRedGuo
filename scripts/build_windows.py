@@ -11,9 +11,10 @@ from app_build import BuildVariant, add_variant_argument, sync_project_version
 
 
 def run_command(cmd, **kwargs):
-    print("Executing: " + " ".join(cmd), flush=True)
     is_windows = os.name == 'nt'
-    return subprocess.run(cmd, shell=is_windows, **kwargs)
+    cmd_str = " ".join(cmd) if is_windows else cmd
+    print(f"Executing: {' '.join(cmd) if isinstance(cmd, list) else cmd}", flush=True)
+    return subprocess.run(cmd_str if is_windows else cmd, shell=is_windows, **kwargs)
 
 
 def main():
@@ -25,11 +26,11 @@ def main():
     options = parser.parse_args()
     variant = BuildVariant(options.all_sources)
     environment = os.environ.copy()
-    flutter = shutil.which('flutter') or 'flutter'
+    flutter = 'flutter' if os.name == 'nt' else (shutil.which('flutter') or 'flutter')
     with china_mirror_environment(environment, options.cn_mirrors, gradle=False) as env:
         with mirrored_pub_lockfile(root, env):
             run_command([flutter, 'pub', 'get'], cwd=root, env=env, check=True)
-            run_command([flutter, 'build', 'windows', '--release', '--no-pub', *variant.flutter_arguments], cwd=root, env=env, check=True)
+            run_command([flutter, 'build', 'windows', '--release', '--no-pub', '-v', *variant.flutter_arguments], cwd=root, env=env, check=True)
             run_command([sys.executable, str(root / 'scripts' / 'package_release.py'), '--platform', 'windows', *variant.arguments],
                         cwd=root, env=env, check=True)
 

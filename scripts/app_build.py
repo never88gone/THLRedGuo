@@ -44,8 +44,14 @@ import re
 
 
 def get_beijing_build_number() -> str:
-    # 基于时间生成秒级时间戳构建号，严格满足跨平台单调递增与 32 位整型规范
-    return str(int(datetime.now(timezone.utc).timestamp()))
+    tz_bj = timezone(timedelta(hours=8))
+    now = datetime.now(tz_bj)
+    # 格式：年份后2位(2位) + 今年第几天(3位补零) + 时分(4位补零)
+    # 例如：2026年第287天17:35 -> 262871735 (9位纯数字整数，最大值 263662359，远低于 Android 21.47 亿上限且单调递增)
+    year_part = now.strftime('%y')
+    day_of_year = now.strftime('%j')
+    time_part = now.strftime('%H%M')
+    return f"{year_part}{day_of_year}{time_part}"
 
 
 def sync_project_version(root: Path, base_version: str = "1.0.0") -> str:
