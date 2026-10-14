@@ -1,5 +1,5 @@
 // 预置短剧与影视 CatPawOpen Spider 数据源插件定义。
-// 适配标准 CatPawOpen / CatVodOpen JS 规范，可在端侧沙箱及第三方播放器（猫爪、MiraPlay）中独立运行。
+// 适配标准 CatPawOpen / CatVodOpen JS 规范，可在端侧沙箱及第三方播放器（如猫爪等）中独立运行。
 
 import 'package:flutter/material.dart';
 

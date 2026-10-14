@@ -41,9 +41,17 @@ import '../../views/home/home_app_bar_view.dart';
 import '../../js_source_service.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.repository, required this.store});
+  const HomeScreen({
+    super.key,
+    required this.repository,
+    required this.store,
+    this.initialSearchVisible = false,
+    this.initialSearchQuery = '',
+  });
   final AppRepository repository;
   final LocalStore store;
+  final bool initialSearchVisible;
+  final String initialSearchQuery;
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -462,6 +470,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialSearchVisible) {
+      _searchVisible = true;
+      if (widget.initialSearchQuery.isNotEmpty) {
+        _search.text = widget.initialSearchQuery;
+        _submittedQuery = widget.initialSearchQuery;
+      }
+    }
     _scroll.addListener(_onCatalogScroll);
     _source = SourceSite.byId(widget.store.source);
     _allSources = widget.store.catalogView.allSources;
@@ -1003,7 +1018,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (count > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('已导入 $count 个测试数据源插件（当前测试包专用）'),
+          content: Text('已成功导入 $count 个数据源插件'),
           behavior: SnackBarBehavior.floating,
         ),
       );

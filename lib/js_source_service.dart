@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core_bridge.dart';
 import 'js_source_models.dart';
+import 'js_source_presets.dart';
 
 class JsSourceService extends ChangeNotifier {
   JsSourceService(this._repository, [this._preferences]) {
@@ -48,6 +49,12 @@ class JsSourceService extends ChangeNotifier {
 
       // 3. 读取所有已加载的源列表
       _sources = await _repository.jsSourceList();
+
+      if (_sources.isEmpty && kPresetJsSources.isNotEmpty) {
+        final defaultPreset = kPresetJsSources.first;
+        await _repository.jsSourceSaveAndLoad(defaultPreset.script, defaultPreset.fileName);
+        _sources = await _repository.jsSourceList();
+      }
 
       // 4. 读取用户保存的活跃源偏好
       _preferences ??= await SharedPreferences.getInstance();

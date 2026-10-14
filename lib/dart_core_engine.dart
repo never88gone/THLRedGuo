@@ -780,6 +780,20 @@ class DartCoreEngine {
       } catch (_) {}
     }
 
+    if (chapter is Map && chapter['url'] != null && (chapter['url'] as String).isNotEmpty) {
+      final streamUrl = chapter['url'] as String;
+      final mimeType = streamUrl.contains('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
+      return {
+        'url': streamUrl,
+        'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
+        'headers': const <String, String>{},
+        'quality': quality,
+        'local': false,
+        'mimeType': mimeType,
+        'danmakuId': '$dramaId:$episodeIndex',
+      };
+    }
+
     throw StateError('无法从数据源 [$source] 获取真实播放流');
   }
 

@@ -16,8 +16,8 @@ SOURCE_DIRECTORIES = {
     'fastlane', 'PRD',
 }
 SOURCE_FILES = {
-    '.gitattributes', '.gitignore', '.metadata', '.editorconfig', '.gitlab-ci.yml',
-    'AGENTS.md', 'PROJECT.md', 'PRD.md', 'README.md', 'pubspec.yaml', 'pubspec.lock',
+    '.gitattributes', '.gitignore', '.metadata', '.editorconfig',
+    'AGENTS.md', 'README.md', 'pubspec.yaml', 'pubspec.lock',
     'analysis_options.yaml', 'l10n.yaml', 'flutter_launcher_icons.yaml',
 }
 EXCLUDED_DIRECTORIES = {

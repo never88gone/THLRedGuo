@@ -27,12 +27,14 @@ class DetailScreen extends StatefulWidget {
     required this.drama,
     required this.repository,
     required this.store,
+    this.initialDetail,
     this.resumeOnOpen = false,
     this.downloadOnOpen = false,
     this.playerFactory,
     this.videoBuilder,
   });
   final Drama drama;
+  final DramaDetail? initialDetail;
   final AppRepository repository;
   final LocalStore store;
   final bool resumeOnOpen;
@@ -71,7 +73,12 @@ class _DetailScreenState extends State<DetailScreen> {
     super.initState();
     _profileEpoch = widget.store.profileEpoch;
     widget.store.addListener(_onStoreChanged);
-    _load();
+    if (widget.initialDetail != null) {
+      _detail = widget.initialDetail;
+      _loading = false;
+    } else {
+      _load();
+    }
   }
 
   @override

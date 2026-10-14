@@ -159,7 +159,7 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
         func sanitize(_ list: [Drama]) -> [Drama] {
             list.filter { drama in
                 let src = drama.source.lowercased()
-                return !blockedTokens.contains(where: { src.contains($0) })
+                return src.isEmpty || src == "hongguo"
             }
         }
 

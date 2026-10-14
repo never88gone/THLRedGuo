@@ -66,17 +66,6 @@ def main():
                     for old_arc in to_remove:
                         shutil.rmtree(old_arc, ignore_errors=True)
 
-    # 3. 清理 GitLab Runner 历史完成的临时 build 目录
-    runner_builds = Path(os.path.expanduser("~/builds"))
-    if runner_builds.exists():
-        print(f"3. 正在清理 Runner 历史构建 build 产物...")
-        # 查找所有的 build 目录 (非源码)
-        for p in runner_builds.glob("**/MYIT/Product/THLRedLook/build"):
-            try:
-                print(f"   -> 清理已完成的 Runner build 目录: {p}")
-                shutil.rmtree(p, ignore_errors=True)
-            except Exception:
-                pass
 
     after_free = get_free_gb(target_vol)
     freed = after_free - before_free
