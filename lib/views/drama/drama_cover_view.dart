@@ -382,8 +382,31 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
           snapshot.hasData &&
           snapshot.data != null &&
           snapshot.data!.isNotEmpty) {
+        final path = snapshot.data!;
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+          return Image.network(
+            path,
+            fit: BoxFit.cover,
+            cacheWidth: 440,
+            excludeFromSemantics: true,
+            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+              if (wasSynchronouslyLoaded) return child;
+              return AnimatedOpacity(
+                opacity: frame == null ? 0 : 1,
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
+                child: child,
+              );
+            },
+            loadingBuilder: (_, child, progress) {
+              if (progress == null) return child;
+              return widget.placeholder;
+            },
+            errorBuilder: (_, _, _) => _failed(null),
+          );
+        }
         return Image.file(
-          File(snapshot.data!),
+          File(path),
           fit: BoxFit.cover,
           cacheWidth: 440,
           excludeFromSemantics: true,

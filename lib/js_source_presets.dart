@@ -381,7 +381,7 @@ async function search(wd, quick, pg) {
           dramas.push({
             vod_id: String(id),
             vod_name: cleanText(item.name || videoData.title || item.keyword),
-            vod_pic: videoData.cover_url || videoData.cover || "",
+            vod_pic: videoData.series_cover || videoData.cover_url || videoData.cover || item.cover || "",
             vod_remarks: videoData.episode_cnt ? ("全" + videoData.episode_cnt + "集") : "",
             vod_content: cleanText(videoData.intro || videoData.abstract || ""),
             vod_year: "2024"
@@ -598,7 +598,7 @@ Future<void> showPresetSourceSelectionDialog({
                                 onPressed: () async {
                                   final ok = await importSinglePresetSource(service, preset.id);
                                   if (ok) {
-                                    if (service.activeSourceId == null || service.activeSourceId!.isEmpty) {
+                                    if (service.activeSourceId.isEmpty) {
                                       await service.switchSource(preset.id);
                                     }
                                     setDialogState(() {});
@@ -632,7 +632,7 @@ Future<void> showPresetSourceSelectionDialog({
                 key: const ValueKey('import-all-presets'),
                 onPressed: () async {
                   final count = await importPresetSources(service);
-                  if (service.activeSourceId == null || service.activeSourceId!.isEmpty) {
+                  if (service.activeSourceId.isEmpty) {
                     await service.switchSource('hongguo');
                   }
                   setDialogState(() {});
