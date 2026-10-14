@@ -34,7 +34,8 @@ android {
         applicationId = "com.never88gone.redlook"
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
+        val rawCode = flutter.versionCode
+        versionCode = if (rawCode != null && rawCode > 0 && rawCode < 2100000000) rawCode else (System.currentTimeMillis() / 1000).toInt()
         versionName = flutter.versionName
         manifestPlaceholders["appLabel"] = "糖葫芦果鉴"
         manifestPlaceholders["appBanner"] = if (allSources) "@drawable/tv_banner_all_sources" else "@drawable/tv_banner"

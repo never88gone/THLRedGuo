@@ -87,7 +87,7 @@ public actor NativeBridge {
             return [
                 "id": id,
                 "name": name,
-                "version": "1.0.2",
+                "version": "1.0.0",
                 "description": "自定义 JS 插件"
             ]
         }
@@ -95,7 +95,7 @@ public actor NativeBridge {
         return [
             "id": fallbackId,
             "name": fallbackId,
-            "version": "1.0.2",
+            "version": "1.0.0",
             "description": "本地 JS 插件"
         ]
     }
@@ -336,7 +336,7 @@ public actor NativeBridge {
             return [
                 "ok": true,
                 "data": [
-                    "version": "1.0.2",
+                    "version": "1.0.0",
                     "standalone": true,
                     "allSources": true
                 ]

@@ -32,13 +32,11 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: 安装 Android SDK 与构建工具
+      - name: 安装 Android SDK 与 NDK
         uses: android-actions/setup-android@v3
         with:
-          packages: "platforms;android-36"
+          packages: "platforms;android-35 ndk;28.2.13676358"
           accept-android-sdk-licenses: true
-      - name: 安装 NDK
-        run: sdkmanager 'ndk;28.2.13676358'
       - name: 配置 Android 发布签名
         id: signing
         run: |

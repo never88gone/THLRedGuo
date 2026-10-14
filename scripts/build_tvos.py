@@ -8,8 +8,10 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from app_build import sync_project_version
 
 root = Path(__file__).resolve().parents[1]
+sync_project_version(root, "1.0.0")
 
 def run(cmd, **kwargs):
     print("Executing: " + " ".join(cmd), flush=True)

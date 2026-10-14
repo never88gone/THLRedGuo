@@ -38,6 +38,28 @@ class BuildVariant:
         return cls(values.get('ALL_SOURCES') == 'true')
 
 
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+import re
+
+
+def get_beijing_build_number() -> str:
+    tz_bj = timezone(timedelta(hours=8))
+    return datetime.now(tz_bj).strftime('%Y%m%d%H%M%S')
+
+
+def sync_project_version(root: Path, base_version: str = "1.0.0") -> str:
+    build_num = get_beijing_build_number()
+    full_version = f"{base_version}+{build_num}"
+    pubspec = root / "pubspec.yaml"
+    if pubspec.exists():
+        text = pubspec.read_text(encoding="utf-8")
+        updated = re.sub(r'^version:\s*.*$', f'version: {full_version}', text, flags=re.MULTILINE)
+        pubspec.write_text(updated, encoding="utf-8")
+        print(f"🚀 动态注入基于北京时间生成的构建版本号: {full_version}", flush=True)
+    return full_version
+
+
 def add_variant_argument(parser):
     parser.add_argument('--all-sources', action='store_true',
                         help='构建包含全部站源的真果鉴；默认构建仅红果的红果鉴')
