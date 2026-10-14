@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -14,10 +16,11 @@ def run(cmd, **kwargs):
     subprocess.run(cmd, cwd=kwargs.pop("cwd", root), check=True, **kwargs)
 
 def main():
-    parser = argparse.ArgumentParser(description="真果·鉴 Apple tvOS 自动化构建与验证脚本")
+    parser = argparse.ArgumentParser(description="糖葫芦果鉴 Apple tvOS 自动化构建与打包脚本")
     parser.add_argument("--clean", action="store_true", help="构建前清理构建产物")
     parser.add_argument("--release", action="store_true", help="构建 Release 配置")
-    parser.add_argument("--device", action="store_true", help="构建真机版本 (默认构建模拟器版本)")
+    parser.add_argument("--device", action="store_true", help="构建真机版本 (默认构建真机版本)")
+    parser.add_argument("--package", action="store_true", help="归档并打包输出到 dist/tvos")
     args = parser.parse_args()
 
     if platform.system() != "Darwin":
@@ -32,11 +35,11 @@ def main():
     workspace_path = root / "tvos" / "THLRedLook.xcworkspace"
     project_path = root / "tvos" / "THLRedLook.xcodeproj"
     if not workspace_path.exists() and not project_path.exists():
-        print(f"未找到 Xcode 工程或 Workspace", file=sys.stderr)
+        print("未找到 Xcode 工程或 Workspace", file=sys.stderr)
         sys.exit(1)
 
-    configuration = "Release" if args.release else "Debug"
-    destination = "generic/platform=tvOS" if args.device else "generic/platform=tvOS Simulator"
+    configuration = "Release" if (args.release or args.package) else "Debug"
+    destination = "generic/platform=tvOS"
 
     from datetime import datetime, timezone, timedelta
     tz_bj = timezone(timedelta(hours=8))
@@ -48,27 +51,89 @@ def main():
         subprocess.run(["/usr/libexec/PlistBuddy", "-c", f"Set :CFBundleVersion {beijing_build}", str(info_plist)], capture_output=True)
 
     container_arg = ["-workspace", str(workspace_path)] if workspace_path.exists() else ["-project", str(project_path)]
-    cmd = [
-        xcodebuild,
-        *container_arg,
-        "-scheme", "THLRedLook",
-        "-configuration", configuration,
-        "-destination", destination,
-        f"CURRENT_PROJECT_VERSION={beijing_build}",
-    ]
 
-    if args.device:
-        cmd.append("-allowProvisioningUpdates")
+    if args.package or args.release:
+        archive_path = root / "build" / "tvos" / "THLRedLook.xcarchive"
+        if archive_path.exists():
+            shutil.rmtree(archive_path)
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            xcodebuild,
+            "archive",
+            *container_arg,
+            "-scheme", "THLRedLook",
+            "-configuration", configuration,
+            "-destination", destination,
+            "-archivePath", str(archive_path),
+            f"CURRENT_PROJECT_VERSION={beijing_build}",
+            "CODE_SIGNING_ALLOWED=NO",
+            "CODE_SIGNING_REQUIRED=NO",
+            "CODE_SIGN_IDENTITY=",
+        ]
+        if args.clean:
+            cmd.insert(cmd.index("archive") + 1, "clean")
+
+        print(f"开始归档 tvOS 工程 [{configuration}] -> {archive_path}...")
+        run(cmd)
+
+        app_dir = archive_path / "Products" / "Applications" / "THLRedLook.app"
+        if not app_dir.exists():
+            raise SystemExit(f"tvOS 归档产物不存在: {app_dir}")
+
+        version_match = re.search(r'^version:\s*(\S+)', (root / 'pubspec.yaml').read_text(), re.MULTILINE)
+        version = version_match.group(1) if version_match else "1.0.0"
+
+        output_dir = root / "dist" / "tvos"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1. 导出未签名 zip 包
+        app_zip = output_dir / f"THLRedLook-{version}-tvos-unsigned-app.zip"
+        if app_zip.exists():
+            app_zip.unlink()
+        run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(app_dir), str(app_zip)])
+        print(f"已生成 tvOS App Zip: {app_zip}")
+
+        # 2. 导出未签名 IPA 包 (Payload 结构)
+        payload_dir = output_dir / "Payload"
+        if payload_dir.exists():
+            shutil.rmtree(payload_dir)
+        payload_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(app_dir, payload_dir / "THLRedLook.app", symlinks=True)
+
+        ipa_target = output_dir / f"THLRedLook-{version}-tvos-unsigned.ipa"
+        if ipa_target.exists():
+            ipa_target.unlink()
+        run(["ditto", "-c", "-k", "--sequesterRsrc", str(payload_dir), str(ipa_target)])
+        shutil.rmtree(payload_dir)
+        print(f"已生成 tvOS IPA: {ipa_target}")
+
+        # 3. 生成 SHA256SUMS.txt
+        checksums = []
+        for artifact in sorted(output_dir.glob(f"*-{version}-tvos*")):
+            digest = hashlib.sha256()
+            with artifact.open('rb') as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+                    digest.update(chunk)
+            checksums.append(f"{digest.hexdigest()}  {artifact.name}")
+        (output_dir / "SHA256SUMS.txt").write_text("\n".join(checksums) + "\n", encoding="ascii")
+        print("tvOS 打包完成！")
     else:
-        cmd.append("CODE_SIGNING_ALLOWED=NO")
-
-    if args.clean:
-        cmd.append("clean")
-    cmd.append("build")
-
-    print(f"开始构建 tvOS 工程 [{configuration}] -> {destination}...")
-    run(cmd)
-    print("tvOS 构建成功！")
+        cmd = [
+            xcodebuild,
+            *container_arg,
+            "-scheme", "THLRedLook",
+            "-configuration", configuration,
+            "-destination", destination,
+            f"CURRENT_PROJECT_VERSION={beijing_build}",
+            "CODE_SIGNING_ALLOWED=NO",
+        ]
+        if args.clean:
+            cmd.append("clean")
+        cmd.append("build")
+        print(f"开始构建 tvOS 工程 [{configuration}] -> {destination}...")
+        run(cmd)
+        print("tvOS 构建成功！")
 
 if __name__ == "__main__":
     main()

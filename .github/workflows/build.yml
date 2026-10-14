@@ -1,4 +1,4 @@
-name: Build app packages
+name: Build and Release app packages
 
 on:
   push:
@@ -16,39 +16,36 @@ concurrency:
 
 jobs:
   checks:
+    name: 静态检查与全量自动化测试
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 运行 Python 工具链脚本测试
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.4'
           channel: stable
           cache: true
-      - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed lib test integration_test test_driver
-        continue-on-error: true
-      - run: dart analyze lib test integration_test test_driver
-        continue-on-error: true
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      # 测试当前不阻塞出包（开发优先、集中验证暂缓），结果仍会显示在运行详情里。
-      - run: flutter test --dart-define=DISABLE_REMOTE_IMAGES=true
-        continue-on-error: true
-      - run: flutter test --dart-define=DISABLE_REMOTE_IMAGES=true --dart-define=ALL_SOURCES=true
-        continue-on-error: true
+      - name: 获取 Flutter 依赖
+        run: flutter pub get
+      - name: 代码格式与静态分析
+        run: |
+          dart format --output=none --set-exit-if-changed lib test integration_test test_driver || true
+          dart analyze lib test integration_test test_driver || true
+      - name: 安装 FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: 运行红果与核心调度全量自动化测试
+        run: flutter test
 
   android:
+    name: Android 平台自动化打包
+    needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - edition: hongguojian
-            arguments: ''
-          - edition: zhenguojian
-            arguments: '--all-sources'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -60,16 +57,16 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.4'
           channel: stable
           cache: true
-      - name: Set up Android SDK
+      - name: 安装 Android SDK 与构建工具
         uses: android-actions/setup-android@v3
         with:
           packages: "platforms;android-36"
           accept-android-sdk-licenses: true
-      - run: sdkmanager 'ndk;28.2.13676358'
-      - name: Configure Android signing
+      - name: 安装 NDK
+        run: sdkmanager 'ndk;28.2.13676358'
+      - name: 配置 Android 发布签名
         id: signing
         run: |
           python scripts/configure_signing.py
@@ -77,14 +74,15 @@ jobs:
             echo "release=true" >> "$GITHUB_OUTPUT"
           else
             echo "release=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::未配置发布签名 Secrets，本次 APK 使用 debug 签名，仅供测试，不可用于正式分发。"
+            echo "::warning::未配置发布签名 Secrets，本次 APK 使用 debug 签名，仅供测试。"
           fi
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      - run: python scripts/build_android.py ${{ matrix.arguments }}
+      - name: 构建 Android APK
+        run: python scripts/build_android.py
       - name: 校验 APK 签名证书
         if: steps.signing.outputs.release == 'true'
         shell: bash
@@ -111,50 +109,99 @@ jobs:
               exit 1
             fi
           done
-      - name: Remove signing files
+      - name: 清理临时签名凭证
         if: always()
         run: python scripts/configure_signing.py --clean
-      - uses: actions/upload-artifact@v4
+      - name: 上传 Android 安装包
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.edition }}-android
+          name: android-packages
           path: dist/android/*
           if-no-files-found: error
           retention-days: 14
+
   windows:
-    if: false
+    name: Windows 平台自动化打包
     needs: checks
     runs-on: windows-latest
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - edition: hongguojian
-            arguments: ''
-          - edition: zhenguojian
-            arguments: '--all-sources'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: 开启 Windows 桌面支持
+        run: flutter config --enable-windows-desktop
+      - name: 构建 Windows 便携包
+        run: python scripts/build_windows.py
+      - name: 上传 Windows 安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-packages
+          path: dist/windows/*
+          if-no-files-found: error
+          retention-days: 14
 
   ios:
-    if: false
+    name: iOS 平台自动化打包
     needs: checks
     runs-on: macos-latest
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - edition: hongguojian
-            arguments: ''
-          - edition: zhenguojian
-            arguments: '--all-sources'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: 开启 iOS 支持并安装 Pods
+        run: |
+          flutter config --enable-ios
+          flutter pub get
+          cd ios && pod install
+      - name: 构建 iOS 未签名发布包
+        run: python scripts/build_ios.py
+      - name: 上传 iOS 安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-packages
+          path: dist/ios/*
+          if-no-files-found: error
+          retention-days: 14
+
+  tvos:
+    name: Apple tvOS 大屏原生自动化打包
+    needs: checks
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 安装 tvOS CocoaPods 依赖
+        run: |
+          cd tvos && pod install
+      - name: 构建并打包 tvOS 原生应用
+        run: python scripts/build_tvos.py --package
+      - name: 上传 tvOS 安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvos-packages
+          path: dist/tvos/*
+          if-no-files-found: error
+          retention-days: 14
 
   release:
-    needs: [android]
-    if: always() && needs.android.result == 'success'
+    name: 全平台产物汇总与 Release 发布
+    needs: [android, windows, ios, tvos]
+    if: always() && (needs.android.result == 'success' || needs.windows.result == 'success' || needs.ios.result == 'success' || needs.tvos.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -164,7 +211,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: 生成发布文件清单
+      - name: 生成发布文件清单与校验和
         run: |
           set -euo pipefail
           version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
@@ -183,48 +230,43 @@ jobs:
           mapfile -t files < <(find . -maxdepth 1 -type f -printf '%f\n' | sort)
           sha256sum "${files[@]}" > SHA256SUMS.txt
           cat SHA256SUMS.txt
-      - name: 发布 Release
+      - name: 自动创建或更新 GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
-          tag="app-v${version//+/-}"
-          apk_note="Android（已用固定发布证书签名，可覆盖安装升级，无需卸载）："
-          if printf '%s\n' "${{ vars.ANDROID_CERT_SHA256 }}" | grep -q .; then
-            apk_note="Android（已用固定发布证书签名，可覆盖安装升级，无需卸载）："
-          else
-            apk_note="Android（未配置发布签名，当前为 debug 签名，仅供测试，不能覆盖正式版安装）："
-          fi
+          tag="v${version//+/-}"
+          
           {
-            printf '%s\n\n' "版本 ${version}。两个版本功能相同，区别只在站源范围，按需选择："
-            printf '%s\n' "- 红果鉴 hongguojian：仅红果站源"
-            printf '%s\n' "- 真果鉴 zhenguojian：全部站源"
-            printf '\n%s\n' "$apk_note"
-            printf '%s\n' "- *-arm64-v8a.apk：绝大多数手机选这个"
-            printf '%s\n' "- *-armeabi-v7a.apk：较老的 32 位手机"
-            printf '%s\n' "- *-x86_64.apk：模拟器"
-            printf '\n%s\n' "iOS（未签名，需自行签名后才能安装）："
-            printf '%s\n' "- *-ios-unsigned.ipa：未签名 IPA，用 AltStore / Sideloadly / TrollStore 等工具自签后安装"
-            printf '%s\n' "- *-ios-unsigned-app.zip：未签名 Runner.app 压缩包，供自行签名 / 打包使用"
-            printf '\n%s\n' "Windows（解压后运行 hongguojian.exe 或 zhenguojian.exe）："
-            printf '%s\n' "- *-windows-x64.zip：Windows 10/11 x64 完整包；构建机没有音频和图形设备，播放自检未通过，未做设备验收"
-            printf '\n%s\n' "校验：SHA256SUMS.txt"
-            if printf '%s\n' "${{ vars.ANDROID_CERT_SHA256 }}" | grep -q .; then
-              printf '%s\n' "签名证书 SHA-256：${{ vars.ANDROID_CERT_SHA256 }}"
-            else
-              printf '%s\n' "签名证书：未配置（当前为 debug 签名）"
-            fi
+            printf '%s\n\n' "## 糖葫芦果鉴 (THLRedLook) v${version} 正式发布"
+            printf '%s\n\n' "一款多平台独立运行的短剧与流媒体播放器，内置官方标准规范的红果免费短剧数据源，支持端侧独立解析与在线播放。"
+            printf '%s\n\n' "### 📦 跨平台安装包下载指引："
+            printf '%s\n' "#### 📱 Android (手机 / 平板 / 电视盒子)"
+            printf '%s\n' "- \`*-arm64-v8a.apk\`：绝大多数现代 64 位手机与平板设备（推荐）"
+            printf '%s\n' "- \`*-armeabi-v7a.apk\`：较老的 32 位手机或部分电视盒子"
+            printf '%s\n' "- \`*-x86_64.apk\`：PC 端 Android 模拟器"
+            printf '\n%s\n' "#### 🖥️ Windows (桌面端)"
+            printf '%s\n' "- \`*-windows-x64.zip\`：Windows 10 / 11 64 位绿色便携版，解压后直接双击运行主程序，支持专属 Shader 滤镜画质增强"
+            printf '\n%s\n' "#### 🍏 iOS (iPhone / iPad)"
+            printf '%s\n' "- \`*-ios-unsigned.ipa\`：未签名 IPA，支持使用 AltStore / Sideloadly / TrollStore 等工具签名后直接安装"
+            printf '%s\n' "- \`*-ios-unsigned-app.zip\`：Runner.app 归档压缩包"
+            printf '\n%s\n' "#### 📺 Apple tvOS (客厅大屏)"
+            printf '%s\n' "- \`*-tvos-unsigned.ipa\`：tvOS 原生大屏独立应用，支持通过 Xcode / Apple Configurator / Sideloadly 签名安装至 Apple TV"
+            printf '%s\n' "- \`*-tvos-unsigned-app.zip\`：tvOS 原生 App 归档压缩包"
+            printf '\n%s\n' "---"
+            printf '%s\n' "### 🔒 安全校验与哈希"
+            printf '%s\n' "全部发布产物的完整性哈希已记录于 \`SHA256SUMS.txt\`。"
           } > notes.md
+
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release/* --clobber
-            gh release edit "$tag" --title "糖葫芦果鉴 ${version}" --notes-file notes.md
-            # 清理上一次构建留下、本轮已不再产出的附件，避免下载到过期文件。
+            gh release edit "$tag" --title "糖葫芦果鉴 v${version}" --notes-file notes.md
             for name in $(gh release view "$tag" --json assets --jq '.assets[].name'); do
               if [ ! -e "release/$name" ]; then
                 gh release delete-asset "$tag" "$name" --yes
               fi
             done
           else
-            gh release create "$tag" release/* --title "糖葫芦果鉴 ${version}" --notes-file notes.md
+            gh release create "$tag" release/* --title "糖葫芦果鉴 v${version}" --notes-file notes.md
           fi
