@@ -44,8 +44,8 @@ import re
 
 
 def get_beijing_build_number() -> str:
-    tz_bj = timezone(timedelta(hours=8))
-    return datetime.now(tz_bj).strftime('%Y%m%d%H%M%S')
+    # 基于时间生成秒级时间戳构建号，严格满足跨平台单调递增与 32 位整型规范
+    return str(int(datetime.now(timezone.utc).timestamp()))
 
 
 def sync_project_version(root: Path, base_version: str = "1.0.0") -> str:

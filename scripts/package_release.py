@@ -1,5 +1,6 @@
 import argparse
 import hashlib
+import os
 import re
 import shutil
 import zipfile
@@ -38,7 +39,24 @@ if options.platform == 'android':
         shutil.copy2(source, target)
         artifacts.append(target)
 else:
-    bundle = root / 'build' / 'windows' / 'x64' / 'runner' / 'Release'
+    candidates = [
+        root / 'build' / 'windows' / 'x64' / 'runner' / 'Release',
+        root / 'build' / 'windows' / 'runner' / 'Release',
+    ]
+    bundle = next((c for c in candidates if c.is_dir()), candidates[0])
+
+    if os.name == 'nt' and bundle.is_dir():
+        system_dir = Path(os.environ.get('WINDIR', 'C:\\Windows')) / 'System32'
+        for dll in ['msvcp140.dll', 'vcruntime140.dll']:
+            target_dll = bundle / dll
+            if not target_dll.exists():
+                src = system_dir / dll
+                if src.is_file():
+                    try:
+                        shutil.copy2(src, target_dll)
+                    except Exception:
+                        pass
+
     required = ['zhenguojian.exe', 'flutter_windows.dll', 'libffmpegkit.dll',
                 'libmpv-2.dll', 'msvcp140.dll', 'vcruntime140.dll',
                 'data/icudtl.dat', 'data/app.so']
