@@ -277,5 +277,21 @@ window.__INITIAL_DATA__ = {
 
       runtime.dispose();
     });
+
+    test('8. 仓库纯净红线验证：assets/sources 仅允许包含 hongguo.js (其余源归属于本地 GitLab thlredguojs)', () {
+      final sourcesDir = Directory('assets/sources');
+      expect(sourcesDir.existsSync(), isTrue);
+
+      final files = sourcesDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => !f.path.endsWith('.DS_Store'))
+          .toList();
+
+      final fileNames = files.map((f) => f.uri.pathSegments.last).toList();
+      // 验证仅存在且只允许 hongguo.js
+      expect(fileNames, equals(['hongguo.js']),
+          reason: 'GitHub 仓库 assets/sources 目录严禁混入任何非红果数据源，其余源应保存在本地 GitLab thlredguojs 项目');
+    });
   });
 }

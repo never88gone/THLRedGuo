@@ -107,6 +107,13 @@ def source_files(source):
     missing = REQUIRED_FILES - {path.as_posix() for path in selected}
     if missing:
         raise ValueError('源码缺少必要文件，未执行同步：' + ', '.join(sorted(missing)))
+    # 严格数据源隔离红线：GitHub 开源项目 assets/sources 仅允许包含 hongguo.js，其余源存放于本地 GitLab thlredguojs
+    invalid_sources = [
+        path.as_posix() for path in selected
+        if path.parts[:2] == ('assets', 'sources') and path.name != 'hongguo.js'
+    ]
+    if invalid_sources:
+        raise ValueError('检测到违规数据源文件，严禁同步到 GitHub 仓库（仅限本地 GitLab thlredguojs）：' + ', '.join(invalid_sources))
     return selected
 
 
