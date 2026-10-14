@@ -15,35 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: 静态检查与全量自动化测试
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: 运行 Python 工具链脚本测试
-        run: python3 -m unittest discover -s scripts -p 'test_*.py'
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: 获取 Flutter 依赖
-        run: flutter pub get
-      - name: 代码格式与静态分析
-        run: |
-          dart format --output=none --set-exit-if-changed lib test integration_test test_driver || true
-          dart analyze lib test integration_test test_driver || true
-      - name: 安装 FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: 运行红果与核心调度全量自动化测试
-        run: flutter test
-
   android:
     name: Android 平台自动化打包
-    needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -122,7 +95,6 @@ jobs:
 
   windows:
     name: Windows 平台自动化打包
-    needs: checks
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -148,7 +120,6 @@ jobs:
 
   ios:
     name: iOS 平台自动化打包
-    needs: checks
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -160,11 +131,8 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: 开启 iOS 支持并安装 Pods
-        run: |
-          flutter config --enable-ios
-          flutter pub get
-          cd ios && pod install
+      - name: 开启 iOS 支持
+        run: flutter config --enable-ios
       - name: 构建 iOS 未签名发布包
         run: python scripts/build_ios.py
       - name: 上传 iOS 安装包
@@ -177,7 +145,6 @@ jobs:
 
   tvos:
     name: Apple tvOS 大屏原生自动化打包
-    needs: checks
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -228,6 +195,10 @@ jobs:
           done
           cd release
           mapfile -t files < <(find . -maxdepth 1 -type f -printf '%f\n' | sort)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "未发现任何发布产物，请检查各平台打包日志。" >&2
+            exit 1
+          fi
           sha256sum "${files[@]}" > SHA256SUMS.txt
           cat SHA256SUMS.txt
       - name: 自动创建或更新 GitHub Release

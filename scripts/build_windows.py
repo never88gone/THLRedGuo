@@ -20,7 +20,7 @@ if not flutter:
     raise SystemExit('请先将 Flutter SDK 的 bin 目录加入 PATH。')
 with china_mirror_environment(environment, options.cn_mirrors, gradle=False) as env:
     with mirrored_pub_lockfile(root, env):
-        subprocess.run([flutter, 'pub', 'get', '--enforce-lockfile'], cwd=root, env=env, check=True)
+        subprocess.run([flutter, 'pub', 'get'], cwd=root, env=env, check=True)
         subprocess.run([flutter, 'build', 'windows', '--release', '--no-pub', *variant.flutter_arguments], cwd=root, env=env, check=True)
         subprocess.run([sys.executable, str(root / 'scripts' / 'package_release.py'), '--platform', 'windows', *variant.arguments],
                        cwd=root, env=env, check=True)
