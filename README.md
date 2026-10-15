@@ -142,7 +142,7 @@ flutter run
 - **全量自动化测试**：代码提交至 `main` / `master` 分支或推送标签时，自动运行全套核心引擎与红果 Spider 规范测试；
 - **Android**：自动编译输出全架构发布 APK（`arm64-v8a`、`armeabi-v7a`、`x86_64`）；
 - **Windows**：自动在 Windows runner 编译并生成免安装绿色便携完整包（含 Shader 画质滤镜与运行环境）；
-- **macOS**：自动编译并生成 `.dmg` 原生磁盘镜像安装包（支持直接拖拽至 Applications 安装）与 `.zip` 便携包；配置证书后支持自动打包 `.pkg` 并上传 TestFlight；
+- **macOS**：自动编译并生成原生的 `*.dmg` 磁盘镜像安装包（支持直接拖拽至 Applications 目录完成安装）；
 - **iOS**：自动编译生成未签名 IPA 及 `Runner.app` 归档包，配置证书后自动上传 TestFlight；
 - **Apple tvOS**：自动归档打包原生 tvOS 独立版未签名 IPA 与 App 压缩包，配置证书后自动上传 TestFlight；
 - **自动 Release**：多端产物自动汇总结算 `SHA256SUMS.txt` 校验和，并自动创建/更新 GitHub Release 发布页。
