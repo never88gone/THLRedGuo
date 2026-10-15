@@ -120,12 +120,27 @@ class _DetailScreenState extends State<DetailScreen> {
       final merged = widget.repository.catalogUpdates
           .current(widget.drama)
           .merge(detail.drama);
+      final finalEpisodes = detail.episodes.isNotEmpty
+          ? detail.episodes
+          : (merged.episodes > 0
+              ? List.generate(
+                  merged.episodes,
+                  (index) => Episode(
+                    {
+                      'id': '${merged.cleanSourceId}_${index + 1}',
+                      'title': '第 ${index + 1} 集',
+                      'currentEpisode': index + 1,
+                    },
+                    index + 1,
+                  ),
+                )
+              : <Episode>[]);
       setState(() {
-        _detail = DramaDetail(merged, detail.episodes, warning: detail.warning);
+        _detail = DramaDetail(merged, finalEpisodes, warning: detail.warning);
         _loading = false;
         _episodePage =
             resumeEpisodeIndex(
-              detail.episodes,
+              finalEpisodes,
               widget.store.watched(merged.id),
             ) ~/
             episodePageSize;
@@ -344,10 +359,27 @@ class _DetailScreenState extends State<DetailScreen> {
       );
       if (!mounted) return;
     }
+    final safeDrama = drama.sourceId.isEmpty || drama.sourceId.contains(':')
+        ? Drama(
+            id: drama.id,
+            source: drama.source,
+            sourceId: drama.cleanSourceId,
+            title: drama.title,
+            description: drama.description,
+            cover: drama.cover,
+            episodes: drama.episodes,
+            category: drama.category,
+            heat: drama.heat,
+            views: drama.views,
+            onlineDate: drama.onlineDate,
+            tags: drama.tags,
+            releaseStatus: drama.releaseStatus,
+          )
+        : drama;
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => DetailScreen(
-          drama: drama,
+          drama: safeDrama,
           repository: widget.repository,
           store: widget.store,
         ),
@@ -459,20 +491,20 @@ class _DetailScreenState extends State<DetailScreen> {
                               ),
                               const VerticalDivider(width: 1),
                               Expanded(
-                                child: _loading || _error != null || episodes.isEmpty
-                                    ? _episodeStatus()
-                                    : Column(
-                                        children: [
-                                          _seriesSelector(drama),
-                                          Expanded(
-                                            child: EpisodeBrowser(
+                                child: Column(
+                                  children: [
+                                    _seriesSelector(drama),
+                                    Expanded(
+                                      child: _loading || _error != null || episodes.isEmpty
+                                          ? _episodeStatus()
+                                          : EpisodeBrowser(
                                               episodes: episodes,
                                               currentNumber: watched?.episode,
                                               onSelected: (index) => _play(index),
                                             ),
-                                          ),
-                                        ],
-                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           );
@@ -492,15 +524,15 @@ class _DetailScreenState extends State<DetailScreen> {
                                 child: _overview(drama),
                               ),
                             ),
-                      if (_loading || _error != null || episodes.isEmpty)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _episodeStatus(),
-                        )
-                      else ...[
-                        SliverToBoxAdapter(child: _seriesSelector(drama)),
-                        SliverToBoxAdapter(
-                          child: _episodeSummary(
+                            SliverToBoxAdapter(child: _seriesSelector(drama)),
+                            if (_loading || _error != null || episodes.isEmpty)
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: _episodeStatus(),
+                              )
+                            else ...[
+                              SliverToBoxAdapter(
+                                child: _episodeSummary(
                             episodes,
                             currentNumber: watched?.episode,
                             expanded: showEpisodes,

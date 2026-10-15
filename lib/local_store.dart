@@ -466,14 +466,17 @@ class LocalStore extends ChangeNotifier {
           state.seriesSeasons[anchor.id]!,
     ];
     for (final notice in notices) {
+      final cleanId = notice.id.contains(':')
+          ? notice.id.split(':').last
+          : (notice.id.startsWith('${anchor.source}_')
+              ? notice.id.substring(anchor.source.length + 1)
+              : notice.id);
       items.putIfAbsent(
         notice.id,
         () => Drama(
           id: notice.id,
           source: anchor.source,
-          sourceId: notice.id.startsWith('${anchor.source}_')
-              ? notice.id.substring(anchor.source.length + 1)
-              : notice.id,
+          sourceId: cleanId,
           title: notice.title,
         ),
       );
@@ -947,12 +950,17 @@ class LocalStore extends ChangeNotifier {
       };
       for (final state in states.values) {
         for (final notice in state.seriesSeasons.values) {
+          final cleanId = notice.id.contains(':')
+              ? notice.id.split(':').last
+              : (notice.id.startsWith('${SourceSite.hongguo.id}_')
+                  ? notice.id.substring(SourceSite.hongguo.id.length + 1)
+                  : notice.id);
           candidates.putIfAbsent(
             notice.id,
             () => Drama(
               id: notice.id,
               source: SourceSite.hongguo.id,
-              sourceId: notice.id.substring(SourceSite.hongguo.id.length + 1),
+              sourceId: cleanId,
               title: notice.title,
             ),
           );

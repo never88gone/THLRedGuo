@@ -191,8 +191,19 @@ async function detail(id) {
   let desc = "";
   let vidList = [];
 
+  let cleanId = String(id || "").trim();
+  if (cleanId.includes(":")) {
+    cleanId = cleanId.split(":").pop();
+  } else if (cleanId.includes("_") && !/^\d+$/.test(cleanId)) {
+    cleanId = cleanId.split("_").pop();
+  }
+  const idDigits = cleanId.match(/\d{5,}/);
+  if (idDigits) {
+    cleanId = idDigits[0];
+  }
+
   try {
-    const url = BASE_URL + "/detail?series_id=" + id;
+    const url = BASE_URL + "/detail?series_id=" + cleanId;
     const resp = await fetch(url, {
       headers: {
         "User-Agent": USER_AGENT,

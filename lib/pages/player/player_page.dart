@@ -396,8 +396,41 @@ class _PlayerScreenState extends State<PlayerScreen>
     _notice('正在切换至 ${seasonDrama.title}...');
 
     try {
-      final nextDetail = await widget.repository.detail(seasonDrama);
+      final safeDrama = seasonDrama.sourceId.isEmpty || seasonDrama.sourceId.contains(':')
+          ? Drama(
+              id: seasonDrama.id,
+              source: seasonDrama.source,
+              sourceId: seasonDrama.cleanSourceId,
+              title: seasonDrama.title,
+              description: seasonDrama.description,
+              cover: seasonDrama.cover,
+              episodes: seasonDrama.episodes,
+              category: seasonDrama.category,
+              heat: seasonDrama.heat,
+              views: seasonDrama.views,
+              onlineDate: seasonDrama.onlineDate,
+              tags: seasonDrama.tags,
+              releaseStatus: seasonDrama.releaseStatus,
+            )
+          : seasonDrama;
+      var nextDetail = await widget.repository.detail(safeDrama);
       if (!mounted || _closed) return;
+      if (nextDetail.episodes.isEmpty && safeDrama.episodes > 0) {
+        nextDetail = DramaDetail(
+          safeDrama,
+          List.generate(
+            safeDrama.episodes,
+            (index) => Episode(
+              {
+                'id': '${safeDrama.cleanSourceId}_${index + 1}',
+                'title': '第 ${index + 1} 集',
+                'currentEpisode': index + 1,
+              },
+              index + 1,
+            ),
+          ),
+        );
+      }
       if (nextDetail.episodes.isEmpty) {
         _notice('该季暂无可用集数');
         return;

@@ -180,6 +180,16 @@ class Drama {
     'ongoing' => '连载中',
     _ => '状态未知',
   };
+  String get cleanSourceId {
+    final raw = sourceId.isNotEmpty ? sourceId : id;
+    if (raw.contains(':')) {
+      return raw.split(':').last;
+    }
+    if (source.isNotEmpty && raw.startsWith('${source}_')) {
+      return raw.substring(source.length + 1);
+    }
+    return raw;
+  }
 
   factory Drama.fromJson(Map<String, dynamic> json) {
     var id = json['id'] as String? ?? '';
@@ -194,8 +204,17 @@ class Drama {
     if (source.isEmpty) {
       source = JsSourceService.current?.activeSourceId ?? 'hongguo';
     }
-    if (!hasSourceId) {
-      sourceId = id.contains(':') ? id.split(':').last : id;
+    if (!hasSourceId || sourceId.isEmpty || sourceId.contains(':')) {
+      if (sourceId.contains(':')) {
+        sourceId = sourceId.split(':').last;
+      } else if (id.contains(':')) {
+        sourceId = id.split(':').last;
+      } else if (sourceId.isEmpty) {
+        sourceId = id;
+      }
+    }
+    if (source.isNotEmpty && sourceId.startsWith('${source}_')) {
+      sourceId = sourceId.substring(source.length + 1);
     }
     if (!id.contains(':') && source.isNotEmpty && id.isNotEmpty) {
       id = '$source:$id';

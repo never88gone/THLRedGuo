@@ -709,13 +709,25 @@ class DartCoreEngine {
   }
 
   Future<Map<String, dynamic>> _getDetail(Map<String, dynamic> drama) async {
-    final dramaId = drama['id'] as String? ?? '';
-    final source = drama['source'] as String? ?? (dramaId.contains(':') ? dramaId.split(':').first : 'hongguo');
-    final sourceId = drama['sourceId'] as String? ?? (dramaId.contains(':') ? dramaId.split(':').last : dramaId);
+    final dramaId = drama['id']?.toString() ?? '';
+    final source = (drama['source']?.toString().isNotEmpty == true)
+        ? drama['source']!.toString()
+        : (dramaId.contains(':') ? dramaId.split(':').first : 'hongguo');
+
+    var rawSourceId = drama['sourceId']?.toString() ?? '';
+    if (rawSourceId.trim().isEmpty) {
+      rawSourceId = dramaId;
+    }
+    if (rawSourceId.contains(':')) {
+      rawSourceId = rawSourceId.split(':').last;
+    } else if (rawSourceId.contains('_') && !RegExp(r'^\d+$').hasMatch(rawSourceId)) {
+      rawSourceId = rawSourceId.split('_').last;
+    }
+    final sourceId = rawSourceId.trim();
 
     Map<String, dynamic>? spiderVod;
     final rt = await _getSpiderRuntime(source);
-    if (rt != null) {
+    if (rt != null && sourceId.isNotEmpty) {
       try {
         final detailRes = await rt.detail(sourceId);
         spiderVod = detailRes.vod;
@@ -725,6 +737,7 @@ class DartCoreEngine {
     final fullDrama = Map<String, dynamic>.from(drama);
     fullDrama['source'] = source;
     fullDrama['sourceId'] = sourceId;
+    fullDrama['id'] = dramaId.contains(':') ? dramaId : '$source:$sourceId';
 
     List<Map<String, dynamic>> chapters = [];
     if (spiderVod != null && spiderVod.isNotEmpty) {
@@ -741,6 +754,21 @@ class DartCoreEngine {
       chapters = _parseChaptersFromVodPlayUrl(playUrlRaw);
     }
 
+    if (chapters.isEmpty) {
+      final knownEpisodes = (drama['episodes'] as num?)?.toInt() ?? 0;
+      final fallbackCount = knownEpisodes > 0 ? knownEpisodes : 0;
+      if (fallbackCount > 0) {
+        for (var i = 1; i <= fallbackCount; i++) {
+          chapters.add({
+            'id': '$i',
+            'title': '第 $i 集',
+            'index': i,
+            'raw': '$i',
+          });
+        }
+      }
+    }
+
     fullDrama['episodes'] = chapters.length;
 
     return {
@@ -751,8 +779,19 @@ class DartCoreEngine {
 
   Future<Map<String, dynamic>> _resolvePlayback(Map<String, dynamic> input) async {
     final drama = input['drama'] as Map? ?? {};
-    final dramaId = drama['id'] as String? ?? '';
-    final source = drama['source'] as String? ?? (dramaId.contains(':') ? dramaId.split(':').first : 'hongguo');
+    final dramaId = drama['id']?.toString() ?? '';
+    final source = (drama['source']?.toString().isNotEmpty == true)
+        ? drama['source']!.toString()
+        : (dramaId.contains(':') ? dramaId.split(':').first : 'hongguo');
+
+    var rawSourceId = drama['sourceId']?.toString() ?? '';
+    if (rawSourceId.trim().isEmpty) {
+      rawSourceId = dramaId;
+    }
+    if (rawSourceId.contains(':')) {
+      rawSourceId = rawSourceId.split(':').last;
+    }
+    final sourceId = rawSourceId.trim();
     final episodeIndex = (input['index'] as num?)?.toInt() ?? 1;
     final quality = (input['quality'] as num?)?.toInt() ?? 0;
     final chapter = input['chapter'];
@@ -760,9 +799,16 @@ class DartCoreEngine {
     final rt = await _getSpiderRuntime(source);
     if (rt != null) {
       try {
-        final playTarget = (chapter is Map ? chapter['raw']?.toString() : null) ??
+        var playTarget = (chapter is Map ? (chapter['raw'] ?? chapter['id'])?.toString() : null) ??
             (chapter is String ? chapter : null) ??
             '$episodeIndex';
+        if (!playTarget.startsWith('http://') &&
+            !playTarget.startsWith('https://') &&
+            !playTarget.contains('/') &&
+            !playTarget.contains('_') &&
+            sourceId.isNotEmpty) {
+          playTarget = '${sourceId}_$playTarget';
+        }
         final playRes = await rt.play('flag', playTarget);
         if (playRes.url.isNotEmpty) {
           final streamUrl = playRes.url;
