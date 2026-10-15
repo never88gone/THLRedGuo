@@ -13,7 +13,7 @@ from pathlib import Path
 SOURCE_DIRECTORIES = {
     '.github', 'lib', 'native', 'android', 'windows', 'ios', 'macos', 'linux',
     'tvos', 'web', 'assets', 'packages', 'scripts', 'test', 'test_driver', 'integration_test',
-    'fastlane', 'PRD',
+    'PRD',
 }
 SOURCE_FILES = {
     '.gitattributes', '.gitignore', '.metadata', '.editorconfig',
@@ -26,7 +26,7 @@ EXCLUDED_DIRECTORIES = {
     '.ruff_cache', '.cache', '.venv', 'venv', 'build', 'dist', 'coverage',
     'node_modules', 'vendor', 'Pods', 'Carthage', 'DerivedData', '.swiftpm', 'xcuserdata',
     '.symlinks', 'ephemeral', 'jniLibs', 'CMakeFiles', 'sdk', 'android-sdk',
-    'flutter-sdk', 'ndk', 'toolchains',
+    'flutter-sdk', 'ndk', 'toolchains', 'fastlane',
 }
 EXCLUDED_NAMES = {
     '.DS_Store', 'Thumbs.db', 'local.properties', 'key.properties',

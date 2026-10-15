@@ -43,3 +43,5 @@ ios/Flutter/flutter_export_environment.sh
 *.cer
 *.p8
 .claude/
+fastlane/
+
