@@ -43,6 +43,7 @@ public struct MainTabView: View {
     @State private var selectedTab: TVAppTab = .catalog
     @FocusState private var focusedNavTab: TVAppTab?
     @State private var wasInContentArea: Bool = false
+    @State private var settingsSidebarTrigger: Int = 0
 
     @State private var handoffDrama: Drama?
     @State private var handoffEpIndex: Int = 1
@@ -185,7 +186,10 @@ public struct MainTabView: View {
                     // 自定义顶级无白底导航栏（带焦点精准控制）
                     TVTopNavigationBar(
                         selectedTab: $selectedTab,
-                        focusedNavTab: $focusedNavTab
+                        focusedNavTab: $focusedNavTab,
+                        onFocusSettingsSidebar: {
+                            settingsSidebarTrigger += 1
+                        }
                     )
                     .padding(.top, 28)
                     .padding(.bottom, 12)
@@ -217,6 +221,7 @@ public struct MainTabView: View {
                         case .settings:
                             SettingsView(
                                 forceFocusActiveSource: isSettingsActiveDemo,
+                                focusSidebarTrigger: settingsSidebarTrigger,
                                 onRequestFocusTopNav: {
                                     focusedNavTab = .settings
                                     wasInContentArea = false
@@ -251,6 +256,9 @@ public struct MainTabView: View {
                     } else {
                         // 焦点离开导航栏进入了内容页面
                         wasInContentArea = true
+                        if selectedTab == .settings {
+                            settingsSidebarTrigger += 1
+                        }
                     }
                 }
             }
@@ -459,10 +467,16 @@ public struct MainTabView: View {
 public struct TVTopNavigationBar: View {
     @Binding public var selectedTab: TVAppTab
     public var focusedNavTab: FocusState<TVAppTab?>.Binding
+    public var onFocusSettingsSidebar: (() -> Void)? = nil
 
-    public init(selectedTab: Binding<TVAppTab>, focusedNavTab: FocusState<TVAppTab?>.Binding) {
+    public init(
+        selectedTab: Binding<TVAppTab>,
+        focusedNavTab: FocusState<TVAppTab?>.Binding,
+        onFocusSettingsSidebar: (() -> Void)? = nil
+    ) {
         self._selectedTab = selectedTab
         self.focusedNavTab = focusedNavTab
+        self.onFocusSettingsSidebar = onFocusSettingsSidebar
     }
 
     public var body: some View {
@@ -472,7 +486,15 @@ public struct TVTopNavigationBar: View {
                 TVTopNavTabButton(
                     tab: tab,
                     isSelected: selectedTab == tab,
-                    isFocused: isFocused
+                    isFocused: isFocused,
+                    onDownCommand: (tab == .settings) ? {
+                        focusedNavTab.wrappedValue = nil
+                        onFocusSettingsSidebar?()
+                    } : nil,
+                    onLeftCommand: (tab == .settings) ? {
+                        focusedNavTab.wrappedValue = .downloads
+                        selectedTab = .downloads
+                    } : nil
                 ) {
                     selectedTab = tab
                 }
@@ -497,6 +519,8 @@ public struct TVTopNavTabButton: View {
     public let tab: TVAppTab
     public let isSelected: Bool
     public let isFocused: Bool
+    public var onDownCommand: (() -> Void)? = nil
+    public var onLeftCommand: (() -> Void)? = nil
     public let action: () -> Void
 
     public var body: some View {
@@ -520,6 +544,13 @@ public struct TVTopNavTabButton: View {
         .padding(.vertical, 4)
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focusEffectDisabled()
+        .onMoveCommand { direction in
+            if direction == .down {
+                onDownCommand?()
+            } else if direction == .left {
+                onLeftCommand?()
+            }
+        }
     }
 }
 

@@ -48,7 +48,10 @@ public struct SettingsView: View {
     @State private var autoSavedTip: String? = nil
 
     public var forceFocusActiveSource: Bool = false
+    public var focusSidebarTrigger: Int = 0
     public var onRequestFocusTopNav: (() -> Void)? = nil
+
+    @State private var wasInContentPanel: Bool = false
 
     @EnvironmentObject private var jsService: JSSourceService
     @State private var showingImportAlert = false
@@ -62,8 +65,9 @@ public struct SettingsView: View {
         return "\(version)+\(build)"
     }
 
-    public init(forceFocusActiveSource: Bool = false, onRequestFocusTopNav: (() -> Void)? = nil) {
+    public init(forceFocusActiveSource: Bool = false, focusSidebarTrigger: Int = 0, onRequestFocusTopNav: (() -> Void)? = nil) {
         self.forceFocusActiveSource = forceFocusActiveSource
+        self.focusSidebarTrigger = focusSidebarTrigger
         self.onRequestFocusTopNav = onRequestFocusTopNav
     }
 
@@ -119,6 +123,7 @@ public struct SettingsView: View {
                     .fill(Color(red: 0.10, green: 0.10, blue: 0.13).opacity(0.95))
             )
             .focusSection()
+            .defaultFocus($focusedCategory, selectedCategory)
 
             // 右侧内容
             ScrollView(.vertical, showsIndicators: false) {
@@ -142,15 +147,36 @@ public struct SettingsView: View {
             .clipShape(Rectangle().inset(by: -60))
             .id(selectedCategory)
             .focusSection()
+            .onMoveCommand { direction in
+                if direction == .left {
+                    NSLog("🎯 [FOCUS_TRACE] Settings 右侧内容区按向左 -> 精确回到当前Tab %@", selectedCategory.rawValue)
+                    focusedCategory = selectedCategory
+                }
+            }
         }
         .padding(.horizontal, 48)
         .padding(.vertical, 24)
-        .focusScope(settingsScope)
         .defaultFocus($focusedCategory, selectedCategory)
         .onChange(of: focusedCategory) { newCat in
+            NSLog("🎯 [FOCUS_TRACE] Settings focusedCategory = %@", newCat?.rawValue ?? "nil")
             if let cat = newCat {
-                selectedCategory = cat
+                if wasInContentPanel && cat != selectedCategory {
+                    // 从右侧内容区向左返回时，修正几何偏差，精确落回当前内容页面对应的 selectedCategory！
+                    NSLog("🎯 [FOCUS_TRACE] Settings 捕获右侧向左几何偏差 (%@ -> 纠正为当前选中项 %@)", cat.rawValue, selectedCategory.rawValue)
+                    focusedCategory = selectedCategory
+                } else {
+                    // 用户在左侧侧边栏内部正常上下移动时，才切换内容页面
+                    selectedCategory = cat
+                }
+                wasInContentPanel = false
+            } else {
+                // 焦点离开左侧列表，进入了右侧内容页面
+                wasInContentPanel = true
             }
+        }
+        .onChange(of: focusSidebarTrigger) { _ in
+            focusedCategory = selectedCategory
+            wasInContentPanel = false
         }
         .onExitCommand {
             if focusedCategory == nil {
