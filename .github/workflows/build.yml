@@ -441,11 +441,21 @@ jobs:
           set -euo pipefail
           version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
           mkdir -p release
+          # 仅收集 Android, Windows, macOS 产物，严格排除 iOS 与 tvOS（专供 TestFlight 分发）
           for directory in artifacts/*/; do
+            dirname=$(basename "$directory")
+            if [ "$dirname" = "ios-packages" ] || [ "$dirname" = "tvos-packages" ]; then
+              echo "跳过 $dirname（iOS 与 tvOS 已上架 TestFlight，不放入 GitHub Releases）"
+              continue
+            fi
             for file in "$directory"*; do
               [ -f "$file" ] || continue
               name=$(basename "$file")
               if [ "$name" = "SHA256SUMS.txt" ]; then
+                continue
+              fi
+              if [[ "$name" == *"-ios"* ]] || [[ "$name" == *"-tvos"* ]]; then
+                echo "排除包含 iOS/tvOS 的文件: $name"
                 continue
               fi
               cp "$file" "release/$name"
@@ -454,7 +464,7 @@ jobs:
           cd release
           mapfile -t files < <(find . -maxdepth 1 -type f -printf '%f\n' | sort)
           if [ ${#files[@]} -eq 0 ]; then
-            echo "未发现任何发布产物，请检查各平台打包日志。" >&2
+            echo "未发现任何非 iOS/tvOS 的发布产物，请检查打包日志。" >&2
             exit 1
           fi
           sha256sum "${files[@]}" > SHA256SUMS.txt
@@ -465,48 +475,42 @@ jobs:
         run: |
           set -euo pipefail
           version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
-          tag="v${version//+/-}"
+          base_version="${version%%+*}"
+          tag="v${base_version}"
           
           {
-            printf '%s\n\n' "## 糖葫芦果鉴 (THLRedLook) v${version} 正式发布"
+            printf '%s\n\n' "## 糖葫芦果鉴 (THLRedLook) v${base_version} 正式发布"
             printf '%s\n\n' "一款多平台独立运行的短剧与流媒体播放器，内置官方标准规范的红果免费短剧数据源，支持端侧独立解析与在线播放。"
-            printf '%s\n\n' "### 📦 跨平台安装包下载指引："
+            printf '%s\n\n' "### 📦 跨平台安装包下载（除 iOS / tvOS 走 TestFlight 外，其余端均在此下载）："
             printf '%s\n' "#### 📱 Android (手机 / 平板 / 电视盒子)"
             printf '%s\n' "- \`*-arm64-v8a.apk\`：绝大多数现代 64 位手机与平板设备（推荐）"
             printf '%s\n' "- \`*-armeabi-v7a.apk\`：较老的 32 位手机或部分电视盒子"
             printf '%s\n' "- \`*-x86_64.apk\`：PC 端 Android 模拟器"
             printf '\n%s\n' "#### 🖥️ Windows (桌面端)"
             printf '%s\n' "- \`*-windows-x64.zip\`：Windows 10 / 11 64 位绿色便携版，解压后直接双击运行主程序，支持专属 Shader 滤镜画质增强"
-            printf '\n%s\n' "#### 🍏 iOS (iPhone / iPad)"
-            printf '%s\n' "- \`*-ios-unsigned.ipa\`：未签名 IPA，支持使用 AltStore / Sideloadly / TrollStore 等工具签名后直接安装"
-            printf '%s\n' "- \`*-ios-unsigned-app.zip\`：Runner.app 归档压缩包"
-            printf '\n%s\n' "#### 📺 Apple tvOS (客厅大屏)"
-            printf '%s\n' "- \`*-tvos-unsigned.ipa\`：tvOS 原生大屏独立应用，支持通过 Xcode / Apple Configurator / Sideloadly 签名安装至 Apple TV"
-            printf '%s\n' "- \`*-tvos-unsigned-app.zip\`：tvOS 原生 App 归档压缩包"
             printf '\n%s\n' "#### 💻 macOS (Mac 电脑)"
             printf '%s\n' "- \`*-macos.dmg\`：macOS 原生磁盘映像安装包，双击打开后拖拽至 Applications 即可安装（推荐）"
+            printf '\n%s\n' "#### 🍏 iOS / 📺 tvOS (Apple 设备)"
+            printf '%s\n' "- iOS (iPhone / iPad) 与 Apple tvOS (大屏独立版) 均已通过官方 Apple TestFlight 提供测试与在线安装，无需在此下载未签名离线包。"
             printf '\n%s\n' "---"
             printf '%s\n' "### 🔒 安全校验与哈希"
             printf '%s\n' "全部发布产物的完整性哈希已记录于 \`SHA256SUMS.txt\`。"
           } > notes.md
 
-          # 清理所有历史 Release 与 Tags，只保留最新打包版本
-          echo "正在清理历史打包 Releases..."
-          for old_tag in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
-            if [ "$old_tag" != "$tag" ]; then
-              echo "删除历史 Release 及其 Tag: $old_tag"
-              gh release delete "$old_tag" --cleanup-tag --yes || true
-            fi
-          done
-
+          # 自动创建或覆盖更新 GitHub Release
           if gh release view "$tag" >/dev/null 2>&1; then
+            echo "更新已有 Release: $tag"
             gh release upload "$tag" release/* --clobber
-            gh release edit "$tag" --title "糖葫芦果鉴 v${version}" --notes-file notes.md
+            gh release edit "$tag" --title "糖葫芦果鉴 v${base_version}" --notes-file notes.md
             for name in $(gh release view "$tag" --json assets --jq '.assets[].name'); do
               if [ ! -e "release/$name" ]; then
                 gh release delete-asset "$tag" "$name" --yes
               fi
             done
           else
-            gh release create "$tag" release/* --title "糖葫芦果鉴 v${version}" --notes-file notes.md
+            echo "创建新 Release: $tag (Target: ${{ github.sha }})"
+            gh release create "$tag" release/* \
+              --title "糖葫芦果鉴 v${base_version}" \
+              --notes-file notes.md \
+              --target "${{ github.sha }}"
           fi
