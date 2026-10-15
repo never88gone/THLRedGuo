@@ -14,39 +14,39 @@
 
 | 桌面端宽屏分栏全景 | 桌面端高清播放与选集 |
 | :---: | :---: |
-| ![桌面端全景](assets/screenshots/desktop_overview.png) | ![桌面端播放器](assets/screenshots/desktop_player.png) |
+| <img src="assets/screenshots/desktop_overview.png" width="440" alt="桌面端全景" /> | <img src="assets/screenshots/desktop_player.png" width="440" alt="桌面端播放器" /> |
 
 ### 📱 移动端核心观影体验 (iOS / Android)
 
 | 首页发现与分类 | 搜索与关键词联想 | 热播短剧排行榜 |
 | :---: | :---: | :---: |
-| <img src="assets/screenshots/mobile_home.png" width="260" alt="首页发现" /> | <img src="assets/screenshots/mobile_search.png" width="260" alt="搜索联想" /> | <img src="assets/screenshots/mobile_rankings.png" width="260" alt="短剧榜单" /> |
+| <img src="assets/screenshots/mobile_home.png" width="180" alt="首页发现" /> | <img src="assets/screenshots/mobile_search.png" width="180" alt="搜索联想" /> | <img src="assets/screenshots/mobile_rankings.png" width="180" alt="短剧榜单" /> |
 
 | 剧集详情与选集 | 竖屏沉浸式播放 | 横屏全屏影院模式 |
 | :---: | :---: | :---: |
-| <img src="assets/screenshots/mobile_detail.png" width="260" alt="剧集详情" /> | <img src="assets/screenshots/mobile_player_portrait.png" width="260" alt="竖屏播放" /> | <img src="assets/screenshots/mobile_player_fullscreen.png" width="360" alt="横屏播放" /> |
+| <img src="assets/screenshots/mobile_detail.png" width="180" alt="剧集详情" /> | <img src="assets/screenshots/mobile_player_portrait.png" width="180" alt="竖屏播放" /> | <img src="assets/screenshots/mobile_player_fullscreen.png" width="260" alt="横屏播放" /> |
 
 ### 🗂️ 追剧、历史、离线缓存与插件管理
 
 | 我的追剧收藏 | 最近观看 | 离线下载管理 | JS 数据源插件管理 |
 | :---: | :---: | :---: | :---: |
-| <img src="assets/screenshots/mobile_follow.png" width="200" alt="我的追剧" /> | <img src="assets/screenshots/mobile_history.png" width="200" alt="最近观看" /> | <img src="assets/screenshots/mobile_downloads.png" width="200" alt="离线下载" /> | <img src="assets/screenshots/mobile_js_sources.png" width="200" alt="JS数据源管理" /> |
+| <img src="assets/screenshots/mobile_follow.png" width="150" alt="我的追剧" /> | <img src="assets/screenshots/mobile_history.png" width="150" alt="最近观看" /> | <img src="assets/screenshots/mobile_downloads.png" width="150" alt="离线下载" /> | <img src="assets/screenshots/mobile_js_sources.png" width="150" alt="JS数据源管理" /> |
 
 ### 🔒 隐私安全与私密保险箱
 
 | 九宫格手势锁 | 隐私模式与私密设置 | 独立私密短剧库 |
 | :---: | :---: | :---: |
-| <img src="assets/screenshots/privacy_lock.png" width="260" alt="九宫格手势锁" /> | <img src="assets/screenshots/privacy_settings.png" width="260" alt="隐私设置" /> | <img src="assets/screenshots/privacy_vault.png" width="260" alt="私密短剧库" /> |
+| <img src="assets/screenshots/privacy_lock.png" width="180" alt="九宫格手势锁" /> | <img src="assets/screenshots/privacy_settings.png" width="180" alt="隐私设置" /> | <img src="assets/screenshots/privacy_vault.png" width="180" alt="私密短剧库" /> |
 
 ### 📺 Apple tvOS 客厅大屏原生端
 
 | tvOS 首页瀑布流 | tvOS 剧集详情与选集 |
 | :---: | :---: |
-| ![tvOS首页](assets/screenshots/tvos_home.png) | ![tvOS详情](assets/screenshots/tvos_detail.png) |
+| <img src="assets/screenshots/tvos_home.png" width="380" alt="tvOS首页" /> | <img src="assets/screenshots/tvos_detail.png" width="380" alt="tvOS详情" /> |
 
 | tvOS 热播排行榜 | tvOS 全屏播放与控制层 |
 | :---: | :---: |
-| ![tvOS榜单](assets/screenshots/tvos_rankings.png) | ![tvOS播放器](assets/screenshots/tvos_player.png) |
+| <img src="assets/screenshots/tvos_rankings.png" width="380" alt="tvOS榜单" /> | <img src="assets/screenshots/tvos_player.png" width="380" alt="tvOS播放器" /> |
 
 ---
 
@@ -79,7 +79,6 @@
 - **沉浸式手势操作**：
   - 手机竖屏模式：上下滑动快速切集，长按屏幕任意区域触发临时 3 倍速快进，轻点即时启停；
   - 横屏影院模式：左右滑动手势调节进度，上下滑动手势调节亮度与音量；
-- **实时在线弹幕**：在线播放支持实时弹幕上屏与侧边栏弹幕设置；
 - **系列多季聚拢与快速切换（Multi-Season Engine）**：智能识别剧集季数信息，详情页与播放器选集列表全景展示多季胶囊，无缝换季起播；
 - **画质增强引擎**：Windows 桌面端内置定制化 Shader 增强链路（自动 / 省电 / 清晰优先），显著提升大屏观感；
 - **智能预热与秒开连播**：换集前轻量预热下一集连接与直链，实现换集平滑秒开。
@@ -95,11 +94,6 @@
 - **九宫格手势锁**：支持为应用设置九宫格图形解锁，切至后台自动加锁防窥；
 - **后台高斯模糊虚化**：应用切入后台或多任务预览界面时，自动触发高斯模糊遮罩；
 - **独立私密短剧库**：专属密码保护的私密空间，私密收藏与专属浏览记录不进入常规历史，全方位守护隐私。
-
-### 📡 局域网无感互联 (LAN Sync)
-- **免登录跨设备同步**：基于本地 mDNS / DNS-SD 广播（`_zgj-link._tcp`）自动感知同局域网设备；
-- **安全指纹配对**：首连设备握手校验安全证书指纹，杜绝未经授权的局域网串流；
-- **双向追剧同步与接续播放**：自动同步追剧进度、观看历史与收藏列表，支持一键将播放流推送至大屏设备接续播放。
 
 ---
 
