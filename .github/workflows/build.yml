@@ -201,7 +201,11 @@ jobs:
             exit 0
           fi
           mkdir -p ~/.appstoreconnect/private_keys
-          echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          if [[ "$PRIVATE_KEY_B64" == *"BEGIN PRIVATE KEY"* ]]; then
+            echo "$PRIVATE_KEY_B64" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          else
+            echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          fi
           chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
           signed_ipa=$(find dist/ios -type f \( -name "*ios.ipa" -o -name "*signed.ipa" \) ! -name "*unsigned*" | head -n1)
           if [ -n "$signed_ipa" ] && [ -f "$signed_ipa" ]; then
@@ -302,7 +306,11 @@ jobs:
             exit 0
           fi
           mkdir -p ~/.appstoreconnect/private_keys
-          echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          if [[ "$PRIVATE_KEY_B64" == *"BEGIN PRIVATE KEY"* ]]; then
+            echo "$PRIVATE_KEY_B64" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          else
+            echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          fi
           chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
           signed_ipa=$(find dist/tvos -type f -name "*tvos-signed.ipa" | head -n1)
           if [ -n "$signed_ipa" ] && [ -f "$signed_ipa" ]; then
@@ -406,7 +414,11 @@ jobs:
             exit 0
           fi
           mkdir -p ~/.appstoreconnect/private_keys
-          echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          if [[ "$PRIVATE_KEY_B64" == *"BEGIN PRIVATE KEY"* ]]; then
+            echo "$PRIVATE_KEY_B64" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          else
+            echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          fi
           chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
           signed_pkg=$(find dist/macos -type f -name "*.pkg" | head -n1)
           if [ -n "$signed_pkg" ] && [ -f "$signed_pkg" ]; then
