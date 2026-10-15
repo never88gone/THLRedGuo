@@ -524,42 +524,140 @@ public struct TVPlayerCircleButton: View {
 public struct TVEpisodeButton: View {
     public let episode: Episode
     public var isCurrent: Bool = false
+    public var isFocused: Bool = false
+    public var onUpCommand: (() -> Void)? = nil
+    public var onDownCommand: (() -> Void)? = nil
     public let action: () -> Void
 
-    @FocusState private var isFocused: Bool
-
-    public init(episode: Episode, isCurrent: Bool = false, action: @escaping () -> Void) {
+    public init(
+        episode: Episode,
+        isCurrent: Bool = false,
+        isFocused: Bool = false,
+        isExternalFocused: Bool? = nil,
+        onUpCommand: (() -> Void)? = nil,
+        onDownCommand: (() -> Void)? = nil,
+        action: @escaping () -> Void
+    ) {
         self.episode = episode
         self.isCurrent = isCurrent
+        self.isFocused = isExternalFocused ?? isFocused
+        self.onUpCommand = onUpCommand
+        self.onDownCommand = onDownCommand
         self.action = action
     }
 
     public var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                Text("\(episode.number)")
-                    .font(.system(size: 22, weight: isCurrent ? .black : .bold))
-                    .foregroundColor(isCurrent ? TVTheme.primary : TVTheme.textPrimary)
-                if episode.vip {
-                    Text("VIP")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(TVTheme.vipAccent)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 72)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isCurrent ? TVTheme.primary.opacity(0.35) : (isFocused ? TVTheme.surfaceFocused : TVTheme.surfaceCard))
-            )
-            .tvFocusBorder(
-                isFocused: isFocused,
-                cornerRadius: 14,
-                lineWidth: TVTheme.focusedBorderWidth
+            TVEpisodeButtonLabel(
+                episode: episode,
+                isCurrent: isCurrent,
+                externalFocused: isFocused
             )
         }
         .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isFocused)
         .focusEffectDisabled()
+        .onMoveCommand { direction in
+            if direction == .up {
+                onUpCommand?()
+            } else if direction == .down {
+                onDownCommand?()
+            }
+        }
+    }
+}
+
+private struct TVEpisodeButtonLabel: View {
+    let episode: Episode
+    let isCurrent: Bool
+    let externalFocused: Bool
+
+    @Environment(\.isFocused) private var envIsFocused
+
+    var isFocused: Bool {
+        externalFocused || envIsFocused
+    }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 4) {
+                if isCurrent && !isFocused {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color.red)
+                }
+
+                Text("\(episode.number)")
+                    .font(.system(size: isFocused ? 26 : 22, weight: isFocused ? .heavy : (isCurrent ? .bold : .semibold)))
+                    .foregroundColor(textColor)
+
+                if episode.vip {
+                    Text("VIP")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundColor(isFocused ? .yellow : TVTheme.vipAccent)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.black.opacity(0.4))
+                        .clipShape(Capsule())
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 74)
+
+            if isCurrent && !isFocused {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 8, height: 8)
+                    .padding(8)
+            }
+        }
+        .background(backgroundView)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(
+                    isFocused ? TVTheme.focusedBorderColor : (isCurrent ? Color.red.opacity(0.85) : Color.white.opacity(0.12)),
+                    lineWidth: isFocused ? TVTheme.focusedBorderWidth : (isCurrent ? 2.5 : 1.0)
+                )
+        )
+        .scaleEffect(isFocused ? TVTheme.defaultScale : 1.0)
+        .shadow(
+            color: isFocused ? TVTheme.focusedShadowColor : (isCurrent ? Color.red.opacity(0.35) : Color.clear),
+            radius: isFocused ? TVTheme.focusedShadowRadius : (isCurrent ? 8 : 0),
+            y: isFocused ? 4 : 0
+        )
+        .animation(TVTheme.focusSpringAnimation, value: isFocused)
+        .padding(.horizontal, 2)
+        .padding(.vertical, 2)
+    }
+
+    private var textColor: Color {
+        if isFocused {
+            return .white
+        }
+        if isCurrent {
+            return Color.red.opacity(0.95)
+        }
+        return Color.white.opacity(0.85)
+    }
+
+    @ViewBuilder
+    private var backgroundView: some View {
+        if isFocused {
+            if isCurrent {
+                LinearGradient(
+                    colors: [Color.red, Color(red: 1.0, green: 0.25, blue: 0.35)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                Color(red: 0.30, green: 0.30, blue: 0.35)
+            }
+        } else {
+            if isCurrent {
+                Color.red.opacity(0.25)
+            } else {
+                TVTheme.surfaceCard
+            }
+        }
     }
 }
 

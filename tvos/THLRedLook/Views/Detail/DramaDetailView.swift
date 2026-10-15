@@ -18,6 +18,7 @@ public struct DramaDetailView: View {
     @State private var isDescriptionExpanded: Bool = false
     @State private var showingDownloadSuccess: Bool = false
     @FocusState private var isPlayButtonFocused: Bool
+    @FocusState private var focusedEpisode: Int?
 
     public init(drama: Drama) {
         _viewModel = StateObject(wrappedValue: DetailViewModel(drama: drama))
@@ -189,7 +190,15 @@ public struct DramaDetailView: View {
                                         ForEach(Array(detail.episodeChunks.enumerated()), id: \.offset) { index, chunk in
                                             TVCapsuleButton(
                                                 title: chunk.title,
-                                                isSelected: viewModel.selectedChunkIndex == index
+                                                isSelected: viewModel.selectedChunkIndex == index,
+                                                onDownCommand: {
+                                                    if !detail.episodeChunks.isEmpty && viewModel.selectedChunkIndex < detail.episodeChunks.count {
+                                                        let currentChunk = detail.episodeChunks[viewModel.selectedChunkIndex]
+                                                        if let firstEp = currentChunk.episodes.first {
+                                                            focusedEpisode = firstEp.number
+                                                        }
+                                                    }
+                                                }
                                             ) {
                                                 viewModel.selectedChunkIndex = index
                                             }
@@ -209,11 +218,20 @@ public struct DramaDetailView: View {
                                     ForEach(currentChunk.episodes) { ep in
                                         TVEpisodeButton(
                                             episode: ep,
-                                            isCurrent: viewModel.lastWatchEntry?.episode == ep.number
+                                            isCurrent: viewModel.lastWatchEntry?.episode == ep.number,
+                                            isExternalFocused: focusedEpisode == ep.number,
+                                            onUpCommand: {
+                                                if let firstIndex = currentChunk.episodes.firstIndex(where: { $0.id == ep.id }), firstIndex < 8 {
+                                                    focusedEpisode = nil
+                                                    isPlayButtonFocused = true
+                                                }
+                                            }
                                         ) {
                                             resumePosition = 0
                                             playingEpisodeIndex = ep.number
                                         }
+                                        .focused($focusedEpisode, equals: ep.number)
+                                        .id("detail_episode_\(ep.number)")
                                     }
                                 }
                                 .padding(.top, 12)
