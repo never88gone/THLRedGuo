@@ -7,6 +7,8 @@ PODS:
   - file_picker_darwin (1.0.0):
     - Flutter
     - FlutterMacOS
+  - flutter_js (0.0.1):
+    - FlutterMacOS
   - FlutterMacOS (1.0.0)
   - media_kit_libs_macos_video (1.0.4):
     - FlutterMacOS
@@ -32,6 +34,7 @@ PODS:
 DEPENDENCIES:
   - ffmpeg_kit_flutter_new_min_gpl (from `Flutter/ephemeral/.symlinks/plugins/ffmpeg_kit_flutter_new_min_gpl/macos`)
   - file_picker_darwin (from `Flutter/ephemeral/.symlinks/plugins/file_picker_darwin/darwin`)
+  - flutter_js (from `Flutter/ephemeral/.symlinks/plugins/flutter_js/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - media_kit_libs_macos_video (from `Flutter/ephemeral/.symlinks/plugins/media_kit_libs_macos_video/macos`)
   - media_kit_video (from `Flutter/ephemeral/.symlinks/plugins/media_kit_video/macos`)
@@ -48,6 +51,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/ffmpeg_kit_flutter_new_min_gpl/macos
   file_picker_darwin:
     :path: Flutter/ephemeral/.symlinks/plugins/file_picker_darwin/darwin
+  flutter_js:
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_js/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
   media_kit_libs_macos_video:
@@ -72,6 +77,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   ffmpeg_kit_flutter_new_min_gpl: 6607f08cd5073c5e8d1352c284fb523cf0ad84bf
   file_picker_darwin: 4c2b9a50ea44cb3b071381ea0cf48591bdd80251
+  flutter_js: 79c3c70d33ba464c67d8eb88639a61aa718cd8b8
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   media_kit_libs_macos_video: 85a23e549b5f480e72cae3e5634b5514bc692f65
   media_kit_video: fa6564e3799a0a28bff39442334817088b7ca758

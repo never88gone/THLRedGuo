@@ -321,10 +321,110 @@ EOF
           if-no-files-found: error
           retention-days: 14
 
+  macos:
+    name: macOS 平台自动化打包
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: 开启 macOS 桌面支持
+        run: flutter config --enable-macos-desktop
+      - name: 配置 macOS 发布签名环境
+        id: signing
+        env:
+          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.MACOS_PROVISION_PROFILE_BASE64 }}
+        run: |
+          if [ -n "$CERT_BASE64" ] && [ -n "$CERT_PWD" ]; then
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+            security create-keychain -p "ci_temporal_pwd" build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "ci_temporal_pwd" build.keychain
+            security set-keychain-settings -lut 21600 build.keychain
+
+            echo "$CERT_BASE64" | base64 --decode > cert.p12
+            security import cert.p12 -k build.keychain -P "$CERT_PWD" -T /usr/bin/codesign -T /usr/bin/productbuild
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "ci_temporal_pwd" build.keychain
+            rm -f cert.p12
+
+            if [ -n "$PROFILE_BASE64" ]; then
+              mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+              echo "$PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/macos_appstore.provisionprofile
+            fi
+            cat << 'EOF' > /tmp/macos_export_options.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>destination</key>
+    <string>export</string>
+    <key>method</key>
+    <string>app-store</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>teamID</key>
+    <string>876385K952</string>
+    <key>stripSwiftSymbols</key>
+    <true/>
+</dict>
+</plist>
+EOF
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::未配置 macOS 签名证书 Secrets，本次构建仅生成未签名发布包。"
+          fi
+      - name: 构建并打包 macOS 应用
+        run: |
+          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f /tmp/macos_export_options.plist ]; then
+            python scripts/build_macos.py --export-options /tmp/macos_export_options.plist
+          else
+            python scripts/build_macos.py
+          fi
+      - name: 上传 macOS 至 App Store Connect (TestFlight)
+        if: steps.signing.outputs.has_signing == 'true'
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$KEY_ID" ] && [ -n "$ISSUER_ID" ] && [ -n "$PRIVATE_KEY_B64" ]; then
+            mkdir -p ~/.appstoreconnect/private_keys
+            echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+            signed_pkg=$(find dist/macos -name "*.pkg" | head -n1)
+            if [ -n "$signed_pkg" ] && [ -f "$signed_pkg" ]; then
+              echo "正在上传 macOS PKG 安装包到 App Store Connect: $signed_pkg"
+              xcrun altool --upload-app -f "$signed_pkg" -t osx --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+            else
+              echo "未发现签名的 macOS PKG 产物，跳过上传。"
+            fi
+          else
+            echo "::notice::未配置 APP_STORE_CONNECT_* Secrets，跳过上传 TestFlight。"
+          fi
+      - name: 清理 macOS 钥匙串与临时凭证
+        if: always()
+        run: |
+          security delete-keychain build.keychain 2>/dev/null || true
+          rm -rf ~/.appstoreconnect /tmp/macos_export_options.plist
+      - name: 上传 macOS 安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-packages
+          path: dist/macos/*
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     name: 全平台产物汇总与 Release 发布
-    needs: [android, windows, ios, tvos]
-    if: always() && (needs.android.result == 'success' || needs.windows.result == 'success' || needs.ios.result == 'success' || needs.tvos.result == 'success')
+    needs: [android, windows, ios, tvos, macos]
+    if: always() && (needs.android.result == 'success' || needs.windows.result == 'success' || needs.ios.result == 'success' || needs.tvos.result == 'success' || needs.macos.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
