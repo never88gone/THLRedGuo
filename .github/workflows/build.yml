@@ -171,6 +171,7 @@ jobs:
               if [ -n "$UUID" ]; then
                 cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/${UUID}.mobileprovision
               fi
+              cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/thlredlook_iOS_dis.mobileprovision
               cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/ios_appstore.mobileprovision
               rm -f /tmp/profile.mobileprovision
             fi
@@ -276,6 +277,7 @@ jobs:
               if [ -n "$UUID" ]; then
                 cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/${UUID}.mobileprovision
               fi
+              cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/thlredlook_tvOS_dis.mobileprovision
               cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/tvos_appstore.mobileprovision
               rm -f /tmp/profile.mobileprovision
             fi
@@ -384,6 +386,7 @@ jobs:
               if [ -n "$UUID" ]; then
                 cp /tmp/profile.provisionprofile ~/Library/MobileDevice/Provisioning\ Profiles/${UUID}.provisionprofile
               fi
+              cp /tmp/profile.provisionprofile ~/Library/MobileDevice/Provisioning\ Profiles/thlredlook_macOS_dis.provisionprofile
               cp /tmp/profile.provisionprofile ~/Library/MobileDevice/Provisioning\ Profiles/macos_appstore.provisionprofile
               rm -f /tmp/profile.provisionprofile
             fi
