@@ -139,10 +139,19 @@ jobs:
       - name: 配置 iOS 发布签名环境
         id: signing
         env:
-          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 || vars.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD || vars.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 || vars.IOS_PROVISION_PROFILE_BASE64 }}
         run: |
+          CERT_LEN=${#CERT_BASE64}
+          PWD_LEN=${#CERT_PWD}
+          PROFILE_LEN=${#PROFILE_BASE64}
+          echo "==== 诊断 iOS 签名凭证配置 ===="
+          echo "  - APPLE_CERTIFICATE_P12_BASE64: $( [ $CERT_LEN -gt 0 ] && echo "已配置 ($CERT_LEN 字符)" || echo "❌ 未配置或为空" )"
+          echo "  - APPLE_CERTIFICATE_PASSWORD: $( [ $PWD_LEN -gt 0 ] && echo "已配置" || echo "❌ 未配置或为空" )"
+          echo "  - IOS_PROVISION_PROFILE_BASE64: $( [ $PROFILE_LEN -gt 0 ] && echo "已配置 ($PROFILE_LEN 字符)" || echo "❌ 未配置或为空" )"
+          echo "================================"
+
           if [ -n "$CERT_BASE64" ] && [ -n "$CERT_PWD" ]; then
             echo "has_signing=true" >> "$GITHUB_OUTPUT"
             security create-keychain -p "ci_temporal_pwd" build.keychain
@@ -179,9 +188,9 @@ jobs:
       - name: 上传 iOS 至 App Store Connect (TestFlight)
         env:
           HAS_SIGNING: ${{ steps.signing.outputs.has_signing }}
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID || vars.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID || vars.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY || vars.APP_STORE_CONNECT_PRIVATE_KEY }}
         run: |
           if [ "$HAS_SIGNING" != "true" ]; then
             echo "::warning::【未配置签名证书】未检测到 APPLE_CERTIFICATE_P12_BASE64，已跳过 TestFlight 上传。"
@@ -231,10 +240,19 @@ jobs:
       - name: 配置 tvOS 发布签名环境
         id: signing
         env:
-          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          PROFILE_BASE64: ${{ secrets.TVOS_PROVISION_PROFILE_BASE64 }}
+          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 || vars.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD || vars.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.TVOS_PROVISION_PROFILE_BASE64 || vars.TVOS_PROVISION_PROFILE_BASE64 }}
         run: |
+          CERT_LEN=${#CERT_BASE64}
+          PWD_LEN=${#CERT_PWD}
+          PROFILE_LEN=${#PROFILE_BASE64}
+          echo "==== 诊断 tvOS 签名凭证配置 ===="
+          echo "  - APPLE_CERTIFICATE_P12_BASE64: $( [ $CERT_LEN -gt 0 ] && echo "已配置 ($CERT_LEN 字符)" || echo "❌ 未配置或为空" )"
+          echo "  - APPLE_CERTIFICATE_PASSWORD: $( [ $PWD_LEN -gt 0 ] && echo "已配置" || echo "❌ 未配置或为空" )"
+          echo "  - TVOS_PROVISION_PROFILE_BASE64: $( [ $PROFILE_LEN -gt 0 ] && echo "已配置 ($PROFILE_LEN 字符)" || echo "❌ 未配置或为空" )"
+          echo "================================"
+
           if [ -n "$CERT_BASE64" ] && [ -n "$CERT_PWD" ]; then
             echo "has_signing=true" >> "$GITHUB_OUTPUT"
             security create-keychain -p "ci_temporal_pwd" build.keychain
@@ -271,9 +289,9 @@ jobs:
       - name: 上传 tvOS 至 App Store Connect (TestFlight)
         env:
           HAS_SIGNING: ${{ steps.signing.outputs.has_signing }}
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID || vars.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID || vars.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY || vars.APP_STORE_CONNECT_PRIVATE_KEY }}
         run: |
           if [ "$HAS_SIGNING" != "true" ]; then
             echo "::warning::【未配置签名证书】未检测到 APPLE_CERTIFICATE_P12_BASE64，已跳过 TestFlight 上传。"
@@ -326,10 +344,19 @@ jobs:
       - name: 配置 macOS 发布签名环境
         id: signing
         env:
-          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          PROFILE_BASE64: ${{ secrets.MACOS_PROVISION_PROFILE_BASE64 }}
+          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 || vars.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD || vars.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.MACOS_PROVISION_PROFILE_BASE64 || vars.MACOS_PROVISION_PROFILE_BASE64 }}
         run: |
+          CERT_LEN=${#CERT_BASE64}
+          PWD_LEN=${#CERT_PWD}
+          PROFILE_LEN=${#PROFILE_BASE64}
+          echo "==== 诊断 macOS 签名凭证配置 ===="
+          echo "  - APPLE_CERTIFICATE_P12_BASE64: $( [ $CERT_LEN -gt 0 ] && echo "已配置 ($CERT_LEN 字符)" || echo "❌ 未配置或为空" )"
+          echo "  - APPLE_CERTIFICATE_PASSWORD: $( [ $PWD_LEN -gt 0 ] && echo "已配置" || echo "❌ 未配置或为空" )"
+          echo "  - MACOS_PROVISION_PROFILE_BASE64: $( [ $PROFILE_LEN -gt 0 ] && echo "已配置 ($PROFILE_LEN 字符)" || echo "❌ 未配置或为空" )"
+          echo "================================"
+
           if [ -n "$CERT_BASE64" ] && [ -n "$CERT_PWD" ]; then
             echo "has_signing=true" >> "$GITHUB_OUTPUT"
             security create-keychain -p "ci_temporal_pwd" build.keychain
@@ -366,9 +393,9 @@ jobs:
       - name: 上传 macOS 至 App Store Connect (TestFlight)
         env:
           HAS_SIGNING: ${{ steps.signing.outputs.has_signing }}
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID || vars.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID || vars.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY || vars.APP_STORE_CONNECT_PRIVATE_KEY }}
         run: |
           if [ "$HAS_SIGNING" != "true" ]; then
             echo "::warning::【未配置签名证书】未检测到 APPLE_CERTIFICATE_P12_BASE64，已跳过 TestFlight 上传。"
