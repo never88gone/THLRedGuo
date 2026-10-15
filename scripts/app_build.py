@@ -1,5 +1,13 @@
 import base64
 from dataclasses import dataclass
+import sys
+
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 
 @dataclass(frozen=True)
@@ -62,7 +70,7 @@ def sync_project_version(root: Path, base_version: str = "1.0.0") -> str:
         text = pubspec.read_text(encoding="utf-8")
         updated = re.sub(r'^version:\s*.*$', f'version: {full_version}', text, flags=re.MULTILINE)
         pubspec.write_text(updated, encoding="utf-8")
-        print(f"🚀 动态注入基于北京时间生成的构建版本号: {full_version}", flush=True)
+        print(f"[INFO] 动态注入基于北京时间生成的构建版本号: {full_version}", flush=True)
     return full_version
 
 

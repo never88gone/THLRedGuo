@@ -113,7 +113,7 @@ def generate_assets():
     render_top_shelf(4640, 1440, 1280).save(os.path.join(shelf_wide_dir, "TopShelf@2x.png"), "PNG")
     print("✓ Saved Top Shelf Image Wide")
 
-    print("\n🎉 全部 tvOS App 图标与宽屏资产生成完毕！")
+    print("\n[INFO] 全部 tvOS App 图标与宽屏资产生成完毕！")
 
 if __name__ == "__main__":
     generate_assets()

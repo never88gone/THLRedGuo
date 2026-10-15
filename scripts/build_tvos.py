@@ -45,7 +45,7 @@ def main():
     destination = "generic/platform=tvOS"
 
     beijing_build = get_beijing_build_number()
-    print(f"🚀 动态注入北京时间编译号 (Build Number): {beijing_build}")
+    print(f"[INFO] 动态注入北京时间编译号 (Build Number): {beijing_build}")
 
     info_plist = root / "tvos" / "THLRedLook" / "App" / "Info.plist"
     if info_plist.exists():
