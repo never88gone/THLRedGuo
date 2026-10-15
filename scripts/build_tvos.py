@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from app_build import sync_project_version
+from app_build import sync_project_version, get_beijing_build_number
 
 root = Path(__file__).resolve().parents[1]
 sync_project_version(root, "1.0.0")
@@ -23,6 +23,7 @@ def main():
     parser.add_argument("--release", action="store_true", help="构建 Release 配置")
     parser.add_argument("--device", action="store_true", help="构建真机版本 (默认构建真机版本)")
     parser.add_argument("--package", action="store_true", help="归档并打包输出到 dist/tvos")
+    parser.add_argument("--export-options", type=Path, help="使用指定的 ExportOptions.plist 导出签名 IPA")
     args = parser.parse_args()
 
     if platform.system() != "Darwin":
@@ -43,9 +44,7 @@ def main():
     configuration = "Release" if (args.release or args.package) else "Debug"
     destination = "generic/platform=tvOS"
 
-    from datetime import datetime, timezone, timedelta
-    tz_bj = timezone(timedelta(hours=8))
-    beijing_build = datetime.now(tz_bj).strftime('%Y%m%d%H%M%S')
+    beijing_build = get_beijing_build_number()
     print(f"🚀 动态注入北京时间编译号 (Build Number): {beijing_build}")
 
     info_plist = root / "tvos" / "THLRedLook" / "App" / "Info.plist"
@@ -69,10 +68,13 @@ def main():
             "-destination", destination,
             "-archivePath", str(archive_path),
             f"CURRENT_PROJECT_VERSION={beijing_build}",
-            "CODE_SIGNING_ALLOWED=NO",
-            "CODE_SIGNING_REQUIRED=NO",
-            "CODE_SIGN_IDENTITY=",
         ]
+        if not args.export_options:
+            cmd.extend([
+                "CODE_SIGNING_ALLOWED=NO",
+                "CODE_SIGNING_REQUIRED=NO",
+                "CODE_SIGN_IDENTITY=",
+            ])
         if args.clean:
             cmd.insert(cmd.index("archive") + 1, "clean")
 
@@ -108,9 +110,33 @@ def main():
             ipa_target.unlink()
         run(["ditto", "-c", "-k", "--sequesterRsrc", str(payload_dir), str(ipa_target)])
         shutil.rmtree(payload_dir)
-        print(f"已生成 tvOS IPA: {ipa_target}")
+        print(f"已生成 tvOS 未签名 IPA: {ipa_target}")
 
-        # 3. 生成 SHA256SUMS.txt
+        # 3. 若提供了 ExportOptions.plist，导出官方签名 IPA
+        if args.export_options:
+            export_plist = args.export_options.expanduser().resolve()
+            if not export_plist.is_file():
+                raise SystemExit(f"ExportOptions.plist 不存在: {export_plist}")
+            export_dir = root / "build" / "tvos" / "export"
+            if export_dir.exists():
+                shutil.rmtree(export_dir)
+            export_dir.mkdir(parents=True, exist_ok=True)
+            export_cmd = [
+                xcodebuild,
+                "-exportArchive",
+                "-archivePath", str(archive_path),
+                "-exportPath", str(export_dir),
+                "-exportOptionsPlist", str(export_plist),
+                "-allowProvisioningUpdates",
+            ]
+            print(f"导出签名 tvOS IPA: {' '.join(export_cmd)}")
+            run(export_cmd)
+            for exported_ipa in export_dir.glob("*.ipa"):
+                signed_target = output_dir / f"THLRedLook-{version}-tvos-signed.ipa"
+                shutil.copy2(exported_ipa, signed_target)
+                print(f"已生成 tvOS 签名发布 IPA: {signed_target}")
+
+        # 4. 生成 SHA256SUMS.txt
         checksums = []
         for artifact in sorted(output_dir.glob(f"*-{version}-tvos*")):
             digest = hashlib.sha256()

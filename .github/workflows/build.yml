@@ -133,8 +133,86 @@ jobs:
           cache: true
       - name: 开启 iOS 支持
         run: flutter config --enable-ios
-      - name: 构建 iOS 未签名发布包
-        run: python scripts/build_ios.py
+      - name: 配置 iOS 发布签名环境
+        id: signing
+        env:
+          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+        run: |
+          if [ -n "$CERT_BASE64" ] && [ -n "$CERT_PWD" ]; then
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+            security create-keychain -p "ci_temporal_pwd" build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "ci_temporal_pwd" build.keychain
+            security set-keychain-settings -lut 21600 build.keychain
+
+            echo "$CERT_BASE64" | base64 --decode > cert.p12
+            security import cert.p12 -k build.keychain -P "$CERT_PWD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "ci_temporal_pwd" build.keychain
+            rm -f cert.p12
+
+            if [ -n "$PROFILE_BASE64" ]; then
+              mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+              echo "$PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/ios_appstore.mobileprovision
+            fi
+            # 动态生成 App Store 导出配置
+            cat << 'EOF' > /tmp/ios_export_options.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>destination</key>
+    <string>export</string>
+    <key>method</key>
+    <string>app-store</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>teamID</key>
+    <string>876385K952</string>
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>compileBitcode</key>
+    <false/>
+</dict>
+</plist>
+EOF
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::未配置 iOS 签名证书 Secrets，本次构建仅生成未签名发布包。"
+          fi
+      - name: 构建 iOS 应用安装包
+        run: |
+          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f /tmp/ios_export_options.plist ]; then
+            python scripts/build_ios.py --export-options /tmp/ios_export_options.plist
+          else
+            python scripts/build_ios.py
+          fi
+      - name: 上传 iOS 至 App Store Connect (TestFlight)
+        if: steps.signing.outputs.has_signing == 'true'
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$KEY_ID" ] && [ -n "$ISSUER_ID" ] && [ -n "$PRIVATE_KEY_B64" ]; then
+            mkdir -p ~/.appstoreconnect/private_keys
+            echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+            signed_ipa=$(find dist/ios -name "*ios.ipa" -o -name "*ios-signed.ipa" | head -n1)
+            if [ -n "$signed_ipa" ] && [ -f "$signed_ipa" ]; then
+              echo "正在上传 iOS 签名包到 App Store Connect: $signed_ipa"
+              xcrun altool --upload-app -f "$signed_ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+            else
+              echo "未发现签名的 iOS IPA 产物，跳过上传。"
+            fi
+          else
+            echo "::notice::未配置 APP_STORE_CONNECT_* Secrets，跳过上传 TestFlight。"
+          fi
+      - name: 清理 iOS 钥匙串与临时凭证
+        if: always()
+        run: |
+          security delete-keychain build.keychain 2>/dev/null || true
+          rm -rf ~/.appstoreconnect /tmp/ios_export_options.plist
       - name: 上传 iOS 安装包
         uses: actions/upload-artifact@v4
         with:
@@ -155,8 +233,86 @@ jobs:
       - name: 安装 tvOS CocoaPods 依赖
         run: |
           cd tvos && pod install
+      - name: 配置 tvOS 发布签名环境
+        id: signing
+        env:
+          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.TVOS_PROVISION_PROFILE_BASE64 }}
+        run: |
+          if [ -n "$CERT_BASE64" ] && [ -n "$CERT_PWD" ]; then
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+            security create-keychain -p "ci_temporal_pwd" build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "ci_temporal_pwd" build.keychain
+            security set-keychain-settings -lut 21600 build.keychain
+
+            echo "$CERT_BASE64" | base64 --decode > cert.p12
+            security import cert.p12 -k build.keychain -P "$CERT_PWD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "ci_temporal_pwd" build.keychain
+            rm -f cert.p12
+
+            if [ -n "$PROFILE_BASE64" ]; then
+              mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+              echo "$PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/tvos_appstore.mobileprovision
+            fi
+            # 动态生成 tvOS App Store 导出配置
+            cat << 'EOF' > /tmp/tvos_export_options.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>destination</key>
+    <string>export</string>
+    <key>method</key>
+    <string>app-store</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>teamID</key>
+    <string>876385K952</string>
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>compileBitcode</key>
+    <false/>
+</dict>
+</plist>
+EOF
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::未配置 tvOS 签名证书 Secrets，本次构建仅生成未签名发布包。"
+          fi
       - name: 构建并打包 tvOS 原生应用
-        run: python scripts/build_tvos.py --package
+        run: |
+          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f /tmp/tvos_export_options.plist ]; then
+            python scripts/build_tvos.py --package --export-options /tmp/tvos_export_options.plist
+          else
+            python scripts/build_tvos.py --package
+          fi
+      - name: 上传 tvOS 至 App Store Connect (TestFlight)
+        if: steps.signing.outputs.has_signing == 'true'
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          if [ -n "$KEY_ID" ] && [ -n "$ISSUER_ID" ] && [ -n "$PRIVATE_KEY_B64" ]; then
+            mkdir -p ~/.appstoreconnect/private_keys
+            echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+            signed_ipa=$(find dist/tvos -name "*tvos-signed.ipa" | head -n1)
+            if [ -n "$signed_ipa" ] && [ -f "$signed_ipa" ]; then
+              echo "正在上传 tvOS 签名包到 App Store Connect: $signed_ipa"
+              xcrun altool --upload-app -f "$signed_ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+            else
+              echo "未发现签名的 tvOS IPA 产物，跳过上传。"
+            fi
+          else
+            echo "::notice::未配置 APP_STORE_CONNECT_* Secrets，跳过上传 TestFlight。"
+          fi
+      - name: 清理 tvOS 钥匙串与临时凭证
+        if: always()
+        run: |
+          security delete-keychain build.keychain 2>/dev/null || true
+          rm -rf ~/.appstoreconnect /tmp/tvos_export_options.plist
       - name: 上传 tvOS 安装包
         uses: actions/upload-artifact@v4
         with:
