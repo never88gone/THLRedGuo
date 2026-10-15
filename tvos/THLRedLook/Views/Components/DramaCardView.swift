@@ -155,18 +155,25 @@ public struct DramaCardView: View {
     public var watchProgress: Double? = nil
     public var progressText: String? = nil
     public var forceFocused: Bool = false
-    public let onSelect: () -> Void
+    public var isExternalFocused: Bool? = nil
+    public var onSelect: () -> Void
 
-    @FocusState private var isFocused: Bool
+    @Environment(\.isFocused) private var envIsFocused: Bool
+
+    private var isFocused: Bool {
+        isExternalFocused ?? envIsFocused
+    }
 
     public init(
         drama: Drama,
+        isExternalFocused: Bool? = nil,
         watchProgress: Double? = nil,
         progressText: String? = nil,
         forceFocused: Bool = false,
         onSelect: @escaping () -> Void
     ) {
         self.drama = drama
+        self.isExternalFocused = isExternalFocused
         self.watchProgress = watchProgress
         self.progressText = progressText
         self.forceFocused = forceFocused
@@ -237,7 +244,6 @@ public struct DramaCardView: View {
             .background(Color.clear)
         }
         .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isFocused)
         .focusEffectDisabled()
     }
 }

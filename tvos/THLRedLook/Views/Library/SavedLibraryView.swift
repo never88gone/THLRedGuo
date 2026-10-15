@@ -3,6 +3,9 @@ import SwiftUI
 public struct SavedLibraryView: View {
     @StateObject private var viewModel = LibraryViewModel()
     @State private var selectedDrama: Drama?
+    @FocusState private var focusedMainTab: LibraryViewModel.LibraryTab?
+    @FocusState private var focusedFollowFilter: FollowState?
+    @FocusState private var focusedDramaId: String?
 
     private let columns = [
         GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
@@ -24,6 +27,7 @@ public struct SavedLibraryView: View {
                             ) {
                                 viewModel.selectedTab = tab
                             }
+                            .focused($focusedMainTab, equals: tab)
                         }
 
                         Spacer()
@@ -39,6 +43,8 @@ public struct SavedLibraryView: View {
                     .padding(.leading, 48)
                     .padding(.trailing, 48)
                     .padding(.top, 28)
+                    .focusSection()
+                    .defaultFocus($focusedMainTab, viewModel.selectedTab)
 
                     if viewModel.selectedTab == .follows {
                         HStack(spacing: 24) {
@@ -49,12 +55,15 @@ public struct SavedLibraryView: View {
                                 ) {
                                     viewModel.selectedFollowFilter = state
                                 }
+                                .focused($focusedFollowFilter, equals: state)
                             }
                             Spacer()
                         }
                         .padding(.leading, 48)
                         .padding(.trailing, 48)
                         .padding(.top, 4)
+                        .focusSection()
+                        .defaultFocus($focusedFollowFilter, viewModel.selectedFollowFilter)
                     }
 
                     // 列表内容
@@ -81,6 +90,7 @@ public struct SavedLibraryView: View {
                                         ) {
                                             selectedDrama = entry.drama
                                         }
+                                        .focused($focusedDramaId, equals: entry.drama.id)
                                     }
                                 }
                                 .padding(.horizontal, 48)
@@ -104,6 +114,7 @@ public struct SavedLibraryView: View {
                                         DramaCardView(drama: drama) {
                                             selectedDrama = drama
                                         }
+                                        .focused($focusedDramaId, equals: drama.id)
                                     }
                                 }
                                 .padding(.horizontal, 48)
@@ -111,11 +122,22 @@ public struct SavedLibraryView: View {
                             }
                         }
                     }
+                    .focusSection()
+                    .defaultFocus($focusedDramaId, viewModel.selectedTab == .history ? viewModel.historyList.first?.drama.id : viewModel.followedList.first?.id)
                 }
             }
         }
         .fullScreenCover(item: $selectedDrama) { drama in
             DramaDetailView(drama: drama)
+        }
+        .onChange(of: focusedMainTab) { t in
+            NSLog("🎯 [FOCUS_TRACE] Library focusedMainTab = %@", t?.rawValue ?? "nil")
+        }
+        .onChange(of: focusedFollowFilter) { f in
+            NSLog("🎯 [FOCUS_TRACE] Library focusedFollowFilter = %@", f?.rawValue ?? "nil")
+        }
+        .onChange(of: focusedDramaId) { d in
+            NSLog("🎯 [FOCUS_TRACE] Library focusedDramaId = %@", d ?? "nil")
         }
     }
 }

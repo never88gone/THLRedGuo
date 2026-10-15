@@ -7,6 +7,8 @@ public struct RankingsView: View {
     @EnvironmentObject private var jsService: JSSourceService
     @EnvironmentObject private var store: LocalStore
     @State private var selectedDrama: Drama?
+    @FocusState private var focusedBoardId: String?
+    @FocusState private var focusedDramaId: String?
 
     private let columns = [
         GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
@@ -46,6 +48,7 @@ public struct RankingsView: View {
                                 ) {
                                     viewModel.selectBoard(board)
                                 }
+                                .focused($focusedBoardId, equals: board.id)
                             }
                         }
                         .padding(.horizontal, 48)
@@ -53,6 +56,8 @@ public struct RankingsView: View {
                         .padding(.bottom, 12)
                     }
                     .clipShape(Rectangle().inset(by: -30))
+                    .focusSection()
+                    .defaultFocus($focusedBoardId, viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id)
 
                     if viewModel.isLoading && viewModel.items.isEmpty {
                         Spacer()
@@ -77,6 +82,7 @@ public struct RankingsView: View {
                                         DramaCardView(drama: drama) {
                                             selectedDrama = drama
                                         }
+                                        .focused($focusedDramaId, equals: drama.id)
 
                                         // 前三名金银铜徽章
                                         Text("\(index + 1)")
@@ -94,6 +100,8 @@ public struct RankingsView: View {
                             .padding(.horizontal, 48)
                             .padding(.vertical, 24)
                         }
+                        .focusSection()
+                        .defaultFocus($focusedDramaId, viewModel.items.first?.id)
                     }
                 }
                 .task(id: currentActiveSource) {
@@ -105,6 +113,12 @@ public struct RankingsView: View {
         .fullScreenCover(item: $selectedDrama) { drama in
             DramaDetailView(drama: drama)
         }
+        .onChange(of: focusedBoardId) { b in
+            NSLog("🎯 [FOCUS_TRACE] Rankings focusedBoardId = %@", b ?? "nil")
+        }
+        .onChange(of: focusedDramaId) { d in
+            NSLog("🎯 [FOCUS_TRACE] Rankings focusedDramaId = %@", d ?? "nil")
+        }
     }
 }
 
@@ -113,6 +127,8 @@ public struct RecommendationsView: View {
     @StateObject private var jsService = JSSourceService.shared
     @StateObject private var store = LocalStore.shared
     @State private var selectedDrama: Drama?
+    @FocusState private var focusedCategory: String?
+    @FocusState private var focusedDramaId: String?
 
     private let columns = [
         GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
@@ -150,6 +166,7 @@ public struct RecommendationsView: View {
                             ) {
                                 viewModel.selectSubCategory(cat)
                             }
+                            .focused($focusedCategory, equals: cat)
                         }
                         Spacer()
                     }
@@ -157,6 +174,8 @@ public struct RecommendationsView: View {
                     .padding(.trailing, 48)
                     .padding(.top, 32)
                     .padding(.bottom, 8)
+                    .focusSection()
+                    .defaultFocus($focusedCategory, viewModel.selectedSubCategory.isEmpty ? viewModel.subCategories.first : viewModel.selectedSubCategory)
 
                     if viewModel.isLoading && viewModel.items.isEmpty {
                         Spacer()
@@ -169,11 +188,14 @@ public struct RecommendationsView: View {
                                     DramaCardView(drama: drama) {
                                         selectedDrama = drama
                                     }
+                                    .focused($focusedDramaId, equals: drama.id)
                                 }
                             }
                             .padding(.horizontal, 48)
                             .padding(.vertical, 24)
                         }
+                        .focusSection()
+                        .defaultFocus($focusedDramaId, viewModel.items.first?.id)
                     }
                 }
                 .task(id: currentActiveSource) {
@@ -187,6 +209,12 @@ public struct RecommendationsView: View {
         }
         .fullScreenCover(item: $selectedDrama) { drama in
             DramaDetailView(drama: drama)
+        }
+        .onChange(of: focusedCategory) { c in
+            NSLog("🎯 [FOCUS_TRACE] Recommendations focusedCategory = %@", c ?? "nil")
+        }
+        .onChange(of: focusedDramaId) { d in
+            NSLog("🎯 [FOCUS_TRACE] Recommendations focusedDramaId = %@", d ?? "nil")
         }
     }
 }

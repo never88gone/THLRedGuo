@@ -190,6 +190,7 @@ public struct MainTabView: View {
                     .padding(.top, 28)
                     .padding(.bottom, 12)
                     .zIndex(100)
+                    .defaultFocus($focusedNavTab, selectedTab)
                     .focusSection()
 
                     // 页面切换容器
@@ -224,7 +225,6 @@ public struct MainTabView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .focusSection()
                 }
                 .background(TVTheme.backgroundGradient.ignoresSafeArea())
                 // 需求 1：焦点在内容页面，点击返回页面应该回到导航栏，而不是退出 app
@@ -238,6 +238,7 @@ public struct MainTabView: View {
                 }
                 // 需求 2：从内容页面按上键时，焦点精确重定向到当前激活的 selectedTab
                 .onChange(of: focusedNavTab) { newTab in
+                    NSLog("🎯 [FOCUS_TRACE] TopNav focusedNavTab = %@", newTab?.rawValue ?? "nil")
                     if let tab = newTab {
                         if wasInContentArea && tab != selectedTab {
                             // 修正跳往正上方错误 Tab 的系统默认行为，精确落回当前选中的 Tab

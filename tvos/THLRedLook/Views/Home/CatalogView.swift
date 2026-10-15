@@ -5,6 +5,8 @@ public struct CatalogView: View {
     @ObservedObject var store: LocalStore
     @State private var showingFilterSheet = false
     @State private var selectedDrama: Drama?
+    @FocusState private var focusedCategory: String?
+    @FocusState private var focusedDramaId: String?
     public var forceFocusFirstCard: Bool = false
     public var initialCategory: String? = nil
 
@@ -35,6 +37,7 @@ public struct CatalogView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 20) {
                         ForEach(viewModel.categories) { category in
+                            let catId = category.id.isEmpty ? "all" : category.id
                             TVCapsuleButton(
                                 title: category.name,
                                 isSelected: viewModel.selectedCategory.id == category.id,
@@ -44,6 +47,7 @@ public struct CatalogView: View {
                             ) {
                                 viewModel.selectCategory(category, immediate: true)
                             }
+                            .focused($focusedCategory, equals: catId)
                         }
                     }
                     .padding(.top, 16)
@@ -60,17 +64,21 @@ public struct CatalogView: View {
                     TVButton(title: viewModel.selectedSort.label, icon: "line.3.horizontal.decrease.circle") {
                         showingFilterSheet = true
                     }
+                    .focused($focusedCategory, equals: "__filter__")
 
                     // 刷新按钮
                     TVButton(title: "", icon: "arrow.clockwise") {
                         Task { await viewModel.reloadAll() }
                     }
+                    .focused($focusedCategory, equals: "__refresh__")
                 }
                 .padding(.top, 8)
                 .padding(.trailing, 8)
             }
             .padding(.horizontal, 48)
             .background(Color.clear)
+            .focusSection()
+            .defaultFocus($focusedCategory, viewModel.selectedCategory.id.isEmpty ? "all" : viewModel.selectedCategory.id)
 
             // 内容网格
             if viewModel.isLoading && viewModel.items.isEmpty {
@@ -101,6 +109,7 @@ public struct CatalogView: View {
                             ) {
                                 selectedDrama = drama
                             }
+                            .focused($focusedDramaId, equals: drama.id)
                             .onAppear {
                                 if drama.id == viewModel.items.last?.id {
                                     Task { await viewModel.loadNextPage() }
@@ -123,6 +132,8 @@ public struct CatalogView: View {
                         .padding(.vertical, 24)
                     }
                 }
+                .focusSection()
+                .defaultFocus($focusedDramaId, viewModel.items.first?.id)
             } // end else for loading
             } // end else for jsService
         } // end VStack
@@ -131,6 +142,12 @@ public struct CatalogView: View {
         }
         .fullScreenCover(item: $selectedDrama) { drama in
             DramaDetailView(drama: drama)
+        }
+        .onChange(of: focusedCategory) { cat in
+            NSLog("🎯 [FOCUS_TRACE] Catalog focusedCategory = %@", cat ?? "nil")
+        }
+        .onChange(of: focusedDramaId) { dramaId in
+            NSLog("🎯 [FOCUS_TRACE] Catalog focusedDramaId = %@", dramaId ?? "nil")
         }
         .task(id: jsService.activeSourceId) {
             await viewModel.reloadAll()
