@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from app_build import BuildVariant, add_variant_argument, sync_project_version, get_beijing_build_number
@@ -18,6 +19,40 @@ sync_project_version(root, "1.0.0")
 def run(cmd, **kwargs):
     print("Executing: " + (" ".join(cmd) if isinstance(cmd, list) else cmd), flush=True)
     subprocess.run(cmd, cwd=kwargs.pop("cwd", root), check=True, **kwargs)
+
+
+def create_dmg(app_path: Path, dmg_target: Path, volume_name: str = "糖葫芦果鉴"):
+    """使用 macOS 原生 hdiutil 命令生成标准的拖拽安装 DMG 镜像包"""
+    if dmg_target.exists():
+        dmg_target.unlink()
+
+    staging_dir = dmg_target.parent / f"dmg_staging_{int(time.time())}"
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir)
+    staging_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        dest_app = staging_dir / app_path.name
+        run(["ditto", str(app_path), str(dest_app)])
+
+        app_link = staging_dir / "Applications"
+        if not app_link.exists():
+            os.symlink("/Applications", app_link)
+
+        cmd = [
+            "hdiutil", "create",
+            "-volname", volume_name,
+            "-srcfolder", str(staging_dir),
+            "-ov",
+            "-format", "UDZO",
+            str(dmg_target),
+        ]
+        print(f"正在创建 macOS DMG 磁盘镜像安装包 -> {dmg_target}...")
+        run(cmd)
+        print(f"已生成 macOS DMG 安装包: {dmg_target}")
+    finally:
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir, ignore_errors=True)
 
 
 def main():
@@ -118,20 +153,27 @@ def main():
             except subprocess.CalledProcessError as e:
                 print(f"[WARNING] 导出 PKG 失败: {e}，将自动降级提取已签名的应用包。")
 
+        app_dir = archive_path / "Products" / "Applications"
+        app_candidates = list(app_dir.glob("*.app"))
+        if not app_candidates:
+            raise SystemExit("归档产物中未找到 .app 目录。")
+        target_app = app_candidates[0]
+
+        # 1. 始终生成 DMG 磁盘镜像安装包（带 /Applications 软链接，Mac 用户最友好的拖拽安装体验）
+        dmg_target = output_dir / f"{variant.slug}-{version}-macos.dmg"
+        create_dmg(target_app, dmg_target)
+        artifacts.append(dmg_target)
+
+        # 2. 始终生成 ZIP 便携压缩包
+        zip_target = output_dir / f"{variant.slug}-{version}-macos-app.zip"
+        if zip_target.exists():
+            zip_target.unlink()
+        run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(target_app), str(zip_target)])
+        artifacts.append(zip_target)
+        print(f"已生成 macOS App Zip: {zip_target}")
+
         if not exported_pkg:
             print("::warning::【未配置 Mac 安装器证书】钥匙串未检测到 Installer 证书，跳过 TestFlight PKG 打包。")
-            app_dir = archive_path / "Products" / "Applications"
-            app_candidates = list(app_dir.glob("*.app"))
-            if app_candidates:
-                target_app = app_candidates[0]
-                zip_target = output_dir / f"{variant.slug}-{version}-macos-app.zip"
-                if zip_target.exists():
-                    zip_target.unlink()
-                run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(target_app), str(zip_target)])
-                artifacts.append(zip_target)
-                print(f"已从归档中生成 macOS 签名应用包: {zip_target}")
-            else:
-                raise SystemExit("归档产物中未找到 .app 目录。")
     else:
         run([flutter, "build", "macos", "--release", "--no-pub", *variant.flutter_arguments])
         app_path = root / "build" / "macos" / "Build" / "Products" / "Release" / "THLRedLook.app"
@@ -142,6 +184,12 @@ def main():
             else:
                 raise SystemExit("未找到编译生成的 macOS .app 产物")
 
+        # 1. 生成 DMG 磁盘镜像安装包
+        dmg_target = output_dir / f"{variant.slug}-{version}-macos.dmg"
+        create_dmg(app_path, dmg_target)
+        artifacts.append(dmg_target)
+
+        # 2. 生成 ZIP 便携压缩包
         zip_target = output_dir / f"{variant.slug}-{version}-macos-app.zip"
         if zip_target.exists():
             zip_target.unlink()
