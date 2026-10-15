@@ -50,7 +50,9 @@ function parseJsonFromHtml(body) {
           depth--;
           if (depth === 0) {
             try {
-              return JSON.parse(body.slice(startIdx, i + 1));
+              let jsonSlice = body.slice(startIdx, i + 1);
+              jsonSlice = jsonSlice.replace(/("(?:series_)?id"):\s*(\d{15,})/g, '$1:"$2"');
+              return JSON.parse(jsonSlice);
             } catch (e) {
               break;
             }
@@ -340,27 +342,60 @@ async function search(wd, quick, pg) {
       }
     });
 
-    if (resp && resp.status === 200 && resp.body) {
-      const json = JSON.parse(resp.body);
+    let rawBody = "";
+    if (resp && resp.status === 200) {
+      if (typeof resp.text === "function") {
+        rawBody = await resp.text();
+      } else if (resp.body) {
+        rawBody = String(resp.body);
+      }
+    }
+
+    if (rawBody) {
+      let safeBody = rawBody.replace(/("(?:series_)?id"):\s*(\d{15,})/g, '$1:"$2"');
+      safeBody = safeBody.replace(/("(?:keyword)"):\s*(\d{15,})/g, '$1:"$2"');
+      const json = JSON.parse(safeBody);
       const list = json.suggest_list || (json.data && json.data.suggest_list) || [];
       for (let i = 0; i < list.length; i++) {
         const item = list[i];
-        const videoData = item.video_data || item;
-        const id = videoData.series_id_str || videoData.series_id || item.series_id || item.id;
-        if (id) {
-          const rawPic = videoData.series_cover || videoData.cover_url || videoData.cover || videoData.thumb_url || item.series_cover || item.cover_url || item.cover || item.thumb_url || "";
-          let pic = String(rawPic).trim();
-          if (pic.startsWith("//")) pic = "https:" + pic;
+        const videoData = item.video_data || {};
 
-          dramas.push({
-            vod_id: String(id),
-            vod_name: cleanText(item.name || videoData.title || item.keyword),
-            vod_pic: pic,
-            vod_remarks: videoData.episode_cnt ? ("全" + videoData.episode_cnt + "集") : "",
-            vod_content: cleanText(videoData.intro || videoData.abstract || ""),
-            vod_year: "2024"
-          });
+        let rawId = videoData.series_id || videoData.series_id_str || "";
+        if (!rawId && item.keyword && /^\d{15,}$/.test(String(item.keyword).trim())) {
+          rawId = String(item.keyword).trim();
         }
+        if (!rawId && item.series_id) {
+          rawId = String(item.series_id).trim();
+        }
+        const id = String(rawId).trim();
+        if (!id || !/^\d+$/.test(id)) {
+          continue;
+        }
+
+        const rawPic = videoData.series_cover || videoData.cover_url || videoData.cover || videoData.thumb_url || item.series_cover || item.cover_url || item.cover || item.thumb_url || "";
+        let pic = String(rawPic).trim();
+        if (pic.startsWith("//")) pic = "https:" + pic;
+
+        const hasVids = Array.isArray(videoData.vid_list) && videoData.vid_list.length > 0;
+        if (!pic && !hasVids) {
+          continue;
+        }
+
+        const title = cleanText(videoData.series_title || videoData.series_name || videoData.title || item.name || item.keyword);
+        if (!title) continue;
+
+        const epCnt = videoData.episode_cnt || item.episode_cnt || 0;
+        const remark = videoData.episode_right_text || item.episode_right_text || (epCnt ? ("全" + epCnt + "集") : "");
+        const intro = cleanText(videoData.series_intro || videoData.video_desc || videoData.intro || videoData.abstract || videoData.desc || item.series_intro || item.intro || item.desc);
+
+        dramas.push({
+          vod_id: String(id),
+          vod_name: title,
+          vod_pic: pic,
+          vod_remarks: remark,
+          vod_content: intro || (title + (epCnt ? (" · 全" + epCnt + "集") : "")),
+          vod_year: "2024"
+        });
       }
     }
   } catch (e) {}

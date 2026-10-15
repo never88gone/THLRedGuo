@@ -17,7 +17,6 @@ public struct DramaDetailView: View {
     @State private var resumePosition: Double = 0
     @State private var isDescriptionExpanded: Bool = false
     @State private var showingDownloadSuccess: Bool = false
-    @State private var selectedRelatedSeason: Drama?
     @FocusState private var isPlayButtonFocused: Bool
 
     public init(drama: Drama) {
@@ -162,7 +161,9 @@ public struct DramaDetailView: View {
                                     ForEach(viewModel.seasonItems) { item in
                                         TVSeasonCapsuleCard(item: item) {
                                             if !item.isCurrent {
-                                                selectedRelatedSeason = item.drama
+                                                Task {
+                                                    await viewModel.switchToDrama(item.drama)
+                                                }
                                             }
                                         }
                                     }
@@ -250,8 +251,8 @@ public struct DramaDetailView: View {
                     },
                     onSwitchSeason: { newDrama in
                         playingEpisodeIndex = nil
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            selectedRelatedSeason = newDrama
+                        Task {
+                            await viewModel.switchToDrama(newDrama)
                         }
                     }
                 )
@@ -284,9 +285,6 @@ public struct DramaDetailView: View {
                     }
                 }
             }
-        }
-        .fullScreenCover(item: $selectedRelatedSeason) { relatedDrama in
-            DramaDetailView(drama: relatedDrama)
         }
         .onExitCommand {
             presentationMode.wrappedValue.dismiss()

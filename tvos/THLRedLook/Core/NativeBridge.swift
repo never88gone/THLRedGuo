@@ -495,11 +495,13 @@ public actor NativeBridge {
             return ["items": dramas]
 
         case "detail":
-            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? activeSourceId
             guard let dramaDict = payload["drama"] as? [String: Any],
                   let dramaId = dramaDict["id"] as? String, !dramaId.isEmpty else {
                 throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "剧集信息无效"])
             }
+            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? (dramaDict["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? activeSourceId
             guard !targetSrc.isEmpty, let ctx = getOrCreateContext(sourceId: targetSrc) else {
                 throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "数据源未就绪"])
             }
@@ -520,7 +522,16 @@ public actor NativeBridge {
                     vod = data
                 }
 
-                freshDrama = mapVodToDrama(vod: vod, sourceId: targetSrc)
+                let mapped = mapVodToDrama(vod: vod, sourceId: targetSrc)
+                for (k, v) in mapped {
+                    if let str = v as? String, !str.isEmpty {
+                        freshDrama[k] = str
+                    } else if let num = v as? Int, num > 0 {
+                        freshDrama[k] = num
+                    } else if freshDrama[k] == nil {
+                        freshDrama[k] = v
+                    }
+                }
 
                 // 解析 CatPawOpen 规范标准选集串: vod_play_url ("第1集$url1#第2集$url2" 或带线路 "线路$$$第1集$url1#...")
                 if let playUrls = vod["vod_play_url"] as? String, !playUrls.isEmpty {
@@ -567,9 +578,11 @@ public actor NativeBridge {
             ]
 
         case "resolve":
-            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? activeSourceId
-            let epIndex = payload["index"] as? Int ?? 1
             let dramaDict = payload["drama"] as? [String: Any] ?? [:]
+            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? (dramaDict["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? activeSourceId
+            let epIndex = payload["index"] as? Int ?? 1
             let dramaId = dramaDict["id"] as? String ?? "1"
 
             var targetUrl = ""

@@ -71,7 +71,7 @@ public final class PlayerViewModel: ObservableObject {
         Task {
             do {
                 let detail = try await self.repository.loadDetail(drama: self.drama)
-                if detail.episodes.count > self.allEpisodes.count {
+                if !detail.episodes.isEmpty {
                     self.allEpisodes = detail.episodes
                     NSLog("🎬 [PlayerVM] 动态拉取补全剧集列表，共 %d 集", detail.episodes.count)
                 }
@@ -92,7 +92,10 @@ public final class PlayerViewModel: ObservableObject {
         do {
             let result = try await repository.loadCatalog(source: drama.source, query: baseName)
             let filtered = result.items.filter { 
-                $0.id != drama.id && $0.source.lowercased() == targetSource && $0.title.contains(baseName) 
+                $0.id != drama.id &&
+                $0.source.lowercased() == targetSource &&
+                !$0.cover.isEmpty &&
+                $0.title.contains(baseName) 
             }.sorted { $0.title < $1.title }
             self.relatedSeasons = filtered
         } catch {
@@ -145,7 +148,13 @@ public final class PlayerViewModel: ObservableObject {
         player?.pause()
 
         do {
-            let currentEp = allEpisodes.indices.contains(episodeIndex - 1) ? allEpisodes[episodeIndex - 1] : nil
+            var currentEp = allEpisodes.indices.contains(episodeIndex - 1) ? allEpisodes[episodeIndex - 1] : nil
+            if currentEp == nil || currentEp?.raw == nil {
+                if let freshDetail = try? await self.repository.loadDetail(drama: self.drama), !freshDetail.episodes.isEmpty {
+                    self.allEpisodes = freshDetail.episodes
+                    currentEp = self.allEpisodes.indices.contains(episodeIndex - 1) ? self.allEpisodes[episodeIndex - 1] : nil
+                }
+            }
             let epId = currentEp?.id ?? "\(episodeIndex)"
 
             if drama.id.starts(with: "test_") {

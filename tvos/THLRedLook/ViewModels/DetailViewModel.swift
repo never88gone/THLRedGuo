@@ -27,7 +27,7 @@ public final class DetailViewModel: ObservableObject {
     @Published public var relatedSeasons: [Drama] = []
     @Published public var seasonItems: [SeasonItem] = []
 
-    public let drama: Drama
+    @Published public var drama: Drama
     private let repository: NativeRepository
     private let store: LocalStore
     private let downloadService: DownloadService
@@ -49,8 +49,23 @@ public final class DetailViewModel: ObservableObject {
         self.detail = DramaDetail(drama: drama, episodes: eps, warning: "")
     }
 
+    public func switchToDrama(_ newDrama: Drama) async {
+        guard newDrama.id != drama.id else { return }
+        self.drama = newDrama
+        self.followState = store.followState(for: newDrama.id)
+        self.lastWatchEntry = store.getWatchEntry(dramaId: newDrama.id)
+        self.selectedChunkIndex = 0
+        let total = max(20, newDrama.episodes)
+        let eps = (1...total).map { Episode(id: "\(newDrama.id)_\($0)", title: "第 \($0) 集", number: $0) }
+        self.detail = DramaDetail(drama: newDrama, episodes: eps, warning: "")
+        self.isLoading = true
+        self.errorMessage = nil
+        await loadDetail()
+    }
+
     public func loadDetail() async {
-        if detail == nil {
+        let hasRealEpisodes = detail?.episodes.contains(where: { $0.raw != nil }) == true
+        if !hasRealEpisodes {
             isLoading = true
         }
         errorMessage = nil
@@ -61,6 +76,7 @@ public final class DetailViewModel: ObservableObject {
         do {
             let loaded = try await repository.loadDetail(drama: drama)
             self.detail = loaded
+            self.drama = loaded.drama
             // 如果有历史记录，自动切换到对应集所属的 chunk
             if let entry = lastWatchEntry, !loaded.episodeChunks.isEmpty {
                 for (index, chunk) in loaded.episodeChunks.enumerated() {
@@ -104,9 +120,13 @@ public final class DetailViewModel: ObservableObject {
         do {
             let result = try await repository.loadCatalog(source: drama.source, query: baseName)
             var candidates = result.items.filter {
-                $0.source.lowercased() == targetSource && $0.title.contains(baseName)
+                $0.source.lowercased() == targetSource &&
+                !$0.cover.isEmpty &&
+                $0.title.contains(baseName)
             }
-            if !candidates.contains(where: { $0.id == drama.id }) {
+            if let existingIndex = candidates.firstIndex(where: { $0.id == drama.id }) {
+                candidates[existingIndex] = drama.merge(with: candidates[existingIndex])
+            } else {
                 candidates.append(drama)
             }
 
