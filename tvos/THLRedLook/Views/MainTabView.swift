@@ -80,15 +80,29 @@ public struct MainTabView: View {
         var initCategory: String? = nil
         var initRecomCategory: String? = nil
 
-        let representativeDrama = Drama(
-            id: "test_hongguo_1001",
+        var customDramaId: String? = nil
+        var customDramaTitle: String? = nil
+        if let idx = args.firstIndex(of: "-testDramaId"), idx + 1 < args.count {
+            customDramaId = args[idx + 1]
+        } else if let envId = ProcessInfo.processInfo.environment["TEST_DRAMA_ID"], !envId.isEmpty {
+            customDramaId = envId
+        }
+        if let idx = args.firstIndex(of: "-testDramaTitle"), idx + 1 < args.count {
+            customDramaTitle = args[idx + 1]
+        } else if let envTitle = ProcessInfo.processInfo.environment["TEST_DRAMA_TITLE"], !envTitle.isEmpty {
+            customDramaTitle = envTitle
+        }
+
+        let defaultDrama = Drama(
+            id: customDramaId ?? "test_hongguo_1001",
             source: "hongguo",
-            title: "都市逆袭之王者归来",
+            title: customDramaTitle ?? "都市逆袭之王者归来",
             description: "一代战神龙王隐忍三年，龙殿重聚之时，风云再起，震惊四海八荒！",
             cover: "https://example.com/cover.jpg",
             episodes: 80
         )
-        let representativeEpisodes = (1...80).map { Episode(id: "test_hongguo_1001_\($0)", title: "第 \($0) 集", number: $0) }
+        let representativeDrama = defaultDrama
+        let representativeEpisodes = (1...80).map { Episode(id: "\(representativeDrama.id)_\($0)", title: "第 \($0) 集", number: $0) }
 
         if let p = targetPage?.trimmingCharacters(in: .whitespacesAndNewlines) {
             switch p {

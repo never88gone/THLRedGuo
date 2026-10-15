@@ -34,7 +34,24 @@ public actor NativeBridge {
         if isInitialized { return }
 
         try? FileManager.default.createDirectory(at: sourcesDirURL, withIntermediateDirectories: true)
+
+        let hongguoFile = sourcesDirURL.appendingPathComponent("hongguo.js")
+        let needsUpdate: Bool
+        if let currentScript = try? String(contentsOf: hongguoFile, encoding: .utf8) {
+            needsUpdate = currentScript != BuiltInHongguoJSContent
+        } else {
+            needsUpdate = true
+        }
+        if needsUpdate {
+            try? BuiltInHongguoJSContent.write(to: hongguoFile, atomically: true, encoding: .utf8)
+            NSLog("🎬 [NativeBridge] 已自动同步并更新最新内置红果官方数据源到沙盒: %@", hongguoFile.path)
+        }
+
         scanSourcesDirectory()
+
+        if activeSourceId.isEmpty || activeSourceId == "hongguo" || !installedSources.keys.contains(activeSourceId) {
+            activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : (installedSources.keys.first ?? "")
+        }
 
         isInitialized = true
         NSLog("🎬 [NativeBridge] CatPawOpen Swift 原生核心初始化成功，已装载 %ld 个插件，当前激活源: '%@'", installedSources.count, activeSourceId)
@@ -51,11 +68,16 @@ public actor NativeBridge {
         }
 
         for file in files where file.pathExtension.lowercased() == "js" {
-            guard let script = try? String(contentsOf: file, encoding: .utf8), !script.isEmpty else {
+            guard var script = try? String(contentsOf: file, encoding: .utf8), !script.isEmpty else {
                 continue
             }
             if let meta = extractScriptMeta(script: script, fallbackId: file.deletingPathExtension().lastPathComponent) {
                 let sid = meta["id"] as? String ?? file.deletingPathExtension().lastPathComponent
+                if sid == "hongguo" && script != BuiltInHongguoJSContent {
+                    script = BuiltInHongguoJSContent
+                    try? BuiltInHongguoJSContent.write(to: file, atomically: true, encoding: .utf8)
+                    NSLog("🎬 [NativeBridge] 扫描时已将旧版沙盒红果源自动热升级为最新内置官方源")
+                }
                 installedSources[sid] = meta
                 sourceScripts[sid] = script
             }
@@ -63,7 +85,7 @@ public actor NativeBridge {
 
         // 如果存在活跃源但不在已安装列表中，清空或重置
         if !installedSources.keys.contains(activeSourceId) {
-            activeSourceId = installedSources.keys.first ?? ""
+            activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : (installedSources.keys.first ?? "")
         }
     }
 
