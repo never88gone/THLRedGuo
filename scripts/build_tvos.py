@@ -50,6 +50,7 @@ def main():
     info_plist = root / "tvos" / "THLRedLook" / "App" / "Info.plist"
     if info_plist.exists():
         subprocess.run(["/usr/libexec/PlistBuddy", "-c", f"Set :CFBundleVersion {beijing_build}", str(info_plist)], capture_output=True)
+        subprocess.run(["/usr/libexec/PlistBuddy", "-c", "Set :CFBundleShortVersionString 1.0.0", str(info_plist)], capture_output=True)
 
     container_arg = ["-workspace", str(workspace_path)] if workspace_path.exists() else ["-project", str(project_path)]
 
@@ -67,6 +68,7 @@ def main():
             "-configuration", configuration,
             "-destination", destination,
             "-archivePath", str(archive_path),
+            "MARKETING_VERSION=1.0.0",
             f"CURRENT_PROJECT_VERSION={beijing_build}",
         ]
         if not args.export_options:
@@ -85,8 +87,7 @@ def main():
         if not app_dir.exists():
             raise SystemExit(f"tvOS 归档产物不存在: {app_dir}")
 
-        version_match = re.search(r'^version:\s*(\S+)', (root / 'pubspec.yaml').read_text(), re.MULTILINE)
-        version = version_match.group(1) if version_match else "1.0.0"
+        version = "1.0.0"
 
         output_dir = root / "dist" / "tvos"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -153,6 +154,7 @@ def main():
             "-scheme", "THLRedLook",
             "-configuration", configuration,
             "-destination", destination,
+            "MARKETING_VERSION=1.0.0",
             f"CURRENT_PROJECT_VERSION={beijing_build}",
             "CODE_SIGNING_ALLOWED=NO",
         ]

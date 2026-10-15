@@ -37,7 +37,17 @@ def main():
         raise SystemExit("请先确保 Flutter 与 Xcode 命令行工具已正确安装并加入 PATH。")
 
     run([flutter, "pub", "get"])
+    # 关键：先执行 flutter build macos --config-only 生成 ephemeral 依赖与 xcfilelist，避免 clean CI 环境下 xcodebuild 报错
+    run([flutter, "build", "macos", "--config-only", "--release", *variant.flutter_arguments])
     run(["pod", "install"], cwd=root / "macos")
+
+    # 兜底确保 ephemeral 下的关键 xcfilelist 文件存在
+    ephemeral_dir = root / "macos" / "Flutter" / "ephemeral"
+    ephemeral_dir.mkdir(parents=True, exist_ok=True)
+    for fname in ["FlutterInputs.xcfilelist", "FlutterOutputs.xcfilelist"]:
+        fpath = ephemeral_dir / fname
+        if not fpath.exists():
+            fpath.touch()
 
     version_match = re.search(r'^version:\s*(\S+)', (root / "pubspec.yaml").read_text(), re.MULTILINE)
     version = version_match.group(1) if version_match else "1.0.0"
@@ -65,6 +75,7 @@ def main():
             "-configuration", "Release",
             "-destination", "generic/platform=macOS",
             "-archivePath", str(archive_path),
+            "MARKETING_VERSION=1.0.0",
             f"CURRENT_PROJECT_VERSION={beijing_build}",
         ]
         if options.clean:
