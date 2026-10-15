@@ -154,7 +154,13 @@ jobs:
 
             if [ -n "$PROFILE_BASE64" ]; then
               mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-              echo "$PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/ios_appstore.mobileprovision
+              echo "$PROFILE_BASE64" | base64 --decode > /tmp/profile.mobileprovision
+              UUID=$(security cms -D -i /tmp/profile.mobileprovision 2>/dev/null | grep -A1 '<key>UUID</key>' | grep '<string>' | sed -E 's/.*<string>(.*)<\/string>.*/\1/' || true)
+              if [ -n "$UUID" ]; then
+                cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/${UUID}.mobileprovision
+              fi
+              cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/ios_appstore.mobileprovision
+              rm -f /tmp/profile.mobileprovision
             fi
             # 动态生成 App Store 导出配置
             cat << 'EOF' > /tmp/ios_export_options.plist
@@ -254,7 +260,13 @@ EOF
 
             if [ -n "$PROFILE_BASE64" ]; then
               mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-              echo "$PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/tvos_appstore.mobileprovision
+              echo "$PROFILE_BASE64" | base64 --decode > /tmp/profile.mobileprovision
+              UUID=$(security cms -D -i /tmp/profile.mobileprovision 2>/dev/null | grep -A1 '<key>UUID</key>' | grep '<string>' | sed -E 's/.*<string>(.*)<\/string>.*/\1/' || true)
+              if [ -n "$UUID" ]; then
+                cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/${UUID}.mobileprovision
+              fi
+              cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/tvos_appstore.mobileprovision
+              rm -f /tmp/profile.mobileprovision
             fi
             # 动态生成 tvOS App Store 导出配置
             cat << 'EOF' > /tmp/tvos_export_options.plist
@@ -357,7 +369,13 @@ EOF
 
             if [ -n "$PROFILE_BASE64" ]; then
               mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-              echo "$PROFILE_BASE64" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/macos_appstore.provisionprofile
+              echo "$PROFILE_BASE64" | base64 --decode > /tmp/profile.provisionprofile
+              UUID=$(security cms -D -i /tmp/profile.provisionprofile 2>/dev/null | grep -A1 '<key>UUID</key>' | grep '<string>' | sed -E 's/.*<string>(.*)<\/string>.*/\1/' || true)
+              if [ -n "$UUID" ]; then
+                cp /tmp/profile.provisionprofile ~/Library/MobileDevice/Provisioning\ Profiles/${UUID}.provisionprofile
+              fi
+              cp /tmp/profile.provisionprofile ~/Library/MobileDevice/Provisioning\ Profiles/macos_appstore.provisionprofile
+              rm -f /tmp/profile.provisionprofile
             fi
             cat << 'EOF' > /tmp/macos_export_options.plist
 <?xml version="1.0" encoding="UTF-8"?>
