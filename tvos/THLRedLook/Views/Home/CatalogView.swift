@@ -5,8 +5,16 @@ public struct CatalogView: View {
     @ObservedObject var store: LocalStore
     @State private var showingFilterSheet = false
     @State private var selectedDrama: Drama?
-    @FocusState private var focusedCategory: String?
-    @FocusState private var focusedDramaId: String?
+
+    public enum FocusTarget: Hashable {
+        case category(String)
+        case filter
+        case refresh
+        case reloadButton
+        case card(String)
+    }
+    @FocusState private var focusedTarget: FocusTarget?
+
     public var forceFocusFirstCard: Bool = false
     public var initialCategory: String? = nil
     public var focusCategoryTrigger: Int = 0
@@ -51,22 +59,23 @@ public struct CatalogView: View {
                             TVCapsuleButton(
                                 title: category.name,
                                 isSelected: viewModel.selectedCategory.id == category.id,
-                                isFocused: focusedCategory == catId,
+                                isFocused: focusedTarget == .category(catId),
                                 onFocused: {
                                     viewModel.selectCategory(category, immediate: false)
                                 },
                                 onUpCommand: {
-                                    focusedCategory = nil
+                                    focusedTarget = nil
                                     onRequestFocusTopNav?()
                                 },
                                 onDownCommand: {
-                                    focusedCategory = nil
-                                    focusedDramaId = viewModel.items.first?.id
+                                    if let first = viewModel.items.first {
+                                        focusedTarget = .card(first.id)
+                                    }
                                 }
                             ) {
                                 viewModel.selectCategory(category, immediate: true)
                             }
-                            .focused($focusedCategory, equals: catId)
+                            .focused($focusedTarget, equals: .category(catId))
                         }
                     }
                     .padding(.top, 16)
@@ -83,45 +92,45 @@ public struct CatalogView: View {
                     TVButton(
                         title: viewModel.selectedSort.label,
                         icon: "line.3.horizontal.decrease.circle",
-                        isFocused: focusedCategory == "__filter__",
+                        isFocused: focusedTarget == .filter,
                         onUpCommand: {
-                            focusedCategory = nil
+                            focusedTarget = nil
                             onRequestFocusTopNav?()
                         },
                         onDownCommand: {
-                            focusedCategory = nil
-                            focusedDramaId = viewModel.items.first?.id
+                            if let first = viewModel.items.first {
+                                focusedTarget = .card(first.id)
+                            }
                         }
                     ) {
                         showingFilterSheet = true
                     }
-                    .focused($focusedCategory, equals: "__filter__")
+                    .focused($focusedTarget, equals: .filter)
 
                     // 刷新按钮
                     TVButton(
                         title: "",
                         icon: "arrow.clockwise",
-                        isFocused: focusedCategory == "__refresh__",
+                        isFocused: focusedTarget == .refresh,
                         onUpCommand: {
-                            focusedCategory = nil
+                            focusedTarget = nil
                             onRequestFocusTopNav?()
                         },
                         onDownCommand: {
-                            focusedCategory = nil
-                            focusedDramaId = viewModel.items.first?.id
+                            if let first = viewModel.items.first {
+                                focusedTarget = .card(first.id)
+                            }
                         }
                     ) {
                         Task { await viewModel.reloadAll() }
                     }
-                    .focused($focusedCategory, equals: "__refresh__")
+                    .focused($focusedTarget, equals: .refresh)
                 }
                 .padding(.top, 8)
                 .padding(.trailing, 8)
             }
             .padding(.horizontal, 48)
             .background(Color.clear)
-            .focusSection()
-            .defaultFocus($focusedCategory, viewModel.selectedCategory.id.isEmpty ? "all" : viewModel.selectedCategory.id)
 
             // 内容网格
             if viewModel.isLoading && viewModel.items.isEmpty {
@@ -137,9 +146,18 @@ public struct CatalogView: View {
                         .foregroundColor(.yellow)
                     Text("加载失败：\(error)")
                         .foregroundColor(.secondary)
-                    TVButton(title: "重新加载", isProminent: true) {
+                    TVButton(
+                        title: "重新加载",
+                        isProminent: true,
+                        isFocused: focusedTarget == .reloadButton,
+                        onUpCommand: {
+                            let catId = viewModel.selectedCategory.id.isEmpty ? "all" : viewModel.selectedCategory.id
+                            focusedTarget = .category(catId)
+                        }
+                    ) {
                         Task { await viewModel.loadFirstPage() }
                     }
+                    .focused($focusedTarget, equals: .reloadButton)
                 }
                 Spacer()
             } else {
@@ -148,17 +166,16 @@ public struct CatalogView: View {
                         ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, drama in
                             DramaCardView(
                                 drama: drama,
-                                isFocused: focusedDramaId == drama.id,
+                                isFocused: focusedTarget == .card(drama.id),
                                 forceFocused: forceFocusFirstCard && index == 0,
                                 onUpCommand: (index < 6) ? {
-                                    focusedDramaId = nil
                                     let catId = viewModel.selectedCategory.id.isEmpty ? "all" : viewModel.selectedCategory.id
-                                    focusedCategory = catId
+                                    focusedTarget = .category(catId)
                                 } : nil
                             ) {
                                 selectedDrama = drama
                             }
-                            .focused($focusedDramaId, equals: drama.id)
+                            .focused($focusedTarget, equals: .card(drama.id))
                             .onAppear {
                                 if drama.id == viewModel.items.last?.id {
                                     Task { await viewModel.loadNextPage() }
@@ -175,14 +192,12 @@ public struct CatalogView: View {
                             ProgressView()
                             Text("正在加载更多...")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                            .foregroundColor(.secondary)
                             Spacer()
                         }
                         .padding(.vertical, 24)
                     }
                 }
-                .focusSection()
-                .defaultFocus($focusedDramaId, viewModel.items.first?.id)
             } // end else for loading
             } // end else for jsService
         } // end VStack
@@ -192,16 +207,12 @@ public struct CatalogView: View {
         .fullScreenCover(item: $selectedDrama) { drama in
             DramaDetailView(drama: drama)
         }
-        .onChange(of: focusedCategory) { cat in
-            NSLog("🎯 [FOCUS_TRACE] Catalog focusedCategory = %@", cat ?? "nil")
-        }
-        .onChange(of: focusedDramaId) { dramaId in
-            NSLog("🎯 [FOCUS_TRACE] Catalog focusedDramaId = %@", dramaId ?? "nil")
+        .onChange(of: focusedTarget) { target in
+            NSLog("🎯 [FOCUS_TRACE] Catalog focusedTarget = %@", String(describing: target))
         }
         .onChange(of: focusCategoryTrigger) { _ in
             let target = viewModel.selectedCategory.id.isEmpty ? "all" : viewModel.selectedCategory.id
-            focusedDramaId = nil
-            focusedCategory = target
+            focusedTarget = .category(target)
             NSLog("🎯 [FOCUS_TRACE] Catalog 收到导航栏向下指令 -> 精确聚焦分类: %@", target)
         }
         .task(id: jsService.activeSourceId) {

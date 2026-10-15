@@ -3,9 +3,15 @@ import SwiftUI
 public struct SavedLibraryView: View {
     @StateObject private var viewModel = LibraryViewModel()
     @State private var selectedDrama: Drama?
-    @FocusState private var focusedMainTab: LibraryViewModel.LibraryTab?
-    @FocusState private var focusedFollowFilter: FollowState?
-    @FocusState private var focusedDramaId: String?
+
+    public enum FocusTarget: Hashable {
+        case mainTab(LibraryViewModel.LibraryTab)
+        case followFilter(FollowState)
+        case clearHistory
+        case card(String)
+        case emptyAction
+    }
+    @FocusState private var focusedTarget: FocusTarget?
 
     private let columns = [
         GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
@@ -30,23 +36,29 @@ public struct SavedLibraryView: View {
                             TVCapsuleButton(
                                 title: tab.label,
                                 isSelected: viewModel.selectedTab == tab,
-                                isFocused: focusedMainTab == tab,
+                                isFocused: focusedTarget == .mainTab(tab),
                                 onUpCommand: {
-                                    focusedMainTab = nil
+                                    focusedTarget = nil
                                     onRequestFocusTopNav?()
                                 },
                                 onDownCommand: {
-                                    focusedMainTab = nil
+                                    NSLog("🎯 [FOCUS_TRACE] Library onDownCommand: tab = %@, historyCount = %ld, followCount = %ld", tab.rawValue, viewModel.historyList.count, viewModel.followedList.count)
                                     if tab == .follows {
-                                        focusedFollowFilter = viewModel.selectedFollowFilter
+                                        focusedTarget = .followFilter(viewModel.selectedFollowFilter)
                                     } else {
-                                        focusedDramaId = viewModel.historyList.first?.drama.id
+                                        if let first = viewModel.historyList.first {
+                                            focusedTarget = .card(first.drama.id)
+                                            NSLog("🎯 [FOCUS_TRACE] Library focusedTarget set to .card(%@)", first.drama.id)
+                                        } else {
+                                            focusedTarget = .emptyAction
+                                            NSLog("🎯 [FOCUS_TRACE] Library historyList is EMPTY, focusedTarget set to .emptyAction")
+                                        }
                                     }
                                 }
                             ) {
                                 viewModel.selectedTab = tab
                             }
-                            .focused($focusedMainTab, equals: tab)
+                            .focused($focusedTarget, equals: .mainTab(tab))
                         }
 
                         Spacer()
@@ -55,15 +67,22 @@ public struct SavedLibraryView: View {
                             TVButton(
                                 title: "清空历史",
                                 icon: "trash",
+                                isFocused: focusedTarget == .clearHistory,
                                 onUpCommand: {
+                                    focusedTarget = nil
                                     onRequestFocusTopNav?()
                                 },
                                 onDownCommand: {
-                                    focusedDramaId = viewModel.historyList.first?.drama.id
+                                    if let first = viewModel.historyList.first {
+                                        focusedTarget = .card(first.drama.id)
+                                    } else {
+                                        focusedTarget = .emptyAction
+                                    }
                                 }
                             ) {
                                 viewModel.clearHistory()
                             }
+                            .focused($focusedTarget, equals: .clearHistory)
                             .padding(.top, 4)
                             .padding(.trailing, 6)
                         }
@@ -71,8 +90,6 @@ public struct SavedLibraryView: View {
                     .padding(.leading, 48)
                     .padding(.trailing, 48)
                     .padding(.top, 28)
-                    .focusSection()
-                    .defaultFocus($focusedMainTab, viewModel.selectedTab)
 
                     if viewModel.selectedTab == .follows {
                         HStack(spacing: 24) {
@@ -80,40 +97,52 @@ public struct SavedLibraryView: View {
                                 TVCapsuleButton(
                                     title: state.label,
                                     isSelected: viewModel.selectedFollowFilter == state,
-                                    isFocused: focusedFollowFilter == state,
+                                    isFocused: focusedTarget == .followFilter(state),
                                     onUpCommand: {
-                                        focusedFollowFilter = nil
-                                        focusedMainTab = .follows
+                                        focusedTarget = .mainTab(.follows)
                                     },
                                     onDownCommand: {
-                                        focusedFollowFilter = nil
-                                        focusedDramaId = viewModel.followedList.first?.id
+                                        if let first = viewModel.followedList.first {
+                                            focusedTarget = .card(first.id)
+                                        } else {
+                                            focusedTarget = .emptyAction
+                                        }
                                     }
                                 ) {
                                     viewModel.selectedFollowFilter = state
                                 }
-                                .focused($focusedFollowFilter, equals: state)
+                                .focused($focusedTarget, equals: .followFilter(state))
                             }
                             Spacer()
                         }
                         .padding(.leading, 48)
                         .padding(.trailing, 48)
                         .padding(.top, 4)
-                        .focusSection()
-                        .defaultFocus($focusedFollowFilter, viewModel.selectedFollowFilter)
                     }
 
                     // 列表内容
                     ScrollView {
                         if viewModel.selectedTab == .history {
                             if viewModel.historyList.isEmpty {
-                                VStack(spacing: 16) {
+                                VStack(spacing: 20) {
                                     Spacer()
                                     Image(systemName: "clock.arrow.circlepath")
-                                        .font(.system(size: 56))
-                                        .foregroundColor(.secondary)
+                                        .font(.system(size: 64))
+                                        .foregroundColor(TVTheme.primary.opacity(0.8))
                                     Text("暂无观看记录，快去探索短剧吧")
-                                        .foregroundColor(.secondary)
+                                        .font(.system(size: 22, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    TVButton(
+                                        title: "去探索短剧",
+                                        icon: "sparkles.tv",
+                                        isFocused: focusedTarget == .emptyAction,
+                                        onUpCommand: {
+                                            focusedTarget = .mainTab(.history)
+                                        }
+                                    ) {
+                                        onRequestFocusTopNav?()
+                                    }
+                                    .focused($focusedTarget, equals: .emptyAction)
                                     Spacer()
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 400)
@@ -122,17 +151,16 @@ public struct SavedLibraryView: View {
                                     ForEach(Array(viewModel.historyList.enumerated()), id: \.element.id) { index, entry in
                                         DramaCardView(
                                             drama: entry.drama,
-                                            isFocused: focusedDramaId == entry.drama.id,
+                                            isFocused: focusedTarget == .card(entry.drama.id),
                                             watchProgress: entry.progressPercent,
                                             progressText: entry.progressLabel,
                                             onUpCommand: (index < 6) ? {
-                                                focusedDramaId = nil
-                                                focusedMainTab = .history
+                                                focusedTarget = .mainTab(.history)
                                             } : nil
                                         ) {
                                             selectedDrama = entry.drama
                                         }
-                                        .focused($focusedDramaId, equals: entry.drama.id)
+                                        .focused($focusedTarget, equals: .card(entry.drama.id))
                                     }
                                 }
                                 .padding(.horizontal, 48)
@@ -140,13 +168,25 @@ public struct SavedLibraryView: View {
                             }
                         } else {
                             if viewModel.followedList.isEmpty {
-                                VStack(spacing: 16) {
+                                VStack(spacing: 20) {
                                     Spacer()
                                     Image(systemName: "bookmark")
-                                        .font(.system(size: 56))
-                                        .foregroundColor(.secondary)
+                                        .font(.system(size: 64))
+                                        .foregroundColor(TVTheme.primary.opacity(0.8))
                                     Text("暂无追剧记录")
-                                        .foregroundColor(.secondary)
+                                        .font(.system(size: 22, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    TVButton(
+                                        title: "去探索短剧",
+                                        icon: "sparkles.tv",
+                                        isFocused: focusedTarget == .emptyAction,
+                                        onUpCommand: {
+                                            focusedTarget = .followFilter(viewModel.selectedFollowFilter)
+                                        }
+                                    ) {
+                                        onRequestFocusTopNav?()
+                                    }
+                                    .focused($focusedTarget, equals: .emptyAction)
                                     Spacer()
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 400)
@@ -155,15 +195,14 @@ public struct SavedLibraryView: View {
                                     ForEach(Array(viewModel.followedList.enumerated()), id: \.element.id) { index, drama in
                                         DramaCardView(
                                             drama: drama,
-                                            isFocused: focusedDramaId == drama.id,
+                                            isFocused: focusedTarget == .card(drama.id),
                                             onUpCommand: (index < 6) ? {
-                                                focusedDramaId = nil
-                                                focusedFollowFilter = viewModel.selectedFollowFilter
+                                                focusedTarget = .followFilter(viewModel.selectedFollowFilter)
                                             } : nil
                                         ) {
                                             selectedDrama = drama
                                         }
-                                        .focused($focusedDramaId, equals: drama.id)
+                                        .focused($focusedTarget, equals: .card(drama.id))
                                     }
                                 }
                                 .padding(.horizontal, 48)
@@ -171,27 +210,17 @@ public struct SavedLibraryView: View {
                             }
                         }
                     }
-                    .focusSection()
-                    .defaultFocus($focusedDramaId, viewModel.selectedTab == .history ? viewModel.historyList.first?.drama.id : viewModel.followedList.first?.id)
                 }
             }
         }
         .fullScreenCover(item: $selectedDrama) { drama in
             DramaDetailView(drama: drama)
         }
-        .onChange(of: focusedMainTab) { t in
-            NSLog("🎯 [FOCUS_TRACE] Library focusedMainTab = %@", t?.rawValue ?? "nil")
-        }
-        .onChange(of: focusedFollowFilter) { f in
-            NSLog("🎯 [FOCUS_TRACE] Library focusedFollowFilter = %@", f?.rawValue ?? "nil")
-        }
-        .onChange(of: focusedDramaId) { d in
-            NSLog("🎯 [FOCUS_TRACE] Library focusedDramaId = %@", d ?? "nil")
+        .onChange(of: focusedTarget) { target in
+            NSLog("🎯 [FOCUS_TRACE] Library focusedTarget = %@", String(describing: target))
         }
         .onChange(of: focusCategoryTrigger) { _ in
-            focusedDramaId = nil
-            focusedFollowFilter = nil
-            focusedMainTab = viewModel.selectedTab
+            focusedTarget = .mainTab(viewModel.selectedTab)
             NSLog("🎯 [FOCUS_TRACE] Library 收到导航栏向下指令 -> 精确聚焦Tab: %@", viewModel.selectedTab.rawValue)
         }
     }
