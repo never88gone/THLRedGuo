@@ -1,0 +1,137 @@
+name: Build Apple tvOS App
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+    paths:
+      - 'tvos/**'
+      - 'scripts/build_tvos.py'
+      - 'scripts/update_tvos_branding.py'
+      - 'scripts/generate_tvos_*.py'
+      - 'scripts/set_testflight_notes.py'
+      - '.github/workflows/build-tvos.yml'
+  pull_request:
+    paths:
+      - 'tvos/**'
+      - 'scripts/build_tvos.py'
+      - 'scripts/update_tvos_branding.py'
+      - 'scripts/generate_tvos_*.py'
+      - 'scripts/set_testflight_notes.py'
+      - '.github/workflows/build-tvos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tvos-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tvos:
+    name: Apple tvOS 大屏原生自动化打包
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 安装 tvOS CocoaPods 依赖
+        run: |
+          cd tvos && pod install
+      - name: 配置 tvOS 发布签名环境
+        id: signing
+        env:
+          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 || vars.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD || vars.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.TVOS_PROVISION_PROFILE_BASE64 || vars.TVOS_PROVISION_PROFILE_BASE64 }}
+        run: |
+          CERT_LEN=${#CERT_BASE64}
+          PWD_LEN=${#CERT_PWD}
+          PROFILE_LEN=${#PROFILE_BASE64}
+          echo "==== 诊断 tvOS 签名凭证配置 ===="
+          echo "  - APPLE_CERTIFICATE_P12_BASE64: $( [ $CERT_LEN -gt 0 ] && echo "已配置 ($CERT_LEN 字符)" || echo "❌ 未配置或为空" )"
+          echo "  - APPLE_CERTIFICATE_PASSWORD: $( [ $PWD_LEN -gt 0 ] && echo "已配置" || echo "❌ 未配置或为空" )"
+          echo "  - TVOS_PROVISION_PROFILE_BASE64: $( [ $PROFILE_LEN -gt 0 ] && echo "已配置 ($PROFILE_LEN 字符)" || echo "❌ 未配置或为空" )"
+          echo "================================"
+
+          if [ -n "$CERT_BASE64" ] && [ -n "$CERT_PWD" ]; then
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+            security create-keychain -p "ci_temporal_pwd" build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "ci_temporal_pwd" build.keychain
+            security set-keychain-settings -lut 21600 build.keychain
+
+            echo "$CERT_BASE64" | base64 --decode > cert.p12
+            security import cert.p12 -k build.keychain -P "$CERT_PWD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "ci_temporal_pwd" build.keychain
+            rm -f cert.p12
+
+            if [ -n "$PROFILE_BASE64" ]; then
+              mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+              echo "$PROFILE_BASE64" | base64 --decode > /tmp/profile.mobileprovision
+              UUID=$(security cms -D -i /tmp/profile.mobileprovision 2>/dev/null | grep -A1 '<key>UUID</key>' | grep '<string>' | sed -E 's/.*<string>(.*)<\/string>.*/\1/' || true)
+              if [ -n "$UUID" ]; then
+                cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/${UUID}.mobileprovision
+              fi
+              cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/thlredlook_tvOS_dis.mobileprovision
+              cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/tvos_appstore.mobileprovision
+              rm -f /tmp/profile.mobileprovision
+            fi
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::未配置 tvOS 签名证书 Secrets，本次构建仅生成未签名发布包。"
+          fi
+      - name: 构建并打包 tvOS 原生应用
+        run: |
+          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f tvos/ExportOptions.plist ]; then
+            python scripts/build_tvos.py --package --export-options tvos/ExportOptions.plist
+          else
+            python scripts/build_tvos.py --package
+          fi
+      - name: 上传 tvOS 至 App Store Connect (TestFlight)
+        env:
+          HAS_SIGNING: ${{ steps.signing.outputs.has_signing }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID || vars.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID || vars.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY || vars.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          if [ "$HAS_SIGNING" != "true" ]; then
+            echo "::warning::【未配置签名证书】未检测到 APPLE_CERTIFICATE_P12_BASE64，已跳过 TestFlight 上传。"
+            exit 0
+          fi
+          if [ -z "$KEY_ID" ] || [ -z "$ISSUER_ID" ] || [ -z "$PRIVATE_KEY_B64" ]; then
+            echo "::warning::【未配置 API 密钥】未检测到 APP_STORE_CONNECT_* Secrets，已跳过 TestFlight 上传。"
+            exit 0
+          fi
+          mkdir -p ~/.appstoreconnect/private_keys
+          if [[ "$PRIVATE_KEY_B64" == *"BEGIN PRIVATE KEY"* ]]; then
+            echo "$PRIVATE_KEY_B64" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          else
+            echo "$PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          fi
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          signed_ipa=$(find dist/tvos -type f -name "*tvos-signed.ipa" | head -n1)
+          if [ -n "$signed_ipa" ] && [ -f "$signed_ipa" ]; then
+            echo "正在上传 tvOS 签名包到 App Store Connect: $signed_ipa"
+            xcrun altool --upload-app -f "$signed_ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+            echo "✅ tvOS 版本成功上传到 App Store Connect！"
+            python scripts/set_testflight_notes.py || true
+          else
+            echo "::error::未发现签名的 tvOS IPA 产物，无法上传。"
+            exit 1
+          fi
+      - name: 清理 tvOS 钥匙串与临时凭证
+        if: always()
+        run: |
+          security delete-keychain build.keychain 2>/dev/null || true
+          rm -rf ~/.appstoreconnect
+      - name: 上传 tvOS 安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvos-packages
+          path: dist/tvos/*
+          if-no-files-found: error
+          retention-days: 14

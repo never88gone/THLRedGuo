@@ -136,14 +136,17 @@ flutter run
 
 ---
 
-## 🚀 GitHub Actions 全平台自动化打包与发布 (CI/CD)
+## 🚀 GitHub Actions 平台解耦自动化打包与发布 (CI/CD)
 
-项目已配置完整的 GitHub Actions 持续集成与多端自动化打包流水线（`.github/workflows/build.yml`）：
-- **全量自动化测试**：代码提交至 `main` / `master` 分支或推送标签时，自动运行全套核心引擎与红果 Spider 规范测试；
-- **Android**：自动编译输出全架构发布 APK（`arm64-v8a`、`armeabi-v7a`、`x86_64`）；
-- **Windows**：自动在 Windows runner 编译并生成免安装绿色便携完整包（含 Shader 画质滤镜与运行环境）；
-- **macOS**：自动编译并生成原生的 `*.dmg` 磁盘镜像安装包（支持直接拖拽至 Applications 目录完成安装）；
-- **iOS**：自动编译生成未签名 IPA 及 `Runner.app` 归档包，配置证书后自动上传 TestFlight；
-- **Apple tvOS**：自动归档打包原生 tvOS 独立版未签名 IPA 与 App 压缩包，配置证书后自动上传 TestFlight；
-- **自动 Release**：多端产物自动汇总结算 `SHA256SUMS.txt` 校验和，并自动创建/更新 GitHub Release 发布页。
+项目已配置完全解耦的 GitHub Actions 持续集成与多端自动化打包流水线，修改不同代码按需独立触发，避免全平台重复打包：
+- **Flutter 多端流水线（`.github/workflows/build-flutter.yml`）**：
+  - **触发机制**：仅在修改 Flutter 跨平台业务代码或各端原生配置（`lib/`、`assets/`、`android/`、`windows/`、`macos/`、`ios/` 等）时触发；支持 `workflow_dispatch` 手动精准单选平台；
+  - **Android**：自动编译输出全架构发布 APK（`arm64-v8a`、`armeabi-v7a`、`x86_64`）；
+  - **Windows**：自动在 Windows runner 编译并生成免安装绿色便携完整包（含 Shader 画质滤镜与运行环境）；
+  - **macOS**：自动编译并生成原生的 `*.dmg` 磁盘镜像安装包（支持直接拖拽至 Applications 目录完成安装）；
+  - **iOS**：自动编译打包并上传至 Apple TestFlight；
+  - **自动 Release**：Android、Windows 与 macOS 产物自动汇总并创建/更新 GitHub Release 发布页。
+- **Apple tvOS 专属流水线（`.github/workflows/build-tvos.yml`）**：
+  - **触发机制**：仅在修改 `tvos/` 大屏原生工程或相关脚本时独立触发；
+  - **Apple tvOS**：自动归档打包原生 tvOS 独立版 IPA，配置证书后自动上传至 Apple TestFlight。
 

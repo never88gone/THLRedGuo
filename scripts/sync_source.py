@@ -52,7 +52,7 @@ REQUIRED_FILES = {
     'lib/dart_core_engine.dart', 'lib/catpaw_js_runtime.dart',
     'android/app/build.gradle.kts', 'android/gradle/wrapper/gradle-wrapper.properties',
     'windows/CMakeLists.txt', 'windows/flutter/CMakeLists.txt',
-    '.github/workflows/build.yml', 'scripts/build_native.py',
+    '.github/workflows/build-flutter.yml', '.github/workflows/build-tvos.yml', 'scripts/build_native.py',
 }
 
 
