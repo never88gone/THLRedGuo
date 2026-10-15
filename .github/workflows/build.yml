@@ -162,35 +162,14 @@ jobs:
               cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/ios_appstore.mobileprovision
               rm -f /tmp/profile.mobileprovision
             fi
-            # 动态生成 App Store 导出配置
-            cat << 'EOF' > /tmp/ios_export_options.plist
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>destination</key>
-    <string>export</string>
-    <key>method</key>
-    <string>app-store</string>
-    <key>signingStyle</key>
-    <string>automatic</string>
-    <key>teamID</key>
-    <string>876385K952</string>
-    <key>stripSwiftSymbols</key>
-    <true/>
-    <key>compileBitcode</key>
-    <false/>
-</dict>
-</plist>
-EOF
           else
             echo "has_signing=false" >> "$GITHUB_OUTPUT"
             echo "::notice::未配置 iOS 签名证书 Secrets，本次构建仅生成未签名发布包。"
           fi
       - name: 构建 iOS 应用安装包
         run: |
-          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f /tmp/ios_export_options.plist ]; then
-            python scripts/build_ios.py --export-options /tmp/ios_export_options.plist
+          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f ios/ExportOptions.plist ]; then
+            python scripts/build_ios.py --export-options ios/ExportOptions.plist
           else
             python scripts/build_ios.py
           fi
@@ -218,7 +197,7 @@ EOF
         if: always()
         run: |
           security delete-keychain build.keychain 2>/dev/null || true
-          rm -rf ~/.appstoreconnect /tmp/ios_export_options.plist
+          rm -rf ~/.appstoreconnect
       - name: 上传 iOS 安装包
         uses: actions/upload-artifact@v4
         with:
@@ -268,35 +247,14 @@ EOF
               cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/tvos_appstore.mobileprovision
               rm -f /tmp/profile.mobileprovision
             fi
-            # 动态生成 tvOS App Store 导出配置
-            cat << 'EOF' > /tmp/tvos_export_options.plist
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>destination</key>
-    <string>export</string>
-    <key>method</key>
-    <string>app-store</string>
-    <key>signingStyle</key>
-    <string>automatic</string>
-    <key>teamID</key>
-    <string>876385K952</string>
-    <key>stripSwiftSymbols</key>
-    <true/>
-    <key>compileBitcode</key>
-    <false/>
-</dict>
-</plist>
-EOF
           else
             echo "has_signing=false" >> "$GITHUB_OUTPUT"
             echo "::notice::未配置 tvOS 签名证书 Secrets，本次构建仅生成未签名发布包。"
           fi
       - name: 构建并打包 tvOS 原生应用
         run: |
-          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f /tmp/tvos_export_options.plist ]; then
-            python scripts/build_tvos.py --package --export-options /tmp/tvos_export_options.plist
+          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f tvos/ExportOptions.plist ]; then
+            python scripts/build_tvos.py --package --export-options tvos/ExportOptions.plist
           else
             python scripts/build_tvos.py --package
           fi
@@ -324,7 +282,7 @@ EOF
         if: always()
         run: |
           security delete-keychain build.keychain 2>/dev/null || true
-          rm -rf ~/.appstoreconnect /tmp/tvos_export_options.plist
+          rm -rf ~/.appstoreconnect
       - name: 上传 tvOS 安装包
         uses: actions/upload-artifact@v4
         with:
@@ -377,32 +335,14 @@ EOF
               cp /tmp/profile.provisionprofile ~/Library/MobileDevice/Provisioning\ Profiles/macos_appstore.provisionprofile
               rm -f /tmp/profile.provisionprofile
             fi
-            cat << 'EOF' > /tmp/macos_export_options.plist
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>destination</key>
-    <string>export</string>
-    <key>method</key>
-    <string>app-store</string>
-    <key>signingStyle</key>
-    <string>automatic</string>
-    <key>teamID</key>
-    <string>876385K952</string>
-    <key>stripSwiftSymbols</key>
-    <true/>
-</dict>
-</plist>
-EOF
           else
             echo "has_signing=false" >> "$GITHUB_OUTPUT"
             echo "::notice::未配置 macOS 签名证书 Secrets，本次构建仅生成未签名发布包。"
           fi
       - name: 构建并打包 macOS 应用
         run: |
-          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f /tmp/macos_export_options.plist ]; then
-            python scripts/build_macos.py --export-options /tmp/macos_export_options.plist
+          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f macos/ExportOptions.plist ]; then
+            python scripts/build_macos.py --export-options macos/ExportOptions.plist
           else
             python scripts/build_macos.py
           fi
@@ -430,7 +370,7 @@ EOF
         if: always()
         run: |
           security delete-keychain build.keychain 2>/dev/null || true
-          rm -rf ~/.appstoreconnect /tmp/macos_export_options.plist
+          rm -rf ~/.appstoreconnect
       - name: 上传 macOS 安装包
         uses: actions/upload-artifact@v4
         with:
