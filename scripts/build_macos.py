@@ -88,22 +88,50 @@ def main():
             shutil.rmtree(export_dir)
         export_dir.mkdir(parents=True, exist_ok=True)
 
-        export_cmd = [
-            xcodebuild,
-            "-exportArchive",
-            "-archivePath", str(archive_path),
-            "-exportPath", str(export_dir),
-            "-exportOptionsPlist", str(export_plist),
-            "-allowProvisioningUpdates",
-        ]
-        print(f"导出签名 macOS PKG: {' '.join(export_cmd)}")
-        run(export_cmd)
+        has_installer = False
+        try:
+            res = subprocess.run(["security", "find-identity", "-v"], capture_output=True, text=True)
+            if "Installer" in res.stdout:
+                has_installer = True
+        except Exception:
+            pass
 
-        for pkg in export_dir.glob("*.pkg"):
-            target_pkg = output_dir / f"{variant.slug}-{version}-macos.pkg"
-            shutil.copy2(pkg, target_pkg)
-            artifacts.append(target_pkg)
-            print(f"已生成签名 macOS PKG 安装包: {target_pkg}")
+        exported_pkg = False
+        if has_installer:
+            export_cmd = [
+                xcodebuild,
+                "-exportArchive",
+                "-archivePath", str(archive_path),
+                "-exportPath", str(export_dir),
+                "-exportOptionsPlist", str(export_plist),
+                "-allowProvisioningUpdates",
+            ]
+            print(f"导出签名 macOS PKG: {' '.join(export_cmd)}")
+            try:
+                run(export_cmd)
+                for pkg in export_dir.glob("*.pkg"):
+                    target_pkg = output_dir / f"{variant.slug}-{version}-macos.pkg"
+                    shutil.copy2(pkg, target_pkg)
+                    artifacts.append(target_pkg)
+                    print(f"已生成签名 macOS PKG 安装包: {target_pkg}")
+                    exported_pkg = True
+            except subprocess.CalledProcessError as e:
+                print(f"[WARNING] 导出 PKG 失败: {e}，将自动降级提取已签名的应用包。")
+
+        if not exported_pkg:
+            print("::warning::【未配置 Mac 安装器证书】钥匙串未检测到 Installer 证书，跳过 TestFlight PKG 打包。")
+            app_dir = archive_path / "Products" / "Applications"
+            app_candidates = list(app_dir.glob("*.app"))
+            if app_candidates:
+                target_app = app_candidates[0]
+                zip_target = output_dir / f"{variant.slug}-{version}-macos-app.zip"
+                if zip_target.exists():
+                    zip_target.unlink()
+                run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(target_app), str(zip_target)])
+                artifacts.append(zip_target)
+                print(f"已从归档中生成 macOS 签名应用包: {zip_target}")
+            else:
+                raise SystemExit("归档产物中未找到 .app 目录。")
     else:
         run([flutter, "build", "macos", "--release", "--no-pub", *variant.flutter_arguments])
         app_path = root / "build" / "macos" / "Build" / "Products" / "Release" / "THLRedLook.app"
