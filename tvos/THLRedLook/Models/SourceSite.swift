@@ -28,21 +28,21 @@ public struct SourceSite: Identifiable, Hashable, Codable {
     }
 
     public var groupName: String {
-        "红果"
+        "精选短剧"
     }
 
     public var entryName: String {
         name
     }
 
-    public static let hongguo = SourceSite(id: "hongguo", name: "红果免费短剧", description: "短剧 · 漫剧 · AI 剧")
+    public static let hongguo = SourceSite(id: "hongguo", name: "官方免费短剧", description: "短剧 · 漫剧 · AI 剧")
 
-    /// 检查是否为 tvOS 支持的站源（仅支持红果）
+    /// 检查是否为 tvOS 支持的站源（仅支持官方规范源）
     public static func isAdultOrProhibitedOnTV(_ id: String) -> Bool {
         id.lowercased() != "hongguo"
     }
 
-    /// 默认公开站源：tvOS 仅支持红果免费短剧
+    /// 默认公开站源：tvOS 仅支持官方免费短剧
     public static let primaryValues: [SourceSite] = [
         hongguo
     ]

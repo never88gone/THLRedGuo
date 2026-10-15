@@ -90,6 +90,8 @@ public struct SavedLibraryView: View {
                     .padding(.leading, 48)
                     .padding(.trailing, 48)
                     .padding(.top, 28)
+                    .focusSection()
+                    .defaultFocus($focusedTarget, .mainTab(.history))
 
                     if viewModel.selectedTab == .follows {
                         HStack(spacing: 24) {
@@ -210,6 +212,7 @@ public struct SavedLibraryView: View {
                             }
                         }
                     }
+                    .focusSection()
                 }
             }
         }

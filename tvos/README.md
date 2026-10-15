@@ -1,4 +1,4 @@
-# 糖葫芦果鉴 Apple tvOS 独立版
+# 糖葫芦Haw Apple tvOS 独立版
 
 基于 Apple tvOS (SwiftUI + Siri Remote Focus Engine + AVKit + Network.framework) 开发的 Apple TV 独立客户端，**100% 完整复刻 Flutter 版本的功能体系与业务逻辑**。
 
@@ -9,9 +9,9 @@
 | 模块 | Flutter 版实现 | tvOS 原生版复刻实现 |
 | :--- | :--- | :--- |
 | **开发语言与 UI** | Flutter 3.47 / Dart | Swift 6.0 / SwiftUI (Apple TV HIG 焦点引擎) |
-| **站源体系** | 红果免费短剧官方开源站源 | `SourceSite.swift` 原生解析与驱动体系 |
+| **站源体系** | 官方免费短剧开源站源 | `SourceSite.swift` 原生解析与驱动体系 |
 | **首页与分类** | 横向切类、连载/完结筛选、排序、无限滚动 | `CatalogView.swift`、`HomeViewModel.swift`、大屏 6 列卡片 |
-| **推荐专区** | 红果推荐（真人剧、漫剧、AI 剧），记住位置 | `RecommendationsView.swift`、子分类缓存与记忆 |
+| **推荐专区** | 精选推荐（真人剧、漫剧、AI 剧），记住位置 | `RecommendationsView.swift`、子分类缓存与记忆 |
 | **排行榜** | 热播榜、新剧榜、好评榜 | `RankingsView.swift`、金银铜徽章排行卡片 |
 | **实时搜索** | 300ms 联想词补全、多源在线搜索、搜索历史 | `SearchRootView.swift`、`SearchViewModel.swift` |
 | **剧集详情与选集** | 海报大图、展开简介、每 50 集分组、断点记忆 | `DramaDetailView.swift`、大屏毛玻璃背景、分段选集网格 |

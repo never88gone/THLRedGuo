@@ -164,7 +164,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
           ),
         Expanded(
           child: !widget.store.allowsSource('hongguo')
-              ? const StatusPanel(title: '当前用户未开放红果', message: '可在用户管理中调整站源权限。')
+              ? const StatusPanel(title: '当前用户未开放精选短剧', message: '可在用户管理中调整站源权限。')
               : _loading && _items.isEmpty
               ? const Center(child: CircularProgressIndicator())
               : _items.isEmpty
@@ -238,7 +238,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     );
     if (widget.embedded) return content;
     return Scaffold(
-      appBar: AppBar(title: const Text('红果推荐'), actions: [refresh]),
+      appBar: AppBar(title: const Text('精选推荐'), actions: [refresh]),
       body: SafeArea(top: false, child: content),
     );
   }

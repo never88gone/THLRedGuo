@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 
-/// 全局统一色彩中心（真果·鉴 / 红果视频短剧设计规范）
+/// 全局统一色彩中心（糖葫芦Haw 品牌视觉设计规范）
 /// 规则：除本文件外，整个工程禁止出现任何硬编码 Color 构造或 Colors 静态引用。
 abstract final class AppColors {
   // ==========================================
-  // 1. 红果视频品牌核心色彩 (Hongguo Brand Accent)
+  // 1. 品牌核心色彩 (Brand Accent)
   // ==========================================
-  /// 红果品牌主色（明艳番茄红/活力红）
+  /// 品牌主色（明艳番茄红/活力红）
   static const Color hongguoRed = Color(0xFFFF2442);
-  /// 红果高亮/悬停浅红
+  /// 品牌高亮/悬停浅红
   static const Color hongguoRedLight = Color(0xFFFF4863);
-  /// 红果深色/按下态深红
+  /// 品牌深色/按下态深红
   static const Color hongguoRedDark = Color(0xFFE01835);
-  /// 红果辅助暖橙色（渐变高光）
+  /// 品牌辅助暖橙色（渐变高光）
   static const Color hongguoOrange = Color(0xFFFF6433);
   /// 暖金皇冠/精选角标
   static const Color hongguoGold = Color(0xFFFFC028);
@@ -122,7 +122,7 @@ abstract final class AppColors {
   static const Color playerProgressInactive = Color(0x3DFFFFFF);
   /// 播放器缓存进度颜色
   static const Color playerProgressBuffered = Color(0x66FFFFFF);
-  /// 播放器激活高亮颜色（红果红）
+  /// 播放器激活高亮颜色（品牌活力红）
   static const Color playerProgressActive = Color(0xFFFF2442);
   /// 弹幕开关激活背景
   static const Color danmakuActiveBg = Color(0xFFFF2442);
@@ -166,13 +166,13 @@ abstract final class AppColors {
   // ==========================================
   // 9. 界面高频半透明场景常量（杜绝业务层动态计算）
   // ==========================================
-  /// 选中的微高亮卡片背景 (红果红 12% 透明)
+  /// 选中的微高亮卡片背景 (品牌红 12% 透明)
   static const Color accentSubtle12 = Color(0x1FFF2442);
-  /// 微弱红果红背景 (红果红 8% 透明)
+  /// 微弱品牌红背景 (品牌红 8% 透明)
   static const Color accentSubtle08 = Color(0x14FF2442);
-  /// 边框微弱红果红 (红果红 40% 透明)
+  /// 边框微弱品牌红 (品牌红 40% 透明)
   static const Color accentBorder40 = Color(0x66FF2442);
-  /// 滑块激活轨道弱红 (红果红 35% 透明)
+  /// 滑块激活轨道弱红 (品牌红 35% 透明)
   static const Color accentTrack35 = Color(0x59FF2442);
   /// 成功态轻量浅绿背景 (成功绿 15% 透明)
   static const Color successSubtle15 = Color(0x2600C853);
@@ -192,7 +192,7 @@ abstract final class AppColors {
   static Color blackWithAlpha(double alpha) =>
       Color.fromRGBO(0, 0, 0, alpha.clamp(0.0, 1.0));
 
-  /// 生成红果红半透明色
+  /// 生成品牌红半透明色
   static Color hongguoRedWithAlpha(double alpha) =>
       Color.fromRGBO(255, 36, 66, alpha.clamp(0.0, 1.0));
 
@@ -203,7 +203,7 @@ abstract final class AppColors {
 
 /// 全局统一渐变设计系统（杜绝粗糙扁平，打造现代流媒体轻奢质感）
 abstract final class AppGradients {
-  /// 红果品牌主活力渐变（亮粉红 -> 活力红 -> 暖橙，用于主行动点 CTA、播放键、高亮标签）
+  /// 品牌主活力渐变（亮粉红 -> 活力红 -> 暖橙，用于主行动点 CTA、播放键、高亮标签）
   static const LinearGradient primary = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,

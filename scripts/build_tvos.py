@@ -18,7 +18,7 @@ def run(cmd, **kwargs):
     subprocess.run(cmd, cwd=kwargs.pop("cwd", root), check=True, **kwargs)
 
 def main():
-    parser = argparse.ArgumentParser(description="糖葫芦果鉴 Apple tvOS 自动化构建与打包脚本")
+    parser = argparse.ArgumentParser(description="糖葫芦Haw Apple tvOS 自动化构建与打包脚本")
     parser.add_argument("--clean", action="store_true", help="构建前清理构建产物")
     parser.add_argument("--release", action="store_true", help="构建 Release 配置")
     parser.add_argument("--device", action="store_true", help="构建真机版本 (默认构建真机版本)")

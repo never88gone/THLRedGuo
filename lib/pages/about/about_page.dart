@@ -78,7 +78,7 @@ class _AboutPageState extends State<AboutPage> {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🎉 糖葫芦果鉴已解锁全部数据源！'),
+          content: Text('🎉 糖葫芦Haw已解锁全部数据源！'),
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 2),
         ),
@@ -234,7 +234,7 @@ class _AboutPageState extends State<AboutPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                '糖葫芦果鉴 · 数据源管理',
+                                '糖葫芦Haw · 数据源管理',
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),

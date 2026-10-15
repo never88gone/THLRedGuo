@@ -244,7 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // 2. 短剧播放偏好
           SettingsGroupCard(
-            title: '红果短剧播放设置',
+            title: '短剧播放设置',
             icon: Icons.play_circle_outline_rounded,
             children: [
               ListTile(
@@ -385,7 +385,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     shape: BoxShape.circle,
                   ),
                 ),
-                title: const Text('红果品牌视觉'),
+                title: const Text('品牌视觉'),
                 subtitle: const Text('经典活力红短剧主题色'),
                 trailing: const Icon(Icons.done_all_rounded, color: AppColors.hongguoRed),
               ),
@@ -442,7 +442,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.verified_outlined),
-                title: const Text('关于 糖葫芦果鉴'),
+                title: const Text('关于 糖葫芦Haw'),
                 subtitle: Text(_appVersion),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Navigator.push(

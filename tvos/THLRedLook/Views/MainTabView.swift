@@ -212,8 +212,6 @@ public struct MainTabView: View {
                     .padding(.top, 28)
                     .padding(.bottom, 12)
                     .zIndex(100)
-                    .defaultFocus($focusedNavTab, selectedTab)
-                    .focusSection()
 
                     // 页面切换容器
                     ZStack {
@@ -293,8 +291,19 @@ public struct MainTabView: View {
                     } else {
                         // 焦点离开导航栏进入了内容页面
                         wasInContentArea = true
-                        if selectedTab == .settings {
+                        switch selectedTab {
+                        case .catalog:
+                            catalogCategoryFocusTrigger += 1
+                        case .recommendations:
+                            recommendationsCategoryFocusTrigger += 1
+                        case .rankings:
+                            rankingsBoardFocusTrigger += 1
+                        case .library:
+                            libraryTabFocusTrigger += 1
+                        case .settings:
                             settingsSidebarTrigger += 1
+                        default:
+                            break
                         }
                     }
                 }
@@ -302,6 +311,9 @@ public struct MainTabView: View {
         }
         .onAppear {
             parseLaunchMode()
+            if focusedNavTab == nil {
+                focusedNavTab = selectedTab
+            }
         }
         .onReceive(lanService.$incomingPlayback) { incoming in
             guard let inc = incoming else { return }

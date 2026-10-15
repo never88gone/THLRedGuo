@@ -115,7 +115,7 @@ def main():
             notes = default_file.read_text(encoding="utf-8").strip()
 
     if not notes:
-        notes = "真果鉴版本更新：优化在线播放流畅度与稳定性，适配多端设备体验。"
+        notes = "糖葫芦Haw版本更新：优化在线播放流畅度与稳定性，适配多端设备体验。"
 
     token = make_jwt(key_id, issuer_id, private_key)
 

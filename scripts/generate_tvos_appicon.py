@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 生成 tvOS 全套 App 图标与 Top Shelf 宽屏资产
-基于最新 AI 精心制作的糖葫芦果鉴（THLRedLook）专属 3D 玻璃态冰糖葫芦播放器图标
+基于最新 AI 精心制作的糖葫芦Haw（THLRedLook）专属 3D 玻璃态冰糖葫芦播放器图标
 """
 
 import os

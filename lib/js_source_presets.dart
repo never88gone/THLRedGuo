@@ -26,16 +26,16 @@ const List<PresetJsSource> kPresetJsSources = [
   PresetJsSource(
     id: 'hongguo',
     fileName: 'hongguo.js',
-    name: '红果免费短剧',
+    name: '官方免费短剧',
     description: '官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠短剧',
     script: r'''/**
- * 红果免费短剧 CatPawOpen Spider (hongguo.js)
+ * 官方免费短剧 CatPawOpen Spider (hongguo.js)
  * 适配 CatPawOpen / CatVodOpen 标准规范 v1.0.3
  */
 
 const meta = {
   id: "hongguo",
-  name: "红果免费短剧",
+  name: "官方免费短剧",
   version: "1.0.3",
   description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
   author: "社区开发者",
@@ -297,7 +297,7 @@ async function detail(id) {
         vod_pic: cover,
         vod_content: desc,
         vod_remarks: epUrls.length > 0 ? ("全" + epUrls.length + "集") : "",
-        vod_play_from: "红果直链",
+        vod_play_from: "官方直链",
         vod_play_url: epUrls.join("#")
       }
     ]

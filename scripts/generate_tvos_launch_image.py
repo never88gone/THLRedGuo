@@ -49,7 +49,7 @@ def generate_launch_image(width, height, scale_factor=1.0):
         subtitle_font = ImageFont.load_default()
         copy_font = ImageFont.load_default()
         
-    title_text = "糖葫芦果鉴"
+    title_text = "糖葫芦Haw"
     subtitle_text = "极速 · 纯净 · 独立端侧影视体验"
     copy_text = "THL RedLook for Apple tvOS"
     

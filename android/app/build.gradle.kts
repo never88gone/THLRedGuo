@@ -37,7 +37,7 @@ android {
         val rawCode = runCatching { flutter.versionCode }.getOrNull()
         versionCode = if (rawCode != null && rawCode > 0 && rawCode < 2100000000) rawCode else (System.currentTimeMillis() / 1000).toInt()
         versionName = flutter.versionName ?: "1.0.0"
-        manifestPlaceholders["appLabel"] = "糖葫芦果鉴"
+        manifestPlaceholders["appLabel"] = "糖葫芦Haw"
         manifestPlaceholders["appBanner"] = if (allSources) "@drawable/tv_banner_all_sources" else "@drawable/tv_banner"
     }
 

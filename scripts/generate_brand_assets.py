@@ -134,7 +134,7 @@ def main():
         banner.paste(icon_thumb_rounded, (44, 90), mask=icon_thumb_rounded)
         
         draw = ImageDraw.Draw(banner)
-        draw.text((250, 142), '糖葫芦果鉴', font=font, fill='white')
+        draw.text((250, 142), '糖葫芦Haw', font=font, fill='white')
         save_file(banner, f'android/app/src/main/res/drawable-xhdpi/{resource}.png', 'PNG')
     # 6. iOS LaunchImage 启动图 (圆角精致 Logo 居中呈现)
     ios_launch_dir = output / 'ios/Runner/Assets.xcassets/LaunchImage.imageset'

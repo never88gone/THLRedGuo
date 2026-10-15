@@ -44,7 +44,7 @@ public actor NativeBridge {
         }
         if needsUpdate {
             try? BuiltInHongguoJSContent.write(to: hongguoFile, atomically: true, encoding: .utf8)
-            NSLog("🎬 [NativeBridge] 已自动同步并更新最新内置红果官方数据源到沙盒: %@", hongguoFile.path)
+            NSLog("🎬 [NativeBridge] 已自动同步并更新最新内置官方数据源到沙盒: %@", hongguoFile.path)
         }
 
         scanSourcesDirectory()
@@ -76,7 +76,7 @@ public actor NativeBridge {
                 if sid == "hongguo" && script != BuiltInHongguoJSContent {
                     script = BuiltInHongguoJSContent
                     try? BuiltInHongguoJSContent.write(to: file, atomically: true, encoding: .utf8)
-                    NSLog("🎬 [NativeBridge] 扫描时已将旧版沙盒红果源自动热升级为最新内置官方源")
+                    NSLog("🎬 [NativeBridge] 扫描时已将旧版沙盒数据源自动热升级为最新内置官方源")
                 }
                 installedSources[sid] = meta
                 sourceScripts[sid] = script

@@ -91,7 +91,7 @@ public struct SettingsView: View {
                         Text("系统设置")
                             .font(.system(size: 30, weight: .bold))
                             .foregroundColor(.white)
-                        Text("糖葫芦果鉴 · 控制中心")
+                        Text("糖葫芦Haw · 控制中心")
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.6))
                     }
@@ -223,7 +223,7 @@ public struct SettingsView: View {
     // MARK: - 1. 站源管理与导入面板
     private var sourcesPanel: some View {
         VStack(alignment: .leading, spacing: 32) {
-            panelHeader(title: "站源管理", desc: "配置并选择当前要使用的影视数据源。内置支持官方标准红果短剧源，也可导入自定义 JS 插件。")
+            panelHeader(title: "站源管理", desc: "配置并选择当前要使用的影视数据源。内置支持官方标准短剧源，也可导入自定义 JS 插件。")
             
             // 顶部操作栏
             HStack(spacing: 20) {
@@ -231,7 +231,7 @@ public struct SettingsView: View {
                 let isHongguoActive = jsService.activeSourceId == "hongguo"
 
                 TVButton(
-                    title: isHongguoInstalled ? (isHongguoActive ? "红果官方源 (已激活)" : "设为默认红果源") : "导入官方红果数据源",
+                    title: isHongguoInstalled ? (isHongguoActive ? "官方数据源 (已激活)" : "设为默认源") : "导入官方数据源",
                     icon: isHongguoActive ? "checkmark.circle.fill" : "sparkles.tv.fill",
                     isProminent: true
                 ) {
@@ -240,9 +240,9 @@ public struct SettingsView: View {
                         let success = await jsService.importBuiltInHongguoSource(autoSelect: true)
                         isImporting = false
                         if success {
-                            saveNotice = "已成功导入红果免费短剧官方源，并默认设为当前激活源！"
+                            saveNotice = "已成功导入官方免费短剧数据源，并默认设为当前激活源！"
                         } else {
-                            saveNotice = "导入红果数据源失败，请重试。"
+                            saveNotice = "导入数据源失败，请重试。"
                         }
                     }
                 }
@@ -261,17 +261,17 @@ public struct SettingsView: View {
             
             if jsService.sources.isEmpty {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("暂无任何数据源。推荐立即导入官方标准红果短剧源，即刻开启全量短剧在线播放体验。")
+                    Text("暂无任何数据源。推荐立即导入官方标准数据源，即刻开启全量短剧在线播放体验。")
                         .font(.system(size: 16))
                         .foregroundColor(.white.opacity(0.6))
 
-                    TVButton(title: "立即导入官方红果数据源", icon: "sparkles.tv.fill", isProminent: true) {
+                    TVButton(title: "立即导入官方数据源", icon: "sparkles.tv.fill", isProminent: true) {
                         Task {
                             isImporting = true
                             let success = await jsService.importBuiltInHongguoSource(autoSelect: true)
                             isImporting = false
                             if success {
-                                saveNotice = "已成功导入红果免费短剧官方源，并默认设为当前激活源！"
+                                saveNotice = "已成功导入官方免费短剧数据源，并默认设为当前激活源！"
                             }
                         }
                     }
@@ -325,7 +325,7 @@ public struct SettingsView: View {
                     .frame(width: 600)
                     .font(.system(size: 24))
                 
-                Text("提示：导入红果数据源时将默认自动选中并激活")
+                Text("提示：导入官方数据源时将默认自动选中并激活")
                     .font(.system(size: 16))
                     .foregroundColor(.white.opacity(0.6))
 
@@ -338,14 +338,14 @@ public struct SettingsView: View {
                         showingImportAlert = false
                     }
 
-                    TVButton(title: "直接导入内置红果源", icon: "sparkles.tv.fill") {
+                    TVButton(title: "直接导入内置官方源", icon: "sparkles.tv.fill") {
                         Task {
                             isImporting = true
                             let success = await jsService.importBuiltInHongguoSource(autoSelect: true)
                             isImporting = false
                             showingImportAlert = false
                             if success {
-                                saveNotice = "已成功导入红果免费短剧官方源，并默认设为当前激活源！"
+                                saveNotice = "已成功导入官方免费短剧数据源，并默认设为当前激活源！"
                             }
                         }
                     }
@@ -1096,7 +1096,7 @@ struct AboutHeroCard: View {
                 // 核心品牌信息
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 16) {
-                        Text("糖葫芦果鉴 · 电视版")
+                        Text("糖葫芦Haw · 电视版")
                             .font(.system(size: 44, weight: .heavy))
                             .foregroundColor(.white)
 

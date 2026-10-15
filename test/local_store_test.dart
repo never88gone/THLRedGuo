@@ -106,12 +106,12 @@ void main() {
       expect(store.history, isEmpty);
     });
 
-    test('4. 隐私数据源模式与红果观看历史脱敏测试', () async {
+    test('4. 隐私数据源模式与特定源观看历史脱敏测试', () async {
       final hongguoDrama = Drama(
         id: 'hongguo:888',
         source: 'hongguo',
         sourceId: '888',
-        title: '红果隐秘短剧',
+        title: '隐秘短剧',
       );
 
       await store.saveWatch(WatchEntry(
@@ -125,7 +125,7 @@ void main() {
       expect(store.history.any((e) => e.drama.id == 'hongguo:888'), isTrue);
       expect(store.watched('hongguo:888'), isNotNull);
 
-      // 将红果源设置为隐私数据源
+      // 将特定源设置为隐私数据源
       await store.setSourcePrivate('hongguo', true);
       expect(store.isPrivateSource('hongguo'), isTrue);
 

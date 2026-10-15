@@ -6,8 +6,8 @@ from sync_source import source_files
 class TestToolchainScripts(unittest.TestCase):
     def test_build_variant(self):
         variant = BuildVariant(all_sources=False)
-        self.assertEqual(variant.slug, 'hongguojian')
-        self.assertEqual(variant.name, '糖葫芦果鉴')
+        self.assertEqual(variant.slug, 'THLRedLook')
+        self.assertEqual(variant.name, '糖葫芦Haw')
         self.assertEqual(variant.arguments, [])
 
     def test_source_isolation_hongguo_only(self):

@@ -304,7 +304,7 @@ class _SourceSwitcherContent extends StatelessWidget {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('已导入 $count 个预置红果数据源插件'),
+                          content: Text('已导入 $count 个预置数据源插件'),
                           behavior: SnackBarBehavior.floating,
                         ),
                       );
@@ -312,7 +312,7 @@ class _SourceSwitcherContent extends StatelessWidget {
                   }
                 },
                 icon: const Icon(Icons.flash_on_rounded, size: 18),
-                label: const Text('一键导入预置红果数据源'),
+                label: const Text('一键导入预置数据源'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(

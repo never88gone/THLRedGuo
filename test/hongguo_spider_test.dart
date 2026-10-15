@@ -7,7 +7,7 @@ import 'package:http/testing.dart';
 import 'package:THLRedLook/catpaw_js_runtime.dart';
 
 void main() {
-  group('红果数据源 (hongguo.js) 自动化规范与链路测试', () {
+  group('官方数据源 (hongguo.js) 自动化规范与链路测试', () {
     late String hongguoScript;
 
     setUpAll(() async {
@@ -19,7 +19,7 @@ void main() {
 
     test('1. 元数据 (meta) 与 CatPawOpen 规范契约验证', () async {
       expect(hongguoScript.contains('id: "hongguo"'), isTrue);
-      expect(hongguoScript.contains('name: "红果免费短剧"'), isTrue);
+      expect(hongguoScript.contains('name: "官方免费短剧"'), isTrue);
       expect(hongguoScript.contains('version: "1.0.3"'), isTrue);
       expect(hongguoScript.contains('features: ["search", "categories"]'), isTrue);
       expect(hongguoScript.contains('type: "video"'), isTrue);
@@ -34,7 +34,7 @@ void main() {
 
       final meta = await runtime.getMeta();
       expect(meta['id'], equals('hongguo'));
-      expect(meta['name'], equals('红果免费短剧'));
+      expect(meta['name'], equals('官方免费短剧'));
       expect(meta['version'], equals('1.0.3'));
       expect(meta['type'], equals('video'));
       expect(meta['features'], containsAll(['search', 'categories']));
@@ -88,7 +88,7 @@ void main() {
       final fakeHtml = '''
 <!DOCTYPE html>
 <html>
-<head><title>红果短剧 - 分类</title></head>
+<head><title>短剧 - 分类</title></head>
 <body>
 <script>
 window._ROUTER_DATA = ${jsonEncode(fakeRouterData)};
@@ -169,7 +169,7 @@ window._ROUTER_DATA = ${jsonEncode(fakeDetailRouterData)};
       expect(vod['vod_name'], equals('战神归来当赘婿'));
       expect(vod['vod_pic'], equals('https://p3.example.com/cover1_large.jpg'));
       expect(vod['vod_remarks'], equals('全4集'));
-      expect(vod['vod_play_from'], equals('红果直链'));
+      expect(vod['vod_play_from'], equals('官方直链'));
 
       final playUrl = vod['vod_play_url'] as String;
       expect(playUrl, isNotEmpty);
@@ -291,7 +291,7 @@ window.__INITIAL_DATA__ = {
       final fileNames = files.map((f) => f.uri.pathSegments.last).toList();
       // 验证仅存在且只允许 hongguo.js
       expect(fileNames, equals(['hongguo.js']),
-          reason: 'GitHub 仓库 assets/sources 目录严禁混入任何非红果数据源，其余源应保存在本地 GitLab thlredguojs 项目');
+          reason: 'GitHub 仓库 assets/sources 目录严禁混入任何第三方数据源，其余源应保存在本地 GitLab thlredguojs 项目');
     });
   });
 }

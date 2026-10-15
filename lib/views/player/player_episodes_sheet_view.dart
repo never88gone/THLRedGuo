@@ -317,7 +317,7 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
               ),
               const SizedBox(height: 12),
             ],
-            // 集数网格卡片区（柔和 12px 圆角 + 红果渐变微光，消除 8px 硬框）
+            // 集数网格卡片区（柔和 12px 圆角 + 品牌渐变微光，消除 8px 硬框）
             Expanded(
               child: episodes.isEmpty
                   ? const Center(

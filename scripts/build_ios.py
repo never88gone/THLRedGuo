@@ -21,7 +21,7 @@ def run(arguments, **kwargs):
 def main():
     if platform.system() != 'Darwin':
         raise SystemExit('iOS 构建需要 macOS 和完整 Xcode。')
-    parser = argparse.ArgumentParser(description='构建糖葫芦果鉴 iOS 应用')
+    parser = argparse.ArgumentParser(description='构建糖葫芦Haw iOS 应用')
     parser.add_argument('--export-options', type=Path, help='使用自己的 Xcode 签名配置导出 IPA')
     add_variant_argument(parser)
     options = parser.parse_args()

@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:THLRedLook/dart_core_engine.dart';
 
 void main() {
-  group('DartCoreEngine 核心引擎与红果调度自动化测试', () {
+  group('DartCoreEngine 核心引擎与内置源调度自动化测试', () {
     late DartCoreEngine engine;
     late String hongguoScript;
     late Directory tempDir;
@@ -49,7 +49,7 @@ void main() {
       expect(saveRes['data']['intervalMs'], equals(300));
     });
 
-    test('2. 载入并安装红果数据源插件 (jsSource.saveAndLoad & setActive)', () async {
+    test('2. 载入并安装官方数据源插件 (jsSource.saveAndLoad & setActive)', () async {
       final loadRes = await engine.dispatch({
         'action': 'jsSource.saveAndLoad',
         'script': hongguoScript,
@@ -57,7 +57,7 @@ void main() {
       });
       expect(loadRes['ok'], isTrue);
       expect(loadRes['data']['meta']['id'], equals('hongguo'));
-      expect(loadRes['data']['meta']['name'], equals('红果免费短剧'));
+      expect(loadRes['data']['meta']['name'], equals('官方免费短剧'));
 
       final listRes = await engine.dispatch({'action': 'jsSource.list'});
       expect(listRes['ok'], isTrue);
@@ -76,7 +76,7 @@ void main() {
       expect(activeRes['data']['active'], equals('hongguo'));
     });
 
-    test('3. 分类获取 (categories) 与红果四大分类验证', () async {
+    test('3. 分类获取 (categories) 与官方四大分类验证', () async {
       final catRes = await engine.dispatch({
         'action': 'categories',
         'source': 'hongguo',

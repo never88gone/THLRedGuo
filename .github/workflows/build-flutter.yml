@@ -422,8 +422,8 @@ jobs:
           tag="v${base_version}"
           
           {
-            printf '%s\n\n' "## 糖葫芦果鉴 (THLRedLook) v${base_version} 正式发布"
-            printf '%s\n\n' "一款多平台独立运行的短剧与流媒体播放器，内置官方标准规范的红果免费短剧数据源，支持端侧独立解析与在线播放。"
+            printf '%s\n\n' "## 糖葫芦Haw (THLRedLook) v${base_version} 正式发布"
+            printf '%s\n\n' "一款多平台独立运行的短剧与流媒体播放器，内置官方标准规范的数据源，支持端侧独立解析与在线播放。"
             printf '%s\n\n' "### 📦 跨平台安装包下载（除 iOS 走 TestFlight 外，其余端均在此下载）："
             printf '%s\n' "#### 📱 Android (手机 / 平板 / 电视盒子)"
             printf '%s\n' "- \`*-arm64-v8a.apk\`：绝大多数现代 64 位手机与平板设备（推荐）"
@@ -444,7 +444,7 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "更新已有 Release: $tag"
             gh release upload "$tag" release/* --clobber
-            gh release edit "$tag" --title "糖葫芦果鉴 v${base_version}" --notes-file notes.md
+            gh release edit "$tag" --title "糖葫芦Haw v${base_version}" --notes-file notes.md
             for name in $(gh release view "$tag" --json assets --jq '.assets[].name'); do
               if [ ! -e "release/$name" ]; then
                 gh release delete-asset "$tag" "$name" --yes
@@ -453,7 +453,7 @@ jobs:
           else
             echo "创建新 Release: $tag (Target: ${{ github.sha }})"
             gh release create "$tag" release/* \
-              --title "糖葫芦果鉴 v${base_version}" \
+              --title "糖葫芦Haw v${base_version}" \
               --notes-file notes.md \
               --target "${{ github.sha }}"
           fi

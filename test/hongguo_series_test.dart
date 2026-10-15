@@ -3,7 +3,7 @@ import 'package:THLRedLook/hongguo_series.dart';
 import 'package:THLRedLook/models.dart';
 
 void main() {
-  group('红果多季剧集识别与聚合引擎 (Hongguo Multi-Season Engine) 测试', () {
+  group('官方多季剧集识别与聚合引擎 (Hongguo Multi-Season Engine) 测试', () {
     test('1. 基础标题清洗 (去除画质与状态杂质)', () {
       expect(cleanSeriesBaseTitle('盖世龙王 (4K高清全集)'), equals('盖世龙王'));
       expect(cleanSeriesBaseTitle('赘婿当道 [1080P完结]'), equals('赘婿当道'));

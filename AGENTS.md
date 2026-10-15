@@ -1,4 +1,4 @@
-# 真果鉴开发约定
+# 糖葫芦Haw开发约定
 
 ## 项目目标
 
@@ -44,5 +44,5 @@
 
 按用户 2026-10-14 的要求：
 1. `thlredguojs` 是单独存放其他第三方与多元 JS 数据源的项目，专门托管在本地 GitLab 仓库中维护。
-2. 面向 GitHub 的本项目（`THLRedGuo`）及镜像（`guoapp`），**绝对只允许且仅允许包含官方规范的「红果」数据源（`assets/sources/hongguo.js`）**。
+2. 面向 GitHub 的本项目（`THLRedGuo`）及镜像（`guoapp`），**绝对只允许且仅允许包含官方规范的短剧数据源（`assets/sources/hongguo.js`）**。
 3. 任何其他数据源脚本、敏感源或第三方抓取规则绝对禁止放入或提交到 `THLRedGuo` 项目代码、资源目录或发布产物中，确保面向公网的 GitHub 仓库保持纯净与开源合规。

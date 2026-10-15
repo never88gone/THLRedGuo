@@ -15,9 +15,9 @@ class SourceSite {
   String get groupName => name;
   String get entryName => name;
 
-  static const hongguo = SourceSite('hongguo', '红果', '短剧 · 漫剧 · AI 剧');
+  static const hongguo = SourceSite('hongguo', '精选短剧', '短剧 · 漫剧 · AI 剧');
 
-  /// 默认可见站源：开源版本仅包含红果短剧
+  /// 默认可见站源：开源版本仅包含官方规范短剧
   static const primaryValues = [hongguo];
 
   /// 敏感站源：开源版本已全部移除
@@ -27,11 +27,11 @@ class SourceSite {
 
   static bool _runtimeActivated = false;
 
-  /// 是否已激活真果鉴（编译开关打开或运行时用户激活）。
+  /// 是否已激活全功能模式（编译开关打开或运行时用户激活）。
   static bool get isZhenguojianActivated =>
       allSourcesEnabled || _runtimeActivated;
 
-  /// 运行时激活真果鉴，解锁全部数据源。
+  /// 运行时激活全功能模式，解锁全部数据源。
   static void activateAllSources() => _runtimeActivated = true;
 
   /// 重置运行时激活状态（主要供测试使用）。

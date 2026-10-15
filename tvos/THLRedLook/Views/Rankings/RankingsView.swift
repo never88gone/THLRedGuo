@@ -77,6 +77,8 @@ public struct RankingsView: View {
                         .padding(.bottom, 12)
                     }
                     .clipShape(Rectangle().inset(by: -30))
+                    .focusSection()
+                    .defaultFocus($focusedTarget, viewModel.boards.first(where: \.isAllowedOnTV).map { FocusTarget.board($0.id) } ?? .board("hot"))
 
                     if viewModel.isLoading && viewModel.items.isEmpty {
                         Spacer()
@@ -127,6 +129,8 @@ public struct RankingsView: View {
                             .padding(.horizontal, 48)
                             .padding(.vertical, 24)
                         }
+                        .focusSection()
+                        .defaultFocus($focusedTarget, viewModel.items.first.map { FocusTarget.card($0.id) })
                     }
                 }
                 .task(id: currentActiveSource) {
@@ -225,6 +229,8 @@ public struct RecommendationsView: View {
                     .padding(.trailing, 48)
                     .padding(.top, 32)
                     .padding(.bottom, 8)
+                    .focusSection()
+                    .defaultFocus($focusedTarget, .category("真人剧"))
 
                     if viewModel.isLoading && viewModel.items.isEmpty {
                         Spacer()
@@ -238,7 +244,7 @@ public struct RecommendationsView: View {
                                         drama: drama,
                                         isFocused: focusedTarget == .card(drama.id),
                                         onUpCommand: (index < 6) ? {
-                                            let cat = viewModel.selectedSubCategory.isEmpty ? (viewModel.subCategories.first ?? "") : viewModel.selectedSubCategory
+                                            let cat = viewModel.selectedSubCategory.isEmpty ? (viewModel.subCategories.first ?? "真人剧") : viewModel.selectedSubCategory
                                             focusedTarget = .category(cat)
                                             NSLog("🎯 [FOCUS_TRACE] Recommendations 卡片第 1 行按向上 -> 精确回到当前分类: %@", cat)
                                         } : nil
@@ -251,6 +257,8 @@ public struct RecommendationsView: View {
                             .padding(.horizontal, 48)
                             .padding(.vertical, 24)
                         }
+                        .focusSection()
+                        .defaultFocus($focusedTarget, viewModel.items.first.map { FocusTarget.card($0.id) })
                     }
                 }
                 .task(id: currentActiveSource) {
@@ -272,7 +280,7 @@ public struct RecommendationsView: View {
             NSLog("🎯 [FOCUS_TRACE] Recommendations focusedTarget = %@", String(describing: target))
         }
         .onChange(of: focusCategoryTrigger) { _ in
-            let target = viewModel.selectedSubCategory.isEmpty ? (viewModel.subCategories.first ?? "") : viewModel.selectedSubCategory
+            let target = viewModel.selectedSubCategory.isEmpty ? (viewModel.subCategories.first ?? "真人剧") : viewModel.selectedSubCategory
             focusedTarget = .category(target)
             NSLog("🎯 [FOCUS_TRACE] Recommendations 收到导航栏向下指令 -> 精确聚焦分类: %@", target)
         }

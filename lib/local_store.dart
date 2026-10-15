@@ -165,7 +165,7 @@ class LocalStore extends ChangeNotifier {
   /// 当前是否处于「不使用密码、显示全部站源」状态。
   bool get sourceGateOff => _gateOff;
 
-  /// 是否已激活真果鉴。
+  /// 是否已激活全功能模式。
   bool get isZhenguojianActivated => SourceSite.isZhenguojianActivated;
 
   void _loadSourceGate() {
@@ -213,7 +213,7 @@ class LocalStore extends ChangeNotifier {
     _notify();
   });
 
-  /// 激活「真果鉴」：解锁全部站源，并使全部站源默认可见。
+  /// 激活全功能模式：解锁全部站源，并使全部站源默认可见。
   Future<void> activateZhenguojian() => _queue(() async {
     SourceSite.activateAllSources();
     await _commit({

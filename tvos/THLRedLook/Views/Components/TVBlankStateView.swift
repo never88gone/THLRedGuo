@@ -27,7 +27,7 @@ public struct TVSourceBlankStateView: View {
                     .font(.system(size: 40, weight: .bold))
                     .foregroundColor(.white)
 
-                Text("当前未激活数据源，可直接一键导入官方红果短剧源\n或添加自定义 JS 插件网络订阅。")
+                Text("当前未激活数据源，可直接一键导入官方短剧源\n或添加自定义 JS 插件网络订阅。")
                     .font(.system(size: 22))
                     .foregroundColor(.white.opacity(0.65))
                     .multilineTextAlignment(.center)
@@ -35,7 +35,7 @@ public struct TVSourceBlankStateView: View {
             }
 
             HStack(spacing: 24) {
-                TVButton(title: "导入官方红果数据源", icon: "sparkles.tv.fill", isProminent: true) {
+                TVButton(title: "导入官方数据源", icon: "sparkles.tv.fill", isProminent: true) {
                     Task {
                         isImporting = true
                         let success = await jsService.importBuiltInHongguoSource(autoSelect: true)
@@ -43,7 +43,7 @@ public struct TVSourceBlankStateView: View {
                         if success {
                             onImportSuccess?()
                         } else {
-                            alertMessage = "导入红果数据源失败，请重试。"
+                            alertMessage = "导入数据源失败，请重试。"
                         }
                     }
                 }
@@ -102,7 +102,7 @@ public struct TVSourceBlankStateView: View {
                         showingImportAlert = false
                     }
 
-                    TVButton(title: "直接导入内置红果源", icon: "sparkles.tv.fill") {
+                    TVButton(title: "直接导入内置官方源", icon: "sparkles.tv.fill") {
                         Task {
                             isImporting = true
                             let success = await jsService.importBuiltInHongguoSource(autoSelect: true)

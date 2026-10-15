@@ -16,11 +16,11 @@ class BuildVariant:
 
     @property
     def name(self):
-        return '糖葫芦果鉴'
+        return '糖葫芦Haw'
 
     @property
     def slug(self):
-        return 'zhenguojian' if self.all_sources else 'hongguojian'
+        return 'THLRedLook'
 
     @property
     def arguments(self):
@@ -76,4 +76,4 @@ def sync_project_version(root: Path, base_version: str = "1.0.0") -> str:
 
 def add_variant_argument(parser):
     parser.add_argument('--all-sources', action='store_true',
-                        help='构建包含全部站源的真果鉴；默认构建仅红果的红果鉴')
+                        help='构建包含全部站源的版本；默认构建仅官方规范数据源版本')

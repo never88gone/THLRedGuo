@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:THLRedLook/models.dart';
 
@@ -119,13 +118,13 @@ void main() {
       expect(restored.finished, isFalse);
     });
 
-    test('4. tvOS 端红果站源独占与大屏合规过滤契约', () {
-      // 验证 tvOS 规范：非红果站源强制过滤屏蔽
+    test('4. tvOS 端官方站源独占与大屏合规过滤契约', () {
+      // 验证 tvOS 规范：非官方规范站源强制过滤屏蔽
       bool isAdultOrProhibitedOnTV(String sourceId) {
         return sourceId.toLowerCase() != 'hongguo';
       }
 
-      expect(isAdultOrProhibitedOnTV('hongguo'), isFalse, reason: '红果源在大屏端允许使用');
+      expect(isAdultOrProhibitedOnTV('hongguo'), isFalse, reason: '官方规范站源在大屏端允许使用');
       expect(isAdultOrProhibitedOnTV('huangdou'), isTrue, reason: '敏感源在客厅大屏端必须严格屏蔽');
       expect(isAdultOrProhibitedOnTV('unknown_adult'), isTrue, reason: '未授权源在客厅大屏端必须严格屏蔽');
     });

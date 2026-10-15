@@ -172,7 +172,7 @@ public struct LanSyncView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("大屏投屏待命已就绪")
                         .font(.headline)
-                    Text("在糖葫芦果鉴手机端播放页面点击「投屏到电视」，画面将直接在本机无缝接续播放。")
+                    Text("在糖葫芦Haw手机端播放页面点击「投屏到电视」，画面将直接在本机无缝接续播放。")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }

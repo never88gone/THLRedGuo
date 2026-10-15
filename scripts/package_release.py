@@ -57,7 +57,16 @@ else:
                     except Exception:
                         pass
 
-    required = ['zhenguojian.exe', 'flutter_windows.dll', 'libffmpegkit.dll',
+    exe_name = f'{variant.slug}.exe'
+    actual_exe = None
+    for candidate in [exe_name, 'THLRedLook.exe', 'zhenguojian.exe', 'hongguojian.exe']:
+        if (bundle / candidate).is_file():
+            actual_exe = candidate
+            break
+    if not actual_exe:
+        raise SystemExit(f'Windows 安装包缺少可执行文件：{exe_name}')
+
+    required = ['flutter_windows.dll', 'libffmpegkit.dll',
                 'libmpv-2.dll', 'msvcp140.dll', 'vcruntime140.dll',
                 'data/icudtl.dat', 'data/app.so']
     missing = [name for name in required if not (bundle / name).is_file()]
@@ -68,7 +77,7 @@ else:
         for source in sorted(bundle.rglob('*')):
             if source.is_file():
                 relative = source.relative_to(bundle).as_posix()
-                if relative == 'zhenguojian.exe':
+                if relative in ('zhenguojian.exe', 'THLRedLook.exe', 'hongguojian.exe'):
                     relative = variant.slug + '.exe'
                 archive.write(source, relative)
     artifacts.append(target)

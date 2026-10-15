@@ -244,7 +244,7 @@ public final class JSSourceService: ObservableObject {
                 LocalStore.shared.setSource("")
             }
         } else if self.sources.contains(where: { ($0["id"] as? String) == "hongguo" }) {
-            // 优先默认激活红果源
+            // 优先默认激活官方源
             self.activeSourceId = "hongguo"
             LocalStore.shared.setSource("hongguo")
         } else if let firstId = self.sources.first?["id"] as? String {
@@ -265,7 +265,7 @@ public final class JSSourceService: ObservableObject {
         }
     }
 
-    /// 导入官方规范的内置红果免费短剧数据源，导入时默认选中该数据源
+    /// 导入官方规范的内置免费短剧数据源，导入时默认选中该数据源
     @discardableResult
     public func importBuiltInHongguoSource(autoSelect: Bool = true) async -> Bool {
         let script = BuiltInHongguoJSContent
@@ -299,7 +299,7 @@ public final class JSSourceService: ObservableObject {
         if ok {
             await refresh()
             let fileId = fileName.replacingOccurrences(of: ".js", with: "")
-            // 红果数据源导入时默认选择，或者当 autoSelect 开启 / 当前活跃源为空时自动选择
+            // 官方数据源导入时默认选择，或者当 autoSelect 开启 / 当前活跃源为空时自动选择
             if autoSelect || fileId == "hongguo" || self.activeSourceId.isEmpty {
                 let targetId = self.sources.contains(where: { ($0["id"] as? String) == fileId }) ? fileId : (self.sources.contains(where: { ($0["id"] as? String) == "hongguo" }) ? "hongguo" : (sources.first?["id"] as? String ?? ""))
                 if !targetId.isEmpty {
@@ -317,13 +317,13 @@ public final class JSSourceService: ObservableObject {
 }
 public let BuiltInHongguoJSContent = #"""
 /**
- * 红果免费短剧 CatPawOpen Spider (hongguo.js)
+ * 官方免费短剧 CatPawOpen Spider (hongguo.js)
  * 适配 CatPawOpen / CatVodOpen 标准规范 v1.0.3
  */
 
 const meta = {
   id: "hongguo",
-  name: "红果免费短剧",
+  name: "官方免费短剧",
   version: "1.0.3",
   description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
   author: "社区开发者",
@@ -587,7 +587,7 @@ async function detail(id) {
         vod_pic: cover,
         vod_content: desc,
         vod_remarks: epUrls.length > 0 ? ("全" + epUrls.length + "集") : "",
-        vod_play_from: "红果直链",
+        vod_play_from: "官方直链",
         vod_play_url: epUrls.join("#")
       }
     ]

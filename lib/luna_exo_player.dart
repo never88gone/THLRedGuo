@@ -82,7 +82,7 @@ class LunaPlayerStreams implements PlayerStream {
 }
 
 /// 采用和 LunaTV-Mobile 完全相同架构的 ExoPlayer (AndroidX Media3) 播放器封装，
-/// 同时对上层红果鉴播控 UI (PlayerControls & TelevisionControls) 暴露完全兼容的 Player 契约。
+/// 同时对上层播控 UI (PlayerControls & TelevisionControls) 暴露完全兼容的 Player 契约。
 class LunaExoPlayer implements Player {
   LunaExoPlayer() {
     state = const PlayerState().copyWith(volume: 100.0);

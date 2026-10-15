@@ -131,6 +131,8 @@ public struct CatalogView: View {
             }
             .padding(.horizontal, 48)
             .background(Color.clear)
+            .focusSection()
+            .defaultFocus($focusedTarget, .category("all"))
 
             // 内容网格
             if viewModel.isLoading && viewModel.items.isEmpty {
@@ -195,9 +197,10 @@ public struct CatalogView: View {
                             .foregroundColor(.secondary)
                             Spacer()
                         }
-                        .padding(.vertical, 24)
                     }
                 }
+                .focusSection()
+                .defaultFocus($focusedTarget, viewModel.items.first.map { FocusTarget.card($0.id) })
             } // end else for loading
             } // end else for jsService
         } // end VStack
@@ -211,9 +214,9 @@ public struct CatalogView: View {
             NSLog("🎯 [FOCUS_TRACE] Catalog focusedTarget = %@", String(describing: target))
         }
         .onChange(of: focusCategoryTrigger) { _ in
-            let target = viewModel.selectedCategory.id.isEmpty ? "all" : viewModel.selectedCategory.id
+            let target = "all"
             focusedTarget = .category(target)
-            NSLog("🎯 [FOCUS_TRACE] Catalog 收到导航栏向下指令 -> 精确聚焦分类: %@", target)
+            NSLog("🎯 [FOCUS_TRACE] Catalog 收到导航栏向下指令 -> 精确聚焦全部按钮: %@", target)
         }
         .task(id: jsService.activeSourceId) {
             await viewModel.reloadAll()

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh_CN</string>
 	<key>CFBundleDisplayName</key>
-	<string>糖葫芦果鉴</string>
+	<string>糖葫芦Haw</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -47,7 +47,7 @@
 		<string>_zgj-link._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>糖葫芦果鉴需要访问本地网络，以便在局域网内与手机端自动同步追剧记录并接收大屏推送播放。</string>
+	<string>糖葫芦Haw需要访问本地网络，以便在局域网内与手机端自动同步追剧记录并接收大屏推送播放。</string>
 	<key>TVTopShelfImage</key>
 	<dict>
 		<key>TVTopShelfPrimaryImageWide</key>

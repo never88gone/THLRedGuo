@@ -7,7 +7,7 @@ class CinematicPlaybackView extends StatelessWidget {
   const CinematicPlaybackView({
     super.key,
     required this.controls,
-    this.badgeText = '红果自制 · 1080P 高清原画',
+    this.badgeText = '官方自制 · 1080P 高清原画',
     this.aspectRatio = 9 / 16,
   });
 
