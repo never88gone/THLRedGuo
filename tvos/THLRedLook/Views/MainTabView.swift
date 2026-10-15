@@ -42,8 +42,12 @@ public struct MainTabView: View {
 
     @State private var selectedTab: TVAppTab = .catalog
     @FocusState private var focusedNavTab: TVAppTab?
-    @State private var wasInContentArea: Bool = false
+    @State private var catalogCategoryFocusTrigger: Int = 0
+    @State private var recommendationsCategoryFocusTrigger: Int = 0
+    @State private var rankingsBoardFocusTrigger: Int = 0
+    @State private var libraryTabFocusTrigger: Int = 0
     @State private var settingsSidebarTrigger: Int = 0
+    @State private var wasInContentArea: Bool = false
 
     @State private var handoffDrama: Drama?
     @State private var handoffEpIndex: Int = 1
@@ -187,8 +191,22 @@ public struct MainTabView: View {
                     TVTopNavigationBar(
                         selectedTab: $selectedTab,
                         focusedNavTab: $focusedNavTab,
-                        onFocusSettingsSidebar: {
-                            settingsSidebarTrigger += 1
+                        onDownCommandForTab: { tab in
+                            focusedNavTab = nil
+                            switch tab {
+                            case .catalog:
+                                catalogCategoryFocusTrigger += 1
+                            case .recommendations:
+                                recommendationsCategoryFocusTrigger += 1
+                            case .rankings:
+                                rankingsBoardFocusTrigger += 1
+                            case .library:
+                                libraryTabFocusTrigger += 1
+                            case .settings:
+                                settingsSidebarTrigger += 1
+                            default:
+                                break
+                            }
                         }
                     )
                     .padding(.top, 28)
@@ -204,18 +222,38 @@ public struct MainTabView: View {
                             CatalogView(
                                 store: store,
                                 forceFocusFirstCard: isCardFocusedDemo,
-                                initialCategory: catalogInitialCategory
+                                initialCategory: catalogInitialCategory,
+                                focusCategoryTrigger: catalogCategoryFocusTrigger,
+                                onRequestFocusTopNav: {
+                                    focusedNavTab = .catalog
+                                }
                             )
                             .id("catalog_\(isCardFocusedDemo)_\(catalogInitialCategory ?? "")")
                         case .recommendations:
-                            RecommendationsView(initialCategory: recommendationsCategory)
-                                .id("recom_\(recommendationsCategory ?? "")")
+                            RecommendationsView(
+                                initialCategory: recommendationsCategory,
+                                focusCategoryTrigger: recommendationsCategoryFocusTrigger,
+                                onRequestFocusTopNav: {
+                                    focusedNavTab = .recommendations
+                                }
+                            )
+                            .id("recom_\(recommendationsCategory ?? "")")
                         case .rankings:
-                            RankingsView()
+                            RankingsView(
+                                focusCategoryTrigger: rankingsBoardFocusTrigger,
+                                onRequestFocusTopNav: {
+                                    focusedNavTab = .rankings
+                                }
+                            )
                         case .search:
                             SearchRootView(initialQuery: deepLinkQuery, targetEpisode: deepLinkEpisode)
                         case .library:
-                            SavedLibraryView()
+                            SavedLibraryView(
+                                focusCategoryTrigger: libraryTabFocusTrigger,
+                                onRequestFocusTopNav: {
+                                    focusedNavTab = .library
+                                }
+                            )
                         case .downloads:
                             DownloadsView()
                         case .settings:
@@ -224,7 +262,6 @@ public struct MainTabView: View {
                                 focusSidebarTrigger: settingsSidebarTrigger,
                                 onRequestFocusTopNav: {
                                     focusedNavTab = .settings
-                                    wasInContentArea = false
                                 }
                             )
                         }
@@ -242,7 +279,7 @@ public struct MainTabView: View {
                     }
                 }
                 // 需求 2：从内容页面按上键时，焦点精确重定向到当前激活的 selectedTab
-                .onChange(of: focusedNavTab) { newTab in
+                .onChange(of: focusedNavTab) { _, newTab in
                     NSLog("🎯 [FOCUS_TRACE] TopNav focusedNavTab = %@", newTab?.rawValue ?? "nil")
                     if let tab = newTab {
                         if wasInContentArea && tab != selectedTab {
@@ -467,16 +504,16 @@ public struct MainTabView: View {
 public struct TVTopNavigationBar: View {
     @Binding public var selectedTab: TVAppTab
     public var focusedNavTab: FocusState<TVAppTab?>.Binding
-    public var onFocusSettingsSidebar: (() -> Void)? = nil
+    public var onDownCommandForTab: ((TVAppTab) -> Void)? = nil
 
     public init(
         selectedTab: Binding<TVAppTab>,
         focusedNavTab: FocusState<TVAppTab?>.Binding,
-        onFocusSettingsSidebar: (() -> Void)? = nil
+        onDownCommandForTab: ((TVAppTab) -> Void)? = nil
     ) {
         self._selectedTab = selectedTab
         self.focusedNavTab = focusedNavTab
-        self.onFocusSettingsSidebar = onFocusSettingsSidebar
+        self.onDownCommandForTab = onDownCommandForTab
     }
 
     public var body: some View {
@@ -487,10 +524,9 @@ public struct TVTopNavigationBar: View {
                     tab: tab,
                     isSelected: selectedTab == tab,
                     isFocused: isFocused,
-                    onDownCommand: (tab == .settings) ? {
-                        focusedNavTab.wrappedValue = nil
-                        onFocusSettingsSidebar?()
-                    } : nil,
+                    onDownCommand: {
+                        onDownCommandForTab?(tab)
+                    },
                     onLeftCommand: (tab == .settings) ? {
                         focusedNavTab.wrappedValue = .downloads
                         selectedTab = .downloads

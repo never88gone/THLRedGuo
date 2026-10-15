@@ -11,7 +11,13 @@ public struct SavedLibraryView: View {
         GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
     ]
 
-    public init() {}
+    public var focusCategoryTrigger: Int = 0
+    public var onRequestFocusTopNav: (() -> Void)? = nil
+
+    public init(focusCategoryTrigger: Int = 0, onRequestFocusTopNav: (() -> Void)? = nil) {
+        self.focusCategoryTrigger = focusCategoryTrigger
+        self.onRequestFocusTopNav = onRequestFocusTopNav
+    }
 
     public var body: some View {
         ZStack {
@@ -24,7 +30,19 @@ public struct SavedLibraryView: View {
                             TVCapsuleButton(
                                 title: tab.label,
                                 isSelected: viewModel.selectedTab == tab,
-                                isExternalFocused: focusedMainTab == tab
+                                isFocused: focusedMainTab == tab,
+                                onUpCommand: {
+                                    focusedMainTab = nil
+                                    onRequestFocusTopNav?()
+                                },
+                                onDownCommand: {
+                                    focusedMainTab = nil
+                                    if tab == .follows {
+                                        focusedFollowFilter = viewModel.selectedFollowFilter
+                                    } else {
+                                        focusedDramaId = viewModel.historyList.first?.drama.id
+                                    }
+                                }
                             ) {
                                 viewModel.selectedTab = tab
                             }
@@ -34,7 +52,16 @@ public struct SavedLibraryView: View {
                         Spacer()
 
                         if viewModel.selectedTab == .history && !viewModel.historyList.isEmpty {
-                            TVButton(title: "清空历史", icon: "trash") {
+                            TVButton(
+                                title: "清空历史",
+                                icon: "trash",
+                                onUpCommand: {
+                                    onRequestFocusTopNav?()
+                                },
+                                onDownCommand: {
+                                    focusedDramaId = viewModel.historyList.first?.drama.id
+                                }
+                            ) {
                                 viewModel.clearHistory()
                             }
                             .padding(.top, 4)
@@ -53,7 +80,15 @@ public struct SavedLibraryView: View {
                                 TVCapsuleButton(
                                     title: state.label,
                                     isSelected: viewModel.selectedFollowFilter == state,
-                                    isExternalFocused: focusedFollowFilter == state
+                                    isFocused: focusedFollowFilter == state,
+                                    onUpCommand: {
+                                        focusedFollowFilter = nil
+                                        focusedMainTab = .follows
+                                    },
+                                    onDownCommand: {
+                                        focusedFollowFilter = nil
+                                        focusedDramaId = viewModel.followedList.first?.id
+                                    }
                                 ) {
                                     viewModel.selectedFollowFilter = state
                                 }
@@ -84,12 +119,16 @@ public struct SavedLibraryView: View {
                                 .frame(maxWidth: .infinity, minHeight: 400)
                             } else {
                                 LazyVGrid(columns: columns, spacing: 36) {
-                                    ForEach(viewModel.historyList) { entry in
+                                    ForEach(Array(viewModel.historyList.enumerated()), id: \.element.id) { index, entry in
                                         DramaCardView(
                                             drama: entry.drama,
-                                            isExternalFocused: focusedDramaId == entry.drama.id,
+                                            isFocused: focusedDramaId == entry.drama.id,
                                             watchProgress: entry.progressPercent,
-                                            progressText: entry.progressLabel
+                                            progressText: entry.progressLabel,
+                                            onUpCommand: (index < 6) ? {
+                                                focusedDramaId = nil
+                                                focusedMainTab = .history
+                                            } : nil
                                         ) {
                                             selectedDrama = entry.drama
                                         }
@@ -113,10 +152,14 @@ public struct SavedLibraryView: View {
                                 .frame(maxWidth: .infinity, minHeight: 400)
                             } else {
                                 LazyVGrid(columns: columns, spacing: 36) {
-                                    ForEach(viewModel.followedList) { drama in
+                                    ForEach(Array(viewModel.followedList.enumerated()), id: \.element.id) { index, drama in
                                         DramaCardView(
                                             drama: drama,
-                                            isExternalFocused: focusedDramaId == drama.id
+                                            isFocused: focusedDramaId == drama.id,
+                                            onUpCommand: (index < 6) ? {
+                                                focusedDramaId = nil
+                                                focusedFollowFilter = viewModel.selectedFollowFilter
+                                            } : nil
                                         ) {
                                             selectedDrama = drama
                                         }
@@ -144,6 +187,12 @@ public struct SavedLibraryView: View {
         }
         .onChange(of: focusedDramaId) { d in
             NSLog("🎯 [FOCUS_TRACE] Library focusedDramaId = %@", d ?? "nil")
+        }
+        .onChange(of: focusCategoryTrigger) { _ in
+            focusedDramaId = nil
+            focusedFollowFilter = nil
+            focusedMainTab = viewModel.selectedTab
+            NSLog("🎯 [FOCUS_TRACE] Library 收到导航栏向下指令 -> 精确聚焦Tab: %@", viewModel.selectedTab.rawValue)
         }
     }
 }

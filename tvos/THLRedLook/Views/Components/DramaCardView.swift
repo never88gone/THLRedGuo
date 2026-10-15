@@ -152,39 +152,36 @@ public struct PosterArtworkView: View {
 
 public struct DramaCardView: View {
     public let drama: Drama
+    public var isFocused: Bool = false
     public var watchProgress: Double? = nil
     public var progressText: String? = nil
     public var forceFocused: Bool = false
-    public var isExternalFocused: Bool? = nil
+    public var onUpCommand: (() -> Void)? = nil
     public var onSelect: () -> Void
-
-    @FocusState private var isInternalFocused: Bool
-
-    private var isFocused: Bool {
-        if let ext = isExternalFocused {
-            return ext || isInternalFocused
-        }
-        return isInternalFocused
-    }
 
     public init(
         drama: Drama,
+        isFocused: Bool = false,
         isExternalFocused: Bool? = nil,
         watchProgress: Double? = nil,
         progressText: String? = nil,
         forceFocused: Bool = false,
+        onUpCommand: (() -> Void)? = nil,
         onSelect: @escaping () -> Void
     ) {
         self.drama = drama
-        self.isExternalFocused = isExternalFocused
+        self.isFocused = isExternalFocused ?? isFocused
         self.watchProgress = watchProgress
         self.progressText = progressText
         self.forceFocused = forceFocused
+        self.onUpCommand = onUpCommand
         self.onSelect = onSelect
     }
 
+    @Environment(\.isFocused) private var envIsFocused
+
     public var body: some View {
-        let effectiveFocused = isFocused || forceFocused
+        let effectiveFocused = isFocused || forceFocused || envIsFocused
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: 10) {
                 ZStack(alignment: .topTrailing) {
@@ -247,7 +244,11 @@ public struct DramaCardView: View {
             .background(Color.clear)
         }
         .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isInternalFocused)
         .focusEffectDisabled()
+        .onMoveCommand { direction in
+            if direction == .up {
+                onUpCommand?()
+            }
+        }
     }
 }

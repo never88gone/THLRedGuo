@@ -348,27 +348,34 @@ public struct TVButton: View {
     public let title: String
     public var icon: String? = nil
     public var isProminent: Bool = false
-    public var isExternalFocused: Bool? = nil
+    public var isFocused: Bool = false
+    public var onUpCommand: (() -> Void)? = nil
+    public var onDownCommand: (() -> Void)? = nil
     public let action: () -> Void
 
-    @FocusState private var isInternalFocused: Bool
-
-    private var isFocused: Bool {
-        if let ext = isExternalFocused {
-            return ext || isInternalFocused
-        }
-        return isInternalFocused
-    }
-
-    public init(title: String, icon: String? = nil, isProminent: Bool = false, isExternalFocused: Bool? = nil, action: @escaping () -> Void) {
+    public init(
+        title: String,
+        icon: String? = nil,
+        isProminent: Bool = false,
+        isFocused: Bool = false,
+        isExternalFocused: Bool? = nil,
+        onUpCommand: (() -> Void)? = nil,
+        onDownCommand: (() -> Void)? = nil,
+        action: @escaping () -> Void
+    ) {
         self.title = title
         self.icon = icon
         self.isProminent = isProminent
-        self.isExternalFocused = isExternalFocused
+        self.isFocused = isExternalFocused ?? isFocused
+        self.onUpCommand = onUpCommand
+        self.onDownCommand = onDownCommand
         self.action = action
     }
 
+    @Environment(\.isFocused) private var envIsFocused
+
     public var body: some View {
+        let activeFocused = isFocused || envIsFocused
         Button(action: action) {
             HStack(spacing: 10) {
                 if let ic = icon {
@@ -384,16 +391,22 @@ public struct TVButton: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(isProminent ? (isFocused ? TVTheme.primaryHover : TVTheme.primary) : (isFocused ? TVTheme.surfaceFocused : TVTheme.surfaceCard))
+                    .fill(isProminent ? (activeFocused ? TVTheme.primaryHover : TVTheme.primary) : (activeFocused ? TVTheme.surfaceFocused : TVTheme.surfaceCard))
             )
             .foregroundColor(TVTheme.textPrimary)
-            .tvFocusBorder(isFocused: isFocused, cornerRadius: 14)
+            .tvFocusBorder(isFocused: activeFocused, cornerRadius: 14)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isInternalFocused)
         .focusEffectDisabled()
+        .onMoveCommand { direction in
+            if direction == .up {
+                onUpCommand?()
+            } else if direction == .down {
+                onDownCommand?()
+            }
+        }
     }
 }
 
@@ -401,34 +414,35 @@ public struct TVButton: View {
 public struct TVCapsuleButton: View {
     public let title: String
     public var isSelected: Bool = false
-    public var isExternalFocused: Bool? = nil
+    public var isFocused: Bool = false
     public var onFocused: (() -> Void)? = nil
+    public var onUpCommand: (() -> Void)? = nil
+    public var onDownCommand: (() -> Void)? = nil
     public let action: () -> Void
-
-    @FocusState private var isInternalFocused: Bool
-
-    private var isFocused: Bool {
-        if let ext = isExternalFocused {
-            return ext || isInternalFocused
-        }
-        return isInternalFocused
-    }
 
     public init(
         title: String,
         isSelected: Bool = false,
+        isFocused: Bool = false,
         isExternalFocused: Bool? = nil,
         onFocused: (() -> Void)? = nil,
+        onUpCommand: (() -> Void)? = nil,
+        onDownCommand: (() -> Void)? = nil,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.isSelected = isSelected
-        self.isExternalFocused = isExternalFocused
+        self.isFocused = isExternalFocused ?? isFocused
         self.onFocused = onFocused
+        self.onUpCommand = onUpCommand
+        self.onDownCommand = onDownCommand
         self.action = action
     }
 
+    @Environment(\.isFocused) private var envIsFocused
+
     public var body: some View {
+        let activeFocused = isFocused || envIsFocused
         Button(action: action) {
             Text(title)
                 .font(.system(size: 17, weight: isSelected ? .bold : .medium))
@@ -436,17 +450,23 @@ public struct TVCapsuleButton: View {
                 .padding(.horizontal, 26)
                 .padding(.vertical, 12)
                 .background(
-                    isSelected ? (isFocused ? TVTheme.primaryHover : TVTheme.primary) : (isFocused ? TVTheme.surfaceFocused : TVTheme.surfaceCard)
+                    isSelected ? (activeFocused ? TVTheme.primaryHover : TVTheme.primary) : (activeFocused ? TVTheme.surfaceFocused : TVTheme.surfaceCard)
                 )
                 .clipShape(Capsule())
-                .tvCapsuleFocus(isFocused: isFocused)
+                .tvCapsuleFocus(isFocused: activeFocused)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isInternalFocused)
         .focusEffectDisabled()
-        .onChange(of: isFocused) { focused in
+        .onMoveCommand { direction in
+            if direction == .up {
+                onUpCommand?()
+            } else if direction == .down {
+                onDownCommand?()
+            }
+        }
+        .onChange(of: activeFocused) { focused in
             if focused {
                 onFocused?()
             }
@@ -547,34 +567,35 @@ public struct TVEpisodeButton: View {
 public struct TVRankingBoardButton: View {
     public let board: RankingBoard
     public var isSelected: Bool = false
-    public var isExternalFocused: Bool? = nil
+    public var isFocused: Bool = false
     public var onFocused: (() -> Void)? = nil
+    public var onUpCommand: (() -> Void)? = nil
+    public var onDownCommand: (() -> Void)? = nil
     public let action: () -> Void
-
-    @FocusState private var isInternalFocused: Bool
-
-    private var isFocused: Bool {
-        if let ext = isExternalFocused {
-            return ext || isInternalFocused
-        }
-        return isInternalFocused
-    }
 
     public init(
         board: RankingBoard,
         isSelected: Bool = false,
+        isFocused: Bool = false,
         isExternalFocused: Bool? = nil,
         onFocused: (() -> Void)? = nil,
+        onUpCommand: (() -> Void)? = nil,
+        onDownCommand: (() -> Void)? = nil,
         action: @escaping () -> Void
     ) {
         self.board = board
         self.isSelected = isSelected
-        self.isExternalFocused = isExternalFocused
+        self.isFocused = isExternalFocused ?? isFocused
         self.onFocused = onFocused
+        self.onUpCommand = onUpCommand
+        self.onDownCommand = onDownCommand
         self.action = action
     }
 
+    @Environment(\.isFocused) private var envIsFocused
+
     public var body: some View {
+        let activeFocused = isFocused || envIsFocused
         Button(action: action) {
             VStack(spacing: 6) {
                 Text(board.name)
@@ -582,7 +603,7 @@ public struct TVRankingBoardButton: View {
                     .foregroundColor(TVTheme.textPrimary)
                 Text(board.description)
                     .font(.caption)
-                    .foregroundColor(isFocused ? TVTheme.textPrimary.opacity(0.9) : TVTheme.textSecondary)
+                    .foregroundColor(activeFocused ? TVTheme.textPrimary.opacity(0.9) : TVTheme.textSecondary)
                     .lineLimit(1)
             }
             .frame(minWidth: 160)
@@ -590,16 +611,22 @@ public struct TVRankingBoardButton: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? (isFocused ? TVTheme.primaryHover : TVTheme.primary) : (isFocused ? TVTheme.surfaceFocused : TVTheme.surfaceCard))
+                    .fill(isSelected ? (activeFocused ? TVTheme.primaryHover : TVTheme.primary) : (activeFocused ? TVTheme.surfaceFocused : TVTheme.surfaceCard))
             )
-            .tvFocusBorder(isFocused: isFocused, cornerRadius: 14)
+            .tvFocusBorder(isFocused: activeFocused, cornerRadius: 14)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isInternalFocused)
         .focusEffectDisabled()
-        .onChange(of: isFocused) { focused in
+        .onMoveCommand { direction in
+            if direction == .up {
+                onUpCommand?()
+            } else if direction == .down {
+                onDownCommand?()
+            }
+        }
+        .onChange(of: activeFocused) { focused in
             if focused {
                 onFocused?()
             }

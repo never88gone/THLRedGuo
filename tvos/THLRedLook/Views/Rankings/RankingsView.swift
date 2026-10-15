@@ -14,7 +14,13 @@ public struct RankingsView: View {
         GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
     ]
 
-    public init() {}
+    public var focusCategoryTrigger: Int = 0
+    public var onRequestFocusTopNav: (() -> Void)? = nil
+
+    public init(focusCategoryTrigger: Int = 0, onRequestFocusTopNav: (() -> Void)? = nil) {
+        self.focusCategoryTrigger = focusCategoryTrigger
+        self.onRequestFocusTopNav = onRequestFocusTopNav
+    }
 
     private var currentActiveSource: String {
         let active = jsService.activeSourceId.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -42,9 +48,17 @@ public struct RankingsView: View {
                                 TVRankingBoardButton(
                                     board: board,
                                     isSelected: viewModel.selectedBoard?.id == board.id,
-                                    isExternalFocused: focusedBoardId == board.id,
+                                    isFocused: focusedBoardId == board.id,
                                     onFocused: {
                                         viewModel.selectBoard(board)
+                                    },
+                                    onUpCommand: {
+                                        focusedBoardId = nil
+                                        onRequestFocusTopNav?()
+                                    },
+                                    onDownCommand: {
+                                        focusedBoardId = nil
+                                        focusedDramaId = viewModel.items.first?.id
                                     }
                                 ) {
                                     viewModel.selectBoard(board)
@@ -82,7 +96,11 @@ public struct RankingsView: View {
                                     ZStack(alignment: .topLeading) {
                                         DramaCardView(
                                             drama: drama,
-                                            isExternalFocused: focusedDramaId == drama.id
+                                            isFocused: focusedDramaId == drama.id,
+                                            onUpCommand: (index < 6) ? {
+                                                focusedDramaId = nil
+                                                focusedBoardId = viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id
+                                            } : nil
                                         ) {
                                             selectedDrama = drama
                                         }
@@ -123,6 +141,12 @@ public struct RankingsView: View {
         .onChange(of: focusedDramaId) { d in
             NSLog("🎯 [FOCUS_TRACE] Rankings focusedDramaId = %@", d ?? "nil")
         }
+        .onChange(of: focusCategoryTrigger) { _ in
+            let target = viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id
+            focusedDramaId = nil
+            focusedBoardId = target
+            NSLog("🎯 [FOCUS_TRACE] Rankings 收到导航栏向下指令 -> 精确聚焦榜单: %@", target ?? "nil")
+        }
     }
 }
 
@@ -139,9 +163,13 @@ public struct RecommendationsView: View {
     ]
 
     public var initialCategory: String? = nil
+    public var focusCategoryTrigger: Int = 0
+    public var onRequestFocusTopNav: (() -> Void)? = nil
 
-    public init(initialCategory: String? = nil) {
+    public init(initialCategory: String? = nil, focusCategoryTrigger: Int = 0, onRequestFocusTopNav: (() -> Void)? = nil) {
         self.initialCategory = initialCategory
+        self.focusCategoryTrigger = focusCategoryTrigger
+        self.onRequestFocusTopNav = onRequestFocusTopNav
     }
 
     private var currentActiveSource: String {
@@ -164,9 +192,17 @@ public struct RecommendationsView: View {
                             TVCapsuleButton(
                                 title: cat,
                                 isSelected: viewModel.selectedSubCategory == cat,
-                                isExternalFocused: focusedCategory == cat,
+                                isFocused: focusedCategory == cat,
                                 onFocused: {
                                     viewModel.selectSubCategory(cat)
+                                },
+                                onUpCommand: {
+                                    focusedCategory = nil
+                                    onRequestFocusTopNav?()
+                                },
+                                onDownCommand: {
+                                    focusedCategory = nil
+                                    focusedDramaId = viewModel.items.first?.id
                                 }
                             ) {
                                 viewModel.selectSubCategory(cat)
@@ -189,10 +225,14 @@ public struct RecommendationsView: View {
                     } else {
                         ScrollView {
                             LazyVGrid(columns: columns, spacing: 36) {
-                                ForEach(viewModel.items) { drama in
+                                ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, drama in
                                     DramaCardView(
                                         drama: drama,
-                                        isExternalFocused: focusedDramaId == drama.id
+                                        isFocused: focusedDramaId == drama.id,
+                                        onUpCommand: (index < 6) ? {
+                                            focusedDramaId = nil
+                                            focusedCategory = viewModel.selectedSubCategory.isEmpty ? viewModel.subCategories.first : viewModel.selectedSubCategory
+                                        } : nil
                                     ) {
                                         selectedDrama = drama
                                     }
@@ -223,6 +263,12 @@ public struct RecommendationsView: View {
         }
         .onChange(of: focusedDramaId) { d in
             NSLog("🎯 [FOCUS_TRACE] Recommendations focusedDramaId = %@", d ?? "nil")
+        }
+        .onChange(of: focusCategoryTrigger) { _ in
+            let target = viewModel.selectedSubCategory.isEmpty ? (viewModel.subCategories.first ?? "") : viewModel.selectedSubCategory
+            focusedDramaId = nil
+            focusedCategory = target
+            NSLog("🎯 [FOCUS_TRACE] Recommendations 收到导航栏向下指令 -> 精确聚焦分类: %@", target)
         }
     }
 }

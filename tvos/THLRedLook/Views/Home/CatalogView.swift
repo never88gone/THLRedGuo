@@ -9,15 +9,25 @@ public struct CatalogView: View {
     @FocusState private var focusedDramaId: String?
     public var forceFocusFirstCard: Bool = false
     public var initialCategory: String? = nil
+    public var focusCategoryTrigger: Int = 0
+    public var onRequestFocusTopNav: (() -> Void)? = nil
 
     private let columns = [
         GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
     ]
 
-    public init(store: LocalStore = .shared, forceFocusFirstCard: Bool = false, initialCategory: String? = nil) {
+    public init(
+        store: LocalStore = .shared,
+        forceFocusFirstCard: Bool = false,
+        initialCategory: String? = nil,
+        focusCategoryTrigger: Int = 0,
+        onRequestFocusTopNav: (() -> Void)? = nil
+    ) {
         self.store = store
         self.forceFocusFirstCard = forceFocusFirstCard
         self.initialCategory = initialCategory
+        self.focusCategoryTrigger = focusCategoryTrigger
+        self.onRequestFocusTopNav = onRequestFocusTopNav
     }
 
     @EnvironmentObject private var jsService: JSSourceService
@@ -41,9 +51,17 @@ public struct CatalogView: View {
                             TVCapsuleButton(
                                 title: category.name,
                                 isSelected: viewModel.selectedCategory.id == category.id,
-                                isExternalFocused: focusedCategory == catId,
+                                isFocused: focusedCategory == catId,
                                 onFocused: {
                                     viewModel.selectCategory(category, immediate: false)
+                                },
+                                onUpCommand: {
+                                    focusedCategory = nil
+                                    onRequestFocusTopNav?()
+                                },
+                                onDownCommand: {
+                                    focusedCategory = nil
+                                    focusedDramaId = viewModel.items.first?.id
                                 }
                             ) {
                                 viewModel.selectCategory(category, immediate: true)
@@ -65,7 +83,15 @@ public struct CatalogView: View {
                     TVButton(
                         title: viewModel.selectedSort.label,
                         icon: "line.3.horizontal.decrease.circle",
-                        isExternalFocused: focusedCategory == "__filter__"
+                        isFocused: focusedCategory == "__filter__",
+                        onUpCommand: {
+                            focusedCategory = nil
+                            onRequestFocusTopNav?()
+                        },
+                        onDownCommand: {
+                            focusedCategory = nil
+                            focusedDramaId = viewModel.items.first?.id
+                        }
                     ) {
                         showingFilterSheet = true
                     }
@@ -75,7 +101,15 @@ public struct CatalogView: View {
                     TVButton(
                         title: "",
                         icon: "arrow.clockwise",
-                        isExternalFocused: focusedCategory == "__refresh__"
+                        isFocused: focusedCategory == "__refresh__",
+                        onUpCommand: {
+                            focusedCategory = nil
+                            onRequestFocusTopNav?()
+                        },
+                        onDownCommand: {
+                            focusedCategory = nil
+                            focusedDramaId = viewModel.items.first?.id
+                        }
                     ) {
                         Task { await viewModel.reloadAll() }
                     }
@@ -114,8 +148,13 @@ public struct CatalogView: View {
                         ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, drama in
                             DramaCardView(
                                 drama: drama,
-                                isExternalFocused: focusedDramaId == drama.id,
-                                forceFocused: forceFocusFirstCard && index == 0
+                                isFocused: focusedDramaId == drama.id,
+                                forceFocused: forceFocusFirstCard && index == 0,
+                                onUpCommand: (index < 6) ? {
+                                    focusedDramaId = nil
+                                    let catId = viewModel.selectedCategory.id.isEmpty ? "all" : viewModel.selectedCategory.id
+                                    focusedCategory = catId
+                                } : nil
                             ) {
                                 selectedDrama = drama
                             }
@@ -158,6 +197,12 @@ public struct CatalogView: View {
         }
         .onChange(of: focusedDramaId) { dramaId in
             NSLog("🎯 [FOCUS_TRACE] Catalog focusedDramaId = %@", dramaId ?? "nil")
+        }
+        .onChange(of: focusCategoryTrigger) { _ in
+            let target = viewModel.selectedCategory.id.isEmpty ? "all" : viewModel.selectedCategory.id
+            focusedDramaId = nil
+            focusedCategory = target
+            NSLog("🎯 [FOCUS_TRACE] Catalog 收到导航栏向下指令 -> 精确聚焦分类: %@", target)
         }
         .task(id: jsService.activeSourceId) {
             await viewModel.reloadAll()
