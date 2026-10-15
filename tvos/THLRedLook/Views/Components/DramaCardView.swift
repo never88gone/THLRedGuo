@@ -158,10 +158,13 @@ public struct DramaCardView: View {
     public var isExternalFocused: Bool? = nil
     public var onSelect: () -> Void
 
-    @Environment(\.isFocused) private var envIsFocused: Bool
+    @FocusState private var isInternalFocused: Bool
 
     private var isFocused: Bool {
-        isExternalFocused ?? envIsFocused
+        if let ext = isExternalFocused {
+            return ext || isInternalFocused
+        }
+        return isInternalFocused
     }
 
     public init(
@@ -244,6 +247,7 @@ public struct DramaCardView: View {
             .background(Color.clear)
         }
         .buttonStyle(TVZeroHighlightButtonStyle())
+        .focused($isInternalFocused)
         .focusEffectDisabled()
     }
 }

@@ -41,6 +41,7 @@ public struct CatalogView: View {
                             TVCapsuleButton(
                                 title: category.name,
                                 isSelected: viewModel.selectedCategory.id == category.id,
+                                isExternalFocused: focusedCategory == catId,
                                 onFocused: {
                                     viewModel.selectCategory(category, immediate: false)
                                 }
@@ -61,13 +62,21 @@ public struct CatalogView: View {
 
                 HStack(spacing: 16) {
                     // 排序筛选按钮
-                    TVButton(title: viewModel.selectedSort.label, icon: "line.3.horizontal.decrease.circle") {
+                    TVButton(
+                        title: viewModel.selectedSort.label,
+                        icon: "line.3.horizontal.decrease.circle",
+                        isExternalFocused: focusedCategory == "__filter__"
+                    ) {
                         showingFilterSheet = true
                     }
                     .focused($focusedCategory, equals: "__filter__")
 
                     // 刷新按钮
-                    TVButton(title: "", icon: "arrow.clockwise") {
+                    TVButton(
+                        title: "",
+                        icon: "arrow.clockwise",
+                        isExternalFocused: focusedCategory == "__refresh__"
+                    ) {
                         Task { await viewModel.reloadAll() }
                     }
                     .focused($focusedCategory, equals: "__refresh__")
@@ -105,6 +114,7 @@ public struct CatalogView: View {
                         ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, drama in
                             DramaCardView(
                                 drama: drama,
+                                isExternalFocused: focusedDramaId == drama.id,
                                 forceFocused: forceFocusFirstCard && index == 0
                             ) {
                                 selectedDrama = drama

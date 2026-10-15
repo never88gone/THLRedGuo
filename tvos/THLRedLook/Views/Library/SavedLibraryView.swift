@@ -23,7 +23,8 @@ public struct SavedLibraryView: View {
                         ForEach(LibraryViewModel.LibraryTab.allCases) { tab in
                             TVCapsuleButton(
                                 title: tab.label,
-                                isSelected: viewModel.selectedTab == tab
+                                isSelected: viewModel.selectedTab == tab,
+                                isExternalFocused: focusedMainTab == tab
                             ) {
                                 viewModel.selectedTab = tab
                             }
@@ -51,7 +52,8 @@ public struct SavedLibraryView: View {
                             ForEach([FollowState.watching, FollowState.wishlist, FollowState.watched, FollowState.updated]) { state in
                                 TVCapsuleButton(
                                     title: state.label,
-                                    isSelected: viewModel.selectedFollowFilter == state
+                                    isSelected: viewModel.selectedFollowFilter == state,
+                                    isExternalFocused: focusedFollowFilter == state
                                 ) {
                                     viewModel.selectedFollowFilter = state
                                 }
@@ -85,6 +87,7 @@ public struct SavedLibraryView: View {
                                     ForEach(viewModel.historyList) { entry in
                                         DramaCardView(
                                             drama: entry.drama,
+                                            isExternalFocused: focusedDramaId == entry.drama.id,
                                             watchProgress: entry.progressPercent,
                                             progressText: entry.progressLabel
                                         ) {
@@ -111,7 +114,10 @@ public struct SavedLibraryView: View {
                             } else {
                                 LazyVGrid(columns: columns, spacing: 36) {
                                     ForEach(viewModel.followedList) { drama in
-                                        DramaCardView(drama: drama) {
+                                        DramaCardView(
+                                            drama: drama,
+                                            isExternalFocused: focusedDramaId == drama.id
+                                        ) {
                                             selectedDrama = drama
                                         }
                                         .focused($focusedDramaId, equals: drama.id)

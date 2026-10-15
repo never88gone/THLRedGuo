@@ -351,10 +351,13 @@ public struct TVButton: View {
     public var isExternalFocused: Bool? = nil
     public let action: () -> Void
 
-    @Environment(\.isFocused) private var envIsFocused: Bool
+    @FocusState private var isInternalFocused: Bool
 
     private var isFocused: Bool {
-        isExternalFocused ?? envIsFocused
+        if let ext = isExternalFocused {
+            return ext || isInternalFocused
+        }
+        return isInternalFocused
     }
 
     public init(title: String, icon: String? = nil, isProminent: Bool = false, isExternalFocused: Bool? = nil, action: @escaping () -> Void) {
@@ -389,6 +392,7 @@ public struct TVButton: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .buttonStyle(TVZeroHighlightButtonStyle())
+        .focused($isInternalFocused)
         .focusEffectDisabled()
     }
 }
@@ -401,10 +405,13 @@ public struct TVCapsuleButton: View {
     public var onFocused: (() -> Void)? = nil
     public let action: () -> Void
 
-    @Environment(\.isFocused) private var envIsFocused: Bool
+    @FocusState private var isInternalFocused: Bool
 
     private var isFocused: Bool {
-        isExternalFocused ?? envIsFocused
+        if let ext = isExternalFocused {
+            return ext || isInternalFocused
+        }
+        return isInternalFocused
     }
 
     public init(
@@ -437,8 +444,9 @@ public struct TVCapsuleButton: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .buttonStyle(TVZeroHighlightButtonStyle())
+        .focused($isInternalFocused)
         .focusEffectDisabled()
-        .onChange(of: envIsFocused) { focused in
+        .onChange(of: isFocused) { focused in
             if focused {
                 onFocused?()
             }
@@ -543,10 +551,13 @@ public struct TVRankingBoardButton: View {
     public var onFocused: (() -> Void)? = nil
     public let action: () -> Void
 
-    @Environment(\.isFocused) private var envIsFocused: Bool
+    @FocusState private var isInternalFocused: Bool
 
     private var isFocused: Bool {
-        isExternalFocused ?? envIsFocused
+        if let ext = isExternalFocused {
+            return ext || isInternalFocused
+        }
+        return isInternalFocused
     }
 
     public init(
@@ -586,8 +597,9 @@ public struct TVRankingBoardButton: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .buttonStyle(TVZeroHighlightButtonStyle())
+        .focused($isInternalFocused)
         .focusEffectDisabled()
-        .onChange(of: envIsFocused) { focused in
+        .onChange(of: isFocused) { focused in
             if focused {
                 onFocused?()
             }

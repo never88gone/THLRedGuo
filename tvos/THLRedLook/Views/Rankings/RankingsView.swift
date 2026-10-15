@@ -42,6 +42,7 @@ public struct RankingsView: View {
                                 TVRankingBoardButton(
                                     board: board,
                                     isSelected: viewModel.selectedBoard?.id == board.id,
+                                    isExternalFocused: focusedBoardId == board.id,
                                     onFocused: {
                                         viewModel.selectBoard(board)
                                     }
@@ -79,7 +80,10 @@ public struct RankingsView: View {
                             LazyVGrid(columns: columns, spacing: 36) {
                                 ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, drama in
                                     ZStack(alignment: .topLeading) {
-                                        DramaCardView(drama: drama) {
+                                        DramaCardView(
+                                            drama: drama,
+                                            isExternalFocused: focusedDramaId == drama.id
+                                        ) {
                                             selectedDrama = drama
                                         }
                                         .focused($focusedDramaId, equals: drama.id)
@@ -160,6 +164,7 @@ public struct RecommendationsView: View {
                             TVCapsuleButton(
                                 title: cat,
                                 isSelected: viewModel.selectedSubCategory == cat,
+                                isExternalFocused: focusedCategory == cat,
                                 onFocused: {
                                     viewModel.selectSubCategory(cat)
                                 }
@@ -185,7 +190,10 @@ public struct RecommendationsView: View {
                         ScrollView {
                             LazyVGrid(columns: columns, spacing: 36) {
                                 ForEach(viewModel.items) { drama in
-                                    DramaCardView(drama: drama) {
+                                    DramaCardView(
+                                        drama: drama,
+                                        isExternalFocused: focusedDramaId == drama.id
+                                    ) {
                                         selectedDrama = drama
                                     }
                                     .focused($focusedDramaId, equals: drama.id)
