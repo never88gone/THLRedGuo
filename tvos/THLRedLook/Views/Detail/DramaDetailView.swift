@@ -19,6 +19,7 @@ public struct DramaDetailView: View {
     @State private var isDescriptionExpanded: Bool = false
     @State private var showingDownloadSuccess: Bool = false
     @FocusState private var isPlayButtonFocused: Bool
+    @FocusState private var focusedSeasonDramaId: String?
     @FocusState private var focusedEpisode: Int?
     @FocusState private var focusedChunkIndex: Int?
 
@@ -135,7 +136,9 @@ public struct DramaDetailView: View {
                                         isExternalFocused: isPlayButtonFocused,
                                         onDownCommand: {
                                             isPlayButtonFocused = false
-                                            if detail.episodeChunks.count > 1 {
+                                            if viewModel.seasonItems.count > 1 {
+                                                focusedSeasonDramaId = viewModel.drama.id
+                                            } else if detail.episodeChunks.count > 1 {
                                                 focusedChunkIndex = viewModel.selectedChunkIndex
                                             } else if let firstEp = detail.episodes.first {
                                                 focusedEpisode = firstEp.number
@@ -176,7 +179,22 @@ public struct DramaDetailView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 20) {
                                     ForEach(viewModel.seasonItems) { item in
-                                        TVSeasonCapsuleCard(item: item) {
+                                        TVSeasonCapsuleCard(
+                                            item: item,
+                                            isExternalFocused: focusedSeasonDramaId == item.drama.id,
+                                            onUpCommand: {
+                                                focusedSeasonDramaId = nil
+                                                isPlayButtonFocused = true
+                                            },
+                                            onDownCommand: {
+                                                focusedSeasonDramaId = nil
+                                                if detail.episodeChunks.count > 1 {
+                                                    focusedChunkIndex = viewModel.selectedChunkIndex
+                                                } else if let firstEp = detail.episodes.first {
+                                                    focusedEpisode = firstEp.number
+                                                }
+                                            }
+                                        ) {
                                             if !item.isCurrent {
                                                 Task {
                                                     await viewModel.switchToDrama(item.drama)
@@ -188,11 +206,15 @@ public struct DramaDetailView: View {
                                                 }
                                             }
                                         }
+                                        .focused($focusedSeasonDramaId, equals: item.drama.id)
+                                        .id("season_card_\(item.drama.id)")
                                     }
                                 }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 6)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 8)
+                                .focusSection()
                             }
+                            .focusSection()
                         }
                         
                         Divider()
@@ -215,7 +237,11 @@ public struct DramaDetailView: View {
                                                 isExternalFocused: focusedChunkIndex == index,
                                                 onUpCommand: {
                                                     focusedChunkIndex = nil
-                                                    isPlayButtonFocused = true
+                                                    if viewModel.seasonItems.count > 1 {
+                                                        focusedSeasonDramaId = viewModel.drama.id
+                                                    } else {
+                                                        isPlayButtonFocused = true
+                                                    }
                                                 },
                                                 onDownCommand: {
                                                     focusedChunkIndex = nil
@@ -259,6 +285,8 @@ public struct DramaDetailView: View {
                                                     focusedEpisode = nil
                                                     if detail.episodeChunks.count > 1 {
                                                         focusedChunkIndex = viewModel.selectedChunkIndex
+                                                    } else if viewModel.seasonItems.count > 1 {
+                                                        focusedSeasonDramaId = viewModel.drama.id
                                                     } else {
                                                         isPlayButtonFocused = true
                                                     }
@@ -369,52 +397,177 @@ public struct DramaDetailView: View {
     }
 }
 
-/// 紧凑型季度选择卡片（高度约 60，横向排布，无标题，含小海报与明确当前季高亮徽章）
+/// 紧凑型季度选择卡片（横向排布，无标题，含小海报与明确当前季高亮徽章）
 public struct TVSeasonCapsuleCard: View {
     public let item: SeasonItem
+    public var isExternalFocused: Bool = false
+    public var onUpCommand: (() -> Void)? = nil
+    public var onDownCommand: (() -> Void)? = nil
     public let action: () -> Void
+
+    public init(
+        item: SeasonItem,
+        isExternalFocused: Bool = false,
+        onUpCommand: (() -> Void)? = nil,
+        onDownCommand: (() -> Void)? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.item = item
+        self.isExternalFocused = isExternalFocused
+        self.onUpCommand = onUpCommand
+        self.onDownCommand = onDownCommand
+        self.action = action
+    }
 
     public var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                // 小海报缩略图（36x50，圆角 6，内含带协议与字符转义的 PosterArtworkView）
-                PosterArtworkView(drama: item.drama, cornerRadius: 6)
-                    .frame(width: 36, height: 50)
-                    .clipped()
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.title)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-
-                    if item.isCurrent {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 6, height: 6)
-                            Text("当前播放")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(Color.red.opacity(0.95))
-                        }
-                    } else {
-                        Text(item.drama.releaseLabel)
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.65))
-                    }
-                }
-                .padding(.trailing, 8)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(item.isCurrent ? Color.red.opacity(0.22) : Color.white.opacity(0.08))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(item.isCurrent ? Color.red.opacity(0.8) : Color.white.opacity(0.12), lineWidth: item.isCurrent ? 2 : 1)
+            TVSeasonCapsuleCardLabel(
+                item: item,
+                externalFocused: isExternalFocused
             )
         }
-        .buttonStyle(.card)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 4)
+        .buttonStyle(TVZeroHighlightButtonStyle())
+        .focusEffectDisabled()
+        .onMoveCommand { direction in
+            if direction == .up {
+                onUpCommand?()
+            } else if direction == .down {
+                onDownCommand?()
+            }
+        }
+    }
+}
+
+private struct TVSeasonCapsuleCardLabel: View {
+    let item: SeasonItem
+    let externalFocused: Bool
+
+    @Environment(\.isFocused) private var envIsFocused
+
+    var isFocused: Bool {
+        externalFocused || envIsFocused
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // 小海报缩略图（36x50，圆角 6，内含 PosterArtworkView）
+            PosterArtworkView(drama: item.drama, cornerRadius: 6)
+                .frame(width: 36, height: 50)
+                .clipped()
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isFocused ? (item.isCurrent ? Color.white : TVTheme.focusedBorderColor) : Color.white.opacity(0.12), lineWidth: 1)
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title)
+                    .font(.system(size: isFocused ? 19 : 18, weight: .bold))
+                    .foregroundColor(titleColor)
+
+                if item.isCurrent {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(isFocused ? Color.white : Color.red)
+                            .frame(width: 6, height: 6)
+                        Text("当前播放")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundColor(isFocused ? Color.white : Color(red: 1.0, green: 0.35, blue: 0.45))
+                    }
+                } else {
+                    Text(item.drama.releaseLabel)
+                        .font(.system(size: 13, weight: isFocused ? .semibold : .regular))
+                        .foregroundColor(subTitleColor)
+                }
+            }
+            .padding(.trailing, 10)
+        }
+        .padding(.horizontal, isFocused ? 12 : 10)
+        .padding(.vertical, isFocused ? 8 : 6)
+        .background(backgroundView)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(borderStrokeColor, lineWidth: borderWidth)
+        )
+        .scaleEffect(isFocused ? 1.06 : 1.0)
+        .shadow(color: shadowColor, radius: shadowRadius, y: isFocused ? 4 : 0)
+        .animation(TVTheme.focusSpringAnimation, value: isFocused)
+    }
+
+    private var titleColor: Color {
+        if isFocused {
+            return item.isCurrent ? .white : .black
+        }
+        return .white
+    }
+
+    private var subTitleColor: Color {
+        if isFocused {
+            return item.isCurrent ? .white.opacity(0.9) : Color.black.opacity(0.75)
+        }
+        return Color.white.opacity(0.65)
+    }
+
+    private var borderStrokeColor: Color {
+        if isFocused {
+            return item.isCurrent ? Color.white : TVTheme.focusedBorderColor
+        }
+        if item.isCurrent {
+            return Color.red.opacity(0.85)
+        }
+        return Color.white.opacity(0.12)
+    }
+
+    private var borderWidth: CGFloat {
+        if isFocused {
+            return 3.0
+        }
+        if item.isCurrent {
+            return 2.0
+        }
+        return 1.0
+    }
+
+    private var shadowColor: Color {
+        if isFocused {
+            return item.isCurrent ? Color.red.opacity(0.85) : TVTheme.focusedShadowColor
+        }
+        if item.isCurrent {
+            return Color.red.opacity(0.4)
+        }
+        return Color.clear
+    }
+
+    private var shadowRadius: CGFloat {
+        if isFocused {
+            return 16.0
+        }
+        if item.isCurrent {
+            return 8.0
+        }
+        return 0
+    }
+
+    @ViewBuilder
+    private var backgroundView: some View {
+        if isFocused {
+            if item.isCurrent {
+                LinearGradient(
+                    colors: [Color(red: 0.95, green: 0.12, blue: 0.22), Color(red: 1.0, green: 0.35, blue: 0.45)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                Color(white: 0.95)
+            }
+        } else {
+            if item.isCurrent {
+                Color.red.opacity(0.25)
+            } else {
+                TVTheme.surfaceCard
+            }
+        }
     }
 }
