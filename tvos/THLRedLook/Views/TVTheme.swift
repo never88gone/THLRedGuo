@@ -410,7 +410,7 @@ public struct TVButton: View {
     }
 }
 
-// 统一胶囊焦点按钮（分类栏、Tab、筛选标签）
+// 统一胶囊焦点按钮（分类栏、Tab、选集分段、筛选标签）
 public struct TVCapsuleButton: View {
     public let title: String
     public var isSelected: Bool = false
@@ -439,21 +439,14 @@ public struct TVCapsuleButton: View {
         self.action = action
     }
 
-    @Environment(\.isFocused) private var envIsFocused
-
     public var body: some View {
-        let activeFocused = isFocused || envIsFocused
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 17, weight: isSelected ? .bold : .medium))
-                .foregroundColor(TVTheme.textPrimary)
-                .padding(.horizontal, 26)
-                .padding(.vertical, 12)
-                .background(
-                    isSelected ? (activeFocused ? TVTheme.primaryHover : TVTheme.primary) : (activeFocused ? TVTheme.surfaceFocused : TVTheme.surfaceCard)
-                )
-                .clipShape(Capsule())
-                .tvCapsuleFocus(isFocused: activeFocused)
+            TVCapsuleButtonLabel(
+                title: title,
+                isSelected: isSelected,
+                externalFocused: isFocused,
+                onFocused: onFocused
+            )
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
@@ -466,9 +459,114 @@ public struct TVCapsuleButton: View {
                 onDownCommand?()
             }
         }
-        .onChange(of: activeFocused) { focused in
-            if focused {
-                onFocused?()
+    }
+}
+
+private struct TVCapsuleButtonLabel: View {
+    let title: String
+    let isSelected: Bool
+    let externalFocused: Bool
+    let onFocused: (() -> Void)?
+
+    @Environment(\.isFocused) private var envIsFocused
+
+    var isFocused: Bool {
+        externalFocused || envIsFocused
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: isFocused ? 19 : 17, weight: (isFocused || isSelected) ? .heavy : .medium))
+            .foregroundColor(textColor)
+            .padding(.horizontal, isFocused ? 28 : 24)
+            .padding(.vertical, isFocused ? 13 : 11)
+            .background(backgroundView)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(borderStrokeColor, lineWidth: borderWidth)
+            )
+            .scaleEffect(isFocused ? 1.08 : 1.0)
+            .shadow(color: shadowColor, radius: shadowRadius, y: isFocused ? 4 : 0)
+            .animation(TVTheme.focusSpringAnimation, value: isFocused)
+            .onChange(of: isFocused) { focused in
+                if focused {
+                    onFocused?()
+                }
+            }
+    }
+
+    private var textColor: Color {
+        if isFocused {
+            return isSelected ? .white : .black
+        }
+        if isSelected {
+            return .white
+        }
+        return Color.white.opacity(0.85)
+    }
+
+    private var borderStrokeColor: Color {
+        if isFocused {
+            return isSelected ? Color.white : TVTheme.focusedBorderColor
+        }
+        if isSelected {
+            return Color.white.opacity(0.35)
+        }
+        return Color.white.opacity(0.12)
+    }
+
+    private var borderWidth: CGFloat {
+        if isFocused {
+            return TVTheme.focusedCapsuleBorderWidth
+        }
+        if isSelected {
+            return 2.0
+        }
+        return 1.0
+    }
+
+    private var shadowColor: Color {
+        if isFocused {
+            return isSelected ? Color.red.opacity(0.85) : TVTheme.focusedShadowColor
+        }
+        if isSelected {
+            return Color.red.opacity(0.4)
+        }
+        return Color.clear
+    }
+
+    private var shadowRadius: CGFloat {
+        if isFocused {
+            return 16.0
+        }
+        if isSelected {
+            return 8.0
+        }
+        return 0
+    }
+
+    @ViewBuilder
+    private var backgroundView: some View {
+        if isFocused {
+            if isSelected {
+                LinearGradient(
+                    colors: [Color(red: 0.95, green: 0.12, blue: 0.22), Color(red: 1.0, green: 0.35, blue: 0.45)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                Color(white: 0.95)
+            }
+        } else {
+            if isSelected {
+                LinearGradient(
+                    colors: [Color.red, Color(red: 0.80, green: 0.10, blue: 0.20)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                TVTheme.surfaceCard
             }
         }
     }

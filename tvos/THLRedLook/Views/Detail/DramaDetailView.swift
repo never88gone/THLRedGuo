@@ -20,6 +20,7 @@ public struct DramaDetailView: View {
     @State private var showingDownloadSuccess: Bool = false
     @FocusState private var isPlayButtonFocused: Bool
     @FocusState private var focusedEpisode: Int?
+    @FocusState private var focusedChunkIndex: Int?
 
     public init(drama: Drama) {
         _viewModel = StateObject(wrappedValue: DetailViewModel(drama: drama))
@@ -127,7 +128,20 @@ public struct DramaDetailView: View {
                                     let resumePos = viewModel.lastWatchEntry?.position ?? 0
                                     let playTitle = viewModel.lastWatchEntry != nil ? "继续播放 第 \(resumeEp) 集" : "立即播放"
 
-                                    TVButton(title: playTitle, icon: "play.fill", isProminent: true) {
+                                    TVButton(
+                                        title: playTitle,
+                                        icon: "play.fill",
+                                        isProminent: true,
+                                        isExternalFocused: isPlayButtonFocused,
+                                        onDownCommand: {
+                                            isPlayButtonFocused = false
+                                            if detail.episodeChunks.count > 1 {
+                                                focusedChunkIndex = viewModel.selectedChunkIndex
+                                            } else if let firstEp = detail.episodes.first {
+                                                focusedEpisode = firstEp.number
+                                            }
+                                        }
+                                    ) {
                                         selectedEpisodeNumber = resumeEp
                                         resumePosition = resumePos
                                         playingEpisodeIndex = resumeEp
@@ -190,7 +204,7 @@ public struct DramaDetailView: View {
                                 .font(.title2)
                                 .bold()
 
-                            // 分组 Tab (1-50, 51-100)（增加上侧、左侧、右侧间距，杜绝 ScrollView 截断）
+                            // 分组 Tab (1-50, 51-100)（增加上侧、左侧、右侧间距，保证焦点段完整激活）
                             if detail.episodeChunks.count > 1 {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 24) {
@@ -198,7 +212,13 @@ public struct DramaDetailView: View {
                                             TVCapsuleButton(
                                                 title: chunk.title,
                                                 isSelected: viewModel.selectedChunkIndex == index,
+                                                isExternalFocused: focusedChunkIndex == index,
+                                                onUpCommand: {
+                                                    focusedChunkIndex = nil
+                                                    isPlayButtonFocused = true
+                                                },
                                                 onDownCommand: {
+                                                    focusedChunkIndex = nil
                                                     if !detail.episodeChunks.isEmpty && viewModel.selectedChunkIndex < detail.episodeChunks.count {
                                                         let currentChunk = detail.episodeChunks[viewModel.selectedChunkIndex]
                                                         if let firstEp = currentChunk.episodes.first {
@@ -209,13 +229,17 @@ public struct DramaDetailView: View {
                                             ) {
                                                 viewModel.selectedChunkIndex = index
                                             }
+                                            .focused($focusedChunkIndex, equals: index)
+                                            .id("detail_chunk_\(index)")
                                         }
                                     }
                                     .padding(.top, 14)
                                     .padding(.bottom, 14)
                                     .padding(.leading, 12)
                                     .padding(.trailing, 24)
+                                    .focusSection()
                                 }
+                                .focusSection()
                             }
 
                             // 当前组内的集数列表网格（采用 8 列并预留上、左、右安全间距）
@@ -229,9 +253,15 @@ public struct DramaDetailView: View {
                                             isCurrent: isCurrentEp,
                                             isExternalFocused: focusedEpisode == ep.number,
                                             onUpCommand: {
-                                                if let firstIndex = currentChunk.episodes.firstIndex(where: { $0.id == ep.id }), firstIndex < 8 {
+                                                let firstEpNum = currentChunk.episodes.first?.number ?? 1
+                                                let offset = ep.number - firstEpNum
+                                                if offset < 8 {
                                                     focusedEpisode = nil
-                                                    isPlayButtonFocused = true
+                                                    if detail.episodeChunks.count > 1 {
+                                                        focusedChunkIndex = viewModel.selectedChunkIndex
+                                                    } else {
+                                                        isPlayButtonFocused = true
+                                                    }
                                                 }
                                             }
                                         ) {
