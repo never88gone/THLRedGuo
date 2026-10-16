@@ -308,6 +308,7 @@ class NativeRepository extends AppRepository {
       await _read('danmaku', {
         'action': 'danmaku',
         'playbackSession': plan.session,
+        'episodeId': plan.danmakuId,
         'startMs': startMs,
         'durationMs': durationMs,
       }),

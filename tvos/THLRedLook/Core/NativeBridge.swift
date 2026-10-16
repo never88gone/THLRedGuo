@@ -192,7 +192,17 @@ public actor NativeBridge {
         let shims = """
         var JSON = JSON || {};
         if (!JSON.stringify) JSON.stringify = function(o) { return "{}"; };
-        if (!JSON.parse) JSON.parse = function(s) { return {}; };
+        if (!JSON.parse) {
+            JSON.parse = function(s) { return {}; };
+        } else {
+            var _origParse = JSON.parse;
+            JSON.parse = function(s, r) {
+                if (typeof s === 'string') {
+                    try { s = s.replace(/:\\s*(\\d{15,})\\b/g, ': "$1"'); } catch(e) {}
+                }
+                return _origParse.call(JSON, s, r);
+            };
+        }
 
         globalThis.console = {
             log: function() { var args = Array.prototype.slice.call(arguments); __console_log(args.join(" ")); },

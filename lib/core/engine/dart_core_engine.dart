@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -303,11 +304,18 @@ class DartCoreEngine {
 
       // 弹幕支持
       case 'danmaku':
+        final episodeId = input['episodeId'] as String? ?? (input['playbackSession'] as String? ?? '');
+        final startMs = (input['startMs'] as num?)?.toInt() ?? 0;
+        final durationMs = (input['durationMs'] as num?)?.toInt() ?? 86400000;
+        final nextMs = math.min(startMs + 30000, durationMs > 0 ? durationMs : startMs + 30000);
         return {
-          'items': [
-            {'timeMs': 1200, 'text': '剧情好精彩！', 'color': 0xFFFFFF},
-            {'timeMs': 3500, 'text': '打脸来得太快了！', 'color': 0xFFFFEE},
-            {'timeMs': 8000, 'text': '男女主好般配啊', 'color': 0xFF00EE},
+          'episodeId': episodeId,
+          'startMs': startMs,
+          'nextMs': nextMs,
+          'items': <Map<String, dynamic>>[
+            {'id': '${episodeId}_${startMs}_1', 'timeMs': startMs + 1200, 'text': '剧情好精彩！', 'color': 0xFFFFFFFF},
+            {'id': '${episodeId}_${startMs}_2', 'timeMs': startMs + 3500, 'text': '打脸来得太快了！', 'color': 0xFFFFEEEE},
+            {'id': '${episodeId}_${startMs}_3', 'timeMs': startMs + 8000, 'text': '男女主好般配啊', 'color': 0xFF00EEFF},
           ],
         };
 
@@ -823,11 +831,13 @@ class DartCoreEngine {
         if (playRes.url.isNotEmpty) {
           final streamUrl = playRes.url;
           final mimeType = streamUrl.contains('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
+          final detectedQuality = streamUrl.contains('1080') ? 1080 : (streamUrl.contains('720') ? 720 : 360);
           return {
             'url': streamUrl,
             'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
             'headers': playRes.header,
-            'quality': quality,
+            'quality': quality > 0 ? quality : detectedQuality,
+            'qualities': detectedQuality >= 1080 ? [1080, 720, 360] : (detectedQuality >= 720 ? [720, 360] : [360]),
             'local': false,
             'mimeType': mimeType,
             'danmakuId': '$dramaId:$episodeIndex',
@@ -839,11 +849,13 @@ class DartCoreEngine {
     if (chapter is Map && chapter['url'] != null && (chapter['url'] as String).isNotEmpty) {
       final streamUrl = chapter['url'] as String;
       final mimeType = streamUrl.contains('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
+      final detectedQuality = streamUrl.contains('1080') ? 1080 : (streamUrl.contains('720') ? 720 : 360);
       return {
         'url': streamUrl,
         'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
         'headers': const <String, String>{},
-        'quality': quality,
+        'quality': quality > 0 ? quality : detectedQuality,
+        'qualities': detectedQuality >= 1080 ? [1080, 720, 360] : (detectedQuality >= 720 ? [720, 360] : [360]),
         'local': false,
         'mimeType': mimeType,
         'danmakuId': '$dramaId:$episodeIndex',
@@ -870,7 +882,8 @@ class DartCoreEngine {
               'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
               'Referer': 'https://hongguoduanju.com/',
             },
-            'quality': quality,
+            'quality': 360,
+            'qualities': [360],
             'local': false,
             'mimeType': 'video/mp4',
             'danmakuId': '$dramaId:$episodeIndex',
