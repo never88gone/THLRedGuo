@@ -237,6 +237,16 @@ async function detail(id) {
         }
       }
 
+      if (vidList.length === 0) {
+        const vidMatch = body.match(/vid_list[^:]*:\s*\[([^\]]*)\]/);
+        if (vidMatch && vidMatch[1]) {
+          const ids = vidMatch[1].match(/\d{15,}/g);
+          if (ids && ids.length > 0) {
+            vidList = ids;
+          }
+        }
+      }
+
       const ldMatch = body.match(/<script[^>]*type=[\x27\x22]application\/ld\+json[\x27\x22][^>]*>([\s\S]*?)<\/script>/);
       if (ldMatch && ldMatch[1]) {
         try {
@@ -265,6 +275,32 @@ async function detail(id) {
     }
   } catch (e) {}
 
+  if (vidList.length === 0 && cleanId) {
+    try {
+      const pUrl = BASE_URL + "/player/" + cleanId;
+      const pResp = await fetch(pUrl, {
+        headers: {
+          "User-Agent": USER_AGENT,
+          "Referer": BASE_URL + "/"
+        }
+      });
+      if (pResp && pResp.status === 200 && pResp.body) {
+        const pBody = pResp.body;
+        const vidMatch = pBody.match(/vid_list[^:]*:\s*\[([^\]]*)\]/);
+        if (vidMatch && vidMatch[1]) {
+          const ids = vidMatch[1].match(/\d{15,}/g);
+          if (ids && ids.length > 0) {
+            vidList = ids;
+          }
+        }
+        if (!title) {
+          const tMatch = pBody.match(/<title>([^<]+)<\/title>/);
+          if (tMatch && tMatch[1]) title = cleanText(tMatch[1].split(/[-_|]/)[0]);
+        }
+      }
+    } catch (e) {}
+  }
+
   const epUrls = [];
   if (vidList.length > 0) {
     for (let i = 0; i < vidList.length; i++) {
@@ -272,7 +308,7 @@ async function detail(id) {
     }
   } else if (epTotalCount > 0) {
     for (let i = 0; i < epTotalCount; i++) {
-      epUrls.push("第" + (i + 1) + "集$" + BASE_URL + "/player/" + cleanId + "/" + (i + 1));
+      epUrls.push("第" + (i + 1) + "集$" + cleanId + "_" + (i + 1));
     }
   }
 
@@ -296,37 +332,166 @@ async function detail(id) {
 }
 
 async function play(flag, id, flags) {
-  let playTarget = id || "";
+  let playTarget = (id || "").toString().trim();
+  if (playTarget.includes(":")) {
+    playTarget = playTarget.split(":").pop().trim();
+  }
   let realStreamUrl = "";
 
-  try {
-    let playPageUrl = playTarget;
-    if (!playPageUrl.startsWith("http")) {
-      playPageUrl = BASE_URL + (playTarget.startsWith("/") ? playTarget : ("/player/" + playTarget));
-    }
-
-    const resp = await fetch(playPageUrl, {
-      headers: {
+  if (playTarget.startsWith("http") && (playTarget.includes(".mp4") || playTarget.includes(".m3u8"))) {
+    return {
+      parse: 0,
+      url: playTarget,
+      header: {
         "User-Agent": USER_AGENT,
         "Referer": BASE_URL + "/"
       }
-    });
+    };
+  }
 
-    if (resp && resp.status === 200 && resp.body) {
-      const body = resp.body;
-      const m = body.match(/"main_url"\s*:\s*"([^"]+)"/);
-      if (m && m[1]) {
-        realStreamUrl = m[1].replace(/\\u0026/g, "&").replace(/\\u002F/g, "/").replace(/\\\//g, "/");
-      }
-      if (!realStreamUrl) {
-        const m3u8Match = body.match(/https?:\/\/[^"'\s<>\\]+\.(?:m3u8|mp4)(?:\?[^"'\s<>\\]*)?/);
-        if (m3u8Match) realStreamUrl = m3u8Match[0];
-      }
+  let seriesId = "";
+  let itemId = "";
+  let episodeIndex = 1;
+
+  const segments = playTarget.split(/[\/_]/).filter(Boolean);
+  const longDigits = [];
+  let shortDigit = 0;
+
+  for (const seg of segments) {
+    const m = seg.match(/\d+/);
+    if (!m) continue;
+    const numStr = m[0];
+    if (numStr.length >= 15) {
+      longDigits.push(numStr);
+    } else if (numStr.length >= 1 && shortDigit === 0) {
+      shortDigit = parseInt(numStr, 10);
     }
-  } catch (e) {}
+  }
 
-  if (!realStreamUrl && playTarget.startsWith("http") && (playTarget.includes(".mp4") || playTarget.includes(".m3u8"))) {
-    realStreamUrl = playTarget;
+  if (longDigits.length >= 2) {
+    seriesId = longDigits[0];
+    itemId = longDigits[1];
+  } else if (longDigits.length === 1) {
+    seriesId = longDigits[0];
+    if (shortDigit > 0) {
+      episodeIndex = shortDigit;
+    }
+  }
+
+  if (itemId && itemId.length >= 15) {
+    const playPageUrl = BASE_URL + "/player/" + (seriesId || itemId) + "/" + itemId;
+    try {
+      const resp = await fetch(playPageUrl, {
+        headers: {
+          "User-Agent": USER_AGENT,
+          "Referer": BASE_URL + "/"
+        }
+      });
+      if (resp && resp.status === 200 && resp.body) {
+        const body = resp.body;
+        const m = body.match(/"main_url"\s*:\s*"([^"]+)"/);
+        if (m && m[1]) {
+          realStreamUrl = m[1].replace(/\\u0026/g, "&").replace(/\\u002F/g, "/").replace(/\\\//g, "/");
+        }
+        if (!realStreamUrl) {
+          const mContent = body.match(/"contentUrl"\s*:\s*"([^"]+)"/);
+          if (mContent && mContent[1]) realStreamUrl = mContent[1];
+        }
+        if (!realStreamUrl) {
+          const m3u8Match = body.match(/https?:\/\/[^"'\s<>\\]+\.(?:m3u8|mp4)(?:\?[^"'\s<>\\]*)?/);
+          if (m3u8Match) realStreamUrl = m3u8Match[0];
+        }
+      }
+    } catch (e) {}
+
+    if (!realStreamUrl) {
+      realStreamUrl = BASE_URL + "/video/public/" + itemId + "/360p.mp4";
+    }
+  }
+
+  if (!realStreamUrl && seriesId) {
+    let targetVid = "";
+    if (episodeIndex > 1) {
+      try {
+        const detailUrl = BASE_URL + "/detail?series_id=" + seriesId;
+        const dResp = await fetch(detailUrl, {
+          headers: {
+            "User-Agent": USER_AGENT,
+            "Referer": BASE_URL + "/"
+          }
+        });
+        if (dResp && dResp.status === 200 && dResp.body) {
+          const dBody = dResp.body;
+          const vidMatch = dBody.match(/vid_list[^:]*:\s*\[([^\]]*)\]/);
+          if (vidMatch && vidMatch[1]) {
+            const vids = vidMatch[1].match(/\d{15,}/g);
+            if (vids && vids.length >= episodeIndex) {
+              targetVid = vids[episodeIndex - 1];
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (targetVid) {
+      const playPageUrl = BASE_URL + "/player/" + seriesId + "/" + targetVid;
+      try {
+        const resp = await fetch(playPageUrl, {
+          headers: {
+            "User-Agent": USER_AGENT,
+            "Referer": BASE_URL + "/"
+          }
+        });
+        if (resp && resp.status === 200 && resp.body) {
+          const body = resp.body;
+          const m = body.match(/"main_url"\s*:\s*"([^"]+)"/);
+          if (m && m[1]) {
+            realStreamUrl = m[1].replace(/\\u0026/g, "&").replace(/\\u002F/g, "/").replace(/\\\//g, "/");
+          }
+          if (!realStreamUrl) {
+            const mContent = body.match(/"contentUrl"\s*:\s*"([^"]+)"/);
+            if (mContent && mContent[1]) realStreamUrl = mContent[1];
+          }
+        }
+      } catch (e) {}
+      if (!realStreamUrl) {
+        realStreamUrl = BASE_URL + "/video/public/" + targetVid + "/360p.mp4";
+      }
+    } else {
+      const playPageUrl = BASE_URL + "/player/" + seriesId;
+      try {
+        const resp = await fetch(playPageUrl, {
+          headers: {
+            "User-Agent": USER_AGENT,
+            "Referer": BASE_URL + "/"
+          }
+        });
+        if (resp && resp.status === 200 && resp.body) {
+          const body = resp.body;
+          const m = body.match(/"main_url"\s*:\s*"([^"]+)"/);
+          if (m && m[1]) {
+            realStreamUrl = m[1].replace(/\\u0026/g, "&").replace(/\\u002F/g, "/").replace(/\\\//g, "/");
+          }
+          if (!realStreamUrl) {
+            const mContent = body.match(/"contentUrl"\s*:\s*"([^"]+)"/);
+            if (mContent && mContent[1]) realStreamUrl = mContent[1];
+          }
+          if (!realStreamUrl) {
+            const m3u8Match = body.match(/https?:\/\/[^"'\s<>\\]+\.(?:m3u8|mp4)(?:\?[^"'\s<>\\]*)?/);
+            if (m3u8Match) realStreamUrl = m3u8Match[0];
+          }
+          if (!realStreamUrl) {
+            const vidMatch = body.match(/vid_list[^:]*:\s*\[([^\]]*)\]/);
+            if (vidMatch && vidMatch[1]) {
+              const vids = vidMatch[1].match(/\d{15,}/g);
+              if (vids && vids.length > 0) {
+                realStreamUrl = BASE_URL + "/video/public/" + vids[0] + "/360p.mp4";
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
   }
 
   if (!realStreamUrl) {

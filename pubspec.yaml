@@ -1,7 +1,7 @@
 name: THLRedLook
 description: 独立运行的多端短剧应用
 publish_to: none
-version: 1.0.0+262890909
+version: 1.0.0+262891014
 
 environment:
   sdk: '>=3.12.0 <4.0.0'

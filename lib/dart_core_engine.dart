@@ -810,7 +810,16 @@ class DartCoreEngine {
             sourceId.isNotEmpty) {
           playTarget = '${sourceId}_$playTarget';
         }
-        final playRes = await rt.play('flag', playTarget);
+        var playRes = await rt.play('flag', playTarget);
+        if (playRes.url.isEmpty && sourceId.isNotEmpty) {
+          final fallbackTarget = '${sourceId}_$episodeIndex';
+          if (fallbackTarget != playTarget) {
+            playRes = await rt.play('flag', fallbackTarget);
+          }
+          if (playRes.url.isEmpty) {
+            playRes = await rt.play('flag', sourceId);
+          }
+        }
         if (playRes.url.isNotEmpty) {
           final streamUrl = playRes.url;
           final mimeType = streamUrl.contains('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
