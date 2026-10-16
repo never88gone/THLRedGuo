@@ -64,9 +64,9 @@ public struct DramaDetailView: View {
             }
             .ignoresSafeArea()
 
-            if viewModel.isLoading {
+            if viewModel.isLoading && viewModel.detail == nil {
                 ProgressView("正在载入剧集详情...")
-            } else if let error = viewModel.errorMessage {
+            } else if let error = viewModel.errorMessage, viewModel.detail == nil {
                 VStack(spacing: 16) {
                     Text("加载出错：\(error)")
                     TVButton(title: "重试", isProminent: true) {
@@ -198,6 +198,7 @@ public struct DramaDetailView: View {
                                             if !item.isCurrent {
                                                 Task {
                                                     await viewModel.switchToDrama(item.drama)
+                                                    focusedSeasonDramaId = item.drama.id
                                                     if let entry = viewModel.lastWatchEntry {
                                                         selectedEpisodeNumber = entry.episode
                                                     } else {

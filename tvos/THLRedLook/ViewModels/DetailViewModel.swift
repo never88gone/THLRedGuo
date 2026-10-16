@@ -59,6 +59,11 @@ public final class DetailViewModel: ObservableObject {
         self.followState = store.followState(for: newDrama.id)
         self.lastWatchEntry = store.getWatchEntry(dramaId: newDrama.id)
         self.selectedChunkIndex = 0
+        if !self.seasonItems.isEmpty {
+            self.seasonItems = self.seasonItems.map {
+                SeasonItem(drama: $0.drama, seasonNumber: $0.seasonNumber, title: $0.title, isCurrent: $0.drama.id == newDrama.id)
+            }
+        }
         let total = max(20, newDrama.episodes)
         let eps = (1...total).map { Episode(id: "\(newDrama.id)_\($0)", title: "第 \($0) 集", number: $0) }
         self.detail = DramaDetail(drama: newDrama, episodes: eps, warning: "")
@@ -112,11 +117,14 @@ public final class DetailViewModel: ObservableObject {
         if let numMatch = suffix.range(of: "[0-9]+", options: .regularExpression), let n = Int(suffix[numMatch]) {
             return n
         }
+        for (ch, val) in cnMap {
+            if suffix.contains(ch) { return val }
+        }
         return 1
     }
 
     private func loadSeasons() async {
-        let pattern = "第\\s*[0-9零一二两三四五六七八九十百]+\\s*[季部].*$"
+        let pattern = "(?:第\\s*[0-9零一二两三四五六七八九十百]+\\s*[季部]|\\s*[0-9零一二两三四五六七八九十]+).*$"
         var baseName = drama.title.replacingOccurrences(of: pattern, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
         if baseName.isEmpty { baseName = drama.title }
 
@@ -135,8 +143,10 @@ public final class DetailViewModel: ObservableObject {
             }
 
             if candidates.count <= 1 {
-                self.seasonItems = []
-                self.relatedSeasons = []
+                if self.seasonItems.isEmpty {
+                    self.seasonItems = []
+                    self.relatedSeasons = []
+                }
                 return
             }
 
