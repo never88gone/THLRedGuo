@@ -898,12 +898,14 @@ async function play(flag, id, flags) {
     };
   }
 
+  const exactReferer = playerPageUrl || (BASE_URL + "/player/" + (seriesId || itemId) + "/" + (itemId || seriesId));
+
   return {
     parse: 0,
     url: realStreamUrl,
     header: {
       "User-Agent": USER_AGENT,
-      "Referer": BASE_URL + "/"
+      "Referer": exactReferer
     }
   };
 }

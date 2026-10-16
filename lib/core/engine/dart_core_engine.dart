@@ -894,9 +894,9 @@ class DartCoreEngine {
           return {
             'url': streamUrl,
             'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
-            'headers': const <String, String>{
+            'headers': <String, String>{
               'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-              'Referer': 'https://hongguoduanju.com/',
+              'Referer': 'https://hongguoduanju.com/player/$sourceId/$vid',
             },
             'quality': 360,
             'qualities': [360],
