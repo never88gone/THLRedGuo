@@ -50,11 +50,10 @@ class JsSourceService extends ChangeNotifier {
       // 3. 读取所有已加载的源列表
       _sources = await _repository.jsSourceList();
 
-      if (_sources.isEmpty && kPresetJsSources.isNotEmpty) {
-        final defaultPreset = kPresetJsSources.first;
-        await _repository.jsSourceSaveAndLoad(defaultPreset.script, defaultPreset.fileName);
-        _sources = await _repository.jsSourceList();
+      for (final preset in kPresetJsSources) {
+        await _repository.jsSourceSaveAndLoad(preset.script, preset.fileName);
       }
+      _sources = await _repository.jsSourceList();
 
       // 4. 读取用户保存的活跃源偏好
       _preferences ??= await SharedPreferences.getInstance();
