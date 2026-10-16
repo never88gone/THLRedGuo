@@ -54,6 +54,7 @@ class PlayerScreen extends StatefulWidget {
     this.playerFactory,
     this.videoBuilder,
     this.handoff,
+    this.initialSeriesEntries,
   });
   final DramaDetail detail;
   final int initialIndex;
@@ -64,6 +65,7 @@ class PlayerScreen extends StatefulWidget {
   final AppRepository repository;
   final LocalStore store;
   final LanIncomingPlayback? handoff;
+  final List<HongguoSeriesEntry>? initialSeriesEntries;
   @visibleForTesting
   final Player Function()? playerFactory;
   @visibleForTesting
@@ -350,6 +352,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         );
       }
     });
+    _seriesEntries = widget.initialSeriesEntries;
     _discoverSeasons();
   }
 
@@ -371,6 +374,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         anchor: widget.detail.drama,
         repository: widget.repository,
         store: widget.store,
+        existingEntries: _seriesEntries,
       );
       if (mounted && !_closed && entries.isNotEmpty) {
         setState(() {
@@ -396,7 +400,10 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (!mounted) return;
     }
 
-    _notice('正在切换至 ${seasonDrama.title}...');
+    _notice(
+      '正在切换至 ${seasonDrama.title}...',
+      duration: const Duration(milliseconds: 700),
+    );
 
     try {
       final safeDrama = seasonDrama.sourceId.isEmpty || seasonDrama.sourceId.contains(':')
@@ -467,6 +474,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             allowOnlineFallback: widget.allowOnlineFallback,
             playerFactory: widget.playerFactory,
             videoBuilder: widget.videoBuilder,
+            initialSeriesEntries: _currentSeriesEntries,
           ),
         ),
       );
@@ -1309,7 +1317,7 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   void _notice(
     String message, {
-    Duration duration = const Duration(milliseconds: 1200),
+    Duration duration = const Duration(milliseconds: 800),
   }) {
     if (!mounted || _closed) return;
     final messenger = ScaffoldMessenger.maybeOf(context);

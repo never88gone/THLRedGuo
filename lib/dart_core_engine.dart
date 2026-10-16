@@ -850,6 +850,35 @@ class DartCoreEngine {
       };
     }
 
+    if (source == 'hongguo') {
+      final candidates = [
+        chapter is Map ? chapter['raw']?.toString() : null,
+        chapter is Map ? chapter['id']?.toString() : null,
+        chapter is String ? chapter : null,
+        sourceId,
+      ];
+      for (final text in candidates) {
+        if (text == null || text.isEmpty) continue;
+        final match = RegExp(r'\d{15,}').firstMatch(text);
+        if (match != null) {
+          final vid = match.group(0)!;
+          final streamUrl = 'https://hongguoduanju.com/video/public/$vid/360p.mp4';
+          return {
+            'url': streamUrl,
+            'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
+            'headers': const <String, String>{
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+              'Referer': 'https://hongguoduanju.com/',
+            },
+            'quality': quality,
+            'local': false,
+            'mimeType': 'video/mp4',
+            'danmakuId': '$dramaId:$episodeIndex',
+          };
+        }
+      }
+    }
+
     throw StateError('无法从数据源 [$source] 获取真实播放流');
   }
 

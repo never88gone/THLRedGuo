@@ -411,27 +411,34 @@ async function play(flag, id, flags) {
 
   if (!realStreamUrl && seriesId) {
     let targetVid = "";
-    if (episodeIndex > 1) {
-      try {
-        const detailUrl = BASE_URL + "/detail?series_id=" + seriesId;
-        const dResp = await fetch(detailUrl, {
-          headers: {
-            "User-Agent": USER_AGENT,
-            "Referer": BASE_URL + "/"
-          }
-        });
-        if (dResp && dResp.status === 200 && dResp.body) {
-          const dBody = dResp.body;
-          const vidMatch = dBody.match(/vid_list[^:]*:\s*\[([^\]]*)\]/);
-          if (vidMatch && vidMatch[1]) {
-            const vids = vidMatch[1].match(/\d{15,}/g);
-            if (vids && vids.length >= episodeIndex) {
-              targetVid = vids[episodeIndex - 1];
-            }
+    try {
+      const detailUrl = BASE_URL + "/detail?series_id=" + seriesId;
+      const dResp = await fetch(detailUrl, {
+        headers: {
+          "User-Agent": USER_AGENT,
+          "Referer": BASE_URL + "/"
+        }
+      });
+      if (dResp && dResp.status === 200 && dResp.body) {
+        const dBody = dResp.body;
+        const vidMatch = dBody.match(/(?:vid_list|item_list|video_list|episode_list)[^:]*:\s*\[([^\]]*)\]/);
+        if (vidMatch && vidMatch[1]) {
+          const vids = vidMatch[1].match(/\d{15,}/g);
+          if (vids && vids.length > 0) {
+            const idx = Math.max(0, Math.min(episodeIndex - 1, vids.length - 1));
+            targetVid = vids[idx];
           }
         }
-      } catch (e) {}
-    }
+        if (!targetVid) {
+          const allVids = dBody.match(/\/player\/\d{5,}\/(\d{15,})/g);
+          if (allVids && allVids.length > 0) {
+            const vids = allVids.map(function(s) { return s.split("/").pop(); });
+            const idx = Math.max(0, Math.min(episodeIndex - 1, vids.length - 1));
+            targetVid = vids[idx];
+          }
+        }
+      }
+    } catch (e) {}
 
     if (targetVid) {
       const playPageUrl = BASE_URL + "/player/" + seriesId + "/" + targetVid;
@@ -481,16 +488,20 @@ async function play(flag, id, flags) {
             if (m3u8Match) realStreamUrl = m3u8Match[0];
           }
           if (!realStreamUrl) {
-            const vidMatch = body.match(/vid_list[^:]*:\s*\[([^\]]*)\]/);
+            const vidMatch = body.match(/(?:vid_list|item_list|video_list|episode_list)[^:]*:\s*\[([^\]]*)\]/);
             if (vidMatch && vidMatch[1]) {
               const vids = vidMatch[1].match(/\d{15,}/g);
               if (vids && vids.length > 0) {
-                realStreamUrl = BASE_URL + "/video/public/" + vids[0] + "/360p.mp4";
+                const idx = Math.max(0, Math.min(episodeIndex - 1, vids.length - 1));
+                realStreamUrl = BASE_URL + "/video/public/" + vids[idx] + "/360p.mp4";
               }
             }
           }
         }
       } catch (e) {}
+      if (!realStreamUrl && seriesId.length >= 15) {
+        realStreamUrl = BASE_URL + "/video/public/" + seriesId + "/360p.mp4";
+      }
     }
   }
 

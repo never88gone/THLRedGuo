@@ -262,8 +262,9 @@ String cleanSeriesBaseTitle(String title) {
 /// 聚合计算与排序同系列的多季剧集列表
 List<HongguoSeriesEntry> hongguoSeriesEntries(
   Drama anchor,
-  Iterable<Drama> candidates,
-) {
+  Iterable<Drama> candidates, {
+  Iterable<HongguoSeriesEntry>? lockedEntries,
+}) {
   if (anchor.title.trim().isEmpty) return const [];
   var anchorInfo = hongguoSeriesInfo(anchor);
   String key, unit;
@@ -306,25 +307,89 @@ List<HongguoSeriesEntry> hongguoSeriesEntries(
   }
 
   if (anchorInfo == null) return const [];
-  final byId = <String, HongguoSeriesEntry>{};
-  for (final drama in [anchor, ...candidates]) {
-    if (drama.source != anchor.source) continue;
-    final info = hongguoSeriesInfo(drama, unit: unit);
-    if (info == null || info.key != key) continue;
-    byId[drama.id] = HongguoSeriesEntry(
-      drama: drama,
-      season: drama.id == anchor.id ? anchorSeason : info.season,
-      unit: unit,
-    );
+
+  final bySeason = <int, HongguoSeriesEntry>{};
+  final candidateInfos = <String, HongguoSeriesInfo>{};
+
+  // 1. 若有已确立的季列表，优先锁定既有季条目，确保跨季切换时不跳变
+  if (lockedEntries != null) {
+    for (final entry in lockedEntries) {
+      if (entry.drama.source == anchor.source) {
+        bySeason[entry.season] = entry;
+        final info = hongguoSeriesInfo(entry.drama, unit: unit);
+        if (info != null) candidateInfos[entry.drama.id] = info;
+      }
+    }
   }
 
-  final entries = byId.values.toList()
-    ..sort((a, b) {
-      final season = a.season.compareTo(b.season);
-      return season != 0
-          ? season
-          : naturalTitleCompare(a.drama.title, b.drama.title);
-    });
+  // 2. 当前 anchor 必须在对应季拥有绝对优先权
+  final anchorEntry = HongguoSeriesEntry(
+    drama: anchor,
+    season: anchorSeason,
+    unit: unit,
+  );
+  bySeason[anchorSeason] = anchorEntry;
+  candidateInfos[anchor.id] = anchorInfo;
+
+  // 3. 遍历候选短剧，同季冲突进行择优仲裁
+  for (final drama in candidates) {
+    if (drama.source != anchor.source) continue;
+    if (drama.id == anchor.id) continue;
+    final info = hongguoSeriesInfo(drama, unit: unit);
+    if (info == null || info.key != key) continue;
+    candidateInfos[drama.id] = info;
+
+    final targetSeason = info.season;
+    final existing = bySeason[targetSeason];
+
+    if (existing == null) {
+      bySeason[targetSeason] = HongguoSeriesEntry(
+        drama: drama,
+        season: targetSeason,
+        unit: unit,
+      );
+    } else {
+      // 若当前位置是 anchor 或已被锁定的已确定条目，不得随意替换
+      if (existing.drama.id == anchor.id) continue;
+      if (lockedEntries != null &&
+          lockedEntries.any((e) => e.season == targetSeason && e.drama.id == existing.drama.id)) {
+        continue;
+      }
+
+      final existingInfo = candidateInfos[existing.drama.id];
+      // 显式标季（explicit: true）优先于未标季的隐式推断
+      if (info.explicit && (existingInfo?.explicit != true)) {
+        bySeason[targetSeason] = HongguoSeriesEntry(
+          drama: drama,
+          season: targetSeason,
+          unit: unit,
+        );
+      } else if (!info.explicit && (existingInfo?.explicit == true)) {
+        continue;
+      } else {
+        // 集数较多优先
+        if (drama.episodes > existing.drama.episodes) {
+          bySeason[targetSeason] = HongguoSeriesEntry(
+            drama: drama,
+            season: targetSeason,
+            unit: unit,
+          );
+        } else if (drama.episodes == existing.drama.episodes) {
+          if (naturalTitleCompare(drama.title, existing.drama.title) < 0) {
+            bySeason[targetSeason] = HongguoSeriesEntry(
+              drama: drama,
+              season: targetSeason,
+              unit: unit,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // 4. 严格按季号升序排列 (1, 2, 3...)，保证顺序恒定单调递增
+  final entries = bySeason.values.toList()
+    ..sort((a, b) => a.season.compareTo(b.season));
 
   return entries.length > 1 ? entries : const [];
 }
@@ -334,9 +399,12 @@ Future<List<HongguoSeriesEntry>> discoverSeriesSeasons({
   required Drama anchor,
   required AppRepository repository,
   LocalStore? store,
+  List<HongguoSeriesEntry>? existingEntries,
 }) async {
   final localCandidates = store != null ? store.seriesDramasFor(anchor) : <Drama>[];
-  var entries = hongguoSeriesEntries(anchor, localCandidates);
+  var entries = existingEntries != null && existingEntries.isNotEmpty
+      ? existingEntries
+      : hongguoSeriesEntries(anchor, localCandidates);
 
   final baseTitle = cleanSeriesBaseTitle(anchor.title);
   if (baseTitle.length < 2) return entries;
@@ -352,11 +420,19 @@ Future<List<HongguoSeriesEntry>> discoverSeriesSeasons({
       await store.refreshDramas(searchItems);
     }
     final allCandidates = <String, Drama>{
+      for (final e in entries) e.drama.id: e.drama,
       for (final d in localCandidates) d.id: d,
       for (final d in searchItems) d.id: d,
       anchor.id: anchor,
     };
-    entries = hongguoSeriesEntries(anchor, allCandidates.values);
+    final fresh = hongguoSeriesEntries(
+      anchor,
+      allCandidates.values,
+      lockedEntries: entries.isNotEmpty ? entries : null,
+    );
+    if (fresh.length >= entries.length) {
+      entries = fresh;
+    }
   } catch (_) {}
 
   return entries;

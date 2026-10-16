@@ -30,6 +30,7 @@ class DetailScreen extends StatefulWidget {
     this.initialDetail,
     this.resumeOnOpen = false,
     this.downloadOnOpen = false,
+    this.initialSeriesEntries,
     this.playerFactory,
     this.videoBuilder,
   });
@@ -39,6 +40,7 @@ class DetailScreen extends StatefulWidget {
   final LocalStore store;
   final bool resumeOnOpen;
   final bool downloadOnOpen;
+  final List<HongguoSeriesEntry>? initialSeriesEntries;
   @visibleForTesting
   final Player Function()? playerFactory;
   @visibleForTesting
@@ -73,6 +75,7 @@ class _DetailScreenState extends State<DetailScreen> {
     super.initState();
     _profileEpoch = widget.store.profileEpoch;
     widget.store.addListener(_onStoreChanged);
+    _seriesEntries = widget.initialSeriesEntries;
     if (widget.initialDetail != null) {
       _detail = widget.initialDetail;
       _loading = false;
@@ -212,6 +215,7 @@ class _DetailScreenState extends State<DetailScreen> {
         anchor: drama,
         repository: widget.repository,
         store: widget.store,
+        existingEntries: _seriesEntries,
       );
       if (mounted && generation == _generation && entries.isNotEmpty) {
         setState(() {
@@ -337,6 +341,7 @@ class _DetailScreenState extends State<DetailScreen> {
           store: widget.store,
           playerFactory: widget.playerFactory,
           videoBuilder: widget.videoBuilder,
+          initialSeriesEntries: _seriesEntries,
         ),
       ),
     );
@@ -376,12 +381,16 @@ class _DetailScreenState extends State<DetailScreen> {
             releaseStatus: drama.releaseStatus,
           )
         : drama;
+    final currentEntries = (_seriesEntries != null && _seriesEntries!.isNotEmpty)
+        ? _seriesEntries
+        : hongguoSeriesEntries(anchor, widget.store.seriesDramasFor(anchor));
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => DetailScreen(
           drama: safeDrama,
           repository: widget.repository,
           store: widget.store,
+          initialSeriesEntries: currentEntries,
         ),
       ),
     );
