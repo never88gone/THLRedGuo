@@ -629,10 +629,24 @@ public actor NativeBridge {
                 targetUrl = "https://example.com/stream/\(dramaId)/\(epIndex).mp4"
             }
 
+            var detectedQuality = 360
+            if targetUrl.contains("4k") || targetUrl.contains("2160p") {
+                detectedQuality = 2160
+            } else if targetUrl.contains("1080p") {
+                detectedQuality = 1080
+            } else if targetUrl.contains("720p") {
+                detectedQuality = 720
+            } else if targetUrl.contains("480p") {
+                detectedQuality = 480
+            } else if targetUrl.contains("360p") {
+                detectedQuality = 360
+            }
+
             return [
                 "url": targetUrl,
                 "headers": targetHeaders,
-                "quality": 1080,
+                "quality": detectedQuality,
+                "qualities": [detectedQuality],
                 "session": "\(Date().timeIntervalSince1970)"
             ]
 

@@ -70,8 +70,9 @@ public struct PlaybackPlan: Hashable, Codable {
         switch q {
         case 2160: return "4K 超清"
         case 1080: return "1080P 高清"
-        case 720: return "720P 标清"
+        case 720: return "720P 高清"
         case 480: return "480P 流畅"
+        case 360: return "360P 标清"
         default: return q > 0 ? "\(q)P" : "自动"
         }
     }

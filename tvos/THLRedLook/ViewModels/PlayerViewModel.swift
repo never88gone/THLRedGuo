@@ -10,7 +10,7 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var duration: Double = 0
     @Published public var currentEpisodeIndex: Int
     @Published public var plan: PlaybackPlan?
-    @Published public var selectedQuality: Int = 1080
+    @Published public var selectedQuality: Int = 360
     @Published public var playbackRate: Float = 1.0
     @Published public var danmakuEnabled: Bool = true
     @Published public var activeDanmakus: [DanmakuItem] = []
@@ -249,6 +249,17 @@ public final class PlayerViewModel: ObservableObject {
                     let dur = currentItem.duration.seconds
                     let pSize = currentItem.presentationSize
                     NSLog("🎬 [PlayerVM] item.readyToPlay: duration=%.2f, presentationSize=%.0fx%.0f, tracksCount=%ld", dur, pSize.width, pSize.height, currentItem.tracks.count)
+                    if pSize.width > 0 && pSize.height > 0 {
+                        let minDim = min(pSize.width, pSize.height)
+                        let realQuality: Int
+                        if minDim >= 2160 { realQuality = 2160 }
+                        else if minDim >= 1080 { realQuality = 1080 }
+                        else if minDim >= 720 { realQuality = 720 }
+                        else if minDim >= 480 { realQuality = 480 }
+                        else if minDim >= 360 { realQuality = 360 }
+                        else { realQuality = Int(minDim) }
+                        self.selectedQuality = realQuality
+                    }
                     for (idx, track) in currentItem.tracks.enumerated() {
                         let mediaType = track.assetTrack?.mediaType.rawValue ?? "unknown"
                         NSLog("🎬 [PlayerVM] track[%ld]: mediaType=%@, isEnabled=%d", idx, mediaType, track.isEnabled)
