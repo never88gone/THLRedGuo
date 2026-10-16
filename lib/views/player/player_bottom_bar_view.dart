@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../app_colors.dart';
-import '../../widgets.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
 
 /// 播放器底部控制层（进度条、清晰度、倍速、画中画、全屏）
 class PlayerBottomBarView extends StatelessWidget {

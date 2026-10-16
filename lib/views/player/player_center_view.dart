@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../app_colors.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 /// 播放器居中操作按键区（包含大播放/暂停圆钮、上一集、下一集）
 class PlayerCenterView extends StatelessWidget {

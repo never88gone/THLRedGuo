@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:THLRedLook/hongguo_series.dart';
-import 'package:THLRedLook/models.dart';
+import 'package:THLRedLook/core/series/hongguo_series.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 void main() {
   group('官方多季剧集识别与聚合引擎 (Hongguo Multi-Season Engine) 测试', () {

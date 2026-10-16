@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:THLRedLook/models.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 void main() {
   group('tvOS 原生端模型契约与多端交互规范自动化测试', () {

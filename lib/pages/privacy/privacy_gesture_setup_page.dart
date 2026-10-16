@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../utils/privacy/privacy_lock_controller.dart';
-import '../../utils/theme/app_colors.dart';
-import '../../views/privacy/pattern_lock_view.dart';
+import 'package:THLRedLook/utils/privacy/privacy_lock_controller.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/privacy/pattern_lock_view.dart';
 
 class PrivacyGestureSetupPage extends StatefulWidget {
   const PrivacyGestureSetupPage({

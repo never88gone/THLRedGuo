@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:THLRedLook/main.dart' as app;
-import 'package:THLRedLook/widgets.dart';
-import 'package:THLRedLook/detail_screen.dart';
-import 'package:THLRedLook/player_screen.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/pages/detail/detail_page.dart';
+import 'package:THLRedLook/pages/player/player_page.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

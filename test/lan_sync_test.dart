@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:THLRedLook/lan_models.dart';
-import 'package:THLRedLook/lan_sync_models.dart';
-import 'package:THLRedLook/models.dart';
+import 'package:THLRedLook/models/lan/lan_models.dart';
+import 'package:THLRedLook/models/lan/lan_sync_models.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 void main() {
   group('局域网互联与跨端推流同步 (LAN Sync & Handoff) 自动化测试', () {

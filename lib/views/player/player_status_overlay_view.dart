@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../app_colors.dart';
-import '../../core_bridge.dart';
-import '../../diary_service.dart';
-import '../../local_store.dart';
-import '../../models.dart';
-import '../../sources_screen.dart';
-import '../../widgets.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/utils/diary/diary_service.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/pages/sources/sources_page.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
 
 /// 播放器异常与加载状态覆盖层
 class PlayerStatusOverlayView extends StatelessWidget {

@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import '../../lan_sync_models.dart';
-import '../../models.dart';
+import 'package:THLRedLook/models/lan/lan_sync_models.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 class LanPeer {
   const LanPeer({

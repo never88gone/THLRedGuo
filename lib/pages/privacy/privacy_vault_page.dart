@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../core_bridge.dart';
-import '../../detail_screen.dart';
-import '../../local_store.dart';
-import '../../models.dart';
-import '../../player_screen.dart';
-import '../../utils/privacy/privacy_vault_controller.dart';
-import '../../utils/theme/app_colors.dart';
-import '../../widgets.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/pages/detail/detail_page.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/pages/player/player_page.dart';
+import 'package:THLRedLook/utils/privacy/privacy_vault_controller.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
 
 class PrivacyVaultPage extends StatefulWidget {
   const PrivacyVaultPage({

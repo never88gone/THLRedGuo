@@ -2,8 +2,8 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../models/privacy/privacy_settings.dart';
-import 'gesture_hasher.dart';
+import 'package:THLRedLook/models/privacy/privacy_settings.dart';
+import 'package:THLRedLook/utils/privacy/gesture_hasher.dart';
 
 class PrivacyLockController extends ChangeNotifier {
   PrivacyLockController(this.preferences) {

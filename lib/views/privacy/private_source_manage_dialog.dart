@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../local_store.dart';
-import '../../utils/privacy/privacy_vault_controller.dart';
-import '../../utils/theme/app_colors.dart';
-import 'vault_password_dialog.dart';
-import 'vault_password_setup_dialog.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/utils/privacy/privacy_vault_controller.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/privacy/vault_password_dialog.dart';
+import 'package:THLRedLook/views/privacy/vault_password_setup_dialog.dart';
 
 class PrivateSourceManageDialog extends StatefulWidget {
   const PrivateSourceManageDialog({

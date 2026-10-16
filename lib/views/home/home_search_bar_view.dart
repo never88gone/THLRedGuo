@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:THLRedLook/search_input.dart';
+import 'package:THLRedLook/views/search/search_input.dart';
 
 /// 首页搜索框与历史搜索词组合视图
 class HomeSearchBarView extends StatelessWidget {

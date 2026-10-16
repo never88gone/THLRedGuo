@@ -3,9 +3,9 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-import '../../core_bridge.dart';
-import '../../models.dart';
-import '../../utils/theme/app_colors.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 /// 短剧海报毛玻璃托底背景组件，突出剧目图片质感并提供沉浸式环境光晕
 class DramaBackdrop extends StatelessWidget {

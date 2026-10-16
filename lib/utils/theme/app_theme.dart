@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'app_colors.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 abstract final class AppTheme {
   static final light = _theme(Brightness.light);

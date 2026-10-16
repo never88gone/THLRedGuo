@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'pattern_dot_painter.dart';
+import 'package:THLRedLook/views/privacy/pattern_dot_painter.dart';
 
 class PatternLockView extends StatefulWidget {
   const PatternLockView({

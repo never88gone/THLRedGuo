@@ -8,37 +8,37 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
 
-import '../../app_colors.dart';
-import '../../app_layout.dart';
-import '../../app_orientation.dart';
-import '../../app_theme.dart';
-import '../../core_bridge.dart';
-import '../../diary_service.dart';
-import '../../luna_exo_player.dart';
-import '../../danmaku_controller.dart';
-import '../../download_picker.dart';
-import '../../downloads_screen.dart';
-import '../../follow_state.dart';
-import '../../hongguo_series.dart';
-import '../../local_store.dart';
-import '../../models.dart';
-import '../../widgets.dart';
-import '../../playback_loader.dart';
-import '../../playback_preloader.dart';
-import '../../playback_recovery.dart';
-import '../../playback_preferences.dart';
-import '../../player_interactions.dart';
-import '../../player_menu.dart';
-import '../../television_controls.dart';
-import '../../lan_controller.dart';
-import '../../lan_screen.dart';
-import '../../video_enhancement.dart';
-import '../../video_output_size.dart';
-import '../../views/player/player_mobile_panel_view.dart';
-import '../../views/player/player_desktop_panel_view.dart';
-import '../../views/player/player_viewport_view.dart';
-import '../../views/player/player_quality_sheet_view.dart';
-import '../../utils/player/player_dialog_helper.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
+import 'package:THLRedLook/utils/screen/app_orientation.dart';
+import 'package:THLRedLook/utils/theme/app_theme.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/utils/diary/diary_service.dart';
+import 'package:THLRedLook/core/player/luna_exo_player.dart';
+import 'package:THLRedLook/core/danmaku/danmaku_controller.dart';
+import 'package:THLRedLook/views/download/download_picker.dart';
+import 'package:THLRedLook/pages/downloads/downloads_page.dart';
+import 'package:THLRedLook/core/store/follow_state.dart';
+import 'package:THLRedLook/core/series/hongguo_series.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/core/player/playback_loader.dart';
+import 'package:THLRedLook/core/player/playback_preloader.dart';
+import 'package:THLRedLook/core/player/playback_recovery.dart';
+import 'package:THLRedLook/core/player/playback_preferences.dart';
+import 'package:THLRedLook/core/player/player_interactions.dart';
+import 'package:THLRedLook/views/player/player_menu.dart';
+import 'package:THLRedLook/views/television/television_controls.dart';
+import 'package:THLRedLook/core/lan/lan_controller.dart';
+import 'package:THLRedLook/pages/lan/lan_page.dart';
+import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
+import 'package:THLRedLook/utils/media/video_output_size.dart';
+import 'package:THLRedLook/views/player/player_mobile_panel_view.dart';
+import 'package:THLRedLook/views/player/player_desktop_panel_view.dart';
+import 'package:THLRedLook/views/player/player_viewport_view.dart';
+import 'package:THLRedLook/views/player/player_quality_sheet_view.dart';
+import 'package:THLRedLook/utils/player/player_dialog_helper.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
@@ -333,8 +333,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (_profileEpoch != widget.store.profileEpoch ||
         handoff?.cancelled == true) {
       handoff?.fail('接收用户已变更，推送已取消');
-      if (handoff != null)
+      if (handoff != null) {
         unawaited(widget.repository.release(handoff.plan.session));
+      }
       _loading = false;
       _error = '播放接收已取消';
     } else {
@@ -687,10 +688,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       LanPlaybackHost(
         identity: _lanIdentity,
         title:
-            widget.detail.drama.title +
-            ' · 第 ' +
-            widget.detail.episodes[_index].number.toString() +
-            ' 集',
+            '${widget.detail.drama.title} · 第 ${widget.detail.episodes[_index].number} 集',
         stop: _stopForLan,
       ),
     );
@@ -707,8 +705,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         _error != null ||
         _openedIndex != _index ||
         _index != widget.initialIndex ||
-        widget.store.profileEpoch != _profileEpoch)
+        widget.store.profileEpoch != _profileEpoch) {
       return;
+    }
     final state = _player.state;
     final position = state.position.inMilliseconds / 1000;
     final duration = state.duration.inMilliseconds / 1000;
@@ -720,8 +719,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         state.buffering ||
         (state.width ?? 0) <= 0 ||
         position < handoff.position - .5 ||
-        position > handoff.position + 20)
+        position > handoff.position + 20) {
       return;
+    }
     _lanFirstPosition ??= position;
     if (position >= _lanFirstPosition! + .15) handoff.acknowledge(position);
   }
@@ -731,8 +731,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     await _serialize(() async {
       if (_closed ||
           generation != _generation ||
-          widget.store.profileEpoch != _profileEpoch)
+          widget.store.profileEpoch != _profileEpoch) {
         return;
+      }
       _playIntent = false;
       _interactions.cancel();
       _enhancement.suspend();
@@ -749,8 +750,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         _closed ||
         _loading ||
         _error != null ||
-        widget.mediaId != null)
+        widget.mediaId != null) {
       return;
+    }
     final generation = _generation;
     final index = _index;
     bool current() =>
@@ -1343,8 +1345,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       preload: true,
     );
     await widget.store.setPlaybackPreferences(nextPreferences);
-    if (!mounted || _closed || widget.store.profileEpoch != _profileEpoch)
+    if (!mounted || _closed || widget.store.profileEpoch != _profileEpoch) {
       return;
+    }
     final qualityChanged = nextPreferences.quality != _requestedQuality;
     _enhancement.setPreferences(nextPreferences.enhancement);
     setState(() {

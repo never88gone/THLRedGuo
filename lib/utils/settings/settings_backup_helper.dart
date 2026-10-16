@@ -3,8 +3,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../app_build.dart';
-import '../../local_store.dart';
+import 'package:THLRedLook/utils/build/app_build.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
 
 class SettingsBackupHelper {
   const SettingsBackupHelper();
@@ -58,6 +58,7 @@ class SettingsBackupHelper {
     );
     if (accepted == true && context.mounted) {
       await store.importBackup(content);
+      if (!context.mounted) return false;
       Navigator.of(context).popUntil((route) => route.isFirst);
       return true;
     }

@@ -1,9 +1,9 @@
 // ignore_for_file: avoid_print
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:THLRedLook/dart_core_engine.dart';
-import 'package:THLRedLook/core_bridge.dart';
-import 'package:THLRedLook/models.dart';
+import 'package:THLRedLook/core/engine/dart_core_engine.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 void main() {
   setUpAll(() async {

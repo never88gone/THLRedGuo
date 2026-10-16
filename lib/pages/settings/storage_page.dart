@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../core_bridge.dart';
-import '../../local_store.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
 
 String storageSize(int bytes) {
   if (bytes < 0) return '暂不可用';

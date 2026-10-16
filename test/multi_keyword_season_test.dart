@@ -1,9 +1,9 @@
 // ignore_for_file: avoid_print
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:THLRedLook/dart_core_engine.dart';
-import 'package:THLRedLook/hongguo_series.dart';
-import 'package:THLRedLook/core_bridge.dart';
+import 'package:THLRedLook/core/engine/dart_core_engine.dart';
+import 'package:THLRedLook/core/series/hongguo_series.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
 
 void main() {
   test('查找并测试各类多季短剧播放', () async {

@@ -1,4 +1,4 @@
-import '../../models.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 class RankingBoard {
   const RankingBoard({

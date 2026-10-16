@@ -1,20 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-import 'package:THLRedLook/app_layout.dart';
-import 'package:THLRedLook/app_theme.dart';
-import 'package:THLRedLook/danmaku_controller.dart';
-import 'package:THLRedLook/local_store.dart';
-import 'package:THLRedLook/models.dart';
-import 'package:THLRedLook/playback_preferences.dart';
-import 'package:THLRedLook/playback_preloader.dart';
-import 'package:THLRedLook/player_menu.dart';
-import 'package:THLRedLook/television_controls.dart';
-import 'package:THLRedLook/video_enhancement.dart';
-import '../theme/app_colors.dart';
-import '../../views/player/player_quality_sheet_view.dart';
-import '../../views/player/player_episodes_sheet_view.dart';
-import '../../hongguo_series.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
+import 'package:THLRedLook/utils/theme/app_theme.dart';
+import 'package:THLRedLook/core/danmaku/danmaku_controller.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/core/player/playback_preferences.dart';
+import 'package:THLRedLook/core/player/playback_preloader.dart';
+import 'package:THLRedLook/views/player/player_menu.dart';
+import 'package:THLRedLook/views/television/television_controls.dart';
+import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/player/player_quality_sheet_view.dart';
+import 'package:THLRedLook/views/player/player_episodes_sheet_view.dart';
+import 'package:THLRedLook/core/series/hongguo_series.dart';
 
 /// 播放器弹窗与面板辅助工具类
 class PlayerDialogHelper {

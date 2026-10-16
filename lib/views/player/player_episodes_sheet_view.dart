@@ -1,9 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-import '../../hongguo_series.dart';
-import '../../models.dart';
-import '../../utils/theme/app_colors.dart';
+import 'package:THLRedLook/core/series/hongguo_series.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 /// 移动端沉浸式选集半屏抽屉面板
 class PlayerEpisodesSheetView extends StatefulWidget {

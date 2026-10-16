@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../app_colors.dart';
-import '../../app_theme.dart';
-import '../../core_bridge.dart';
-import '../../diary_service.dart';
-import '../../local_store.dart';
-import '../../models.dart';
-import '../../resource_settings_screen.dart';
-import '../../sources_screen.dart';
-import '../../source_switcher_sheet.dart';
-import '../../widgets.dart';
-import '../../views/settings/settings_group_view.dart';
-import '../../utils/privacy/privacy_lock_controller.dart';
-import '../../utils/settings/settings_backup_helper.dart';
-import '../privacy/privacy_settings_page.dart';
-import '../about/about_page.dart';
-import 'storage_page.dart';
-import 'js_sources_page.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/theme/app_theme.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/utils/diary/diary_service.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/pages/settings/resource_settings_page.dart';
+import 'package:THLRedLook/pages/sources/sources_page.dart';
+import 'package:THLRedLook/views/sources/source_switcher_sheet.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/views/settings/settings_group_view.dart';
+import 'package:THLRedLook/utils/privacy/privacy_lock_controller.dart';
+import 'package:THLRedLook/utils/settings/settings_backup_helper.dart';
+import 'package:THLRedLook/pages/privacy/privacy_settings_page.dart';
+import 'package:THLRedLook/pages/about/about_page.dart';
+import 'package:THLRedLook/pages/settings/storage_page.dart';
+import 'package:THLRedLook/pages/settings/js_sources_page.dart';
 
 export 'storage_page.dart' show storageSize;
 

@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../app_colors.dart';
-import '../../app_layout.dart';
-import '../../local_store.dart';
-import '../../models.dart';
-import '../../source_gate_taps.dart';
-import '../../source_switcher_sheet.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/utils/sources/source_gate_taps.dart';
+import 'package:THLRedLook/views/sources/source_switcher_sheet.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key, required this.store});

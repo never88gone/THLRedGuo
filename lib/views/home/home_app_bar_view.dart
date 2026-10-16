@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'package:THLRedLook/app_build.dart';
-import 'package:THLRedLook/app_colors.dart';
-import 'package:THLRedLook/models.dart';
-import 'package:THLRedLook/widgets.dart';
+import 'package:THLRedLook/utils/build/app_build.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
 
 /// 首页顶部导航栏组件
 class HomeAppBarView extends StatelessWidget implements PreferredSizeWidget {

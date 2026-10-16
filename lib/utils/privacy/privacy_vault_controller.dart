@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../models.dart';
-import '../../models/privacy/privacy_vault_entry.dart';
-import 'gesture_hasher.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/models/privacy/privacy_vault_entry.dart';
+import 'package:THLRedLook/utils/privacy/gesture_hasher.dart';
 
 class PrivacyVaultController extends ChangeNotifier {
   PrivacyVaultController(this.preferences) {

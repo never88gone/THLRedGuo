@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 /// 移动端画质选择半屏沉浸式抽屉面板
 class PlayerQualitySheetView extends StatelessWidget {

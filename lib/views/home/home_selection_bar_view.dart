@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:THLRedLook/batch_downloads.dart';
+import 'package:THLRedLook/core/download/batch_downloads.dart';
 
 /// 首页多选短剧下载底部控制栏
 class HomeSelectionBarView extends StatelessWidget {

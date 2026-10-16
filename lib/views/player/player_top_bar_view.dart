@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../app_colors.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 /// 播放器顶部应用与返回栏（符合手机端与桌面端交互规范）
 class PlayerTopBarView extends StatelessWidget {

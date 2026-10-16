@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:THLRedLook/local_store.dart';
-import 'package:THLRedLook/models.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

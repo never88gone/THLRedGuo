@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../utils/privacy/privacy_vault_controller.dart';
-import '../../utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/privacy/privacy_vault_controller.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 class VaultPasswordDialog extends StatefulWidget {
   const VaultPasswordDialog({

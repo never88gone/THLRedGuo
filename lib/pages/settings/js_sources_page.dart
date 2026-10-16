@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../../app_colors.dart';
-import '../../core_bridge.dart';
-import '../../js_source_models.dart';
-import '../../js_source_presets.dart';
-import '../../js_source_service.dart';
-import '../../local_store.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/js/js_source_models.dart';
+import 'package:THLRedLook/core/js/js_source_presets.dart';
+import 'package:THLRedLook/core/js/js_source_service.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
 
 class JsSourcesPage extends StatefulWidget {
   const JsSourcesPage({

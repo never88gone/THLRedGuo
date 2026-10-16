@@ -2,23 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-import 'package:THLRedLook/app_colors.dart';
-import 'package:THLRedLook/app_layout.dart';
-import 'package:THLRedLook/app_theme.dart';
-import 'package:THLRedLook/core_bridge.dart';
-import 'package:THLRedLook/danmaku_controller.dart';
-import 'package:THLRedLook/danmaku_overlay.dart';
-import 'package:THLRedLook/diary_service.dart';
-import 'package:THLRedLook/local_store.dart';
-import 'package:THLRedLook/luna_exo_player.dart';
-import 'package:THLRedLook/models.dart';
-import 'package:THLRedLook/player_interactions.dart';
-import 'package:THLRedLook/player_menu.dart';
-import 'package:THLRedLook/sources_screen.dart';
-import 'package:THLRedLook/television_controls.dart';
-import 'package:THLRedLook/video_enhancement.dart';
-import 'package:THLRedLook/widgets.dart';
-import 'player_controls_view.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
+import 'package:THLRedLook/utils/theme/app_theme.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/danmaku/danmaku_controller.dart';
+import 'package:THLRedLook/views/danmaku/danmaku_overlay.dart';
+import 'package:THLRedLook/utils/diary/diary_service.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/core/player/luna_exo_player.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/core/player/player_interactions.dart';
+import 'package:THLRedLook/views/player/player_menu.dart';
+import 'package:THLRedLook/pages/sources/sources_page.dart';
+import 'package:THLRedLook/views/television/television_controls.dart';
+import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/views/player/player_controls_view.dart';
 
 /// 播放器画面视口组件（视频画面、手势、HUD、弹幕图层、加载中/错误兜底面板）
 class PlayerViewportView extends StatelessWidget {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 class PatternDotPainter extends CustomPainter {
   const PatternDotPainter({

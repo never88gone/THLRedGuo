@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../app_colors.dart';
-import '../../hongguo_series.dart';
-import '../../models.dart';
-import '../../player_menu.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/core/series/hongguo_series.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/views/player/player_menu.dart';
 
 /// 桌面端与宽屏模式下的右侧选集分栏组件
 class PlayerDesktopPanelView extends StatelessWidget {

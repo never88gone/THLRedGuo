@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../app_colors.dart';
-import '../../core_bridge.dart';
-import '../../download_picker.dart';
-import '../../follow_state.dart';
-import '../../hongguo_series.dart';
-import '../../local_store.dart';
-import '../../models.dart';
-import '../../player_menu.dart';
-import '../../widgets.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/views/download/download_picker.dart';
+import 'package:THLRedLook/core/store/follow_state.dart';
+import 'package:THLRedLook/core/series/hongguo_series.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/views/player/player_menu.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
 
 /// 移动端半屏沉浸模式下的底部信息与交互面板（选集、简介、下载）
 class PlayerMobilePanelView extends StatefulWidget {

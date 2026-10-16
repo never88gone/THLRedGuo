@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../app_colors.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 /// 播放器右上方轻量级弹幕控制开关
 class PlayerDanmakuButtonView extends StatelessWidget {

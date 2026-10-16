@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-import '../../app_colors.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 class CinematicPlaybackView extends StatelessWidget {
   const CinematicPlaybackView({

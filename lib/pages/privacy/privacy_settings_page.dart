@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../core_bridge.dart';
-import '../../local_store.dart';
-import '../../utils/privacy/privacy_lock_controller.dart';
-import '../../utils/privacy/privacy_vault_controller.dart';
-import '../../utils/theme/app_colors.dart';
-import '../../views/privacy/private_source_manage_dialog.dart';
-import '../../views/privacy/vault_password_dialog.dart';
-import '../../views/privacy/vault_password_setup_dialog.dart';
-import '../../views/settings/settings_group_view.dart';
-import 'privacy_gesture_setup_page.dart';
-import 'privacy_vault_page.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/utils/privacy/privacy_lock_controller.dart';
+import 'package:THLRedLook/utils/privacy/privacy_vault_controller.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/privacy/private_source_manage_dialog.dart';
+import 'package:THLRedLook/views/privacy/vault_password_dialog.dart';
+import 'package:THLRedLook/views/privacy/vault_password_setup_dialog.dart';
+import 'package:THLRedLook/views/settings/settings_group_view.dart';
+import 'package:THLRedLook/pages/privacy/privacy_gesture_setup_page.dart';
+import 'package:THLRedLook/pages/privacy/privacy_vault_page.dart';
 
 class PrivacySettingsPage extends StatefulWidget {
   const PrivacySettingsPage({

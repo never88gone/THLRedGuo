@@ -1,10 +1,10 @@
 // ignore_for_file: avoid_print
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:THLRedLook/dart_core_engine.dart';
-import 'package:THLRedLook/hongguo_series.dart';
-import 'package:THLRedLook/core_bridge.dart';
-import 'package:THLRedLook/models.dart';
+import 'package:THLRedLook/core/engine/dart_core_engine.dart';
+import 'package:THLRedLook/core/series/hongguo_series.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 void main() {
   test('验证多季切换及各种集数格式下的播放解析 100% 成功', () async {

@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:THLRedLook/dart_core_engine.dart';
-import 'package:THLRedLook/core_bridge.dart';
-import 'package:THLRedLook/hongguo_series.dart';
-import 'package:THLRedLook/models.dart';
+import 'package:THLRedLook/core/engine/dart_core_engine.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/series/hongguo_series.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 void main() {
   test('验证多季短剧切季播放流解析与次序恒定', () async {

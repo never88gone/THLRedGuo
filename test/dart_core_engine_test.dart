@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:THLRedLook/dart_core_engine.dart';
+import 'package:THLRedLook/core/engine/dart_core_engine.dart';
 
 void main() {
   group('DartCoreEngine 核心引擎与内置源调度自动化测试', () {

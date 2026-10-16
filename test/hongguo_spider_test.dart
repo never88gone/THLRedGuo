@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:THLRedLook/catpaw_js_runtime.dart';
+import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 
 void main() {
   group('官方数据源 (hongguo.js) 自动化规范与链路测试', () {

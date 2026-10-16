@@ -2,14 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
-import '../../app_colors.dart';
-import '../../player_interactions.dart';
-import '../../video_enhancement.dart';
-import '../../widgets.dart';
-import 'player_bottom_bar_view.dart';
-import 'player_center_view.dart';
-import 'player_danmaku_button_view.dart';
-import 'player_top_bar_view.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/core/player/player_interactions.dart';
+import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/views/player/player_bottom_bar_view.dart';
+import 'package:THLRedLook/views/player/player_center_view.dart';
+import 'package:THLRedLook/views/player/player_danmaku_button_view.dart';
+import 'package:THLRedLook/views/player/player_top_bar_view.dart';
 
 /// 播放器主控制覆盖层（聚合手势、自动隐藏、顶栏、底栏、居中动作与弹幕）
 class PlayerControls extends StatefulWidget {

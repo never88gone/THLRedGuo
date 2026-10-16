@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:THLRedLook/models.dart';
-import 'package:THLRedLook/remote_widgets.dart';
-import 'package:THLRedLook/widgets.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/views/remote/remote_widgets.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
 
 /// 首页短剧网格与分类列表视图
 class HomeCatalogView extends StatelessWidget {
