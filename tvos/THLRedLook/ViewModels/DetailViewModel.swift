@@ -49,6 +49,10 @@ public final class DetailViewModel: ObservableObject {
         self.detail = DramaDetail(drama: drama, episodes: eps, warning: "")
     }
 
+    public func refreshWatchHistory() {
+        self.lastWatchEntry = store.getWatchEntry(dramaId: drama.id)
+    }
+
     public func switchToDrama(_ newDrama: Drama) async {
         guard newDrama.id != drama.id else { return }
         self.drama = newDrama

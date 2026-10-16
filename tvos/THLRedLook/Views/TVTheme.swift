@@ -579,24 +579,24 @@ private struct TVEpisodeButtonLabel: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            VStack(spacing: 4) {
-                if isCurrent && !isFocused {
+            VStack(spacing: 3) {
+                if isCurrent {
                     Image(systemName: "play.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color.red)
+                        .font(.system(size: isFocused ? 13 : 11, weight: .bold))
+                        .foregroundColor(isFocused ? .white : Color(red: 1.0, green: 0.35, blue: 0.4))
                 }
 
                 Text("\(episode.number)")
-                    .font(.system(size: isFocused ? 26 : 22, weight: isFocused ? .heavy : (isCurrent ? .bold : .semibold)))
+                    .font(.system(size: isFocused ? 28 : (isCurrent ? 24 : 22), weight: isFocused ? .heavy : (isCurrent ? .bold : .semibold)))
                     .foregroundColor(textColor)
 
                 if episode.vip {
                     Text("VIP")
                         .font(.system(size: 10, weight: .heavy))
-                        .foregroundColor(isFocused ? .yellow : TVTheme.vipAccent)
-                        .padding(.horizontal, 4)
+                        .foregroundColor(vipTextColor)
+                        .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(Color.black.opacity(0.4))
+                        .background(vipBackgroundView)
                         .clipShape(Capsule())
                 }
             }
@@ -613,17 +613,10 @@ private struct TVEpisodeButtonLabel: View {
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(
-                    isFocused ? TVTheme.focusedBorderColor : (isCurrent ? Color.red.opacity(0.85) : Color.white.opacity(0.12)),
-                    lineWidth: isFocused ? TVTheme.focusedBorderWidth : (isCurrent ? 2.5 : 1.0)
-                )
+                .stroke(borderStrokeColor, lineWidth: borderWidth)
         )
-        .scaleEffect(isFocused ? TVTheme.defaultScale : 1.0)
-        .shadow(
-            color: isFocused ? TVTheme.focusedShadowColor : (isCurrent ? Color.red.opacity(0.35) : Color.clear),
-            radius: isFocused ? TVTheme.focusedShadowRadius : (isCurrent ? 8 : 0),
-            y: isFocused ? 4 : 0
-        )
+        .scaleEffect(isFocused ? 1.08 : 1.0)
+        .shadow(color: shadowColor, radius: shadowRadius, y: isFocused ? 5 : 0)
         .animation(TVTheme.focusSpringAnimation, value: isFocused)
         .padding(.horizontal, 2)
         .padding(.vertical, 2)
@@ -631,12 +624,66 @@ private struct TVEpisodeButtonLabel: View {
 
     private var textColor: Color {
         if isFocused {
-            return .white
+            return isCurrent ? .white : .black
         }
         if isCurrent {
-            return Color.red.opacity(0.95)
+            return Color(red: 1.0, green: 0.35, blue: 0.4)
         }
         return Color.white.opacity(0.85)
+    }
+
+    private var vipTextColor: Color {
+        if isFocused {
+            return isCurrent ? .yellow : Color(red: 0.7, green: 0.45, blue: 0.0)
+        }
+        return TVTheme.vipAccent
+    }
+
+    private var vipBackgroundView: some View {
+        if isFocused {
+            return isCurrent ? Color.black.opacity(0.4) : Color.black.opacity(0.12)
+        }
+        return Color.black.opacity(0.4)
+    }
+
+    private var borderStrokeColor: Color {
+        if isFocused {
+            return isCurrent ? Color.white : TVTheme.focusedBorderColor
+        }
+        if isCurrent {
+            return Color.red
+        }
+        return Color.white.opacity(0.12)
+    }
+
+    private var borderWidth: CGFloat {
+        if isFocused {
+            return TVTheme.focusedBorderWidth
+        }
+        if isCurrent {
+            return 2.5
+        }
+        return 1.0
+    }
+
+    private var shadowColor: Color {
+        if isFocused {
+            return isCurrent ? Color.red.opacity(0.8) : TVTheme.focusedShadowColor
+        }
+        if isCurrent {
+            return Color.red.opacity(0.45)
+        }
+        return Color.clear
+    }
+
+    private var shadowRadius: CGFloat {
+        if isFocused {
+            return 16.0
+        }
+        if isCurrent {
+            return 8.0
+        }
+        return 0
     }
 
     @ViewBuilder
@@ -644,16 +691,20 @@ private struct TVEpisodeButtonLabel: View {
         if isFocused {
             if isCurrent {
                 LinearGradient(
-                    colors: [Color.red, Color(red: 1.0, green: 0.25, blue: 0.35)],
+                    colors: [Color(red: 0.95, green: 0.12, blue: 0.22), Color(red: 1.0, green: 0.35, blue: 0.45)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             } else {
-                Color(red: 0.30, green: 0.30, blue: 0.35)
+                Color(white: 0.95)
             }
         } else {
             if isCurrent {
-                Color.red.opacity(0.25)
+                LinearGradient(
+                    colors: [Color.red.opacity(0.38), Color(red: 0.65, green: 0.08, blue: 0.18).opacity(0.42)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             } else {
                 TVTheme.surfaceCard
             }

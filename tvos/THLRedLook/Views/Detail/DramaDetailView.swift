@@ -14,6 +14,7 @@ public struct DramaDetailView: View {
     @Environment(\.presentationMode) var presentationMode
 
     @State private var playingEpisodeIndex: Int?
+    @State private var selectedEpisodeNumber: Int = 1
     @State private var resumePosition: Double = 0
     @State private var isDescriptionExpanded: Bool = false
     @State private var showingDownloadSuccess: Bool = false
@@ -122,11 +123,12 @@ public struct DramaDetailView: View {
                                 // 动作按钮行（预留上侧、左侧、右侧充足防裁切间距）
                                 HStack(spacing: 32) {
                                     // 播放按钮
-                                    let resumeEp = viewModel.lastWatchEntry?.episode ?? 1
+                                    let resumeEp = viewModel.lastWatchEntry?.episode ?? selectedEpisodeNumber
                                     let resumePos = viewModel.lastWatchEntry?.position ?? 0
                                     let playTitle = viewModel.lastWatchEntry != nil ? "继续播放 第 \(resumeEp) 集" : "立即播放"
 
                                     TVButton(title: playTitle, icon: "play.fill", isProminent: true) {
+                                        selectedEpisodeNumber = resumeEp
                                         resumePosition = resumePos
                                         playingEpisodeIndex = resumeEp
                                     }
@@ -164,6 +166,11 @@ public struct DramaDetailView: View {
                                             if !item.isCurrent {
                                                 Task {
                                                     await viewModel.switchToDrama(item.drama)
+                                                    if let entry = viewModel.lastWatchEntry {
+                                                        selectedEpisodeNumber = entry.episode
+                                                    } else {
+                                                        selectedEpisodeNumber = 1
+                                                    }
                                                 }
                                             }
                                         }
@@ -216,9 +223,10 @@ public struct DramaDetailView: View {
                                 let currentChunk = detail.episodeChunks[viewModel.selectedChunkIndex]
                                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 8), spacing: 24) {
                                     ForEach(currentChunk.episodes) { ep in
+                                        let isCurrentEp = (ep.number == selectedEpisodeNumber) || (viewModel.lastWatchEntry?.episode == ep.number)
                                         TVEpisodeButton(
                                             episode: ep,
-                                            isCurrent: viewModel.lastWatchEntry?.episode == ep.number,
+                                            isCurrent: isCurrentEp,
                                             isExternalFocused: focusedEpisode == ep.number,
                                             onUpCommand: {
                                                 if let firstIndex = currentChunk.episodes.firstIndex(where: { $0.id == ep.id }), firstIndex < 8 {
@@ -227,7 +235,8 @@ public struct DramaDetailView: View {
                                                 }
                                             }
                                         ) {
-                                            resumePosition = 0
+                                            selectedEpisodeNumber = ep.number
+                                            resumePosition = (viewModel.lastWatchEntry?.episode == ep.number) ? (viewModel.lastWatchEntry?.position ?? 0) : 0
                                             playingEpisodeIndex = ep.number
                                         }
                                         .focused($focusedEpisode, equals: ep.number)
@@ -245,6 +254,9 @@ public struct DramaDetailView: View {
                 }
                 .defaultFocus($isPlayButtonFocused, true)
                 .onAppear {
+                    if let entry = viewModel.lastWatchEntry {
+                        selectedEpisodeNumber = entry.episode
+                    }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         isPlayButtonFocused = true
                     }
@@ -253,6 +265,14 @@ public struct DramaDetailView: View {
         }
         .task {
             await viewModel.loadDetail()
+            if let entry = viewModel.lastWatchEntry {
+                selectedEpisodeNumber = entry.episode
+            }
+        }
+        .onChange(of: viewModel.lastWatchEntry?.episode) { newEp in
+            if let ep = newEp {
+                selectedEpisodeNumber = ep
+            }
         }
         .fullScreenCover(item: Binding<EpisodeWrapper?>(
             get: { playingEpisodeIndex != nil ? EpisodeWrapper(index: playingEpisodeIndex!) : nil },
@@ -266,11 +286,20 @@ public struct DramaDetailView: View {
                     initialPosition: resumePosition,
                     onDismiss: {
                         playingEpisodeIndex = nil
+                        viewModel.refreshWatchHistory()
+                        if let entry = viewModel.lastWatchEntry {
+                            selectedEpisodeNumber = entry.episode
+                        }
                     },
                     onSwitchSeason: { newDrama in
                         playingEpisodeIndex = nil
                         Task {
                             await viewModel.switchToDrama(newDrama)
+                            if let entry = viewModel.lastWatchEntry {
+                                selectedEpisodeNumber = entry.episode
+                            } else {
+                                selectedEpisodeNumber = 1
+                            }
                         }
                     }
                 )

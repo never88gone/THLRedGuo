@@ -3,6 +3,8 @@ import SwiftUI
 public struct SearchRootView: View {
     @StateObject private var viewModel = SearchViewModel()
     @State private var selectedDrama: Drama?
+    @FocusState private var focusedDramaId: String?
+    @FocusState private var isSearchFieldFocused: Bool
 
     private let columns = [
         GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
@@ -35,6 +37,7 @@ public struct SearchRootView: View {
                                 get: { viewModel.query },
                                 set: { viewModel.onQueryChanged($0) }
                             ))
+                            .focused($isSearchFieldFocused)
                             .onSubmit {
                                 Task { await viewModel.executeSearch() }
                             }
@@ -118,10 +121,21 @@ public struct SearchRootView: View {
                     } else {
                         ScrollView {
                             LazyVGrid(columns: columns, spacing: 36) {
-                                ForEach(viewModel.searchResults) { drama in
-                                    DramaCardView(drama: drama) {
+                                ForEach(Array(viewModel.searchResults.enumerated()), id: \.element.id) { index, drama in
+                                    DramaCardView(
+                                        drama: drama,
+                                        isExternalFocused: focusedDramaId == drama.id,
+                                        onUpCommand: {
+                                            if index < 4 {
+                                                focusedDramaId = nil
+                                                isSearchFieldFocused = true
+                                            }
+                                        }
+                                    ) {
                                         selectedDrama = drama
                                     }
+                                    .focused($focusedDramaId, equals: drama.id)
+                                    .id("search_card_\(drama.id)")
                                 }
                             }
                             .padding(.horizontal, 48)
