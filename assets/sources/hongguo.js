@@ -22,6 +22,23 @@ function cleanText(text) {
   return text.replace(/<[^>]+>/g, "").trim();
 }
 
+function safeJsonParse(text) {
+  if (!text || typeof text !== "string") return null;
+  try {
+    let safe = text;
+    if (/\d{15,}/.test(safe)) {
+      let prev;
+      do {
+        prev = safe;
+        safe = safe.replace(/([:\[,]\s*)(\d{15,})(\s*[,\]\}])/g, '$1"$2"$3');
+      } while (safe !== prev);
+    }
+    return JSON.parse(safe);
+  } catch (e) {
+    try { return JSON.parse(text); } catch (_) { return null; }
+  }
+}
+
 function parseJsonFromHtml(body) {
   if (!body) return null;
   const marker = /(?:window\.)?_ROUTER_DATA\s*=\s*(\{)/.exec(body);
@@ -49,13 +66,10 @@ function parseJsonFromHtml(body) {
         else if (ch === '}') {
           depth--;
           if (depth === 0) {
-            try {
-              let jsonSlice = body.slice(startIdx, i + 1);
-              jsonSlice = jsonSlice.replace(/("(?:series_)?id"):\s*(\d{15,})/g, '$1:"$2"');
-              return JSON.parse(jsonSlice);
-            } catch (e) {
-              break;
-            }
+            const jsonSlice = body.slice(startIdx, i + 1);
+            const parsed = safeJsonParse(jsonSlice);
+            if (parsed) return parsed;
+            break;
           }
         }
       }
@@ -63,7 +77,8 @@ function parseJsonFromHtml(body) {
   }
   const nextMatch = body.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   if (nextMatch && nextMatch[1]) {
-    try { return JSON.parse(nextMatch[1]); } catch (e) {}
+    const parsed = safeJsonParse(nextMatch[1]);
+    if (parsed) return parsed;
   }
   return null;
 }
@@ -368,9 +383,16 @@ async function play(flag, id, flags) {
     }
   }
 
+  const isCorruptedId = function(s) {
+    return !s || !/^\d{15,}$/.test(s) || /000$/.test(s);
+  };
+
   if (longDigits.length >= 2) {
     seriesId = longDigits[0];
     itemId = longDigits[1];
+    if (isCorruptedId(itemId)) {
+      itemId = "";
+    }
   } else if (longDigits.length === 1) {
     seriesId = longDigits[0];
     if (shortDigit > 0) {
@@ -378,7 +400,7 @@ async function play(flag, id, flags) {
     }
   }
 
-  if (itemId && itemId.length >= 15) {
+  if (itemId && itemId.length >= 15 && !isCorruptedId(itemId)) {
     const playPageUrl = BASE_URL + "/player/" + (seriesId || itemId) + "/" + itemId;
     try {
       const resp = await fetch(playPageUrl, {
@@ -404,7 +426,7 @@ async function play(flag, id, flags) {
       }
     } catch (e) {}
 
-    if (!realStreamUrl) {
+    if (!realStreamUrl && !isCorruptedId(itemId)) {
       realStreamUrl = BASE_URL + "/video/public/" + itemId + "/360p.mp4";
     }
   }

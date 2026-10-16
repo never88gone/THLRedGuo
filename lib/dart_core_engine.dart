@@ -855,13 +855,13 @@ class DartCoreEngine {
         chapter is Map ? chapter['raw']?.toString() : null,
         chapter is Map ? chapter['id']?.toString() : null,
         chapter is String ? chapter : null,
-        sourceId,
       ];
       for (final text in candidates) {
         if (text == null || text.isEmpty) continue;
         final match = RegExp(r'\d{15,}').firstMatch(text);
         if (match != null) {
           final vid = match.group(0)!;
+          if (vid.endsWith('000') || vid == sourceId) continue;
           final streamUrl = 'https://hongguoduanju.com/video/public/$vid/360p.mp4';
           return {
             'url': streamUrl,

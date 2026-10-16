@@ -109,10 +109,23 @@ class CatPawJsRuntime {
   }
 
   void _injectGlobals() {
-    _rt.evaluate('''
+    _rt.evaluate(r'''
 var JSON = JSON || {};
 if (!JSON.stringify) JSON.stringify = function(o) { return "{}"; };
 if (!JSON.parse) JSON.parse = function(s) { return {}; };
+(function() {
+  var nativeParse = JSON.parse;
+  JSON.parse = function(text, reviver) {
+    if (typeof text === 'string' && /\d{15,}/.test(text)) {
+      var prev;
+      do {
+        prev = text;
+        text = text.replace(/([:\[,]\s*)(\d{15,})(\s*[,\]\}])/g, '$1"$2"$3');
+      } while (text !== prev);
+    }
+    return nativeParse(text, reviver);
+  };
+})();
 if (typeof console === 'undefined') {
   globalThis.console = {
     log: function() {},

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:THLRedLook/dart_core_engine.dart';
 import 'package:THLRedLook/core_bridge.dart';
 import 'package:THLRedLook/hongguo_series.dart';
+import 'package:THLRedLook/models.dart';
 
 void main() {
   test('验证多季短剧切季播放流解析与次序恒定', () async {
@@ -58,5 +59,18 @@ void main() {
         expect(planEp2.url.startsWith('http'), isTrue);
       }
     }
+
+    // 5. 验证大整数ID精度保护与历史损坏ID自愈
+    final corruptedEp = Episode(
+      {
+        'id': 'https://hongguoduanju.com/player/${catalog.items.first.cleanSourceId}/7621226646028160000',
+        'title': '第 1 集',
+        'currentEpisode': 1,
+      },
+      1,
+    );
+    final selfHealedPlan = await repo.resolve(catalog.items.first, corruptedEp, quality: 0);
+    expect(selfHealedPlan.url, isNotEmpty);
+    expect(selfHealedPlan.url.endsWith('000/360p.mp4'), isFalse, reason: '必须自愈提取真实有效vid，绝不可返回末尾000的404直链');
   });
 }
