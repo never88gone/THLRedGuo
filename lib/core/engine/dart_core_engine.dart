@@ -778,6 +778,22 @@ class DartCoreEngine {
       }
     }
 
+    final accessibleCount = (spiderVod?['accessible_count'] as num?)?.toInt() ??
+        (spiderVod?['accessible_episode_cnt'] as num?)?.toInt() ??
+        (spiderVod?['accessibleCount'] as num?)?.toInt() ??
+        0;
+
+    if (accessibleCount > 0 && accessibleCount < chapters.length) {
+      for (var i = 0; i < chapters.length; i++) {
+        if (i + 1 > accessibleCount) {
+          chapters[i]['vip'] = true;
+        } else {
+          chapters[i]['vip'] = false;
+        }
+      }
+      fullDrama['vip'] = true;
+    }
+
     fullDrama['episodes'] = chapters.length;
 
     return {

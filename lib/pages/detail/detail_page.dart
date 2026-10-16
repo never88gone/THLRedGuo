@@ -302,17 +302,32 @@ class _DetailScreenState extends State<DetailScreen> {
       final accepted = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('这是一集 VIP 内容'),
-          content: const Text('站源可能只提供试看或限制播放。'),
+          title: const Row(
+            children: [
+              Icon(Icons.workspace_premium_rounded, color: Colors.amber),
+              SizedBox(width: 8),
+              Text('官方试看说明'),
+            ],
+          ),
+          content: Text(
+            '本剧官方当前仅开放前序免登录公开试看，第 ${detail.episodes[index].number} 集为官方 VIP/限制集，官方 Web 暂未开放免登录流。\n\n建议直接观看前序开放集数，或通过多元数据源切换全集线路。',
+          ),
           actions: [
             TextButton(
-              autofocus: AppLayout.isTelevision(context),
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
+              child: const Text('我知道了'),
             ),
+            if (index > 0)
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context, false);
+                  _play(0);
+                },
+                child: const Text('播放第 1 集'),
+              ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('尝试播放'),
+              child: const Text('仍尝试播放'),
             ),
           ],
         ),
