@@ -293,6 +293,7 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
                       return Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: InkWell(
+                          key: ValueKey('player-season-${entry.drama.id}'),
                           onTap: isCurrent
                               ? null
                               : () => widget.onSeasonSelected?.call(entry.drama),
