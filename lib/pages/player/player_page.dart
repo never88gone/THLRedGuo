@@ -103,6 +103,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   late final int _profileEpoch;
   int _openedIndex = -1;
   int _generation = 0;
+  int _seasonSwitchTicket = 0;
   int _requestedQuality = 0;
   bool _loading = true;
   bool _forceOnline = false;
@@ -383,6 +384,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (_closed || !mounted) return;
     if (seasonDrama.id == widget.detail.drama.id) return;
 
+    final ticket = ++_seasonSwitchTicket;
+
     final anchor = widget.detail.drama;
     if (widget.store.following(anchor.id)?.seriesSeasons[seasonDrama.id]?.read ==
         false) {
@@ -414,7 +417,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             )
           : seasonDrama;
       var nextDetail = await widget.repository.detail(safeDrama);
-      if (!mounted || _closed) return;
+      if (!mounted || _closed || ticket != _seasonSwitchTicket) return;
       if (nextDetail.episodes.isEmpty && safeDrama.episodes > 0) {
         nextDetail = DramaDetail(
           safeDrama,
@@ -432,7 +435,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         );
       }
       if (nextDetail.episodes.isEmpty) {
-        _notice('该季暂无可用集数');
+        if (ticket == _seasonSwitchTicket) {
+          _notice('该季暂无可用集数');
+        }
         return;
       }
 
@@ -444,6 +449,11 @@ class _PlayerScreenState extends State<PlayerScreen>
       final initialPosition = (watched != null && watched.position > 0)
           ? watched.position.toDouble()
           : 0.0;
+
+      if (ticket != _seasonSwitchTicket || !mounted || _closed) return;
+
+      ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+      ScaffoldMessenger.maybeOf(context)?.removeCurrentSnackBar();
 
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
@@ -461,7 +471,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         ),
       );
     } catch (e) {
-      if (mounted) {
+      if (mounted && ticket == _seasonSwitchTicket) {
         _notice('切换失败: $e');
       }
     }
@@ -1297,11 +1307,22 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
   }
 
-  void _notice(String message) {
+  void _notice(
+    String message, {
+    Duration duration = const Duration(milliseconds: 1200),
+  }) {
     if (!mounted || _closed) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.clearSnackBars();
+    messenger.removeCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: duration,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _setPreferences(PlaybackPreferences preferences) async {
