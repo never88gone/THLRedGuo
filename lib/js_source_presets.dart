@@ -242,21 +242,25 @@ async function detail(id) {
     if (resp && resp.status === 200 && resp.body) {
       const body = resp.body;
       const routerData = parseJsonFromHtml(body);
+      let epTotalCount = 0;
       if (routerData && routerData.loaderData) {
         for (const k of Object.keys(routerData.loaderData)) {
           const lData = routerData.loaderData[k];
           const sDetail = lData && (lData.seriesDetail || lData.videoDetail || lData.series_info);
           if (sDetail) {
             const sTitle = cleanText(sDetail.series_name || sDetail.series_title || sDetail.title || sDetail.name);
-            if (sTitle) title = sTitle;
+            if (sTitle && !title) title = sTitle;
             const sCover = sDetail.series_cover || sDetail.cover || sDetail.cover_url || "";
-            if (sCover) cover = sCover;
+            if (sCover && !cover) cover = sCover;
             const sDesc = cleanText(sDetail.series_intro || sDetail.intro || sDetail.abstract || sDetail.desc);
-            if (sDesc) desc = sDesc;
+            if (sDesc && !desc) desc = sDesc;
             if (Array.isArray(sDetail.vid_list) && sDetail.vid_list.length > 0) {
               vidList = sDetail.vid_list;
+              break;
             }
-            break;
+            if (sDetail.episode_cnt || sDetail.episode_total_cnt) {
+              epTotalCount = Number(sDetail.episode_cnt || sDetail.episode_total_cnt) || 0;
+            }
           }
         }
       }
@@ -292,7 +296,11 @@ async function detail(id) {
   const epUrls = [];
   if (vidList.length > 0) {
     for (let i = 0; i < vidList.length; i++) {
-      epUrls.push("第" + (i + 1) + "集$" + BASE_URL + "/player/" + id + "/" + vidList[i]);
+      epUrls.push("第" + (i + 1) + "集$" + BASE_URL + "/player/" + cleanId + "/" + vidList[i]);
+    }
+  } else if (epTotalCount > 0) {
+    for (let i = 0; i < epTotalCount; i++) {
+      epUrls.push("第" + (i + 1) + "集$" + BASE_URL + "/player/" + cleanId + "/" + (i + 1));
     }
   }
 
@@ -303,8 +311,8 @@ async function detail(id) {
   return {
     list: [
       {
-        vod_id: String(id),
-        vod_name: title || ("短剧 " + id),
+        vod_id: String(cleanId),
+        vod_name: title || ("短剧 " + cleanId),
         vod_pic: cover,
         vod_content: desc,
         vod_remarks: epUrls.length > 0 ? ("全" + epUrls.length + "集") : "",

@@ -78,4 +78,22 @@ void main() {
     print('playbackRes url: ${playbackRes.url}');
     expect(playbackRes.url.isNotEmpty, isTrue);
   });
+
+  test('网络接口无返回或空剧集时，根据已知集数兜底绝不抛出 Cannot add to an unmodifiable list', () async {
+    final repo = NativeRepository();
+    final mockSeasonDrama = Drama(
+      id: 'hongguo:9999999999999999999',
+      source: 'hongguo',
+      sourceId: '9999999999999999999',
+      title: '假定网络异常或暂无播放列表的第2季',
+      episodes: 80, // 已知有80集
+    );
+
+    // 以前这里会抛出 Cannot add to an unmodifiable list
+    final detail = await repo.detail(mockSeasonDrama);
+    expect(detail.episodes.length, 80);
+    expect(detail.episodes.first.number, 1);
+    expect(detail.episodes.last.number, 80);
+    expect(detail.episodes.first.title, '第 1 集');
+  });
 }

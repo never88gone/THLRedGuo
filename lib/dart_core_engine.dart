@@ -483,7 +483,7 @@ class DartCoreEngine {
   }
 
   List<Map<String, dynamic>> _parseChaptersFromVodPlayUrl(String playUrlRaw) {
-    if (playUrlRaw.trim().isEmpty) return const [];
+    if (playUrlRaw.trim().isEmpty) return <Map<String, dynamic>>[];
     var line = playUrlRaw;
     if (line.contains(r'$$$')) {
       line = line.split(r'$$$').first;
@@ -739,7 +739,7 @@ class DartCoreEngine {
     fullDrama['sourceId'] = sourceId;
     fullDrama['id'] = dramaId.contains(':') ? dramaId : '$source:$sourceId';
 
-    List<Map<String, dynamic>> chapters = [];
+    final chapters = <Map<String, dynamic>>[];
     if (spiderVod != null && spiderVod.isNotEmpty) {
       if ((spiderVod['vod_name']?.toString() ?? '').isNotEmpty) {
         fullDrama['title'] = spiderVod['vod_name'].toString();
@@ -751,19 +751,20 @@ class DartCoreEngine {
         fullDrama['description'] = spiderVod['vod_content'].toString();
       }
       final playUrlRaw = spiderVod['vod_play_url']?.toString() ?? '';
-      chapters = _parseChaptersFromVodPlayUrl(playUrlRaw);
+      chapters.addAll(_parseChaptersFromVodPlayUrl(playUrlRaw));
     }
 
     if (chapters.isEmpty) {
       final knownEpisodes = (drama['episodes'] as num?)?.toInt() ?? 0;
       final fallbackCount = knownEpisodes > 0 ? knownEpisodes : 0;
       if (fallbackCount > 0) {
+        final episodePrefix = sourceId.isNotEmpty ? '${sourceId}_' : '';
         for (var i = 1; i <= fallbackCount; i++) {
           chapters.add({
-            'id': '$i',
+            'id': '$episodePrefix$i',
             'title': '第 $i 集',
             'index': i,
-            'raw': '$i',
+            'raw': '$episodePrefix$i',
           });
         }
       }
