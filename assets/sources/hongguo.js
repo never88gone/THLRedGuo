@@ -472,8 +472,7 @@ async function home(filter) {
     class: [
       { type_id: "real-drama", type_name: "真人剧" },
       { type_id: "comic-drama", type_name: "漫剧" },
-      { type_id: "ai-drama", type_name: "AI剧" },
-      { type_id: "comic", type_name: "动漫" }
+      { type_id: "ai-drama", type_name: "AI剧" }
     ],
     filters: {}
   };
@@ -481,7 +480,10 @@ async function home(filter) {
 
 async function category(tid, pg, filter, extend) {
   pg = pg || 1;
-  const route = (!tid || tid === "short_play" || tid === "all") ? "real-drama" : tid;
+  let route = (!tid || tid === "short_play" || tid === "all") ? "real-drama" : tid;
+  if (route === "comic") {
+    route = "comic-drama";
+  }
   const url = BASE_URL + "/category/" + route + (pg > 1 ? ("?page=" + pg) : "");
   let items = [];
 

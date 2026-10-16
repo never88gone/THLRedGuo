@@ -102,25 +102,41 @@ public final class DetailViewModel: ObservableObject {
         isLoading = false
     }
 
-    private func parseSeasonNumber(title: String, baseName: String) -> Int {
+    private func parseSeasonNumber(title: String, baseName: String) -> Int? {
         let suffix = title.replacingOccurrences(of: baseName, with: "").trimmingCharacters(in: .whitespaces)
-        let cnMap: [Character: Int] = ["一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10]
-        if let match = suffix.range(of: "第\\s*([0-9零一二两三四五六七八九十百]+)\\s*[季部]", options: .regularExpression) {
-            let sub = String(suffix[match])
-            if let numMatch = sub.range(of: "[0-9]+", options: .regularExpression), let n = Int(sub[numMatch]) {
-                return n
-            }
-            for (ch, val) in cnMap {
-                if sub.contains(ch) { return val }
+        let searchTexts = [suffix, title]
+        let digitMap: [Character: Int] = ["零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9]
+        
+        for text in searchTexts {
+            if let match = text.range(of: "第\\s*([0-9零一二两三四五六七八九十]+)\\s*[季部]", options: .regularExpression) {
+                let sub = String(text[match])
+                if let numMatch = sub.range(of: "[0-9]+", options: .regularExpression), let n = Int(sub[numMatch]) {
+                    return n
+                }
+                if sub.contains("十") {
+                    let parts = sub.components(separatedBy: "十")
+                    let tensPart = parts.first ?? ""
+                    let unitsPart = parts.count > 1 ? parts[1] : ""
+                    var tens = 1
+                    for (ch, val) in digitMap {
+                        if tensPart.contains(ch) { tens = val; break }
+                    }
+                    var units = 0
+                    for (ch, val) in digitMap {
+                        if unitsPart.contains(ch) { units = val; break }
+                    }
+                    return tens * 10 + units
+                }
+                for (ch, val) in digitMap {
+                    if sub.contains(ch) { return val }
+                }
             }
         }
-        if let numMatch = suffix.range(of: "[0-9]+", options: .regularExpression), let n = Int(suffix[numMatch]) {
+        
+        if let match = suffix.range(of: "([0-9]+)$", options: .regularExpression), let n = Int(suffix[match]) {
             return n
         }
-        for (ch, val) in cnMap {
-            if suffix.contains(ch) { return val }
-        }
-        return 1
+        return nil
     }
 
     private func loadSeasons() async {
@@ -150,22 +166,53 @@ public final class DetailViewModel: ObservableObject {
                 return
             }
 
-            let parsed = candidates.map { d -> (drama: Drama, seasonNum: Int) in
+            var rawList = candidates.map { d -> (drama: Drama, seasonNum: Int?) in
                 let sNum = self.parseSeasonNumber(title: d.title, baseName: baseName)
                 return (d, sNum)
-            }.sorted { a, b in
-                if a.seasonNum != b.seasonNum {
-                    return a.seasonNum < b.seasonNum
+            }
+
+            var seenIds = Set<String>()
+            rawList = rawList.filter {
+                if seenIds.contains($0.drama.id) { return false }
+                seenIds.insert($0.drama.id)
+                return true
+            }
+
+            rawList.sort { a, b in
+                switch (a.seasonNum, b.seasonNum) {
+                case let (.some(sa), .some(sb)):
+                    if sa != sb { return sa < sb }
+                    return a.drama.title < b.drama.title
+                case let (.some(sa), .none):
+                    return sa < 1
+                case let (.none, .some(sb)):
+                    return 1 <= sb
+                case (.none, .none):
+                    return a.drama.title < b.drama.title
                 }
-                return a.drama.title < b.drama.title
             }
 
             var items: [SeasonItem] = []
-            var seenIds = Set<String>()
-            for (idx, entry) in parsed.enumerated() {
-                if seenIds.contains(entry.drama.id) { continue }
-                seenIds.insert(entry.drama.id)
-                let actualSeason = entry.seasonNum > 0 ? entry.seasonNum : (idx + 1)
+            var usedSeasonNumbers = Set<Int>()
+            for entry in rawList {
+                if let s = entry.seasonNum, s > 0, !usedSeasonNumbers.contains(s) {
+                    usedSeasonNumbers.insert(s)
+                }
+            }
+
+            var nextAvailableSeason = 1
+            for entry in rawList {
+                let actualSeason: Int
+                if let s = entry.seasonNum, !items.contains(where: { $0.seasonNumber == s }) {
+                    actualSeason = s
+                } else {
+                    while usedSeasonNumbers.contains(nextAvailableSeason) {
+                        nextAvailableSeason += 1
+                    }
+                    actualSeason = nextAvailableSeason
+                    usedSeasonNumbers.insert(actualSeason)
+                }
+
                 let isCurr = entry.drama.id == drama.id
                 let seasonTitle = "第 \(actualSeason) 季"
                 items.append(SeasonItem(

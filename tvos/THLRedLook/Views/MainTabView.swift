@@ -87,6 +87,7 @@ public struct MainTabView: View {
 
         var customDramaId: String? = nil
         var customDramaTitle: String? = nil
+        var customQuery: String? = nil
         if let idx = args.firstIndex(of: "-testDramaId"), idx + 1 < args.count {
             customDramaId = args[idx + 1]
         } else if let envId = ProcessInfo.processInfo.environment["TEST_DRAMA_ID"], !envId.isEmpty {
@@ -96,6 +97,11 @@ public struct MainTabView: View {
             customDramaTitle = args[idx + 1]
         } else if let envTitle = ProcessInfo.processInfo.environment["TEST_DRAMA_TITLE"], !envTitle.isEmpty {
             customDramaTitle = envTitle
+        }
+        if let idx = args.firstIndex(of: "-testQuery"), idx + 1 < args.count {
+            customQuery = args[idx + 1]
+        } else if let envQuery = ProcessInfo.processInfo.environment["TEST_QUERY"], !envQuery.isEmpty {
+            customQuery = envQuery
         }
 
         let defaultDrama = Drama(
@@ -162,6 +168,7 @@ public struct MainTabView: View {
         _isSettingsActiveDemo = State(initialValue: initSettingsActive)
         _catalogInitialCategory = State(initialValue: initCategory)
         _recommendationsCategory = State(initialValue: initRecomCategory)
+        _deepLinkQuery = State(initialValue: customQuery)
     }
 
     public var body: some View {
@@ -394,10 +401,12 @@ public struct MainTabView: View {
             Task {
                 await JSSourceService.shared.initialize()
                 await MainActor.run {
-                    store.addSearchKeyword("总裁")
+                    let q = self.deepLinkQuery ?? "万妖图录"
+                    store.addSearchKeyword(q)
+                    store.addSearchKeyword("万妖图录")
                     store.addSearchKeyword("逆袭")
-                    store.addSearchKeyword("闪婚")
-                    self.deepLinkQuery = "总裁"
+                    store.addSearchKeyword("总裁")
+                    self.deepLinkQuery = q
                 }
             }
         case "library":

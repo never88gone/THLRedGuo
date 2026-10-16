@@ -444,7 +444,6 @@ class DartCoreEngine {
           {'id': 'real-drama', 'name': '真人剧'},
           {'id': 'comic-drama', 'name': '漫剧'},
           {'id': 'ai-drama', 'name': 'AI剧'},
-          {'id': 'comic', 'name': '动漫'},
         ];
       default:
         return const [
@@ -592,9 +591,8 @@ class DartCoreEngine {
     if (source == 'hongguo') {
       targetCat = switch (rawCategory) {
         'short_play' || 'real_drama' || 'real-drama' => 'real-drama',
-        'comic_series' || 'comic-drama' => 'comic-drama',
+        'comic_series' || 'comic-drama' || 'comic' => 'comic-drama',
         'ai_series' || 'ai-drama' => 'ai-drama',
-        'comic' => 'comic',
         _ => 'real-drama',
       };
     } else {
