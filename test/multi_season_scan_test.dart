@@ -1,9 +1,9 @@
+// ignore_for_file: avoid_print
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:THLRedLook/dart_core_engine.dart';
 import 'package:THLRedLook/hongguo_series.dart';
 import 'package:THLRedLook/core_bridge.dart';
-import 'package:THLRedLook/models.dart';
 
 void main() {
   test('扫描首页和分类短剧测试多季切换', () async {

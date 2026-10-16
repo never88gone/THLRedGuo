@@ -340,6 +340,115 @@ async function fetchAppDetail(seriesId) {
   return null;
 }
 
+// 官方 App API 获取指定视频的完整播放流模型（支持全部集数与多清晰度）
+async function fetchAppVideoModel(videoId) {
+  if (!videoId || !/^\d{10,}$/.test(String(videoId))) return null;
+  try {
+    var now = Date.now();
+    var qs = "aid=8662&app_name=novelread&version_code=73532&version_name=7.3.5.32&manifest_version_code=73532&update_version_code=73532&channel=update_64&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&resolution=1280*2772&dpi=520&ac=wifi&device_id=7361909012345678901&iid=7361909012345678902&_rticket=" + now;
+    var body = JSON.stringify({
+      video_id: String(videoId),
+      content_type: 1,
+      biz_param: {
+        need_all_video_definition: true,
+        video_platform: 3
+      }
+    });
+    var headers = signGorgon(qs, body, now);
+    headers["Content-Type"] = "application/json; charset=utf-8";
+
+    var url = APP_API_BASE + "/novel/player/video_model/v1/?" + qs;
+    var resp = await fetch(url, {
+      method: "POST",
+      headers: headers,
+      body: body
+    });
+
+    if (resp) {
+      var raw = typeof resp.text === "function" ? await resp.text() : resp.body;
+      if (raw) {
+        var parsed = safeJsonParse(raw);
+        if (parsed && parsed.data && parsed.data.video_model) {
+          var model = parsed.data.video_model;
+          if (typeof model === "string") {
+            model = safeJsonParse(model);
+          }
+          return model;
+        }
+        return { isError: true, status: resp.status, raw: String(raw).substring(0, 300) };
+      }
+      return { isError: true, status: resp.status, raw: "EMPTY_BODY" };
+    }
+    return { isError: true, status: 0, raw: "NO_RESP" };
+  } catch (err) {
+    return { isError: true, status: -1, raw: String(err) };
+  }
+}
+
+// 从 video_model 中智能提取最佳播放流（自动进行 Base64 解码，优选 H.264 兼容编码）
+function extractStreamFromVideoModel(model) {
+  if (!model) return "";
+  var variants = [];
+  if (Array.isArray(model.video_list)) {
+    variants = model.video_list;
+  } else if (model.video_list && typeof model.video_list === "object") {
+    var keys = Object.keys(model.video_list);
+    for (var i = 0; i < keys.length; i++) {
+      variants.push(model.video_list[keys[i]]);
+    }
+  }
+
+  function resolveAddress(addr) {
+    if (!addr || typeof addr !== "string") return "";
+    var s = addr.trim();
+    if (!s.startsWith("http://") && !s.startsWith("https://")) {
+      var dec = safeBase64Decode(s);
+      if (dec && (dec.startsWith("http://") || dec.startsWith("https://"))) {
+        s = dec.trim();
+      }
+    }
+    if (s.startsWith("http://") || s.startsWith("https://")) {
+      return s;
+    }
+    return "";
+  }
+
+  var candidates = [];
+  for (var i = 0; i < variants.length; i++) {
+    var item = variants[i];
+    if (!item) continue;
+    var meta = item.video_meta || {};
+    var codec = String(meta.codec_type || "").toLowerCase();
+    // 忽略 bytevc2 等部分系统不兼容的编码
+    if (codec.includes("bytevc2")) continue;
+
+    var keys = ["main_url", "backup_url", "backup_url_1", "backup_url_2", "url_list"];
+    for (var j = 0; j < keys.length; j++) {
+      var rawVal = item[keys[j]];
+      if (Array.isArray(rawVal)) {
+        for (var k = 0; k < rawVal.length; k++) {
+          var u = resolveAddress(rawVal[k]);
+          if (u) candidates.push({ url: u, codec: codec });
+        }
+      } else if (typeof rawVal === "string") {
+        var u = resolveAddress(rawVal);
+        if (u) candidates.push({ url: u, codec: codec });
+      }
+    }
+  }
+
+  // 优先选择 h264 / avc1 标准编码
+  for (var i = 0; i < candidates.length; i++) {
+    if (candidates[i].codec === "h264" || candidates[i].codec === "avc1") {
+      return candidates[i].url;
+    }
+  }
+  if (candidates.length > 0) {
+    return candidates[0].url;
+  }
+  return "";
+}
+
 function parseJsonFromHtml(body) {
   if (!body) return null;
   const marker = /(?:window\.)?_ROUTER_DATA\s*=\s*(\{)/.exec(body);
@@ -728,7 +837,25 @@ async function play(flag, id, flags) {
 
   let realStreamUrl = "";
 
-  // 3. 若拥有有效的播放页地址或具体分集 vid，请求播放页解析官方原生真实流（含 Base64 地址自动解码）
+  // 3. 官方 App 专有播放模型 (video_model)：最高优先级，保证全集（包括后半部分集数）全覆盖与高清流
+  if (itemId && !isCorruptedId(itemId)) {
+    const model = await fetchAppVideoModel(itemId);
+    if (model && !model.isError) {
+      const appStream = extractStreamFromVideoModel(model);
+      if (appStream) {
+        return {
+          parse: 0,
+          url: appStream,
+          header: {
+            "User-Agent": USER_AGENT,
+            "Referer": "https://novel.snssdk.com/"
+          }
+        };
+      }
+    }
+  }
+
+  // 4. 若 App 专用接口未取到流，回退走网页播放页解析官方原生真实流（含 Base64 地址自动解码）
   if (playerPageUrl || (itemId && !isCorruptedId(itemId))) {
     const targetUrl = playerPageUrl || (BASE_URL + "/player/" + (seriesId || itemId) + "/" + itemId);
     try {
@@ -894,7 +1021,6 @@ var spider = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = spider;
 }
-
 ''',
   ),
 ];

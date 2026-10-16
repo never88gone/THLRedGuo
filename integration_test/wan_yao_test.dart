@@ -84,8 +84,62 @@ void main() {
     }
     expect(find.textContaining('无法从数据源'), findsNothing);
 
-    // 5. 验证播放器面板中的系列多季切季交互与提示浮层快速消失
-    print('>>> [6/6] 验证系列多季切换与底部提示浮层');
+    // 5. 观察第 1 集起播状态
+    print('>>> [5/8] 观察第 1 集起播状态...');
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(find.textContaining('无法从数据源'), findsNothing);
+    expect(find.text('暂时无法播放'), findsNothing);
+    print('>>> 第 1 集起播正常');
+
+    // 6. 多集连续选集切换测试（第2集、第3集）
+    print('>>> [6/8] 测试选集面板多集切换验证');
+    final episodesToTest = [2, 3];
+    for (final epNum in episodesToTest) {
+      print('>>> 正在切换到第 $epNum 集...');
+      final epFinder = find.byKey(ValueKey('play-episode-$epNum'));
+      expect(epFinder, findsOneWidget, reason: '选集面板中应能找到第 $epNum 集按钮');
+      await tester.tap(epFinder);
+
+      // 等待切换与起播
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      expect(find.textContaining('无法从数据源'), findsNothing);
+      expect(find.text('暂时无法播放'), findsNothing, reason: '第 $epNum 集应可正常播放');
+      print('>>> 第 $epNum 集切换并播放正常');
+    }
+
+    // 7. 测试未部署公开流分集（第6集）的异常防护与界面自愈
+    print('>>> [7/8] 测试未公开流集数（第 6 集）点击防护与自愈恢复');
+    final ep6Finder = find.byKey(const ValueKey('play-episode-6'));
+    if (ep6Finder.evaluate().isNotEmpty) {
+      print('>>> 点击第 6 集（未部署公开流集数）');
+      await tester.tap(ep6Finder);
+
+      // 观察播放器处理该请求：确保无论底层网络流如何，UI 绝不闪退崩溃
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      expect(find.byType(PlayerScreen), findsOneWidget, reason: '应用在遇到未公开流时应稳健运行不崩溃');
+      print('>>> 第 6 集点击响应正常，UI 保持稳健');
+
+      // 自愈测试：点击可用集数（第 1 集），验证播放自愈恢复
+      print('>>> 触发自愈测试：点击回第 1 集');
+      final ep1BtnFinder = find.byKey(const ValueKey('play-episode-1'));
+      expect(ep1BtnFinder, findsOneWidget);
+      await tester.tap(ep1BtnFinder);
+
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      expect(find.textContaining('无法从数据源'), findsNothing);
+      print('>>> 播放器自愈成功，第 1 集已恢复正常播放');
+    }
+
+    // 8. 验证播放器面板中的系列多季切季交互与提示浮层快速消失
+    print('>>> [8/8] 验证系列多季切换与底部提示浮层');
     // 等待系列多季异步发现完成并渲染
     for (var i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 500));
