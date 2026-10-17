@@ -183,7 +183,7 @@ node scripts/verify_hongguo_live.mjs
 
 Swift 桥接检查需要 macOS 与 Xcode。真实源脚本将报告写入 `build/verification/hongguo-live.json`，存在无流或失效媒体时返回非零退出码。它只验证元数据和 HEAD，不验证视频内容、解码、首帧或持续播放。旧有多季/播放诊断脚本含实时网络请求，本轮未将其“链接非空”的断言作为全集可播证据。
 
-开发验证启动 Flutter 时必须传 `--dart-define=DISABLE_REMOTE_IMAGES=true`；启动 tvOS 验证时设置环境变量 `DISABLE_REMOTE_IMAGES=1`。
+开发验证启动 Flutter 时必须传 `--dart-define=DISABLE_REMOTE_IMAGES=true`；启动 tvOS 验证时将 `DISABLE_REMOTE_IMAGES=1` 显式传入实际 App 进程，不能只依赖构建工具的默认配置。本轮修复后已重新启动详情页，确认 73 集数据正常加载且图片缓存文件数为 0。
 
 ## 优先级待办
 
