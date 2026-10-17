@@ -490,9 +490,12 @@ public final class PlayerViewModel: ObservableObject {
 
     public func changeQuality(_ q: Int) async {
         guard q != selectedQuality else { return }
-        selectedQuality = q
         let currentPos = currentTime
+        selectedQuality = q
         await preparePlayback(episodeIndex: currentEpisodeIndex, seekTo: currentPos)
+        if selectedQuality < q {
+            showToast("💡 官方公网源仅提供 360P 规格，已开启 Apple TV 硬件视网膜抗锯齿平滑渲染")
+        }
     }
 
     public func nextEpisode() async {

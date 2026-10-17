@@ -52,6 +52,9 @@ public class PlayerContainerView: UIView {
         isUserInteractionEnabled = false
         playerLayer.videoGravity = .resizeAspect
         playerLayer.backgroundColor = UIColor.clear.cgColor
+        playerLayer.magnificationFilter = .trilinear
+        playerLayer.minificationFilter = .trilinear
+        playerLayer.contentsScale = UIScreen.main.scale
     }
 
     public override func layoutSubviews() {
