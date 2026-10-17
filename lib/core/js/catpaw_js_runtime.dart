@@ -39,7 +39,15 @@ class CatPawPlayResult {
   final String url;
   final Map<String, String> header;
   final int parse;
-  const CatPawPlayResult({required this.url, required this.header, this.parse = 0});
+  final int quality;
+  final List<int> qualities;
+  const CatPawPlayResult({
+    required this.url,
+    required this.header,
+    this.parse = 0,
+    this.quality = 0,
+    this.qualities = const [],
+  });
 }
 
 class CatPawSearchResult {
@@ -59,8 +67,8 @@ class CatPawJsRuntime {
   Completer<void>? _evalDrainCompleter;
 
   CatPawJsRuntime([http.Client? client])
-      : _httpClient = client ?? http.Client(),
-        _isOwnedClient = client == null;
+    : _httpClient = client ?? http.Client(),
+      _isOwnedClient = client == null;
 
   bool get isReady => _ready;
   bool get isDisposed => _isDisposed;
@@ -204,7 +212,10 @@ if (typeof console === 'undefined') {
         };
       } finally {
         _activeRequests--;
-        if (_isDisposed && _activeRequests == 0 && _drainCompleter != null && !_drainCompleter!.isCompleted) {
+        if (_isDisposed &&
+            _activeRequests == 0 &&
+            _drainCompleter != null &&
+            !_drainCompleter!.isCompleted) {
           _drainCompleter!.complete();
         }
       }
@@ -249,7 +260,10 @@ if (typeof console === 'undefined') {
     final map = (res is Map) ? res : {};
     final list = _toListOfMaps(map['list'] ?? []);
     final pg = (map['page'] as num?)?.toInt() ?? page;
-    final pageCount = (map['pagecount'] as num?)?.toInt() ?? (map['pageCount'] as num?)?.toInt() ?? 1;
+    final pageCount =
+        (map['pagecount'] as num?)?.toInt() ??
+        (map['pageCount'] as num?)?.toInt() ??
+        1;
     final limit = (map['limit'] as num?)?.toInt() ?? 20;
     final total = (map['total'] as num?)?.toInt() ?? 0;
     return CatPawCategoryResult(
@@ -269,14 +283,22 @@ if (typeof console === 'undefined') {
     );
     final map = (res is Map) ? res : {};
     dynamic vod = map['vod'];
-    if (vod == null && map['list'] is List && (map['list'] as List).isNotEmpty) {
+    if (vod == null &&
+        map['list'] is List &&
+        (map['list'] as List).isNotEmpty) {
       vod = (map['list'] as List).first;
     }
     vod ??= map;
-    return CatPawDetailResult(vod: Map<String, dynamic>.from(vod is Map ? vod : {'vod_id': id}));
+    return CatPawDetailResult(
+      vod: Map<String, dynamic>.from(vod is Map ? vod : {'vod_id': id}),
+    );
   }
 
-  Future<CatPawPlayResult> play(String flag, String id, {List<dynamic>? flags}) async {
+  Future<CatPawPlayResult> play(
+    String flag,
+    String id, {
+    List<dynamic>? flags,
+  }) async {
     _assertReady();
     final flagsJson = jsonEncode(flags ?? []);
     final res = await _evalAsync(
@@ -292,10 +314,25 @@ if (typeof console === 'undefined') {
         if (k != null && v != null) header[k.toString()] = v.toString();
       });
     }
-    return CatPawPlayResult(url: url, header: header, parse: parse);
+    return CatPawPlayResult(
+      url: url,
+      header: header,
+      parse: parse,
+      quality: (map['quality'] as num?)?.toInt() ?? 0,
+      qualities:
+          (map['qualities'] is List ? map['qualities'] as List : const [])
+              .whereType<num>()
+              .map((value) => value.toInt())
+              .where((value) => value > 0)
+              .toList(),
+    );
   }
 
-  Future<CatPawSearchResult> search(String keyword, {bool quick = false, int page = 1}) async {
+  Future<CatPawSearchResult> search(
+    String keyword, {
+    bool quick = false,
+    int page = 1,
+  }) async {
     _assertReady();
     final res = await _evalAsync(
       'typeof spider !== "undefined" && typeof spider.search === "function" ? spider.search(${jsonEncode(keyword)}, $quick, $page) : []',
@@ -311,7 +348,10 @@ if (typeof console === 'undefined') {
 
   Future<void> _evalQueue = Future.value();
 
-  Future<dynamic> _evalAsync(String jsCode, {Duration timeout = const Duration(seconds: 15)}) async {
+  Future<dynamic> _evalAsync(
+    String jsCode, {
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
     _assertReady();
     final prevQueue = _evalQueue;
     final queueCompleter = Completer<void>();
@@ -323,19 +363,16 @@ if (typeof console === 'undefined') {
 
     _activeEvals++;
     try {
-      final evalResult = _rt.evaluate('__evalAsync(function() { return ($jsCode); })');
+      final evalResult = _rt.evaluate(
+        '__evalAsync(function() { return ($jsCode); })',
+      );
       if (evalResult.isError) {
         throw Exception('JS 表达式执行失败: ${evalResult.rawResult}');
       }
 
-      JsEvalResult resolved;
-      if (evalResult.stringResult == '[object Promise]') {
-        resolved = await _rt.handlePromise(evalResult, timeout: timeout);
-        if (resolved.isError) {
-          throw Exception('JS Promise 异常: ${resolved.rawResult}');
-        }
-      } else {
-        resolved = evalResult;
+      final resolved = await _rt.handlePromise(evalResult, timeout: timeout);
+      if (resolved.isError) {
+        throw Exception('JS Promise 异常: ${resolved.rawResult}');
       }
 
       final raw = resolved.stringResult;
@@ -361,7 +398,10 @@ if (typeof console === 'undefined') {
     } finally {
       queueCompleter.complete();
       _activeEvals--;
-      if (_isDisposed && _activeEvals == 0 && _evalDrainCompleter != null && !_evalDrainCompleter!.isCompleted) {
+      if (_isDisposed &&
+          _activeEvals == 0 &&
+          _evalDrainCompleter != null &&
+          !_evalDrainCompleter!.isCompleted) {
         _evalDrainCompleter!.complete();
       }
     }
@@ -369,17 +409,24 @@ if (typeof console === 'undefined') {
 
   List<Map<String, dynamic>> _toListOfMaps(dynamic raw) {
     if (raw is! List) return [];
-    return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   List<Map<String, dynamic>> _parseFilters(dynamic raw) {
     if (raw is List) {
-      return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return raw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     } else if (raw is Map) {
-      return raw.entries.map((e) => <String, dynamic>{
-        'key': e.key.toString(),
-        'value': e.value,
-      }).toList();
+      return raw.entries
+          .map(
+            (e) => <String, dynamic>{'key': e.key.toString(), 'value': e.value},
+          )
+          .toList();
     }
     return [];
   }
@@ -393,12 +440,12 @@ if (typeof console === 'undefined') {
 globalThis.__evalAsync = async function(fn) {
   try {
     var res = await fn();
-    return res;
+    return JSON.stringify(res);
   } catch (e) {
-    return {
+    return JSON.stringify({
       __error: true,
       message: e ? (e.message || String(e)) : "Unknown JS error"
-    };
+    });
   }
 };
 ''';
@@ -681,7 +728,7 @@ class CatPawRuntimePool {
   bool _isDisposed = false;
 
   CatPawRuntimePool([http.Client? httpClient])
-      : _httpClient = httpClient ?? http.Client();
+    : _httpClient = httpClient ?? http.Client();
 
   bool get isDisposed => _isDisposed;
 

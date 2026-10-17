@@ -41,12 +41,6 @@ public final class PlayerViewModel: ObservableObject {
     private var prefetchedNextPlan: PlaybackPlan?
     private var prefetchedNextEpisodeIndex: Int?
 
-    // 智能救流引擎：当目标分集公网流 404 或失效时，无缝降级续播可用流，绝不中断播放弹窗
-    private var lastWorkingStreamURL: URL?
-    private var lastWorkingHeaders: [String: String] = [:]
-    private var hasAttemptedRescue: Bool = false
-    private var isRescuedStream: Bool = false
-
     public init(
         drama: Drama,
         allEpisodes: [Episode],
@@ -152,75 +146,11 @@ public final class PlayerViewModel: ObservableObject {
         }
     }
 
-    private func triggerStreamRescue(seekTo: Double) {
-        NSLog("🎬 [PlayerVM] 启动智能救流引擎，为第%d集寻找可用精彩试看流...", currentEpisodeIndex)
-        isLoading = true
-        errorMessage = nil
-        isRescuedStream = true
-
-        Task { [weak self] in
-            guard let self = self else { return }
-
-            // 1. 如果已有之前成功播放过的流（比如第 1 集），直接复用
-            if let workingURL = self.lastWorkingStreamURL {
-                NSLog("🎬 [PlayerVM] [救流成功] 复用前序已验证工作流: %@", workingURL.absoluteString)
-                await MainActor.run {
-                    var opts: [String: Any]? = nil
-                    if !self.lastWorkingHeaders.isEmpty {
-                        opts = ["AVURLAssetHTTPHeaderFieldsKey": self.lastWorkingHeaders]
-                    }
-                    let asset = AVURLAsset(url: workingURL, options: opts)
-                    let item = AVPlayerItem(asset: asset)
-                    self.startPlaybackWithItem(item: item, seekTo: 0)
-                    self.showToast("💡 当前集公网流转码优化中，已为您无缝呈现精彩试看")
-                }
-                return
-            }
-
-            // 2. 如果尚未有工作流，尝试异步解析第 1 集作为试看流
-            let firstEp = self.allEpisodes.first
-            if let rescuePlan = try? await self.repository.resolvePlayback(
-                drama: self.drama,
-                episode: firstEp,
-                episodeIndex: 1,
-                quality: self.selectedQuality
-            ), let rescueURL = URL(string: rescuePlan.url), !rescuePlan.url.isEmpty, !rescuePlan.url.contains("example.com") {
-                NSLog("🎬 [PlayerVM] [救流成功] 动态获取第 1 集试看流: %@", rescuePlan.url)
-                await MainActor.run {
-                    self.lastWorkingStreamURL = rescueURL
-                    self.lastWorkingHeaders = rescuePlan.headers
-                    var opts: [String: Any]? = nil
-                    if !rescuePlan.headers.isEmpty {
-                        opts = ["AVURLAssetHTTPHeaderFieldsKey": rescuePlan.headers]
-                    }
-                    let asset = AVURLAsset(url: rescueURL, options: opts)
-                    let item = AVPlayerItem(asset: asset)
-                    self.startPlaybackWithItem(item: item, seekTo: 0)
-                    self.showToast("💡 当前集公网流转码优化中，已为您无缝呈现精彩试看")
-                }
-                return
-            }
-
-            // 3. 终极兜底：使用官方公网高保真短剧媒体流（确保画面永远在播放，绝不黑屏报错）
-            if let fallbackPublicURL = URL(string: "https://hongguoduanju.com/video/public/7694898085759028248/360p.mp4") {
-                NSLog("🎬 [PlayerVM] [救流成功] 使用公共高保真短剧媒体流兜底")
-                await MainActor.run {
-                    let asset = AVURLAsset(url: fallbackPublicURL)
-                    let item = AVPlayerItem(asset: asset)
-                    self.startPlaybackWithItem(item: item, seekTo: 0)
-                    self.showToast("💡 当前集公网流转码优化中，已为您无缝呈现精彩试看")
-                }
-            }
-        }
-    }
-
     public func preparePlayback(episodeIndex: Int, seekTo: Double = 0) async {
         configureAudioSession()
         isLoading = true
         errorMessage = nil
         currentEpisodeIndex = episodeIndex
-        hasAttemptedRescue = false
-        isRescuedStream = false
         
         prefetchTask?.cancel()
         prefetchTask = nil
@@ -314,11 +244,6 @@ public final class PlayerViewModel: ObservableObject {
             }
         } catch {
             NSLog("🎬 [PlayerVM] preparePlayback 异常: %@", error.localizedDescription)
-            if !self.hasAttemptedRescue {
-                self.hasAttemptedRescue = true
-                self.triggerStreamRescue(seekTo: seekTo)
-                return
-            }
             errorMessage = error.localizedDescription
             isLoading = false
         }
@@ -339,10 +264,6 @@ public final class PlayerViewModel: ObservableObject {
                     self.isLoading = false
                     self.isPlaying = true
                     self.errorMessage = nil
-                    if !self.isRescuedStream, let curItemAsset = currentItem.asset as? AVURLAsset {
-                        self.lastWorkingStreamURL = curItemAsset.url
-                        NSLog("🎬 [PlayerVM] 成功记录有效工作流备用: %@", curItemAsset.url.absoluteString)
-                    }
                     let dur = currentItem.duration.seconds
                     let pSize = currentItem.presentationSize
                     NSLog("🎬 [PlayerVM] item.readyToPlay: duration=%.2f, presentationSize=%.0fx%.0f, tracksCount=%ld", dur, pSize.width, pSize.height, currentItem.tracks.count)
@@ -375,11 +296,8 @@ public final class PlayerViewModel: ObservableObject {
                 case .failed:
                     let err = currentItem.error?.localizedDescription ?? "视频流加载失败"
                     NSLog("🎬 [PlayerVM] item.failed: %@", err)
-                    if !self.hasAttemptedRescue {
-                        self.hasAttemptedRescue = true
-                        self.triggerStreamRescue(seekTo: seekTo)
-                        return
-                    }
+                    self.player?.pause()
+                    self.isPlaying = false
                     self.isLoading = false
                     self.errorMessage = err
                 default:

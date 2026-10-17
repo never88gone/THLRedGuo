@@ -1,5 +1,7 @@
 # 糖葫芦Haw (THLRedLook)
 
+> 当前为 `1.0.1-dev.1+262901332` 开发快照。2026-10-17 已恢复集中验证；App 全集取流尚未打通，不作为全平台通过验收的版本。具体结果见下方“集中验证记录”。
+
 > ⚠️ **免责声明**：本项目仅供编程学习与个人技术研究使用。代码中所有接口与解析逻辑均在设备端侧沙箱中独立执行，请勿用于任何商业用途。
 
 **糖葫芦Haw**（工程标识：`THLRedLook`，包名 / Application ID：`com.never88gone.redlook`）是一款基于 **Flutter + 纯 Dart 高性能核心引擎** 与 **Apple tvOS 原生 SwiftUI** 打造的全平台独立流媒体与短剧聚合应用。
@@ -61,7 +63,7 @@
 | **iOS** | 适配 iPhone / iPad，支持深色模式自适应、原生手势返回与后台低功耗下载 | Xcode 编译签名，输出 IPA 归档 |
 | **macOS** | 桌面端大屏响应式三栏/分栏布局，键盘方向键与快捷键全面支持 | macOS App / PKG 安装包 |
 | **Windows** | 基于 `media_kit` / libmpv 硬件解码，独家集成专属 Shader 画质增强滤镜 | 独立免安装绿色包 / 便携目录（含完整 DLL 与运行环境） |
-| **Apple tvOS** | 独立原生工程（`tvos/`），纯 SwiftUI + Siri Remote 焦点引擎 + AVKit 原生渲染打造，具备完整多季切换、分页分块、智能救流容错引擎（404自动平滑试看续播）与客厅原生影院体验 | 独立 Xcode 工程，输出 tvOS IPA |
+| **Apple tvOS** | 独立原生工程（`tvos/`），纯 SwiftUI + Siri Remote 焦点引擎 + AVKit 原生渲染打造，具备完整多季切换、分页分块、分集取流失败提示与显式重试与客厅原生影院体验 | 独立 Xcode 工程，输出 tvOS IPA |
 
 ---
 
@@ -116,7 +118,7 @@ THLRedLook
 ## 开发与本地构建
 
 ### 环境准备
-- **Flutter SDK**：3.47.x+（推荐使用 `fvm`）
+- **Flutter SDK**：3.44.9+（本轮使用 Dart 3.12.2，推荐使用 `fvm`）
 - **Python**：3.10+（用于运行工程工具链脚本）
 - **平台依赖**：
   - Android：JDK 17+、Android SDK 36
@@ -134,3 +136,61 @@ flutter pub get
 flutter run
 ```
 
+
+
+## 集中验证记录（2026-10-17）
+
+本轮按用户要求恢复自动化验证。使用仓库内唯一官方源 `assets/sources/hongguo.js`，版本升至 1.0.4；Flutter 和 tvOS 内嵌内容通过脚本保持一致。站源图片始终关闭，离线用例只使用合成响应，真实媒体探测仅使用 HEAD。
+
+| 验证范围 | 本轮结果 | 能证明的范围 |
+| :--- | :--- | :--- |
+| Flutter 静态检查 | `flutter analyze` 通过 | 当前源码无分析问题 |
+| Flutter 离线自动化 | 48 项通过 | 官方 Spider、引擎调度、存储、系列识别、播放失败、模型与局域网协议等合成数据场景 |
+| Android 设备端运行时 | 2 项通过，Android 17 / arm64 / 16KB 页模拟器 | QuickJS 元数据、网络桥接、精确分集 ID、Base64 模型、失败与重试 |
+| Android 构建与启动 | Debug APK 构建、安装和启动通过；真实首页、73 集详情及首集解码初始化通过 | 首集实测 360×640、时长约 175 秒；不等同于所有机型、后台任务或全集播放通过 |
+| Swift 原生桥接 | 5 项通过，macOS 上编译执行实际 `NativeBridge.swift` | 合成分类、含引号搜索、分集、Base64 模型、实际清晰度与失败拒绝；不代替 tvOS 播放器测试 |
+| tvOS 26.5 模拟器 | 编译、安装、启动、真实首页与 73 集详情数据加载通过 | 遥控焦点、真机解码和全集播放尚未完成验收；仍有既有弃用/并发警告 |
+| 真实官方源抽检 | 31 项中 19 项通过、12 项失败 | 3 类目录、3 组关键词、6 部剧详情及每部首/中/末集的元数据和媒体 HEAD 探测；中后集存在 404 或无流 |
+| Windows / Android TV / iOS | 本轮未进行设备验证 | 不因共用代码或模型用例而标记通过 |
+
+关键修复：
+
+- Android/Windows 的 QuickJS Promise 会以 Dart Future 返回；现已统一等待并在 JS 边界序列化，修复 Android 首页空列表。
+- 保留 HTTPS 协议、端口和查询参数；末尾为 `000` 的合法长 ID 不再被丢弃。
+- 公共 360P 兜底地址需经 HEAD 确认为视频；失败时不返回拼接的假链接，未知清晰度不伪装为 1080P。
+- 未知权限不再默认把第 4 集起标成受限；tvOS 不再把其他集或固定样片替代当前集，也不再生成 20 个假分集。
+- Flutter/tvOS 源内容增加同步检查，tvOS 搜索参数采用 JSON 序列化，并修正原生剧集 ID 与源 ID 的映射。
+
+App 逆向研究在独立 `thlredguojs` 仓库维护，未把 APK、DEX、反编译代码或其他源放入本项目。已核对提供的 APK 版本和请求类；详情接口返回完整分集表，播放模型和探索性的 App 搜索请求仍返回 HTTP 200 空响应。签名、设备会话和完整 App 搜索尚未验证，不能宣称已经补齐 App 全片库。
+
+### 重跑命令
+
+```bash
+python3 scripts/sync_hongguo_source.py --check
+flutter analyze
+flutter test --concurrency=1 \
+  test/hongguo_spider_test.dart \
+  test/hongguo_playback_regression_test.dart \
+  test/dart_core_engine_test.dart \
+  test/local_store_test.dart test/hongguo_series_test.dart \
+  test/tvos_cross_platform_contract_test.dart \
+  test/notice_snackbar_test.dart test/lan_sync_test.dart
+flutter test integration_test/hongguo_runtime_test.dart -d <设备ID> \
+  --dart-define=DISABLE_REMOTE_IMAGES=true
+python3 scripts/verify_tvos_bridge.py
+node scripts/verify_hongguo_live.mjs
+```
+
+Swift 桥接检查需要 macOS 与 Xcode。真实源脚本将报告写入 `build/verification/hongguo-live.json`，存在无流或失效媒体时返回非零退出码。它只验证元数据和 HEAD，不验证视频内容、解码、首帧或持续播放。旧有多季/播放诊断脚本含实时网络请求，本轮未将其“链接非空”的断言作为全集可播证据。
+
+开发验证启动 Flutter 时必须传 `--dart-define=DISABLE_REMOTE_IMAGES=true`；启动 tvOS 验证时设置环境变量 `DISABLE_REMOTE_IMAGES=1`。
+
+## 优先级待办
+
+1. **P0 / App 接口**：取得官方 App 成功取流的运行时对照，核对公共参数、签名和会话；在 `thlredguojs` 完成 App 搜索、分页与响应映射的验证，再接入唯一官方源。
+2. **P0 / Android 与 Windows**：集中验证搜索、详情、选集、真实解码、错误重试和多季切换；补齐中间集、末集的真实播放证据。
+3. **P1 / Android TV 与 tvOS**：集中完成遥控焦点、分集分页、返回行为、真机解码与长时间连播验证。
+4. **P2 / 下载与其他功能**：在在线播放闭环通过后验证下载中断恢复、合并、离线播放、隐私及跨端同步的实际行为。
+5. **P3 / iOS**：单独验证原生媒体库权限和后台任务限制。
+
+仅保留当前 Git 仓库源码与提交记录；不生成源码压缩包，不恢复 `guoapp` 镜像同步。

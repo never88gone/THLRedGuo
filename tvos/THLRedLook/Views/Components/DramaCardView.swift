@@ -26,6 +26,7 @@ public struct PosterArtworkView: View {
     }
 
     private var normalizedCoverURL: URL? {
+        guard ProcessInfo.processInfo.environment["DISABLE_REMOTE_IMAGES"] != "1" else { return nil }
         var str = drama.cover.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !str.isEmpty else { return nil }
         if str.hasPrefix("//") {

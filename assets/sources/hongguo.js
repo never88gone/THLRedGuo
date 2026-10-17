@@ -1,13 +1,13 @@
 /**
  * 官方免费短剧 CatPawOpen Spider (hongguo.js)
- * 适配 CatPawOpen / CatVodOpen 标准规范 v1.0.3
+ * 适配 CatPawOpen / CatVodOpen 标准规范 v1.0.4
  * 支持官方 App API 与 Web 路由双轨容错解析
  */
 
 const meta = {
   id: "hongguo",
   name: "官方免费短剧",
-  version: "1.0.3",
+  version: "1.0.4",
   description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
   author: "社区开发者",
   type: "video",
@@ -52,6 +52,21 @@ function safeBase64Decode(str) {
     if (typeof atob === "function") {
       return atob(trimmed);
     }
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const normalized = trimmed.replace(/\s/g, "").replace(/-/g, "+").replace(/_/g, "/");
+    if (/[^A-Za-z0-9+/=]/.test(normalized)) return "";
+    let bits = 0;
+    let value = 0;
+    let result = "";
+    for (let i = 0; i < normalized.length && normalized[i] !== "="; i++) {
+      value = (value << 6) | alphabet.indexOf(normalized[i]);
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        result += String.fromCharCode((value >>> bits) & 255);
+      }
+    }
+    return result;
   } catch (_) {}
   return "";
 }
@@ -310,7 +325,7 @@ async function fetchAppDetail(seriesId) {
   return null;
 }
 
-// 官方 App API 获取指定视频的完整播放流模型（支持全部集数与多清晰度）
+// 官方 App API 获取指定视频的完整播放流模型
 async function fetchAppVideoModel(videoId) {
   if (!videoId || !/^\d{10,}$/.test(String(videoId))) return null;
   try {
@@ -608,12 +623,13 @@ async function detail(id) {
     cover = appData.series_cover || appData.cover || "";
     desc = cleanText(appData.series_intro || appData.video_desc || appData.intro || appData.desc);
     epTotalCount = Number(appData.episode_cnt || 0);
+    accessibleCount = Number(appData.accessible_episode_cnt || appData.accessible_count || 0);
 
     if (Array.isArray(appData.video_list) && appData.video_list.length > 0) {
       for (let i = 0; i < appData.video_list.length; i++) {
         const item = appData.video_list[i];
         const vid = item.vid || item.video_id;
-        if (vid && !String(vid).endsWith("000")) {
+        if (vid) {
           vidList.push(String(vid));
         }
       }
@@ -645,10 +661,11 @@ async function detail(id) {
               if (sCover && !cover) cover = sCover;
               const sDesc = cleanText(sDetail.series_intro || sDetail.intro || sDetail.abstract || sDetail.desc);
               if (sDesc && !desc) desc = sDesc;
+              accessibleCount = Number(sDetail.accessible_episode_cnt || 0);
               if (Array.isArray(sDetail.vid_list) && sDetail.vid_list.length > 0) {
                 for (let j = 0; j < sDetail.vid_list.length; j++) {
                   const v = String(sDetail.vid_list[j]);
-                  if (!v.endsWith("000")) vidList.push(v);
+                  if (v) vidList.push(v);
                 }
                 break;
               }
@@ -667,7 +684,7 @@ async function detail(id) {
           if (vidMatch && vidMatch[1]) {
             const ids = vidMatch[1].match(/\d{15,}/g);
             if (ids && ids.length > 0) {
-              vidList = ids.filter(function(v) { return !v.endsWith("000"); });
+              vidList = ids.filter(Boolean);
             }
           }
         }
@@ -737,7 +754,7 @@ async function detail(id) {
         vod_remarks: remarks,
         vod_play_from: "官方直链",
         vod_play_url: epUrls.join("#"),
-        accessible_count: accessibleCount > 0 ? accessibleCount : (epUrls.length > 3 ? 3 : epUrls.length)
+        accessible_count: accessibleCount
       }
     ]
   };
@@ -745,9 +762,7 @@ async function detail(id) {
 
 async function play(flag, id, flags) {
   let playTarget = (id || "").toString().trim();
-  if (playTarget.includes(":")) {
-    playTarget = playTarget.split(":").pop().trim();
-  }
+  playTarget = playTarget.replace(/^hongguo:/, "");
 
   // 若已经是完整的 mp4 / m3u8 网络媒体直链，直接返回
   if (playTarget.startsWith("http") && (playTarget.includes(".mp4") || playTarget.includes(".m3u8"))) {
@@ -767,7 +782,7 @@ async function play(flag, id, flags) {
   let playerPageUrl = "";
 
   const isCorruptedId = function(s) {
-    return !s || /000$/.test(s);
+    return !s;
   };
 
   // 1. 优先从 /player/ 路由中精确提取 seriesId 与 itemId
@@ -808,17 +823,17 @@ async function play(flag, id, flags) {
   if (!itemId && seriesId && !isCorruptedId(seriesId)) {
     const appDetail = await fetchAppDetail(seriesId);
     if (appDetail && Array.isArray(appDetail.video_list) && appDetail.video_list.length > 0) {
-      const idx = Math.max(0, Math.min(episodeIndex - 1, appDetail.video_list.length - 1));
+      const idx = episodeIndex - 1;
       const targetEp = appDetail.video_list[idx];
-      if (targetEp && targetEp.vid && !isCorruptedId(targetEp.vid)) {
-        itemId = String(targetEp.vid);
+      if (targetEp && (targetEp.vid || targetEp.video_id)) {
+        itemId = String(targetEp.vid || targetEp.video_id);
       }
     }
   }
 
   let realStreamUrl = "";
 
-  // 3. 官方 App 专有播放模型 (video_model)：最高优先级，保证全集（包括后半部分集数）全覆盖与高清流
+  // 3. 官方 App 专有播放模型 (video_model)：优先尝试，失败时继续解析网页
   if (itemId && !isCorruptedId(itemId)) {
     const model = await fetchAppVideoModel(itemId);
     if (model && !model.isError) {
@@ -886,8 +901,16 @@ async function play(flag, id, flags) {
     } catch (_) {}
 
     // D. 网页未提取到流时，回退到官方公共媒体地址（注意：必须基于真实分集 vid，绝不使用 seriesId）
-    if (!realStreamUrl && itemId && !isCorruptedId(itemId) && /^\d+$/.test(itemId)) {
-      realStreamUrl = BASE_URL + "/video/public/" + itemId + "/360p.mp4";
+    if (!realStreamUrl && itemId && /^\d+$/.test(itemId)) {
+      const candidate = BASE_URL + "/video/public/" + itemId + "/360p.mp4";
+      try {
+        const check = await fetch(candidate, { method: "HEAD", headers: { "User-Agent": USER_AGENT } });
+        const contentType = check && check.headers && (typeof check.headers.get === "function"
+          ? check.headers.get("content-type") : check.headers["content-type"]);
+        if (check && (check.status === 200 || check.status === 206) && /^video\//i.test(contentType || "")) {
+          realStreamUrl = candidate;
+        }
+      } catch (_) {}
     }
   }
 
@@ -909,8 +932,8 @@ async function play(flag, id, flags) {
       "User-Agent": USER_AGENT,
       "Referer": exactReferer
     },
-    quality: 720,
-    qualities: [1080, 720, 360]
+    quality: /\/360p\.mp4(?:\?|$)/.test(realStreamUrl) ? 360 : 0,
+    qualities: /\/360p\.mp4(?:\?|$)/.test(realStreamUrl) ? [360] : []
   };
 }
 
@@ -952,7 +975,7 @@ async function search(wd, quick, pg) {
           rawId = String(item.series_id).trim();
         }
         const id = String(rawId).trim();
-        if (!id || !/^\d+$/.test(id) || id.endsWith("000")) {
+        if (!id || !/^\d+$/.test(id)) {
           continue;
         }
 

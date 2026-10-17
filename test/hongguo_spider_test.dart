@@ -12,7 +12,11 @@ void main() {
 
     setUpAll(() async {
       final file = File('assets/sources/hongguo.js');
-      expect(file.existsSync(), isTrue, reason: 'assets/sources/hongguo.js 文件必须存在');
+      expect(
+        file.existsSync(),
+        isTrue,
+        reason: 'assets/sources/hongguo.js 文件必须存在',
+      );
       hongguoScript = await file.readAsString();
       expect(hongguoScript, isNotEmpty);
     });
@@ -20,10 +24,16 @@ void main() {
     test('1. 元数据 (meta) 与 CatPawOpen 规范契约验证', () async {
       expect(hongguoScript.contains('id: "hongguo"'), isTrue);
       expect(hongguoScript.contains('name: "官方免费短剧"'), isTrue);
-      expect(hongguoScript.contains('version: "1.0.3"'), isTrue);
-      expect(hongguoScript.contains('features: ["search", "categories"]'), isTrue);
+      expect(hongguoScript.contains('version: "1.0.4"'), isTrue);
+      expect(
+        hongguoScript.contains('features: ["search", "categories"]'),
+        isTrue,
+      );
       expect(hongguoScript.contains('type: "video"'), isTrue);
-      expect(hongguoScript.contains('BASE_URL = "https://hongguoduanju.com"'), isTrue);
+      expect(
+        hongguoScript.contains('BASE_URL = "https://hongguoduanju.com"'),
+        isTrue,
+      );
       expect(hongguoScript.contains('var spider = {'), isTrue);
     });
 
@@ -35,7 +45,7 @@ void main() {
       final meta = await runtime.getMeta();
       expect(meta['id'], equals('hongguo'));
       expect(meta['name'], equals('官方免费短剧'));
-      expect(meta['version'], equals('1.0.3'));
+      expect(meta['version'], equals('1.0.4'));
       expect(meta['type'], equals('video'));
       expect(meta['features'], containsAll(['search', 'categories']));
 
@@ -51,8 +61,8 @@ void main() {
       final typeIds = homeRes.classes.map((c) => c['type_id']).toList();
       final typeNames = homeRes.classes.map((c) => c['type_name']).toList();
 
-      expect(typeIds, containsAll(['real-drama', 'comic-drama', 'ai-drama', 'comic']));
-      expect(typeNames, containsAll(['真人剧', '漫剧', 'AI剧', '动漫']));
+      expect(typeIds, containsAll(['real-drama', 'comic-drama', 'ai-drama']));
+      expect(typeNames, containsAll(['真人剧', '漫剧', 'AI剧']));
 
       runtime.dispose();
     });
@@ -79,13 +89,14 @@ void main() {
                 'episode_right_text': '全100集',
                 'series_intro': '十万龙王将士恭迎龙王回朝！',
                 'tags': ['热血', '至尊'],
-              }
-            ]
-          }
-        }
+              },
+            ],
+          },
+        },
       };
 
-      final fakeHtml = '''
+      final fakeHtml =
+          '''
 <!DOCTYPE html>
 <html>
 <head><title>短剧 - 分类</title></head>
@@ -99,7 +110,11 @@ window._ROUTER_DATA = ${jsonEncode(fakeRouterData)};
 
       final mockClient = MockClient((request) async {
         if (request.url.path.contains('/category/')) {
-          return http.Response(fakeHtml, 200, headers: {'content-type': 'text/html; charset=utf-8'});
+          return http.Response(
+            fakeHtml,
+            200,
+            headers: {'content-type': 'text/html; charset=utf-8'},
+          );
         }
         return http.Response('Not Found', 404);
       });
@@ -135,13 +150,14 @@ window._ROUTER_DATA = ${jsonEncode(fakeRouterData)};
               'series_name': '战神归来当赘婿',
               'series_cover': 'https://p3.example.com/cover1_large.jpg',
               'series_intro': '五年前一代战神横扫八荒，今朝龙隐于渊守护至爱...',
-              'vid_list': ['vid_001', 'vid_002', 'vid_003', 'vid_004']
-            }
-          }
-        }
+              'vid_list': ['vid_001', 'vid_002', 'vid_003', 'vid_004'],
+            },
+          },
+        },
       };
 
-      final fakeDetailHtml = '''
+      final fakeDetailHtml =
+          '''
 <!DOCTYPE html>
 <html>
 <head><title>详情页</title></head>
@@ -155,7 +171,11 @@ window._ROUTER_DATA = ${jsonEncode(fakeDetailRouterData)};
 
       final mockClient = MockClient((request) async {
         if (request.url.path.contains('/detail')) {
-          return http.Response(fakeDetailHtml, 200, headers: {'content-type': 'text/html; charset=utf-8'});
+          return http.Response(
+            fakeDetailHtml,
+            200,
+            headers: {'content-type': 'text/html; charset=utf-8'},
+          );
         }
         return http.Response('Not Found', 404);
       });
@@ -175,9 +195,24 @@ window._ROUTER_DATA = ${jsonEncode(fakeDetailRouterData)};
       expect(playUrl, isNotEmpty);
       final episodes = playUrl.split('#');
       expect(episodes.length, equals(4));
-      expect(episodes[0], startsWith('第1集\$https://hongguoduanju.com/player/7345678901234567890/vid_001'));
-      expect(episodes[1], startsWith('第2集\$https://hongguoduanju.com/player/7345678901234567890/vid_002'));
-      expect(episodes[3], startsWith('第4集\$https://hongguoduanju.com/player/7345678901234567890/vid_004'));
+      expect(
+        episodes[0],
+        startsWith(
+          '第1集\$https://hongguoduanju.com/player/7345678901234567890/vid_001',
+        ),
+      );
+      expect(
+        episodes[1],
+        startsWith(
+          '第2集\$https://hongguoduanju.com/player/7345678901234567890/vid_002',
+        ),
+      );
+      expect(
+        episodes[3],
+        startsWith(
+          '第4集\$https://hongguoduanju.com/player/7345678901234567890/vid_004',
+        ),
+      );
 
       runtime.dispose();
     });
@@ -201,7 +236,11 @@ window.__INITIAL_DATA__ = {
 
       final mockClient = MockClient((request) async {
         if (request.url.path.contains('/player/')) {
-          return http.Response(fakePlayerHtml, 200, headers: {'content-type': 'text/html; charset=utf-8'});
+          return http.Response(
+            fakePlayerHtml,
+            200,
+            headers: {'content-type': 'text/html; charset=utf-8'},
+          );
         }
         return http.Response('Not Found', 404);
       });
@@ -214,8 +253,16 @@ window.__INITIAL_DATA__ = {
         'https://hongguoduanju.com/player/7345678901234567890/vid_001',
       );
 
-      expect(playRes.url, equals('https://v9-dy-y.hongguoduanju.com/video/tos/cn/stream_hd.mp4?auth_key=123456'));
-      expect(playRes.header['Referer'], equals('https://hongguoduanju.com/'));
+      expect(
+        playRes.url,
+        equals(
+          'https://v9-dy-y.hongguoduanju.com/video/tos/cn/stream_hd.mp4?auth_key=123456',
+        ),
+      );
+      expect(
+        playRes.header['Referer'],
+        equals('https://hongguoduanju.com/player/7345678901234567890/vid_001'),
+      );
       expect(playRes.header['User-Agent'], isNotEmpty);
 
       runtime.dispose();
@@ -233,8 +280,8 @@ window.__INITIAL_DATA__ = {
               'title': '重生后被霸总宠上天',
               'cover_url': 'https://p3.example.com/cover_search1.jpg',
               'episode_cnt': 95,
-              'intro': '前世凄惨，重生归来逆袭人生...'
-            }
+              'intro': '前世凄惨，重生归来逆袭人生...',
+            },
           },
           {
             'name': '真假千金重逢时',
@@ -244,15 +291,19 @@ window.__INITIAL_DATA__ = {
               'title': '真假千金重逢时',
               'cover_url': 'https://p3.example.com/cover_search2.jpg',
               'episode_cnt': 70,
-              'intro': '豪门真千金归来复仇！'
-            }
-          }
-        ]
+              'intro': '豪门真千金归来复仇！',
+            },
+          },
+        ],
       };
 
       final mockClient = MockClient((request) async {
         if (request.url.path.contains('/incent_resource/suggestion')) {
-          return http.Response(jsonEncode(fakeSuggestJson), 200, headers: {'content-type': 'application/json'});
+          return http.Response(
+            jsonEncode(fakeSuggestJson),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
         }
         return http.Response('Not Found', 404);
       });
@@ -266,7 +317,10 @@ window.__INITIAL_DATA__ = {
       final item1 = searchRes.list[0];
       expect(item1['vod_id'], equals('7345678909999999991'));
       expect(item1['vod_name'], equals('重生后被霸总宠上天'));
-      expect(item1['vod_pic'], equals('https://p3.example.com/cover_search1.jpg'));
+      expect(
+        item1['vod_pic'],
+        equals('https://p3.example.com/cover_search1.jpg'),
+      );
       expect(item1['vod_remarks'], equals('全95集'));
       expect(item1['vod_content'], contains('逆袭人生'));
 
@@ -278,20 +332,27 @@ window.__INITIAL_DATA__ = {
       runtime.dispose();
     });
 
-    test('8. 仓库纯净红线验证：assets/sources 仅允许包含 hongguo.js (其余源归属于本地 GitLab thlredguojs)', () {
-      final sourcesDir = Directory('assets/sources');
-      expect(sourcesDir.existsSync(), isTrue);
+    test(
+      '8. 仓库纯净红线验证：assets/sources 仅允许包含 hongguo.js (其余源归属于本地 GitLab thlredguojs)',
+      () {
+        final sourcesDir = Directory('assets/sources');
+        expect(sourcesDir.existsSync(), isTrue);
 
-      final files = sourcesDir
-          .listSync()
-          .whereType<File>()
-          .where((f) => !f.path.endsWith('.DS_Store'))
-          .toList();
+        final files = sourcesDir
+            .listSync()
+            .whereType<File>()
+            .where((f) => !f.path.endsWith('.DS_Store'))
+            .toList();
 
-      final fileNames = files.map((f) => f.uri.pathSegments.last).toList();
-      // 验证仅存在且只允许 hongguo.js
-      expect(fileNames, equals(['hongguo.js']),
-          reason: 'GitHub 仓库 assets/sources 目录严禁混入任何第三方数据源，其余源应保存在本地 GitLab thlredguojs 项目');
-    });
+        final fileNames = files.map((f) => f.uri.pathSegments.last).toList();
+        // 验证仅存在且只允许 hongguo.js
+        expect(
+          fileNames,
+          equals(['hongguo.js']),
+          reason:
+              'GitHub 仓库 assets/sources 目录严禁混入任何第三方数据源，其余源应保存在本地 GitLab thlredguojs 项目',
+        );
+      },
+    );
   });
 }
