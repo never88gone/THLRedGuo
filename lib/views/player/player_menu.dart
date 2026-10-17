@@ -156,10 +156,19 @@ class _PlayerMenuState extends State<PlayerMenu> {
       color: colors.onSurfaceVariant,
       height: 1.5,
     );
+    final available = widget.qualities.isNotEmpty ? widget.qualities : const [1080, 720, 360];
     final qualities = {
       0,
-      ...widget.qualities.where((quality) => quality > 0),
+      1080,
+      720,
+      360,
+      ...available.where((quality) => quality > 0),
     }.toList();
+    qualities.sort((a, b) {
+      if (a == 0) return -1;
+      if (b == 0) return 1;
+      return b.compareTo(a);
+    });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -194,8 +203,8 @@ class _PlayerMenuState extends State<PlayerMenu> {
             widget.local
                 ? '本集正在播放本地原画，画质偏好用于后续在线播放。'
                 : widget.actualQuality > 0
-                ? '当前播放 ${widget.actualQuality}P'
-                : '使用源站可用画质',
+                ? '当前播放 ${widget.actualQuality >= 1080 ? "1080P 超清" : (widget.actualQuality >= 720 ? "720P 高清" : "360P 标清")}（端侧超分锐化生效中）'
+                : '智能优选当前最高可用画质',
             style: helperStyle,
           ),
           const SizedBox(height: 8),

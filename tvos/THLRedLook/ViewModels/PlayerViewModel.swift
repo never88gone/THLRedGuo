@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import SwiftUI
 
 @MainActor
 public final class PlayerViewModel: ObservableObject {
@@ -421,12 +422,16 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     public func showControls() {
-        isControlsVisible = true
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isControlsVisible = true
+        }
         resetControlsHideTimer()
     }
 
     public func hideControls() {
-        isControlsVisible = false
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isControlsVisible = false
+        }
         controlsHideTimer?.invalidate()
     }
 

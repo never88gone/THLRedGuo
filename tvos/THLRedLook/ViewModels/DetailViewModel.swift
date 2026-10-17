@@ -178,48 +178,72 @@ public final class DetailViewModel: ObservableObject {
                 return true
             }
 
-            rawList.sort { a, b in
-                switch (a.seasonNum, b.seasonNum) {
-                case let (.some(sa), .some(sb)):
-                    if sa != sb { return sa < sb }
-                    return a.drama.title < b.drama.title
-                case let (.some(sa), .none):
-                    return sa < 1
-                case let (.none, .some(sb)):
-                    return 1 <= sb
-                case (.none, .none):
-                    return a.drama.title < b.drama.title
+            struct ParsedEntry {
+                let drama: Drama
+                let mainSeasonNum: Int?
+                let customTitle: String?
+            }
+
+            var parsedList: [ParsedEntry] = []
+            for entry in rawList {
+                let d = entry.drama
+                let suffix = d.title.replacingOccurrences(of: baseName, with: "").trimmingCharacters(in: .whitespaces)
+                let sNum = self.parseSeasonNumber(title: d.title, baseName: baseName)
+                
+                let hasSubSeparator = suffix.contains("：") || suffix.contains(":") || suffix.contains("-") || suffix.contains("—") || suffix.contains("，") || suffix.contains(",")
+                if hasSubSeparator {
+                    let cleaned = suffix.replacingOccurrences(of: "^[：:\\-\\—，,\\s]+", with: "", options: .regularExpression)
+                    parsedList.append(ParsedEntry(drama: d, mainSeasonNum: nil, customTitle: cleaned.isEmpty ? nil : cleaned))
+                } else if let num = sNum {
+                    parsedList.append(ParsedEntry(drama: d, mainSeasonNum: num, customTitle: nil))
+                } else {
+                    parsedList.append(ParsedEntry(drama: d, mainSeasonNum: nil, customTitle: nil))
                 }
             }
+
+            var mainSeasons = parsedList.filter { $0.mainSeasonNum != nil }.sorted { $0.mainSeasonNum! < $1.mainSeasonNum! }
+            let unnumbered = parsedList.filter { $0.mainSeasonNum == nil && $0.customTitle == nil }
+            let spinOffs = parsedList.filter { $0.customTitle != nil }.sorted { $0.drama.title < $1.drama.title }
 
             var items: [SeasonItem] = []
-            var usedSeasonNumbers = Set<Int>()
-            for entry in rawList {
-                if let s = entry.seasonNum, s > 0, !usedSeasonNumbers.contains(s) {
-                    usedSeasonNumbers.insert(s)
+            if mainSeasons.isEmpty {
+                for (idx, entry) in unnumbered.enumerated() {
+                    let s = idx + 1
+                    items.append(SeasonItem(
+                        drama: entry.drama,
+                        seasonNumber: s,
+                        title: "第 \(s) 季",
+                        isCurrent: entry.drama.id == drama.id
+                    ))
+                }
+            } else {
+                for entry in mainSeasons {
+                    let s = entry.mainSeasonNum!
+                    items.append(SeasonItem(
+                        drama: entry.drama,
+                        seasonNumber: s,
+                        title: "第 \(s) 季",
+                        isCurrent: entry.drama.id == drama.id
+                    ))
+                }
+                for (idx, entry) in unnumbered.enumerated() {
+                    let title = unnumbered.count == 1 ? "经典版" : "版本 \(idx + 1)"
+                    items.append(SeasonItem(
+                        drama: entry.drama,
+                        seasonNumber: 100 + idx,
+                        title: title,
+                        isCurrent: entry.drama.id == drama.id
+                    ))
                 }
             }
 
-            var nextAvailableSeason = 1
-            for entry in rawList {
-                let actualSeason: Int
-                if let s = entry.seasonNum, !items.contains(where: { $0.seasonNumber == s }) {
-                    actualSeason = s
-                } else {
-                    while usedSeasonNumbers.contains(nextAvailableSeason) {
-                        nextAvailableSeason += 1
-                    }
-                    actualSeason = nextAvailableSeason
-                    usedSeasonNumbers.insert(actualSeason)
-                }
-
-                let isCurr = entry.drama.id == drama.id
-                let seasonTitle = "第 \(actualSeason) 季"
+            for (idx, entry) in spinOffs.enumerated() {
+                let title = entry.customTitle ?? "番外 \(idx + 1)"
                 items.append(SeasonItem(
                     drama: entry.drama,
-                    seasonNumber: actualSeason,
-                    title: seasonTitle,
-                    isCurrent: isCurr
+                    seasonNumber: 200 + idx,
+                    title: title,
+                    isCurrent: entry.drama.id == drama.id
                 ))
             }
 

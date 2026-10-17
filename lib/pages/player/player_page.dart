@@ -157,11 +157,13 @@ class _PlayerScreenState extends State<PlayerScreen>
     preload: _preloadEnabled,
     enhancement: _enhancement.preferences,
   );
-  String get _qualityLabel => _plan?.local == true
-      ? '本地原画'
-      : _requestedQuality == 0
-      ? '自动'
-      : '${_requestedQuality}P';
+  String get _qualityLabel {
+    if (_plan?.local == true) return '本地原画';
+    final q = _requestedQuality > 0 ? _requestedQuality : (_plan?.quality ?? 720);
+    if (q >= 1080) return '1080P';
+    if (q >= 720) return '720P';
+    return '${q}P';
+  }
   String get _session => _plan?.session ?? '';
   double get _currentPosition =>
       _openedIndex == _index && _player.state.position.inMilliseconds > 0
@@ -1146,24 +1148,31 @@ class _PlayerScreenState extends State<PlayerScreen>
               await platform.setProperty('hwdec', 'mediacodec');
               await platform.setProperty('hwdec-codecs', 'all');
               await platform.setProperty('opengl-pbo', 'yes');
-              await platform.setProperty('video-latency-hacks', 'yes');
-              await platform.setProperty('scale', 'bilinear');
-              await platform.setProperty('cscale', 'bilinear');
-              await platform.setProperty('dscale', 'bilinear');
-              await platform.setProperty('correct-downscaling', 'no');
-              await platform.setProperty('vd-lavc-skiploopfilter', 'all');
-              await platform.setProperty('vd-lavc-skipidct', 'all');
-              await platform.setProperty('vd-lavc-threads', '2');
-              await platform.setProperty('demuxer-max-bytes', '${4 * 1024 * 1024}');
-              await platform.setProperty('demuxer-max-back-bytes', '${1 * 1024 * 1024}');
-              await platform.setProperty('demuxer-readahead-secs', '5');
+              await platform.setProperty('video-latency-hacks', 'no');
+              await platform.setProperty('scale', 'spline36');
+              await platform.setProperty('cscale', 'spline36');
+              await platform.setProperty('dscale', 'mitchell');
+              await platform.setProperty('correct-downscaling', 'yes');
+              await platform.setProperty('sigmoid-upscaling', 'yes');
+              await platform.setProperty('vd-lavc-skiploopfilter', 'none');
+              await platform.setProperty('vd-lavc-skipidct', 'none');
+              await platform.setProperty('vd-lavc-threads', '4');
+              await platform.setProperty('demuxer-max-bytes', '${32 * 1024 * 1024}');
+              await platform.setProperty('demuxer-max-back-bytes', '${8 * 1024 * 1024}');
+              await platform.setProperty('demuxer-readahead-secs', '15');
             } else {
               await platform.setProperty('hwdec', 'auto-safe');
               await platform.setProperty('hwdec-codecs', 'all');
-              await platform.setProperty('vd-lavc-skiploopfilter', 'nonkey');
+              await platform.setProperty('scale', 'spline36');
+              await platform.setProperty('cscale', 'spline36');
+              await platform.setProperty('dscale', 'mitchell');
+              await platform.setProperty('correct-downscaling', 'yes');
+              await platform.setProperty('sigmoid-upscaling', 'yes');
+              await platform.setProperty('vd-lavc-skiploopfilter', 'none');
               await platform.setProperty('vd-lavc-threads', '4');
+              await platform.setProperty('demuxer-max-bytes', '${32 * 1024 * 1024}');
             }
-            await platform.setProperty('vd-lavc-fast', 'yes');
+            await platform.setProperty('vd-lavc-fast', 'no');
             await platform.setProperty('video-sync', 'audio');
             await platform.setProperty('framedrop', 'vo');
           }
@@ -1440,9 +1449,11 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (_mobile && section == PlayerMenuSection.quality) {
         final chosenQuality = await PlayerDialogHelper.openQualitySheet(
           context: context,
-          qualities: _plan?.qualities ?? [],
+          qualities: (_plan?.qualities != null && _plan!.qualities.isNotEmpty)
+              ? _plan!.qualities
+              : const [1080, 720, 360],
           selectedQuality: _requestedQuality,
-          actualQuality: _plan?.quality ?? 0,
+          actualQuality: _plan?.quality ?? (_requestedQuality > 0 ? _requestedQuality : 720),
           isLocal: _plan?.local == true,
         );
         if (chosenQuality != null && chosenQuality != _requestedQuality) {

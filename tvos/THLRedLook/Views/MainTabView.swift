@@ -45,6 +45,7 @@ public struct MainTabView: View {
     @State private var catalogCategoryFocusTrigger: Int = 0
     @State private var recommendationsCategoryFocusTrigger: Int = 0
     @State private var rankingsBoardFocusTrigger: Int = 0
+    @State private var searchFocusTrigger: Int = 0
     @State private var libraryTabFocusTrigger: Int = 0
     @State private var settingsSidebarTrigger: Int = 0
     @State private var wasInContentArea: Bool = false
@@ -64,6 +65,7 @@ public struct MainTabView: View {
     @State private var recommendationsCategory: String? = nil
     @State private var deepLinkQuery: String? = nil
     @State private var deepLinkEpisode: Int? = nil
+    @State private var testInitialEpisodeIndex: Int = 1
 
     public init() {
         let args = CommandLine.arguments
@@ -102,6 +104,13 @@ public struct MainTabView: View {
             customQuery = args[idx + 1]
         } else if let envQuery = ProcessInfo.processInfo.environment["TEST_QUERY"], !envQuery.isEmpty {
             customQuery = envQuery
+        }
+
+        var customEpisodeIndex: Int = 1
+        if let idx = args.firstIndex(of: "-testEpisode"), idx + 1 < args.count, let n = Int(args[idx + 1]) {
+            customEpisodeIndex = n
+        } else if let envEp = ProcessInfo.processInfo.environment["TEST_EPISODE"], let n = Int(envEp) {
+            customEpisodeIndex = n
         }
 
         let defaultDrama = Drama(
@@ -169,6 +178,7 @@ public struct MainTabView: View {
         _catalogInitialCategory = State(initialValue: initCategory)
         _recommendationsCategory = State(initialValue: initRecomCategory)
         _deepLinkQuery = State(initialValue: customQuery)
+        _testInitialEpisodeIndex = State(initialValue: customEpisodeIndex)
     }
 
     public var body: some View {
@@ -177,7 +187,7 @@ public struct MainTabView: View {
                 TVPlayerView(
                     drama: drama,
                     episodes: directPlayerEpisodes,
-                    initialEpisodeIndex: 1,
+                    initialEpisodeIndex: testInitialEpisodeIndex,
                     initialPosition: 0,
                     initialShowControls: directPlayerControls,
                     keepControlsVisible: directPlayerControls,
@@ -207,6 +217,8 @@ public struct MainTabView: View {
                                 recommendationsCategoryFocusTrigger += 1
                             case .rankings:
                                 rankingsBoardFocusTrigger += 1
+                            case .search:
+                                searchFocusTrigger += 1
                             case .library:
                                 libraryTabFocusTrigger += 1
                             case .settings:
@@ -251,7 +263,14 @@ public struct MainTabView: View {
                                 }
                             )
                         case .search:
-                            SearchRootView(initialQuery: deepLinkQuery, targetEpisode: deepLinkEpisode)
+                            SearchRootView(
+                                initialQuery: deepLinkQuery,
+                                targetEpisode: deepLinkEpisode,
+                                focusTrigger: searchFocusTrigger,
+                                onRequestFocusTopNav: {
+                                    focusedNavTab = .search
+                                }
+                            )
                         case .library:
                             SavedLibraryView(
                                 focusCategoryTrigger: libraryTabFocusTrigger,
@@ -305,6 +324,8 @@ public struct MainTabView: View {
                             recommendationsCategoryFocusTrigger += 1
                         case .rankings:
                             rankingsBoardFocusTrigger += 1
+                        case .search:
+                            searchFocusTrigger += 1
                         case .library:
                             libraryTabFocusTrigger += 1
                         case .settings:
@@ -484,12 +505,14 @@ public struct MainTabView: View {
                 }
             }
         case "detail":
-            Task {
-                await JSSourceService.shared.initialize()
-                let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
-                guard !sourceId.isEmpty else { return }
-                if let cat = try? await NativeRepository.shared.loadCatalog(source: sourceId, page: 1), let first = cat.items.first {
-                    await MainActor.run { self.directDetailDrama = first }
+            if self.directDetailDrama == nil {
+                Task {
+                    await JSSourceService.shared.initialize()
+                    let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
+                    guard !sourceId.isEmpty else { return }
+                    if let cat = try? await NativeRepository.shared.loadCatalog(source: sourceId, page: 1), let first = cat.items.first {
+                        await MainActor.run { self.directDetailDrama = first }
+                    }
                 }
             }
         case "player", "controls", "drawer":
@@ -497,10 +520,14 @@ public struct MainTabView: View {
                 await JSSourceService.shared.initialize()
                 let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
                 guard !sourceId.isEmpty else { return }
-                if let cat = try? await NativeRepository.shared.loadCatalog(source: sourceId, page: 1), let first = cat.items.first {
-                    let detail = (try? await NativeRepository.shared.loadDetail(drama: first))
-                        ?? DramaDetail(drama: first, episodes: (1...max(20, first.episodes)).map { Episode(id: "\(first.id)_\($0)", title: "第 \($0) 集", number: $0) }, warning: "")
-                    let eps = !detail.episodes.isEmpty ? detail.episodes : (1...max(20, first.episodes)).map { Episode(id: "\(first.id)_\($0)", title: "第 \($0) 集", number: $0) }
+                var baseDrama = self.directPlayerDrama
+                if baseDrama == nil {
+                    baseDrama = (try? await NativeRepository.shared.loadCatalog(source: sourceId, page: 1))?.items.first
+                }
+                if let target = baseDrama {
+                    let detail = (try? await NativeRepository.shared.loadDetail(drama: target))
+                        ?? DramaDetail(drama: target, episodes: (1...max(20, target.episodes)).map { Episode(id: "\(target.id)_\($0)", title: "第 \($0) 集", number: $0) }, warning: "")
+                    let eps = !detail.episodes.isEmpty ? detail.episodes : (1...max(20, target.episodes)).map { Episode(id: "\(target.id)_\($0)", title: "第 \($0) 集", number: $0) }
                     await MainActor.run {
                         self.directPlayerEpisodes = eps
                         self.directPlayerDrama = detail.drama

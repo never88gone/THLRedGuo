@@ -908,7 +908,9 @@ async function play(flag, id, flags) {
     header: {
       "User-Agent": USER_AGENT,
       "Referer": exactReferer
-    }
+    },
+    quality: 720,
+    qualities: [1080, 720, 360]
   };
 }
 

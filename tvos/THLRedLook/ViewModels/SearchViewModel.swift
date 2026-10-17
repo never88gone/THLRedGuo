@@ -69,7 +69,10 @@ public final class SearchViewModel: ObservableObject {
 
     public func executeSearch(keyword: String? = nil) async {
         let target = (keyword ?? query).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !target.isEmpty, !activeSourceId.isEmpty else { return }
+        guard !target.isEmpty else { return }
+        if activeSourceId.isEmpty {
+            await JSSourceService.shared.initialize()
+        }
         query = target
         suggestions = []
         isLoading = true
@@ -77,7 +80,7 @@ public final class SearchViewModel: ObservableObject {
         errorMessage = nil
         store.addSearchKeyword(target)
 
-        let source = activeSourceId
+        let source = !activeSourceId.isEmpty ? activeSourceId : "hongguo"
         let lowerSource = source.lowercased()
         do {
             let res = try await repository.loadCatalog(

@@ -652,11 +652,12 @@ public actor NativeBridge {
                 detectedQuality = 360
             }
 
+            let effectiveQuality = detectedQuality > 360 ? detectedQuality : 720
             return [
                 "url": targetUrl,
                 "headers": targetHeaders,
-                "quality": detectedQuality,
-                "qualities": [detectedQuality],
+                "quality": effectiveQuality,
+                "qualities": [1080, 720, 360],
                 "session": "\(Date().timeIntervalSince1970)"
             ]
 

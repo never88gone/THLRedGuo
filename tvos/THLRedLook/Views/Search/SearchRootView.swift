@@ -12,10 +12,19 @@ public struct SearchRootView: View {
 
     public var initialQuery: String?
     public var targetEpisode: Int?
+    public var focusTrigger: Int = 0
+    public var onRequestFocusTopNav: (() -> Void)? = nil
 
-    public init(initialQuery: String? = nil, targetEpisode: Int? = nil) {
+    public init(
+        initialQuery: String? = nil,
+        targetEpisode: Int? = nil,
+        focusTrigger: Int = 0,
+        onRequestFocusTopNav: (() -> Void)? = nil
+    ) {
         self.initialQuery = initialQuery
         self.targetEpisode = targetEpisode
+        self.focusTrigger = focusTrigger
+        self.onRequestFocusTopNav = onRequestFocusTopNav
     }
 
     public var body: some View {
@@ -155,6 +164,15 @@ public struct SearchRootView: View {
                         Task {
                             await viewModel.executeSearch(keyword: q)
                         }
+                    }
+                }
+                .onChange(of: focusTrigger) { _ in
+                    if let firstId = viewModel.searchResults.first?.id {
+                        focusedDramaId = firstId
+                        isSearchFieldFocused = false
+                    } else {
+                        isSearchFieldFocused = true
+                        focusedDramaId = nil
                     }
                 }
             }

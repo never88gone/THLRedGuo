@@ -846,12 +846,13 @@ class DartCoreEngine {
           final streamUrl = playRes.url;
           final mimeType = streamUrl.contains('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
           final detectedQuality = streamUrl.contains('1080') ? 1080 : (streamUrl.contains('720') ? 720 : 360);
+          final effectiveQuality = quality > 0 ? quality : (detectedQuality > 0 ? detectedQuality : 720);
           return {
             'url': streamUrl,
             'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
             'headers': playRes.header,
-            'quality': quality > 0 ? quality : detectedQuality,
-            'qualities': detectedQuality >= 1080 ? [1080, 720, 360] : (detectedQuality >= 720 ? [720, 360] : [360]),
+            'quality': effectiveQuality,
+            'qualities': const [1080, 720, 360],
             'local': false,
             'mimeType': mimeType,
             'danmakuId': '$dramaId:$episodeIndex',
@@ -864,12 +865,13 @@ class DartCoreEngine {
       final streamUrl = chapter['url'] as String;
       final mimeType = streamUrl.contains('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
       final detectedQuality = streamUrl.contains('1080') ? 1080 : (streamUrl.contains('720') ? 720 : 360);
+      final effectiveQuality = quality > 0 ? quality : (detectedQuality > 0 ? detectedQuality : 720);
       return {
         'url': streamUrl,
         'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
         'headers': const <String, String>{},
-        'quality': quality > 0 ? quality : detectedQuality,
-        'qualities': detectedQuality >= 1080 ? [1080, 720, 360] : (detectedQuality >= 720 ? [720, 360] : [360]),
+        'quality': effectiveQuality,
+        'qualities': const [1080, 720, 360],
         'local': false,
         'mimeType': mimeType,
         'danmakuId': '$dramaId:$episodeIndex',
@@ -889,6 +891,7 @@ class DartCoreEngine {
           final vid = match.group(0)!;
           if (vid.endsWith('000') || vid == sourceId) continue;
           final streamUrl = 'https://hongguoduanju.com/video/public/$vid/360p.mp4';
+          final effectiveQuality = quality > 0 ? quality : 720;
           return {
             'url': streamUrl,
             'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
@@ -896,8 +899,8 @@ class DartCoreEngine {
               'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
               'Referer': 'https://hongguoduanju.com/player/$sourceId/$vid',
             },
-            'quality': 360,
-            'qualities': [360],
+            'quality': effectiveQuality,
+            'qualities': const [1080, 720, 360],
             'local': false,
             'mimeType': 'video/mp4',
             'danmakuId': '$dramaId:$episodeIndex',

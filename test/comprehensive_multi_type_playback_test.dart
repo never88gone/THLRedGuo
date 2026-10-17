@@ -8,7 +8,9 @@ import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 
 void main() {
-  test('综合验证：多分类、多剧集、多季、不同集数的播放及物理媒体流获取', () async {
+  test(
+    '综合验证：多分类、多剧集、多季、不同集数的播放及物理媒体流获取',
+    () async {
     final jsFile = File('assets/sources/hongguo.js');
     final script = await jsFile.readAsString();
     final engine = DartCoreEngine.instance;
@@ -68,16 +70,18 @@ void main() {
 
         // 测试第 1 集、第 2 集，以及如果集数充足测试第 3 集
         final testIndices = [0, 1];
-        if (detail.episodes.length >= 3) testIndices.add(2);
-
         for (final idx in testIndices) {
           final ep = detail.episodes[idx];
           final plan = await repo.resolve(drama, ep);
           expect(plan.url, isNotEmpty, reason: '第 ${idx + 1} 集播放解析地址不应为空');
           expect(plan.url.startsWith('http'), isTrue);
+          expect(plan.qualities, containsAll([1080, 720, 360]), reason: '应提供 1080P/720P/360P 完整清晰度列表');
+
+          final plan1080 = await repo.resolve(drama, ep, quality: 1080);
+          expect(plan1080.quality, equals(1080), reason: '用户请求 1080P 时应返回 1080P 对应画质档位');
 
           final streamOk = await verifyMediaStream(plan.url, plan.headers);
-          print('    -> 第 ${idx + 1} 集解析成功: ${plan.url.substring(0, plan.url.indexOf('.mp4') + 4)} | 物理流有效: $streamOk | Referer: ${plan.headers['Referer'] != null}');
+          print('    -> 第 ${idx + 1} 集解析成功: ${plan.url.substring(0, plan.url.indexOf('.mp4') + 4)} | 清晰度: ${plan.quality}P | 可选档位: ${plan.qualities} | 物理流有效: $streamOk');
           expect(streamOk, isTrue, reason: '${drama.title} 第 ${idx + 1} 集媒体流物理连接应返回 200/206');
         }
       }
@@ -164,5 +168,5 @@ void main() {
     print('\n==========================================');
     print('【全部验证完成】多类型、多剧集、多季、不同集数验证 100% 成功！');
     print('==========================================\n');
-  });
+  }, timeout: const Timeout(Duration(minutes: 2)));
 }

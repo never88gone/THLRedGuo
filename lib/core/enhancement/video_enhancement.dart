@@ -22,7 +22,7 @@ class VideoEnhancementController extends ChangeNotifier {
     required List<String> tags,
   }) : _animationHint = videoHasAnimationTags(category, tags) {
     final native = player.platform;
-    supported = video != null && native is NativePlayer && Platform.isWindows;
+    supported = video != null && native is NativePlayer && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
     if (!supported) {
       _status = '当前平台暂不支持画质增强';
       return;

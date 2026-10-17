@@ -19,7 +19,7 @@ public struct DramaDetailView: View {
     @State private var isDescriptionExpanded: Bool = false
     @State private var showingDownloadSuccess: Bool = false
     @FocusState private var isPlayButtonFocused: Bool
-    @FocusState private var focusedSeasonDramaId: String?
+    @FocusState private var focusedSeasonIndex: Int?
     @FocusState private var focusedEpisode: Int?
     @FocusState private var focusedChunkIndex: Int?
 
@@ -137,7 +137,7 @@ public struct DramaDetailView: View {
                                         onDownCommand: {
                                             isPlayButtonFocused = false
                                             if viewModel.seasonItems.count > 1 {
-                                                focusedSeasonDramaId = viewModel.drama.id
+                                                focusedSeasonIndex = viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0
                                             } else if detail.episodeChunks.count > 1 {
                                                 focusedChunkIndex = viewModel.selectedChunkIndex
                                             } else if let firstEp = detail.episodes.first {
@@ -178,16 +178,16 @@ public struct DramaDetailView: View {
                         if viewModel.seasonItems.count > 1 {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 20) {
-                                    ForEach(viewModel.seasonItems) { item in
+                                    ForEach(Array(viewModel.seasonItems.enumerated()), id: \.element.id) { index, item in
                                         TVSeasonCapsuleCard(
                                             item: item,
-                                            isExternalFocused: focusedSeasonDramaId == item.drama.id,
+                                            isExternalFocused: focusedSeasonIndex == index,
                                             onUpCommand: {
-                                                focusedSeasonDramaId = nil
+                                                focusedSeasonIndex = nil
                                                 isPlayButtonFocused = true
                                             },
                                             onDownCommand: {
-                                                focusedSeasonDramaId = nil
+                                                focusedSeasonIndex = nil
                                                 if detail.episodeChunks.count > 1 {
                                                     focusedChunkIndex = viewModel.selectedChunkIndex
                                                 } else if let firstEp = detail.episodes.first {
@@ -197,8 +197,8 @@ public struct DramaDetailView: View {
                                         ) {
                                             if !item.isCurrent {
                                                 Task {
+                                                    focusedSeasonIndex = index
                                                     await viewModel.switchToDrama(item.drama)
-                                                    focusedSeasonDramaId = item.drama.id
                                                     if let entry = viewModel.lastWatchEntry {
                                                         selectedEpisodeNumber = entry.episode
                                                     } else {
@@ -207,15 +207,13 @@ public struct DramaDetailView: View {
                                                 }
                                             }
                                         }
-                                        .focused($focusedSeasonDramaId, equals: item.drama.id)
-                                        .id("season_card_\(item.drama.id)")
+                                        .focused($focusedSeasonIndex, equals: index)
+                                        .id("season_card_\(index)")
                                     }
                                 }
                                 .padding(.vertical, 10)
                                 .padding(.horizontal, 8)
-                                .focusSection()
                             }
-                            .focusSection()
                         }
                         
                         Divider()
@@ -239,7 +237,7 @@ public struct DramaDetailView: View {
                                                 onUpCommand: {
                                                     focusedChunkIndex = nil
                                                     if viewModel.seasonItems.count > 1 {
-                                                        focusedSeasonDramaId = viewModel.drama.id
+                                                        focusedSeasonIndex = viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0
                                                     } else {
                                                         isPlayButtonFocused = true
                                                     }
@@ -264,9 +262,7 @@ public struct DramaDetailView: View {
                                     .padding(.bottom, 14)
                                     .padding(.leading, 12)
                                     .padding(.trailing, 24)
-                                    .focusSection()
                                 }
-                                .focusSection()
                             }
 
                             // 当前组内的集数列表网格（采用 8 列并预留上、左、右安全间距）
@@ -287,7 +283,7 @@ public struct DramaDetailView: View {
                                                     if detail.episodeChunks.count > 1 {
                                                         focusedChunkIndex = viewModel.selectedChunkIndex
                                                     } else if viewModel.seasonItems.count > 1 {
-                                                        focusedSeasonDramaId = viewModel.drama.id
+                                                        focusedSeasonIndex = viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0
                                                     } else {
                                                         isPlayButtonFocused = true
                                                     }
