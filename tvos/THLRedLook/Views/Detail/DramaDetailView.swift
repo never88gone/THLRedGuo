@@ -28,6 +28,7 @@ public struct DramaDetailView: View {
     }
 
     private var normalizedCoverURL: URL? {
+        guard ProcessInfo.processInfo.environment["DISABLE_REMOTE_IMAGES"] != "1" else { return nil }
         var str = viewModel.drama.cover.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !str.isEmpty else { return nil }
         if str.hasPrefix("//") {
