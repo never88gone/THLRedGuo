@@ -172,6 +172,36 @@ public struct TVPlayerView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             }
 
+            // 轻量状态提示 Toast 浮层（救流/切换模式提示，不阻断观看）
+            if let toast = viewModel.toastMessage {
+                VStack {
+                    HStack(spacing: 12) {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.yellow)
+                            .font(.system(size: 20))
+                        Text(toast)
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.88))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.6), radius: 12, y: 6)
+                    .padding(.top, 48)
+
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(150)
+            }
+
             // 纯画面播放模式下的遥控器唤醒交互层（点击 Select 或任何方向键呼出浮层，按 Menu 直接退出播放）
             if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && viewModel.errorMessage == nil {
                 Button(action: {

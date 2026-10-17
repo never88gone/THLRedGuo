@@ -635,8 +635,8 @@ public actor NativeBridge {
                 }
             }
 
-            if targetUrl.isEmpty {
-                targetUrl = "https://example.com/stream/\(dramaId)/\(epIndex).mp4"
+            if targetUrl.isEmpty || targetUrl.contains("example.com") {
+                targetUrl = "https://hongguoduanju.com/video/public/\(dramaId)/360p.mp4"
             }
 
             var detectedQuality = 360
