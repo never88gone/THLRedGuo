@@ -36,6 +36,117 @@ class HongguoSeriesEntry {
   String get label => '第 $season $unit';
 }
 
+bool hasRoundedHongguoSeriesId(Drama drama) {
+  if (drama.source != SourceSite.hongguo.id) return false;
+  final id = drama.cleanSourceId;
+  if (!RegExp(r'^[1-9]\d{15,29}$').hasMatch(id)) return false;
+  final number = double.tryParse(id);
+  if (number == null || !number.isFinite || number <= 9007199254740991) {
+    return false;
+  }
+  return number.toString().replaceFirst(RegExp(r'\.0$'), '') == id;
+}
+
+String _seriesIdentityKey(Drama drama) {
+  final info = hongguoSeriesInfo(drama);
+  return info == null
+      ? normalizedSearchText(_stripNoiseSuffixes(drama.title))
+      : '${info.key}|${info.unit}|${info.season}';
+}
+
+Map<String, Drama> hongguoSeriesIdReplacements(
+  Iterable<Drama> previous,
+  Iterable<Drama> fresh,
+) {
+  final stale = previous.where(hasRoundedHongguoSeriesId).toList();
+  if (stale.isEmpty) return const {};
+  final byTitle = <String, Map<String, Drama>>{};
+  for (final drama in fresh) {
+    if (drama.source != SourceSite.hongguo.id ||
+        !RegExp(r'^[1-9]\d{15,29}$').hasMatch(drama.cleanSourceId) ||
+        hasRoundedHongguoSeriesId(drama)) {
+      continue;
+    }
+    final title = _seriesIdentityKey(drama);
+    if (title.isNotEmpty) (byTitle[title] ??= {})[drama.id] = drama;
+  }
+  final replacements = <String, Drama>{};
+  for (final drama in stale) {
+    final matches =
+        (byTitle[_seriesIdentityKey(drama)]?.values ?? const <Drama>[])
+            .where(
+              (candidate) =>
+                  candidate.cleanSourceId != drama.cleanSourceId &&
+                  double.parse(candidate.cleanSourceId) ==
+                      double.parse(drama.cleanSourceId),
+            )
+            .toList();
+    if (matches.length == 1) replacements[drama.id] = matches.single;
+  }
+  return replacements;
+}
+
+Drama mergeHongguoSeriesIdentity(Drama previous, Drama fresh) =>
+    Drama.fromJson({
+      ...previous.toJson(),
+      'id': fresh.id,
+      'source': fresh.source,
+      'sourceId': fresh.cleanSourceId,
+    }).merge(fresh);
+
+Future<Drama> resolveHongguoSeriesIdentity({
+  required Drama drama,
+  required AppRepository repository,
+  LocalStore? store,
+}) async {
+  if (!hasRoundedHongguoSeriesId(drama)) return drama;
+  final ownerEpoch = store?.profileEpoch;
+  CatalogPage? page;
+  try {
+    page = await repository.catalog(
+      drama.source,
+      query: cleanSeriesBaseTitle(drama.title),
+      force: true,
+    );
+  } catch (_) {}
+  if (store != null && store.profileEpoch != ownerEpoch) {
+    throw AppFailure('用户已变更，请重新打开剧集', code: 'profile_changed');
+  }
+  final items = page?.items ?? const <Drama>[];
+  final same = items
+      .where(
+        (candidate) =>
+            candidate.source == drama.source &&
+            candidate.cleanSourceId == drama.cleanSourceId &&
+            _seriesIdentityKey(candidate) == _seriesIdentityKey(drama),
+      )
+      .firstOrNull;
+  final replacement =
+      same ?? hongguoSeriesIdReplacements([drama], items)[drama.id];
+  if (replacement == null) {
+    try {
+      final detail = await repository.detail(drama);
+      final id = RegExp.escape(drama.cleanSourceId);
+      final exactTarget = RegExp(
+        '(?:/player/$id/|^$id[_/])(\\d{10,30})(?:[/?#]|\$)',
+      );
+      final verified =
+          detail.drama.cleanSourceId == drama.cleanSourceId &&
+          detail.episodes.isNotEmpty &&
+          detail.episodes.every((episode) {
+            final target =
+                (episode.raw['raw'] ?? episode.raw['url'] ?? episode.id)
+                    .toString();
+            return exactTarget.hasMatch(target);
+          });
+      if (verified) return drama.merge(detail.drama);
+    } catch (_) {}
+    throw AppFailure('旧剧集编号需要更新，暂未查到准确结果，请重新搜索该季后重试', code: 'STALE_SERIES_ID');
+  }
+  if (store != null) await store.refreshDramas(items);
+  return mergeHongguoSeriesIdentity(drama, replacement);
+}
+
 /// 清洗短剧标题末尾常见的非季数杂质与标识
 String _stripNoiseSuffixes(String text) {
   var s = text.trim();
@@ -164,7 +275,10 @@ HongguoSeriesInfo? hongguoSeriesInfo(Drama drama, {String? unit}) {
   if (match != null) {
     final base = cleanedTitle.substring(0, match.start).trim();
     final season = int.tryParse(match[1]!);
-    if (base.isNotEmpty && season != null && season >= 1 && season <= _seriesSeasonLimit) {
+    if (base.isNotEmpty &&
+        season != null &&
+        season >= 1 &&
+        season <= _seriesSeasonLimit) {
       return HongguoSeriesInfo(
         baseTitle: base,
         key: normalizedSearchText(base),
@@ -176,9 +290,7 @@ HongguoSeriesInfo? hongguoSeriesInfo(Drama drama, {String? unit}) {
   }
 
   // 3. 罗马数字后缀，如「 II」「 III」「 IV」
-  final romanRegex = RegExp(
-    r'[\(（\[【\s\-_]+([IVXivx]+)\s*[\)）\]】]?[\s\-_]*$',
-  );
+  final romanRegex = RegExp(r'[\(（\[【\s\-_]+([IVXivx]+)\s*[\)）\]】]?[\s\-_]*$');
   match = romanRegex.firstMatch(cleanedTitle);
   if (match != null) {
     final base = cleanedTitle.substring(0, match.start).trim();
@@ -202,7 +314,10 @@ HongguoSeriesInfo? hongguoSeriesInfo(Drama drama, {String? unit}) {
   if (match != null) {
     final base = cleanedTitle.substring(0, match.start).trim();
     final season = int.tryParse(match[1]!);
-    if (base.isNotEmpty && season != null && season >= 2 && season <= _seriesSeasonLimit) {
+    if (base.isNotEmpty &&
+        season != null &&
+        season >= 2 &&
+        season <= _seriesSeasonLimit) {
       return HongguoSeriesInfo(
         baseTitle: base,
         key: normalizedSearchText(base),
@@ -214,9 +329,7 @@ HongguoSeriesInfo? hongguoSeriesInfo(Drama drama, {String? unit}) {
   }
 
   // 5. 常见续篇词缀：「续集」「大结局」「终章」
-  final sequelRegex = RegExp(
-    r'[\(（\[【\s\-_]+(续集|大结局|终章)\s*[\)）\]】]?$',
-  );
+  final sequelRegex = RegExp(r'[\(（\[【\s\-_]+(续集|大结局|终章)\s*[\)）\]】]?$');
   match = sequelRegex.firstMatch(cleanedTitle);
   if (match != null) {
     final base = cleanedTitle.substring(0, match.start).trim();
@@ -250,13 +363,12 @@ HongguoSeriesInfo? hongguoSeriesInfo(Drama drama, {String? unit}) {
 /// 清洗出短剧的基础系列名称
 String cleanSeriesBaseTitle(String title) {
   final cleaned = _stripNoiseSuffixes(title);
-  final info = hongguoSeriesInfo(Drama(
-    id: '',
-    source: '',
-    sourceId: '',
-    title: cleaned,
-  ));
-  return info?.baseTitle.trim().isNotEmpty == true ? info!.baseTitle.trim() : cleaned;
+  final info = hongguoSeriesInfo(
+    Drama(id: '', source: '', sourceId: '', title: cleaned),
+  );
+  return info?.baseTitle.trim().isNotEmpty == true
+      ? info!.baseTitle.trim()
+      : cleaned;
 }
 
 /// 聚合计算与排序同系列的多季剧集列表
@@ -266,6 +378,24 @@ List<HongguoSeriesEntry> hongguoSeriesEntries(
   Iterable<HongguoSeriesEntry>? lockedEntries,
 }) {
   if (anchor.title.trim().isEmpty) return const [];
+  candidates = candidates.toList();
+  final replacements = hongguoSeriesIdReplacements([
+    anchor,
+    ...?lockedEntries?.map((entry) => entry.drama),
+    ...candidates,
+  ], candidates);
+  Drama current(Drama drama) => replacements[drama.id] == null
+      ? drama
+      : mergeHongguoSeriesIdentity(drama, replacements[drama.id]!);
+  anchor = current(anchor);
+  candidates = candidates.map(current).toList();
+  lockedEntries = lockedEntries?.map(
+    (entry) => HongguoSeriesEntry(
+      drama: current(entry.drama),
+      season: entry.season,
+      unit: entry.unit,
+    ),
+  );
   var anchorInfo = hongguoSeriesInfo(anchor);
   String key, unit;
   int anchorSeason;
@@ -352,7 +482,9 @@ List<HongguoSeriesEntry> hongguoSeriesEntries(
       // 若当前位置是 anchor 或已被锁定的已确定条目，不得随意替换
       if (existing.drama.id == anchor.id) continue;
       if (lockedEntries != null &&
-          lockedEntries.any((e) => e.season == targetSeason && e.drama.id == existing.drama.id)) {
+          lockedEntries.any(
+            (e) => e.season == targetSeason && e.drama.id == existing.drama.id,
+          )) {
         continue;
       }
 
@@ -401,7 +533,9 @@ Future<List<HongguoSeriesEntry>> discoverSeriesSeasons({
   LocalStore? store,
   List<HongguoSeriesEntry>? existingEntries,
 }) async {
-  final localCandidates = store != null ? store.seriesDramasFor(anchor) : <Drama>[];
+  final localCandidates = store != null
+      ? store.seriesDramasFor(anchor)
+      : <Drama>[];
   var entries = existingEntries != null && existingEntries.isNotEmpty
       ? existingEntries
       : hongguoSeriesEntries(anchor, localCandidates);
@@ -415,7 +549,9 @@ Future<List<HongguoSeriesEntry>> discoverSeriesSeasons({
       query: baseTitle,
       page: 1,
     );
-    final searchItems = searchPage.items.where((d) => d.source == anchor.source).toList();
+    final searchItems = searchPage.items
+        .where((d) => d.source == anchor.source)
+        .toList();
     if (searchItems.isNotEmpty && store != null) {
       await store.refreshDramas(searchItems);
     }

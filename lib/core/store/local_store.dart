@@ -936,6 +936,58 @@ class LocalStore extends ChangeNotifier {
   Future<void> refreshDramas(Iterable<Drama> dramas) =>
       _refreshDramas(dramas, cacheSeriesCandidates: true);
 
+  FollowState _mergeSeriesFollowState(
+    FollowState previous,
+    FollowState? current,
+  ) {
+    if (current == null) return previous;
+    final manual = previous.manuallyWatched || current.manuallyWatched;
+    final known = previous.knownEpisodes > current.knownEpisodes
+        ? previous.knownEpisodes
+        : current.knownEpisodes;
+    final read = [
+      previous.readEpisodes,
+      current.readEpisodes,
+    ].whereType<int>().toList()..sort();
+    final notices = Map.of(previous.seriesSeasons);
+    for (final notice in current.seriesSeasons.values) {
+      notices[notice.id] = notices[notice.id]?.read == true
+          ? notice.markRead()
+          : notice;
+    }
+    return FollowState(
+      status: manual ? FollowStatus.watched : current.status,
+      manuallyWatched: manual,
+      knownEpisodes: known,
+      readEpisodes: read.isEmpty ? null : read.last,
+      seriesSeasons: notices,
+    );
+  }
+
+  void _replaceSeriesNotices(
+    Map<String, FollowState> states,
+    Map<String, Drama> replacements,
+  ) {
+    for (final row in states.entries.toList()) {
+      final notices = <String, SeriesSeasonNotice>{};
+      for (final notice in row.value.seriesSeasons.values) {
+        final drama = replacements[notice.id];
+        var next = drama == null
+            ? notice
+            : SeriesSeasonNotice(
+                id: drama.id,
+                title: drama.title,
+                season: notice.season,
+                unit: notice.unit,
+                read: notice.read,
+              );
+        if (notices[next.id]?.read == true) next = next.markRead();
+        notices[next.id] = next;
+      }
+      states[row.key] = row.value.copyWith(seriesSeasons: notices);
+    }
+  }
+
   Future<void> _refreshDramas(
     Iterable<Drama> dramas, {
     required bool cacheSeriesCandidates,
@@ -949,6 +1001,55 @@ class LocalStore extends ChangeNotifier {
       final history = Map.of(_history);
       final states = Map.of(_followStates);
       final seriesCandidates = Map.of(_seriesCandidates);
+      final replacements = hongguoSeriesIdReplacements([
+        ...seriesCandidates.values,
+        ...favorites.values,
+        ...history.values.map((entry) => entry.drama),
+        for (final state in states.values)
+          for (final notice in state.seriesSeasons.values)
+            Drama(
+              id: notice.id,
+              source: SourceSite.hongguo.id,
+              title: notice.title,
+            ),
+      ], updates.where((drama) => allowsSource(drama.source)));
+      for (final row in replacements.entries) {
+        final fresh = row.value;
+        final candidate = seriesCandidates.remove(row.key);
+        if (candidate != null) {
+          seriesCandidates[fresh.id] = mergeHongguoSeriesIdentity(
+            candidate,
+            fresh,
+          );
+        }
+        final favorite = favorites.remove(row.key);
+        if (favorite != null) {
+          final corrected = mergeHongguoSeriesIdentity(favorite, fresh);
+          favorites[fresh.id] = corrected.merge(
+            favorites[fresh.id] ?? corrected,
+          );
+          final state = states.remove(row.key);
+          if (state != null) {
+            states[fresh.id] = _mergeSeriesFollowState(state, states[fresh.id]);
+          }
+        }
+        final previous = history.remove(row.key);
+        if (previous != null) {
+          final current = history[fresh.id];
+          final chosen =
+              current == null || previous.updatedAt.isAfter(current.updatedAt)
+              ? previous
+              : current;
+          history[fresh.id] = WatchEntry(
+            drama: mergeHongguoSeriesIdentity(chosen.drama, fresh),
+            episode: chosen.episode,
+            position: chosen.position,
+            duration: chosen.duration,
+            updatedAt: chosen.updatedAt,
+          );
+        }
+      }
+      if (replacements.isNotEmpty) _replaceSeriesNotices(states, replacements);
       for (final drama in updates) {
         if (!allowsSource(drama.source)) continue;
         if (cacheSeriesCandidates && allowsSource(drama.source)) {
@@ -1015,7 +1116,8 @@ class LocalStore extends ChangeNotifier {
         history.values.map((entry) => entry.toJson()).toList(),
       );
       final statesJson = _encodeFollowStates(states);
-      final seriesCandidateJson = cacheSeriesCandidates
+      final seriesCandidateJson =
+          cacheSeriesCandidates || replacements.isNotEmpty
           ? jsonEncode(
               (seriesCandidates.values.toList()
                     ..sort((a, b) => a.id.compareTo(b.id)))

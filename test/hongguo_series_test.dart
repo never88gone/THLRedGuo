@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/player/luna_exo_player.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/core/store/follow_state.dart';
 import 'package:THLRedLook/pages/detail/detail_page.dart';
 import 'package:THLRedLook/pages/player/player_page.dart';
 import 'package:THLRedLook/core/series/hongguo_series.dart';
@@ -56,6 +57,111 @@ class _SeriesRepository extends AppRepository {
   Future<void> release(String session) async {}
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+const _exactFourth = Drama(
+  id: 'hongguo:7688558312157088793',
+  source: 'hongguo',
+  sourceId: '7688558312157088793',
+  title: '满院亲戚全是上古大妖第四季',
+  episodes: 155,
+);
+const _roundedFourth = Drama(
+  id: 'hongguo:7688558312157089000',
+  source: 'hongguo',
+  sourceId: '7688558312157089000',
+  title: '满院亲戚全是上古大妖第四季',
+  episodes: 155,
+);
+const _exactSecond = Drama(
+  id: 'hongguo:7678338044344159256',
+  source: 'hongguo',
+  sourceId: '7678338044344159256',
+  title: '满院亲戚全是上古大妖第二季',
+  episodes: 100,
+);
+const _roundedSecond = Drama(
+  id: 'hongguo:7678338044344159000',
+  source: 'hongguo',
+  sourceId: '7678338044344159000',
+  title: '满院亲戚全是上古大妖第二季',
+  episodes: 100,
+);
+const _exactFifth = Drama(
+  id: 'hongguo:7695704804978330649',
+  source: 'hongguo',
+  sourceId: '7695704804978330649',
+  title: '满院亲戚全是上古大妖第五季',
+  episodes: 222,
+);
+
+class _FreshSeriesRepository extends _SeriesRepository {
+  @override
+  Future<CatalogPage> catalog(
+    String source, {
+    int page = 1,
+    String query = '',
+    String category = '',
+    bool force = false,
+  }) async => CatalogPage(const [
+    _exactSecond,
+    _exactFourth,
+    _exactFifth,
+  ], hasMore: false);
+}
+
+class _DelayedSeriesRepository extends _FreshSeriesRepository {
+  final firstSearch = Completer<CatalogPage>();
+  final detailIds = <String>[];
+  int searches = 0;
+  @override
+  Future<CatalogPage> catalog(
+    String source, {
+    int page = 1,
+    String query = '',
+    String category = '',
+    bool force = false,
+  }) {
+    if (searches++ == 0) return firstSearch.future;
+    return super.catalog(
+      source,
+      page: page,
+      query: query,
+      category: category,
+      force: force,
+    );
+  }
+
+  @override
+  Future<DramaDetail> detail(Drama drama) async {
+    detailIds.add(drama.id);
+    if (hasRoundedHongguoSeriesId(drama)) throw AppFailure('MISSING_EPISODE');
+    return _detail(drama);
+  }
+}
+
+class _UnlistedRoundedRepository extends _SeriesRepository {
+  _UnlistedRoundedRepository(this.searchFails);
+  final bool searchFails;
+  @override
+  Future<CatalogPage> catalog(
+    String source, {
+    int page = 1,
+    String query = '',
+    String category = '',
+    bool force = false,
+  }) async {
+    if (searchFails) throw AppFailure('合成搜索暂不可用');
+    return CatalogPage(const []);
+  }
+
+  @override
+  Future<DramaDetail> detail(Drama drama) async => DramaDetail(drama, [
+    Episode({
+      'raw':
+          'https://hongguoduanju.com/player/${drama.cleanSourceId}/7345678901234567891',
+    }, 1),
+  ]);
 }
 
 class _SeriesPlayer extends LunaExoPlayer {
@@ -193,6 +299,278 @@ void main() {
     expect(
       tester.widget<PlayerScreen>(find.byType(PlayerScreen)).detail.drama.id,
       _fourth.id,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await advance();
+    store.dispose();
+  });
+
+  test('官方新搜索必须修正已锁定季度中的旧精度丢失编号', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final seeded = LocalStore(prefs);
+    await seeded.refreshDramas(const [
+      _roundedSecond,
+      _roundedFourth,
+      _exactFifth,
+    ]);
+    seeded.dispose();
+    final store = LocalStore(prefs);
+    addTearDown(store.dispose);
+    final entries = await discoverSeriesSeasons(
+      anchor: _exactFifth,
+      repository: _FreshSeriesRepository(),
+      store: store,
+      existingEntries: hongguoSeriesEntries(
+        _exactFifth,
+        store.seriesDramasFor(_exactFifth),
+      ),
+    );
+    expect(entries.singleWhere((e) => e.season == 4).drama.id, _exactFourth.id);
+    expect(entries.singleWhere((e) => e.season == 2).drama.id, _exactSecond.id);
+  });
+
+  test('旧编号修正后持久化收藏、进度与新季提醒，重启不再选旧编号', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = LocalStore(prefs);
+    final watchedAt = DateTime(2026, 10, 18, 15, 30);
+    await store.toggleFavorite(_exactSecond);
+    await store.refreshDramas(const [
+      _roundedFourth,
+      _roundedSecond,
+      _exactFifth,
+    ]);
+    await store.markSeriesSeasonRead(_exactSecond.id, _roundedFourth.id);
+    await store.toggleFavorite(_roundedFourth);
+    await store.setFollowStatus(_roundedFourth, FollowStatus.watching);
+    await store.saveWatch(
+      WatchEntry(
+        drama: _roundedFourth,
+        episode: 12,
+        position: 37.5,
+        duration: 158,
+        updatedAt: watchedAt,
+      ),
+    );
+    await store.refreshDramas(const [_exactFourth, _exactSecond, _exactFifth]);
+    store.dispose();
+    final restored = LocalStore(prefs);
+    addTearDown(restored.dispose);
+    expect(restored.isFavorite(_exactFourth.id), isTrue);
+    expect(restored.isFavorite(_roundedFourth.id), isFalse);
+    final watch = restored.watched(_exactFourth.id)!;
+    expect(watch.episode, 12);
+    expect(watch.position, 37.5);
+    expect(watch.updatedAt, watchedAt);
+    expect(restored.watched(_roundedFourth.id), isNull);
+    expect(restored.following(_exactFourth.id)!.status, FollowStatus.watching);
+    final notices = restored.following(_exactSecond.id)!.seriesSeasons;
+    expect(notices.containsKey(_roundedFourth.id), isFalse);
+    expect(notices.containsKey(_exactFourth.id), isFalse);
+    final seasons = hongguoSeriesEntries(
+      _exactFifth,
+      restored.seriesDramasFor(_exactFifth),
+    );
+    expect(seasons.singleWhere((e) => e.season == 4).drama.id, _exactFourth.id);
+  });
+
+  test('未单独收藏的新季提醒迁移后保留已读状态', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = LocalStore(prefs);
+    await store.toggleFavorite(_exactSecond);
+    await store.refreshDramas(const [_roundedFourth]);
+    await store.markSeriesSeasonRead(_exactSecond.id, _roundedFourth.id);
+    expect(
+      store.following(_exactSecond.id)!.seriesSeasons[_roundedFourth.id]!.read,
+      isTrue,
+    );
+    await store.refreshDramas(const [_exactFourth]);
+    store.dispose();
+    final restored = LocalStore(prefs);
+    addTearDown(restored.dispose);
+    final notices = restored.following(_exactSecond.id)!.seriesSeasons;
+    expect(notices.containsKey(_roundedFourth.id), isFalse);
+    expect(notices[_exactFourth.id]!.read, isTrue);
+  });
+
+  test('编号迁移与准确编号历史共存时保留较新断点与手动追剧状态', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore(await SharedPreferences.getInstance());
+    addTearDown(store.dispose);
+    await store.toggleFavorite(_roundedFourth);
+    await store.setFollowStatus(_roundedFourth, FollowStatus.watched);
+    await store.toggleFavorite(_exactFourth);
+    await store.saveWatch(
+      WatchEntry(
+        drama: _roundedFourth,
+        episode: 12,
+        position: 37,
+        duration: 158,
+        updatedAt: DateTime(2026, 10, 17),
+      ),
+    );
+    await store.saveWatch(
+      WatchEntry(
+        drama: _exactFourth,
+        episode: 33,
+        position: 42,
+        duration: 100,
+        updatedAt: DateTime(2026, 10, 18),
+      ),
+    );
+    await store.refreshDramas(const [_exactFourth]);
+    expect(store.favorites, hasLength(1));
+    expect(store.watched(_exactFourth.id)!.episode, 33);
+    expect(store.watched(_exactFourth.id)!.position, 42);
+    expect(store.following(_exactFourth.id)!.manuallyWatched, isTrue);
+  });
+
+  test('编号修正仅接受同剧同季且唯一的官方准确结果', () {
+    const differentSeason = Drama(
+      id: 'hongguo:7688558312157088793',
+      source: 'hongguo',
+      title: '满院亲戚全是上古大妖第三季',
+    );
+    const differentTitle = Drama(
+      id: 'hongguo:7688558312157088793',
+      source: 'hongguo',
+      title: '合成另一部短剧第四季',
+    );
+    const secondExactId = Drama(
+      id: 'hongguo:7688558312157088794',
+      source: 'hongguo',
+      title: '满院亲戚全是上古大妖第四季',
+    );
+    expect(
+      hongguoSeriesIdReplacements(
+        [_roundedFourth],
+        [differentSeason, differentTitle],
+      ),
+      isEmpty,
+    );
+    expect(
+      hongguoSeriesIdReplacements(
+        [_roundedFourth],
+        [_exactFourth, secondExactId],
+      ),
+      isEmpty,
+    );
+    expect(
+      hongguoSeriesIdReplacements([_exactFourth], [_roundedFourth]),
+      isEmpty,
+    );
+    expect(
+      hongguoSeriesIdReplacements(
+        [_roundedFourth],
+        [_exactFourth],
+      )[_roundedFourth.id]!.id,
+      _exactFourth.id,
+    );
+    const variantTitle = Drama(
+      id: 'hongguo:7688558312157089000',
+      source: 'hongguo',
+      title: '满院亲戚全是上古大妖 第4季 (全集)',
+    );
+    expect(
+      hongguoSeriesIdReplacements(
+        [variantTitle],
+        [_exactFourth],
+      )[variantTitle.id]!.id,
+      _exactFourth.id,
+    );
+  });
+
+  test('旧编号点击后必须重新查证，不能从失真数字猜出原始编号', () async {
+    final corrected = await resolveHongguoSeriesIdentity(
+      drama: _roundedFourth,
+      repository: _FreshSeriesRepository(),
+    );
+    expect(corrected.cleanSourceId, '7688558312157088793');
+    expect(
+      () => resolveHongguoSeriesIdentity(
+        drama: _roundedFourth,
+        repository: _SeriesRepository(),
+      ),
+      throwsA(
+        isA<AppFailure>().having((e) => e.code, 'code', 'STALE_SERIES_ID'),
+      ),
+    );
+  });
+
+  test('仅凭末尾为零不能拒绝官方确有准确分集的合法编号', () async {
+    for (final searchFails in [false, true]) {
+      final verified = await resolveHongguoSeriesIdentity(
+        drama: _roundedFourth,
+        repository: _UnlistedRoundedRepository(searchFails),
+      );
+      expect(verified.id, _roundedFourth.id);
+      expect(verified.cleanSourceId, _roundedFourth.cleanSourceId);
+    }
+  });
+
+  testWidgets('网络刷新未完成时点击旧季度，播放器仍使用查证后的准确编号', (tester) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore(await SharedPreferences.getInstance());
+    await store.refreshDramas(const [_roundedFourth, _exactFifth]);
+    final repository = _DelayedSeriesRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DetailScreen(
+          drama: _exactFifth,
+          initialDetail: _detail(_exactFifth),
+          repository: repository,
+          store: store,
+          initialSeriesEntries: hongguoSeriesEntries(_exactFifth, const [
+            _roundedFourth,
+            _exactFifth,
+          ]),
+          playerFactory: _SeriesPlayer.new,
+          videoBuilder: (controls) => controls,
+        ),
+      ),
+    );
+    Future<void> advance() async {
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    await tester.tap(find.byKey(const ValueKey('start-play')));
+    await advance();
+    final old = find.byKey(
+      const ValueKey('player-season-hongguo:7688558312157089000'),
+    );
+    await tester.ensureVisible(old);
+    await tester.tap(old);
+    await advance();
+    expect(repository.detailIds, [_exactFourth.id]);
+    expect(
+      tester.widget<PlayerScreen>(find.byType(PlayerScreen)).detail.drama.id,
+      _exactFourth.id,
+    );
+    repository.firstSearch.complete(
+      CatalogPage(const [_exactSecond, _exactFourth, _exactFifth]),
+    );
+    await advance();
+    Navigator.of(tester.element(find.byType(PlayerScreen))).pop();
+    await advance();
+    expect(
+      tester
+          .widget<InkWell>(
+            find.byKey(const ValueKey('series-hongguo:7688558312157088793')),
+          )
+          .onTap,
+      isNull,
+    );
+    expect(
+      find.byKey(const ValueKey('series-hongguo:7688558312157089000')),
+      findsNothing,
     );
     await tester.pumpWidget(const SizedBox.shrink());
     await advance();

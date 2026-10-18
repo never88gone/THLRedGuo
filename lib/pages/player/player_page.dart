@@ -429,6 +429,12 @@ class _PlayerScreenState extends State<PlayerScreen>
     );
 
     try {
+      seasonDrama = await resolveHongguoSeriesIdentity(
+        drama: seasonDrama,
+        repository: widget.repository,
+        store: widget.store,
+      );
+      if (!mounted || _closed || ticket != _seasonSwitchTicket) return;
       final safeDrama =
           seasonDrama.sourceId.isEmpty || seasonDrama.sourceId.contains(':')
           ? Drama(
@@ -493,7 +499,10 @@ class _PlayerScreenState extends State<PlayerScreen>
             allowOnlineFallback: widget.allowOnlineFallback,
             playerFactory: widget.playerFactory,
             videoBuilder: widget.videoBuilder,
-            initialSeriesEntries: _currentSeriesEntries,
+            initialSeriesEntries: hongguoSeriesEntries(nextDetail.drama, [
+              ..._currentSeriesEntries.map((entry) => entry.drama),
+              ...widget.store.seriesDramasFor(nextDetail.drama),
+            ], lockedEntries: _currentSeriesEntries),
             onSeasonChanged: widget.onSeasonChanged,
           ),
         ),

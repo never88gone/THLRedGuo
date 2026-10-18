@@ -108,13 +108,23 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _load() async {
-    final drama = _detail?.drama ?? widget.drama;
+    var drama = _detail?.drama ?? widget.drama;
     final generation = ++_generation;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
+      drama = await resolveHongguoSeriesIdentity(
+        drama: drama,
+        repository: widget.repository,
+        store: widget.store,
+      );
+      if (!mounted ||
+          generation != _generation ||
+          _profileEpoch != widget.store.profileEpoch) {
+        return;
+      }
       final detail = await widget.repository.detail(drama);
       if (!mounted ||
           generation != _generation ||
@@ -138,6 +148,10 @@ class _DetailScreenState extends State<DetailScreen> {
                 : <Episode>[]);
       setState(() {
         _detail = DramaDetail(merged, finalEpisodes, warning: detail.warning);
+        _seriesEntries = hongguoSeriesEntries(merged, [
+          ...?_seriesEntries?.map((entry) => entry.drama),
+          ...widget.store.seriesDramasFor(merged),
+        ], lockedEntries: _seriesEntries);
         _loading = false;
         _episodePage =
             resumeEpisodeIndex(
@@ -331,6 +345,10 @@ class _DetailScreenState extends State<DetailScreen> {
     _generation++;
     setState(() {
       _detail = detail;
+      _seriesEntries = hongguoSeriesEntries(detail.drama, [
+        ...?_seriesEntries?.map((entry) => entry.drama),
+        ...widget.store.seriesDramasFor(detail.drama),
+      ], lockedEntries: _seriesEntries);
       _loading = false;
       _error = null;
       _expandedDescription = false;
