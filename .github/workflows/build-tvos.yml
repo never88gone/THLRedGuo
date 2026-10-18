@@ -6,18 +6,12 @@ on:
     tags: ['v*']
     paths:
       - 'tvos/**'
-      - 'scripts/build_tvos.py'
-      - 'scripts/update_tvos_branding.py'
-      - 'scripts/generate_tvos_*.py'
-      - 'scripts/set_testflight_notes.py'
+      - 'scripts/**'
       - '.github/workflows/build-tvos.yml'
   pull_request:
     paths:
       - 'tvos/**'
-      - 'scripts/build_tvos.py'
-      - 'scripts/update_tvos_branding.py'
-      - 'scripts/generate_tvos_*.py'
-      - 'scripts/set_testflight_notes.py'
+      - 'scripts/**'
       - '.github/workflows/build-tvos.yml'
   workflow_dispatch:
 
@@ -135,3 +129,45 @@ jobs:
           path: dist/tvos/*
           if-no-files-found: error
           retention-days: 14
+
+  release-tvos:
+    name: Apple tvOS 产物自动发布至 GitHub Release
+    needs: tvos
+    if: always() && github.event_name != 'pull_request' && needs.tvos.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: tvos-packages
+          path: release
+      - name: 自动上传 tvOS 安装包至 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${{ github.ref_name }}"
+            base_version="${tag#v}"
+          else
+            version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
+            base_version="${version%%+*}"
+            tag="v${base_version}"
+          fi
+
+          echo "准备上传 tvOS 产物至 Release: $tag"
+          ls -la release/
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "更新已有 Release: $tag 资产"
+            gh release upload "$tag" release/* --clobber
+          else
+            echo "创建新 Release: $tag (Target: ${{ github.sha }})"
+            gh release create "$tag" release/* \
+              --title "糖葫芦Haw v${base_version}" \
+              --notes "## 糖葫芦Haw (THLRedLook) v${base_version} Apple tvOS 原生大屏版本发布" \
+              --target "${{ github.sha }}"
+          fi

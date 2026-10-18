@@ -11,15 +11,10 @@ on:
       - 'ios/**'
       - 'macos/**'
       - 'windows/**'
+      - 'packages/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
-      - 'scripts/build_android.py'
-      - 'scripts/build_windows.py'
-      - 'scripts/build_ios.py'
-      - 'scripts/build_macos.py'
-      - 'scripts/package_release.py'
-      - 'scripts/configure_signing.py'
-      - 'scripts/set_testflight_notes.py'
+      - 'scripts/**'
       - '.github/workflows/build-flutter.yml'
   pull_request:
     paths:
@@ -29,15 +24,10 @@ on:
       - 'ios/**'
       - 'macos/**'
       - 'windows/**'
+      - 'packages/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
-      - 'scripts/build_android.py'
-      - 'scripts/build_windows.py'
-      - 'scripts/build_ios.py'
-      - 'scripts/build_macos.py'
-      - 'scripts/package_release.py'
-      - 'scripts/configure_signing.py'
-      - 'scripts/set_testflight_notes.py'
+      - 'scripts/**'
       - '.github/workflows/build-flutter.yml'
   workflow_dispatch:
     inputs:
@@ -369,7 +359,7 @@ jobs:
   release:
     name: Flutter 跨平台产物汇总与 Release 发布
     needs: [android, windows, ios, macos]
-    if: always() && (needs.android.result == 'success' || needs.windows.result == 'success' || needs.macos.result == 'success')
+    if: always() && github.event_name != 'pull_request' && (needs.android.result == 'success' || needs.windows.result == 'success' || needs.macos.result == 'success' || needs.ios.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -382,32 +372,26 @@ jobs:
       - name: 生成发布文件清单与校验和
         run: |
           set -euo pipefail
-          version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
           mkdir -p release
-          # 仅收集 Android, Windows, macOS 产物，严格排除 iOS 与 tvOS（专供 TestFlight 分发）
+          # 收集所有已构建平台的发布产物（Android APK、Windows Zip、macOS DMG、iOS IPA 等）
           for directory in artifacts/*/; do
+            [ -d "$directory" ] || continue
             dirname=$(basename "$directory")
-            if [ "$dirname" = "ios-packages" ] || [ "$dirname" = "tvos-packages" ]; then
-              echo "跳过 $dirname（iOS 与 tvOS 已上架 TestFlight，不放入 GitHub Releases）"
-              continue
-            fi
+            echo "正在处理产物目录: $dirname"
             for file in "$directory"*; do
               [ -f "$file" ] || continue
               name=$(basename "$file")
               if [ "$name" = "SHA256SUMS.txt" ]; then
                 continue
               fi
-              if [[ "$name" == *"-ios"* ]] || [[ "$name" == *"-tvos"* ]]; then
-                echo "排除包含 iOS/tvOS 的文件: $name"
-                continue
-              fi
               cp "$file" "release/$name"
+              echo "  已纳入发布文件: $name"
             done
           done
           cd release
           mapfile -t files < <(find . -maxdepth 1 -type f -printf '%f\n' | sort)
           if [ ${#files[@]} -eq 0 ]; then
-            echo "未发现任何非 iOS/tvOS 的发布产物，请检查打包日志。" >&2
+            echo "未发现任何发布产物，请检查打包日志。" >&2
             exit 1
           fi
           sha256sum "${files[@]}" > SHA256SUMS.txt
@@ -417,14 +401,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
-          base_version="${version%%+*}"
-          tag="v${base_version}"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${{ github.ref_name }}"
+            base_version="${tag#v}"
+          else
+            version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
+            base_version="${version%%+*}"
+            tag="v${base_version}"
+          fi
           
           {
             printf '%s\n\n' "## 糖葫芦Haw (THLRedLook) v${base_version} 正式发布"
-            printf '%s\n\n' "一款多平台独立运行的短剧与流媒体播放器，内置官方标准规范的数据源，支持端侧独立解析与在线播放。"
-            printf '%s\n\n' "### 📦 跨平台安装包下载（除 iOS 走 TestFlight 外，其余端均在此下载）："
+            printf '%s\n\n' "全平台独立运行的短剧与流媒体聚合播放器，内置官方标准规范的数据源，支持端侧独立解析与在线播放。"
+            printf '%s\n\n' "### 📦 跨平台安装包下载："
             printf '%s\n' "#### 📱 Android (手机 / 平板 / 电视盒子)"
             printf '%s\n' "- \`*-arm64-v8a.apk\`：绝大多数现代 64 位手机与平板设备（推荐）"
             printf '%s\n' "- \`*-armeabi-v7a.apk\`：较老的 32 位手机或部分电视盒子"
@@ -433,23 +422,18 @@ jobs:
             printf '%s\n' "- \`*-windows-x64.zip\`：Windows 10 / 11 64 位绿色便携版，解压后直接双击运行主程序，支持专属 Shader 滤镜画质增强"
             printf '\n%s\n' "#### 💻 macOS (Mac 电脑)"
             printf '%s\n' "- \`*-macos.dmg\`：macOS 原生磁盘映像安装包，双击打开后拖拽至 Applications 即可安装（推荐）"
-            printf '\n%s\n' "#### 🍏 iOS (Apple 设备)"
-            printf '%s\n' "- iOS (iPhone / iPad) 已通过官方 Apple TestFlight 提供测试与在线安装，无需在此下载未签名离线包。"
+            printf '\n%s\n' "#### 🍏 iOS (iPhone / iPad)"
+            printf '%s\n' "- \`*-ios-unsigned.ipa\`：iOS 离线安装包（可通过 AltStore / Sideloadly / TrollStore / 爱思助手直接自签安装）"
             printf '\n%s\n' "---"
             printf '%s\n' "### 🔒 安全校验与哈希"
-            printf '%s\n' "全部发布产物的完整性哈希已记录于 \`SHA256SUMS.txt\`。"
+            printf '%s\n' "本次发布产物的完整性哈希已记录于 \`SHA256SUMS.txt\`。"
           } > notes.md
 
-          # 自动创建或覆盖更新 GitHub Release
+          # 自动创建或增量更新 GitHub Release（--clobber 覆盖同名文件，并安全保留已有的其他平台安装包）
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "更新已有 Release: $tag"
             gh release upload "$tag" release/* --clobber
             gh release edit "$tag" --title "糖葫芦Haw v${base_version}" --notes-file notes.md
-            for name in $(gh release view "$tag" --json assets --jq '.assets[].name'); do
-              if [ ! -e "release/$name" ]; then
-                gh release delete-asset "$tag" "$name" --yes
-              fi
-            done
           else
             echo "创建新 Release: $tag (Target: ${{ github.sha }})"
             gh release create "$tag" release/* \

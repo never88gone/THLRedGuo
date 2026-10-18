@@ -1,8 +1,69 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:THLRedLook/core/series/hongguo_series.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/views/search/search_input.dart';
 
 void main() {
+  testWidgets('提交新搜索词时不能选中尚未刷新的旧联想', (tester) async {
+    final pending = Completer<List<String>>();
+    final controller = TextEditingController();
+    final submitted = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchInput(
+            controller: controller,
+            hint: '合成搜索',
+            autofocus: true,
+            suggestions: (value) async =>
+                value == '都市' ? ['都市合成候选'] : pending.future,
+            onSearch: submitted.add,
+          ),
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextField), '都市');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump();
+    expect(find.text('都市合成候选'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '萌宝');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    expect(submitted, ['萌宝']);
+    expect(controller.text, '萌宝');
+    pending.complete([]);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
+
+  testWidgets('点击联想结果仍按所选完整标题搜索', (tester) async {
+    final controller = TextEditingController();
+    final submitted = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchInput(
+            controller: controller,
+            hint: '合成搜索',
+            autofocus: true,
+            suggestions: (_) async => ['合成短剧第五季'],
+            onSearch: submitted.add,
+          ),
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextField), '合成');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('search-suggestion-0')));
+    expect(submitted, ['合成短剧第五季']);
+    expect(controller.text, '合成短剧第五季');
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
+
   group('官方多季剧集识别与聚合引擎 (Hongguo Multi-Season Engine) 测试', () {
     test('1. 基础标题清洗 (去除画质与状态杂质)', () {
       expect(cleanSeriesBaseTitle('盖世龙王 (4K高清全集)'), equals('盖世龙王'));

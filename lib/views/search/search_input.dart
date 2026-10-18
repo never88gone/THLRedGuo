@@ -30,7 +30,6 @@ class _SearchInputState extends State<SearchInput> {
   Timer? _timer;
   Completer<Iterable<String>>? _pending;
   int _generation = 0;
-  bool _selected = false;
   final _cache = <String, List<String>>{};
 
   void _cancel() {
@@ -129,10 +128,7 @@ class _SearchInputState extends State<SearchInput> {
       textEditingController: widget.controller,
       focusNode: _focus,
       optionsBuilder: _options,
-      onSelected: (value) {
-        _selected = true;
-        _submit(value);
-      },
+      onSelected: _submit,
       fieldViewBuilder: (context, controller, focus, submitted) => TextField(
         controller: controller,
         focusNode: focus,
@@ -142,11 +138,7 @@ class _SearchInputState extends State<SearchInput> {
           widget.onChanged?.call(value);
           setState(() {});
         },
-        onSubmitted: (value) {
-          _selected = false;
-          submitted();
-          if (!_selected) _submit(value);
-        },
+        onSubmitted: _submit,
         decoration: InputDecoration(
           hintText: widget.hint,
           prefixIcon: const Icon(Icons.search_rounded),
@@ -186,7 +178,9 @@ class _SearchInputState extends State<SearchInput> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
               side: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.35),
+                color: Theme.of(
+                  context,
+                ).colorScheme.outlineVariant.withValues(alpha: 0.35),
                 width: 0.8,
               ),
             ),
