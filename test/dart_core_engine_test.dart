@@ -1,9 +1,275 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+
 import 'package:THLRedLook/core/engine/dart_core_engine.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
+import 'package:THLRedLook/core/player/playback_diagnostics.dart';
+import 'package:THLRedLook/core/player/playback_loader.dart';
+import 'package:THLRedLook/core/player/playback_recovery.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
+
+class _RecoveryRepository extends AppRepository {
+  final pending = <String, Completer<PlaybackPlan>>{};
+  final released = <String>[];
+  int cancellations = 0;
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+  @override
+  Future<PlaybackPlan> resolve(
+    Drama drama,
+    Episode episode, {
+    int quality = 0,
+  }) => (pending[drama.id] ??= Completer<PlaybackPlan>()).future;
+  @override
+  Future<void> cancelPlayback() async {
+    cancellations++;
+  }
+
+  @override
+  Future<void> release(String session) async {
+    released.add(session);
+  }
+}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  group('切季播放恢复与 JS 响应解析回归', () {
+    test('音频设备初始化失败必须恢复，不能仅以画面进度判定成功', () {
+      expect(
+        PlaybackRecovery.audioOutputFailed(
+          'Could not open/initialize audio device -> no sound.',
+        ),
+        isTrue,
+      );
+      expect(
+        PlaybackRecovery.audioOutputFailed(
+          'COULD NOT OPEN/INITIALIZE AUDIO DEVICE',
+        ),
+        isTrue,
+      );
+      expect(
+        PlaybackRecovery.audioOutputFailed('temporary network warning'),
+        isFalse,
+      );
+      expect(PlaybackRecovery.audioOutputFailed(''), isFalse);
+    });
+    const encrypted = PlaybackPlan(
+      url: 'https://synthetic.test/current.mp4',
+      decryptionKey: '11111111111111111111111111111111',
+      session: 'same-episode',
+    );
+    final episode = Episode({'id': 'synthetic-1'}, 1);
+    const oldSeason = Drama(
+      id: 'hongguo:synthetic-five',
+      source: 'hongguo',
+      title: '合成第五季',
+    );
+    const newSeason = Drama(
+      id: 'hongguo:synthetic-four',
+      source: 'hongguo',
+      title: '合成第四季',
+    );
+
+    test('解密缓存使用当前准确分集，失败重试共用上限且不重复首轮缓存', () {
+      final recovery = PlaybackRecovery();
+      expect(
+        recovery.next(encrypted, allowCache: true),
+        PlaybackRecoveryAction.cache,
+      );
+      expect(recovery.cacheAttempted, isTrue);
+      for (var i = 1; i < PlaybackRecovery.maxAttempts; i++) {
+        expect(
+          recovery.next(encrypted, allowCache: true),
+          PlaybackRecoveryAction.refresh,
+        );
+        expect(recovery.retryDelay.inMilliseconds, inInclusiveRange(300, 1500));
+      }
+      expect(
+        recovery.next(encrypted, allowCache: true),
+        PlaybackRecoveryAction.stop,
+      );
+      recovery.reset();
+      expect(recovery.cacheAttempted, isFalse);
+      expect(
+        recovery.next(encrypted, allowCache: true),
+        PlaybackRecoveryAction.cache,
+      );
+    });
+
+    test('未加密、本地或不支持缓存的播放器不选缓存恢复', () {
+      for (final plan in [
+        const PlaybackPlan(url: 'https://synthetic.test/plain.mp4'),
+        const PlaybackPlan(
+          url: '/synthetic/local.mp4',
+          local: true,
+          decryptionKey: '11111111111111111111111111111111',
+        ),
+      ]) {
+        expect(
+          PlaybackRecovery().next(plan, allowCache: true),
+          PlaybackRecoveryAction.refresh,
+        );
+      }
+      expect(
+        PlaybackRecovery().next(encrypted),
+        PlaybackRecoveryAction.refresh,
+      );
+    });
+
+    test('旧季空闲加载器退出不取消新季的取流', () async {
+      final repository = _RecoveryRepository();
+      final previous = PlaybackLoader(repository);
+      final next = PlaybackLoader(repository);
+      final first = previous.load(oldSeason, episode);
+      repository.pending[oldSeason.id]!.complete(encrypted);
+      await first;
+      final second = next.load(newSeason, episode);
+      await previous.close();
+      expect(repository.cancellations, 0);
+      repository.pending[newSeason.id]!.complete(
+        const PlaybackPlan(
+          url: 'https://synthetic.test/new.mp4',
+          session: 'new-season',
+        ),
+      );
+      expect((await second)!.session, 'new-season');
+      await next.close();
+      expect(repository.cancellations, 0);
+    });
+
+    test('退出仍会取消自己的在途取流，并释放迟到会话', () async {
+      final repository = _RecoveryRepository();
+      final loader = PlaybackLoader(repository);
+      final pending = loader.load(oldSeason, episode);
+      await loader.close();
+      expect(repository.cancellations, 1);
+      repository.pending[oldSeason.id]!.complete(encrypted);
+      expect(await pending, isNull);
+      expect(repository.released, ['same-episode']);
+    });
+
+    test('快速换集忽略旧结果，保持最后一次请求', () async {
+      final repository = _RecoveryRepository();
+      final loader = PlaybackLoader(repository);
+      final first = loader.load(oldSeason, episode);
+      final second = loader.load(newSeason, episode);
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.cancellations, 1);
+      repository.pending[oldSeason.id]!.complete(encrypted);
+      repository.pending[newSeason.id]!.complete(
+        const PlaybackPlan(
+          url: 'https://synthetic.test/new.mp4',
+          session: 'new-season',
+        ),
+      );
+      expect(await first, isNull);
+      expect((await second)!.session, 'new-season');
+      expect(repository.released, ['same-episode']);
+      await loader.close();
+    });
+
+    test('没有错误码的站源失败也保留说明，诊断移除地址和凭据', () {
+      final summary = playbackFailureSummary(
+        AppFailure(
+          '合成失败 https://synthetic.test/a.mp4?token=private access_token="synthetic-token" contentKey="11111111111111111111111111111111"\n请重试',
+        ),
+      );
+      expect(summary, contains('source_error: 合成失败'));
+      expect(summary, contains('请重试'));
+      for (final value in [
+        'https://',
+        'synthetic-token',
+        '11111111111111111111111111111111',
+        '\n',
+      ]) {
+        expect(summary, isNot(contains(value)));
+      }
+    });
+
+    test('长整数保护不改写字符串内的游标 JSON、转义引号和数字文本', () async {
+      final runtime = CatPawJsRuntime();
+      try {
+        await runtime.init(r"""
+var spider = {
+  play: async function() {
+    var text = String.raw`{"id":7695704804978330649,"nested":{"ids":[7688558312157088793,-7695704804978330649]},"passback":"{\"id\":7695704804978330649,\"list\":[7688558312157088793]}","description":"数字:7695704804978330649,数组[7688558312157088793]","escaped":"\\\"id:7695704804978330649,","fraction":123456789012345.5,"exponent":1.25e18}`;
+    var parsed = JSON.parse(text);
+    var revived = JSON.parse('{"id":7695704804978330649}', function(key,value){return key === 'id' ? 'revived:'+value : value;});
+    var malformedRejected = false;
+    try { JSON.parse('{"id":07695704804978330649}'); } catch(e) {malformedRejected=true;}
+    return {url:'https://synthetic.test/video.mp4',header:{id:parsed.id,negative:parsed.nested.ids[1],array:parsed.nested.ids[0],passback:parsed.passback,description:parsed.description,escaped:parsed.escaped,fractionType:typeof parsed.fraction,exponentType:typeof parsed.exponent,revived:revived.id,malformed:String(malformedRejected)}};
+  }
+};
+""");
+        final result = await runtime.play('', 'synthetic');
+        expect(result.header['id'], '7695704804978330649');
+        expect(result.header['negative'], '-7695704804978330649');
+        expect(result.header['array'], '7688558312157088793');
+        expect(
+          result.header['passback'],
+          '{"id":7695704804978330649,"list":[7688558312157088793]}',
+        );
+        expect(
+          result.header['description'],
+          '数字:7695704804978330649,数组[7688558312157088793]',
+        );
+        expect(result.header['escaped'], contains('id:7695704804978330649,'));
+        expect(result.header['fractionType'], 'number');
+        expect(result.header['exponentType'], 'number');
+        expect(result.header['revived'], 'revived:7695704804978330649');
+        expect(result.header['malformed'], 'true');
+      } finally {
+        runtime.dispose();
+      }
+    });
+
+    test('取消中的 JS 请求返回明确取消，新调用不继承取消状态', () async {
+      final started = Completer<void>();
+      final response = Completer<http.Response>();
+      var calls = 0;
+      final client = MockClient((request) async {
+        calls++;
+        if (calls == 1) {
+          started.complete();
+          return response.future;
+        }
+        return http.Response('{}', 200);
+      });
+      final runtime = CatPawJsRuntime(client);
+      try {
+        await runtime.init(
+          '''var spider={play:async function(){await fetch('https://synthetic.test/hold');return {url:'https://synthetic.test/video.mp4'};}};''',
+        );
+        final first = runtime.play('', 'synthetic');
+        final failed = expectLater(
+          first,
+          throwsA(
+            isA<CatPawSourceFailure>().having(
+              (e) => e.code,
+              'code',
+              'cancelled',
+            ),
+          ),
+        );
+        await started.future;
+        runtime.cancelPending();
+        response.complete(http.Response('{}', 200));
+        await failed;
+        expect(
+          (await runtime.play('', 'synthetic')).url,
+          'https://synthetic.test/video.mp4',
+        );
+      } finally {
+        runtime.dispose();
+        client.close();
+      }
+    });
+  });
   group('DartCoreEngine 核心引擎与内置源调度自动化测试', () {
     late DartCoreEngine engine;
     late String hongguoScript;
@@ -219,7 +485,8 @@ globalThis.fetch = async function(url, options) {
         },
       });
       expect(result['ok'], isFalse);
-      expect(result['error'], contains('无法从数据源'));
+      expect(result['error'], contains('站源暂未返回本集可播放地址'));
+      expect(result['code'], 'HTTP_404');
     });
 
     test('8. 下载队列 (enqueueDownloads & control) 与本地播放测试', () async {
@@ -296,6 +563,30 @@ var spider = {
       expect(result['data']['expiresAt'], 1800000000000);
       expect(result['data']['headers']['X-Synthetic'], 'required');
       expect(result['data']['quality'], 1080);
+    });
+    test('取流失败保留源错误码，拒绝结果不被合并为空错误', () async {
+      await engine.dispatch({
+        'action': 'jsSource.load',
+        'fileName': 'hongguo.js',
+        'script':
+            "$hongguoScript\nspider.play=async function(){return {url:'',error:'MEDIA_REJECTED'};};",
+      });
+      final result = await engine.dispatch({
+        'action': 'resolve',
+        'drama': {
+          'id': 'hongguo:7345678901234567000',
+          'source': 'hongguo',
+          'sourceId': '7345678901234567000',
+        },
+        'chapter': {
+          'raw':
+              'https://hongguoduanju.com/player/7345678901234567000/7345678901234568000',
+        },
+        'index': 1,
+      });
+      expect(result['ok'], isFalse);
+      expect(result['code'], 'MEDIA_REJECTED');
+      expect(result['error'], contains('本集媒体地址暂不可用'));
     });
   });
 }

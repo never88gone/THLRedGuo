@@ -1,19 +1,35 @@
 import 'package:THLRedLook/models/catalog/models.dart';
 
-enum PlaybackRecoveryAction { alternative, refresh, stop }
+enum PlaybackRecoveryAction { cache, alternative, refresh, stop }
 
 class PlaybackRecovery {
   static const maxAttempts = 5;
   int _attempts = 0;
+  bool _cacheAttempted = false;
   int get attempts => _attempts;
+  bool get cacheAttempted => _cacheAttempted;
+  Duration get retryDelay => Duration(milliseconds: 300 * _attempts);
+
+  static bool audioOutputFailed(String error) =>
+      error.toLowerCase().contains('could not open/initialize audio device');
 
   void reset() {
     _attempts = 0;
+    _cacheAttempted = false;
   }
 
-  PlaybackRecoveryAction next(PlaybackPlan? plan) {
+  PlaybackRecoveryAction next(PlaybackPlan? plan, {bool allowCache = false}) {
     if (_attempts >= maxAttempts) {
       return PlaybackRecoveryAction.stop;
+    }
+    if (allowCache &&
+        !_cacheAttempted &&
+        plan != null &&
+        !plan.local &&
+        plan.decryptionKey.isNotEmpty) {
+      _cacheAttempted = true;
+      _attempts++;
+      return PlaybackRecoveryAction.cache;
     }
     if (plan?.hasAlternative == true) {
       _attempts++;

@@ -68,7 +68,11 @@ class DartCoreEngine {
       final result = await _handleAction(action, input);
       return {'ok': true, 'data': result};
     } catch (e) {
-      return {'ok': false, 'error': e.toString(), 'code': ''};
+      return {
+        'ok': false,
+        'error': e.toString(),
+        'code': e is CatPawSourceFailure ? e.code : 'CORE_ERROR',
+      };
     }
   }
 
@@ -850,6 +854,7 @@ class DartCoreEngine {
     final episodeIndex = (input['index'] as num?)?.toInt() ?? 1;
     final chapter = input['chapter'];
 
+    Object? sourceFailure;
     final rt = await _getSpiderRuntime(source);
     if (rt != null) {
       try {
@@ -906,9 +911,16 @@ class DartCoreEngine {
             'danmakuId': playRes.danmakuId,
           };
         }
-      } catch (_) {}
+        sourceFailure = CatPawSourceFailure.playback(playRes.errorCode);
+      } catch (error) {
+        sourceFailure = error;
+      }
     }
 
+    if (sourceFailure is CatPawSourceFailure &&
+        sourceFailure.code == 'cancelled') {
+      throw sourceFailure;
+    }
     if (chapter is Map &&
         chapter['url'] is String &&
         RegExp(
@@ -935,7 +947,8 @@ class DartCoreEngine {
       };
     }
 
-    throw StateError('无法从数据源 [$source] 获取真实播放流');
+    if (sourceFailure != null) throw sourceFailure;
+    throw CatPawSourceFailure.playback('NO_STREAM');
   }
 
   Map<String, dynamic> _fallbackPlayback(Map<String, dynamic> input) {

@@ -27,6 +27,7 @@ import 'package:THLRedLook/views/common/widgets.dart';
 import 'package:THLRedLook/core/player/playback_loader.dart';
 import 'package:THLRedLook/core/player/playback_preloader.dart';
 import 'package:THLRedLook/core/player/playback_recovery.dart';
+import 'package:THLRedLook/core/player/playback_diagnostics.dart';
 import 'package:THLRedLook/core/player/playback_preferences.dart';
 import 'package:THLRedLook/core/player/player_interactions.dart';
 import 'package:THLRedLook/views/player/player_menu.dart';
@@ -126,6 +127,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _resumeAfterInterruption = false;
   bool _showControlsOnPlaybackReady = true;
   bool _pendingError = false;
+  bool _requireRecovery = false;
   bool _pictureInPictureSupported = false;
   bool _pictureInPictureActive = false;
   bool _pictureInPictureRequested = false;
@@ -248,7 +250,12 @@ class _PlayerScreenState extends State<PlayerScreen>
       _player.stream.error.listen((error) {
         if (_enhancement.handlePlaybackError(error)) return;
         if (!_closed && _acceptErrors && mounted && error.trim().isNotEmpty) {
-          _queueRecovery();
+          if (!_pendingError) {
+            DiaryService.add(
+              '[Play] 原生播放错误: 剧=${widget.detail.drama.cleanSourceId}, 集=${widget.detail.episodes[_index].number}, ${playbackFailureSummary(AppFailure(error, code: 'native_stream'))}',
+            );
+          }
+          _queueRecovery(force: PlaybackRecovery.audioOutputFailed(error));
         }
       }),
     );
@@ -911,11 +918,12 @@ class _PlayerScreenState extends State<PlayerScreen>
     _applyLifecycleVisibility();
   }
 
-  void _queueRecovery() {
+  void _queueRecovery({bool force = false}) {
     if (_closed || !_acceptErrors || _error != null) {
       return;
     }
     _pendingError = true;
+    _requireRecovery = _requireRecovery || force;
     if (!_foreground || (_errorTimer?.isActive ?? false)) {
       return;
     }
@@ -926,8 +934,11 @@ class _PlayerScreenState extends State<PlayerScreen>
         return;
       }
       _pendingError = false;
+      final required = _requireRecovery;
+      _requireRecovery = false;
       final state = _player.state;
-      if (state.playing &&
+      if (!required &&
+          state.playing &&
           !state.buffering &&
           (state.width ?? 0) > 0 &&
           state.position > position + const Duration(milliseconds: 300)) {
@@ -950,10 +961,16 @@ class _PlayerScreenState extends State<PlayerScreen>
     _danmaku.setPlan(null);
     _errorTimer?.cancel();
     _pendingError = false;
+    _requireRecovery = false;
     final position = _currentPosition;
     final action = current.offline
         ? PlaybackRecoveryAction.stop
-        : _recovery.next(current);
+        : _recovery.next(
+            current,
+            allowCache:
+                _player is LunaExoPlayer &&
+                (Platform.isAndroid || Platform.isIOS),
+          );
     if (action == PlaybackRecoveryAction.stop) {
       _resumePosition = position;
       final ticket = _generation;
@@ -984,7 +1001,12 @@ class _PlayerScreenState extends State<PlayerScreen>
       }
       return;
     }
-    await _play(_index, position: position, recoveryAction: action);
+    await _play(
+      _index,
+      position: position,
+      recoveryAction: action,
+      recoveryPlan: current,
+    );
   }
 
   void _togglePlayback() {
@@ -1060,6 +1082,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     int index, {
     double position = 0,
     PlaybackRecoveryAction? recoveryAction,
+    PlaybackPlan? recoveryPlan,
     bool playWhenReady = true,
     PlaybackPlan? handoffPlan,
     bool showControlsOnReady = true,
@@ -1070,6 +1093,12 @@ class _PlayerScreenState extends State<PlayerScreen>
         index >= widget.detail.episodes.length) {
       return;
     }
+    if (recoveryAction != null &&
+        recoveryAction != PlaybackRecoveryAction.cache) {
+      final previousGeneration = _generation;
+      await Future<void>.delayed(_recovery.retryDelay);
+      if (_closed || previousGeneration != _generation) return;
+    }
     _interactions.cancel();
     if (widget.handoff != null &&
         handoffPlan == null &&
@@ -1079,7 +1108,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     if (index != _index) _forceOnline = false;
     final forceEncryptedCache =
-        recoveryAction != null && (_plan?.decryptionKey.isNotEmpty ?? false);
+        recoveryAction != null &&
+        (_recovery.cacheAttempted ||
+            (_plan?.decryptionKey.isNotEmpty ?? false));
     final warmed =
         handoffPlan ??
         (recoveryAction == null && _preloadEnabled && !widget.localOnly
@@ -1098,6 +1129,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     _danmaku.setPlan(null);
     _acceptErrors = false;
     _pendingError = false;
+    _requireRecovery = false;
     _errorTimer?.cancel();
     _health.reset();
     if (recoveryAction == null) {
@@ -1116,6 +1148,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       _error = null;
       _localFailure = false;
       _loadingMessage = switch (recoveryAction) {
+        PlaybackRecoveryAction.cache => '正在尝试本集缓存解密',
         PlaybackRecoveryAction.alternative => '正在切换备用线路',
         PlaybackRecoveryAction.refresh =>
           '正在重新获取播放地址（${_recovery.attempts}/${PlaybackRecovery.maxAttempts}）',
@@ -1129,6 +1162,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     PlaybackPlan? retained;
     PlaybackPlan? failedPlan;
     bool installed = false;
+    var failureStage = 'resolve';
     try {
       await _serialize(() async {
         if (_closed || ticket != _generation) {
@@ -1139,9 +1173,10 @@ class _PlayerScreenState extends State<PlayerScreen>
         if (_closed || ticket != _generation) return;
         _openedIndex = -1;
         await _player.stop();
-        final previous = _plan;
+        final previous = _plan ?? recoveryPlan;
         _plan = null;
-        if (recoveryAction == PlaybackRecoveryAction.alternative) {
+        if (recoveryAction == PlaybackRecoveryAction.alternative ||
+            recoveryAction == PlaybackRecoveryAction.cache) {
           retained = previous;
         } else if (previous != null) {
           if (recoveryAction == PlaybackRecoveryAction.refresh) {
@@ -1154,7 +1189,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         return;
       }
       prepared = retained != null
-          ? await _loader.fallback(retained!)
+          ? recoveryAction == PlaybackRecoveryAction.cache
+                ? await _loader.use(retained!)
+                : await _loader.fallback(retained!)
           : failedPlan != null
           ? await _loader.refresh(
               widget.detail.drama,
@@ -1175,6 +1212,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         return;
       }
       if (Platform.isAndroid || Platform.isIOS) {
+        failureStage = 'prepare';
         prepared = await _encryptedPlayback.prepare(
           prepared,
           forceCache: forceEncryptedCache,
@@ -1189,6 +1227,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         );
       }
       final plan = prepared;
+      failureStage = 'open';
       await _serialize(() async {
         if (_closed || ticket != _generation) {
           await widget.repository.release(plan.session);
@@ -1260,7 +1299,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         installed = true;
         _acceptErrors = true;
         DiaryService.add(
-          '[Play] 打开媒体: local=${plan.local}, host=${Uri.tryParse(plan.url)?.host}',
+          '[Play] 打开媒体: 剧=${widget.detail.drama.cleanSourceId}, 集=${widget.detail.episodes[index].number}, local=${plan.local}, encrypted=${plan.decryptionKey.isNotEmpty}, host=${Uri.tryParse(plan.url)?.host}',
         );
         await _player.open(
           Media(
@@ -1293,7 +1332,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       });
     } catch (error) {
       DiaryService.add(
-        '[Play] 播放失败: ${error is AppFailure ? error.code : error.runtimeType}',
+        '[Play] 播放失败: 剧=${widget.detail.drama.cleanSourceId}, 集=${widget.detail.episodes[index].number}, 阶段=$failureStage, 恢复=${_recovery.attempts}/${PlaybackRecovery.maxAttempts}, ${playbackFailureSummary(error)}',
       );
       if (!_closed && mounted && ticket == _generation) {
         if (prepared != null && identical(_plan, prepared)) {
@@ -1306,13 +1345,15 @@ class _PlayerScreenState extends State<PlayerScreen>
           if (!widget.localOnly &&
               error is! FormatException &&
               error is! FileSystemException) {
-            final action = _recovery.next(prepared);
+            final failed = prepared ?? failedPlan ?? retained ?? recoveryPlan;
+            final action = _recovery.next(failed);
             if (action != PlaybackRecoveryAction.stop) {
               unawaited(
                 _play(
                   index,
                   position: position,
                   recoveryAction: action,
+                  recoveryPlan: failed,
                   playWhenReady: _playIntent,
                 ),
               );
@@ -1341,7 +1382,8 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (warmed != null && !installed) {
         await widget.repository.release(warmed.session);
       }
-      if (retained != null) {
+      if (retained != null &&
+          (!installed || _plan?.session != retained!.session)) {
         await widget.repository.release(retained!.session);
       }
     }

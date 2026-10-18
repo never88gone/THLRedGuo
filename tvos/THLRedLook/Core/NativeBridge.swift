@@ -199,17 +199,43 @@ public actor NativeBridge {
         let shims = """
         var JSON = JSON || {};
         if (!JSON.stringify) JSON.stringify = function(o) { return "{}"; };
-        if (!JSON.parse) {
-            JSON.parse = function(s) { return {}; };
-        } else {
-            var _origParse = JSON.parse;
-            JSON.parse = function(s, r) {
-                if (typeof s === 'string') {
-                    try { s = s.replace(/:\\s*(\\d{15,})\\b/g, ': "$1"'); } catch(e) {}
+        if (!JSON.parse) JSON.parse = function(s) { return {}; };
+        (function() {
+          var nativeParse = JSON.parse;
+          JSON.parse = function(text, reviver) {
+            if (typeof text === 'string' && /\\d{15,}/.test(text)) {
+              var output = '';
+              var copied = 0;
+              var quoted = false;
+              var escaped = false;
+              var numberCharacters = '0123456789.eE+-';
+              for (var index = 0; index < text.length; index++) {
+                var character = text[index];
+                if (quoted) {
+                  if (escaped) escaped = false;
+                  else if (character === '\\\\') escaped = true;
+                  else if (character === '"') quoted = false;
+                  continue;
                 }
-                return _origParse.call(JSON, s, r);
-            };
-        }
+                if (character === '"') {
+                  quoted = true;
+                  continue;
+                }
+                if (character !== '-' && (character < '0' || character > '9')) continue;
+                var start = index;
+                while (index < text.length && numberCharacters.indexOf(text[index]) >= 0) index++;
+                var token = text.slice(start, index);
+                if (/^-?[1-9]\\d{14,}$/.test(token)) {
+                  output += text.slice(copied, start) + '"' + token + '"';
+                  copied = index;
+                }
+                index--;
+              }
+              if (copied > 0) text = output + text.slice(copied);
+            }
+            return nativeParse(text, reviver);
+          };
+        })();
 
         globalThis.console = {
             log: function() { var args = Array.prototype.slice.call(arguments); __console_log(args.join(" ")); },

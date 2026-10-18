@@ -324,7 +324,7 @@ class LunaExoPlayer implements Player {
     VideoFormat? formatHint = isHls ? VideoFormat.hls : null;
 
     DiaryService.add(
-      '[ExoPlayer] open(gen=$myGen): url=$url, isHls=$isHls, formatHint=$formatHint, headers=${headers.keys.toList()}',
+      '[ExoPlayer] open(gen=$myGen): local=${url.startsWith('/') || uri?.scheme == 'file'}, host=${uri?.host}, isHls=$isHls, formatHint=$formatHint',
     );
 
     VideoPlayerController c;
@@ -332,7 +332,7 @@ class LunaExoPlayer implements Player {
       final filePath = uri != null && uri.scheme == 'file'
           ? uri.toFilePath()
           : url;
-      DiaryService.add('[ExoPlayer] 本地文件播放: $filePath');
+      DiaryService.add('[ExoPlayer] 本地缓存播放');
       c = VideoPlayerController.file(
         File(filePath),
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),

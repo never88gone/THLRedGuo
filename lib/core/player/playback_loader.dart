@@ -6,6 +6,7 @@ class PlaybackLoader {
 
   final AppRepository repository;
   int _generation = 0;
+  int? _resolving;
   bool _closed = false;
 
   Future<PlaybackPlan?> load(
@@ -49,10 +50,11 @@ class PlaybackLoader {
     }
     final generation = ++_generation;
     try {
-      await repository.cancelPlayback();
+      if (_resolving != null) await repository.cancelPlayback();
       if (_closed || generation != _generation) {
         return null;
       }
+      _resolving = generation;
       final plan = await resolve();
       if (_closed || generation != _generation) {
         await repository.release(plan.session);
@@ -64,12 +66,14 @@ class PlaybackLoader {
         return null;
       }
       rethrow;
+    } finally {
+      if (_resolving == generation) _resolving = null;
     }
   }
 
   Future<void> close() async {
     _closed = true;
     _generation++;
-    await repository.cancelPlayback();
+    if (_resolving != null) await repository.cancelPlayback();
   }
 }

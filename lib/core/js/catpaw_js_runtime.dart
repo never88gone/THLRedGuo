@@ -46,6 +46,7 @@ class CatPawPlayResult {
   final int mediaBytes;
   final int expiresAt;
   final String danmakuId;
+  final String errorCode;
   const CatPawPlayResult({
     required this.url,
     required this.header,
@@ -56,7 +57,33 @@ class CatPawPlayResult {
     this.mediaBytes = 0,
     this.expiresAt = 0,
     this.danmakuId = '',
+    this.errorCode = '',
   });
+}
+
+class CatPawSourceFailure implements Exception {
+  const CatPawSourceFailure(this.message, {required this.code});
+  final String message;
+  final String code;
+  factory CatPawSourceFailure.playback(String code) {
+    final normalized = RegExp(r'^[A-Za-z0-9_.-]{1,64}$').hasMatch(code)
+        ? code
+        : 'NO_STREAM';
+    final message = switch (normalized) {
+      'cancelled' => '播放请求已取消',
+      'MISSING_EPISODE' => '官方接口暂未返回本集编号',
+      'BUSINESS_REJECTED' => '官方接口暂未允许读取本集',
+      'SECURITY_BLOCKED' => '本集片源地址未通过校验',
+      'MISSING_MODEL' => '官方接口暂未返回本集片源',
+      'MEDIA_REJECTED' => '本集媒体地址暂不可用，请重试',
+      'INVALID_RESPONSE' => '官方接口返回的播放数据无效',
+      'GUEST_REGISTRATION_FAILED' => '官方访客会话初始化失败，请重试',
+      _ => '站源暂未返回本集可播放地址，请重试',
+    };
+    return CatPawSourceFailure(message, code: normalized);
+  }
+  @override
+  String toString() => message;
 }
 
 class CatPawSearchResult {
@@ -81,6 +108,7 @@ class CatPawJsRuntime {
   final Set<Completer<void>> _requestAborts = {};
   int _activeRequests = 0;
   int _activeEvals = 0;
+  int _cancellation = 0;
   Completer<void>? _drainCompleter;
   Completer<void>? _evalDrainCompleter;
 
@@ -128,6 +156,7 @@ class CatPawJsRuntime {
 
   void cancelPending() {
     if (_isDisposed || !_ready) return;
+    _cancellation++;
     _rt.evaluate('globalThis.__hongguoCancelled = true;');
     for (final abort in _requestAborts.toList()) {
       if (!abort.isCompleted) abort.complete();
@@ -158,11 +187,34 @@ if (!JSON.parse) JSON.parse = function(s) { return {}; };
   var nativeParse = JSON.parse;
   JSON.parse = function(text, reviver) {
     if (typeof text === 'string' && /\d{15,}/.test(text)) {
-      var prev;
-      do {
-        prev = text;
-        text = text.replace(/([:\[,]\s*)(\d{15,})(\s*[,\]\}])/g, '$1"$2"$3');
-      } while (text !== prev);
+      var output = '';
+      var copied = 0;
+      var quoted = false;
+      var escaped = false;
+      var numberCharacters = '0123456789.eE+-';
+      for (var index = 0; index < text.length; index++) {
+        var character = text[index];
+        if (quoted) {
+          if (escaped) escaped = false;
+          else if (character === '\\') escaped = true;
+          else if (character === '"') quoted = false;
+          continue;
+        }
+        if (character === '"') {
+          quoted = true;
+          continue;
+        }
+        if (character !== '-' && (character < '0' || character > '9')) continue;
+        var start = index;
+        while (index < text.length && numberCharacters.indexOf(text[index]) >= 0) index++;
+        var token = text.slice(start, index);
+        if (/^-?[1-9]\d{14,}$/.test(token)) {
+          output += text.slice(copied, start) + '"' + token + '"';
+          copied = index;
+        }
+        index--;
+      }
+      if (copied > 0) text = output + text.slice(copied);
     }
     return nativeParse(text, reviver);
   };
@@ -390,6 +442,7 @@ if (typeof console === 'undefined') {
       mediaBytes: (map['mediaBytes'] as num?)?.toInt() ?? 0,
       expiresAt: (map['expiresAt'] as num?)?.toInt() ?? 0,
       danmakuId: map['danmakuId']?.toString() ?? '',
+      errorCode: map['error']?.toString() ?? '',
       quality: (map['quality'] as num?)?.toInt() ?? 0,
       qualities:
           (map['qualities'] is List ? map['qualities'] as List : const [])
@@ -462,6 +515,7 @@ if (typeof console === 'undefined') {
     _assertReady();
 
     _activeEvals++;
+    final cancellation = _cancellation;
     try {
       _rt.evaluate('globalThis.__hongguoCancelled = false;');
       final evalResult = _rt.evaluate(
@@ -472,6 +526,9 @@ if (typeof console === 'undefined') {
       }
 
       final resolved = await _rt.handlePromise(evalResult, timeout: timeout);
+      if (cancellation != _cancellation) {
+        throw CatPawSourceFailure.playback('cancelled');
+      }
       if (resolved.isError) {
         throw Exception('JS Promise 异常: ${resolved.rawResult}');
       }
@@ -493,7 +550,13 @@ if (typeof console === 'undefined') {
       }
 
       if (data is Map && data['__error'] == true) {
-        throw Exception('JS 执行异常: ${data['message']}');
+        final code = data['code']?.toString() ?? '';
+        throw CatPawSourceFailure(
+          '站源执行失败：${data['message']}',
+          code: RegExp(r'^[A-Za-z0-9_.-]{1,64}$').hasMatch(code)
+              ? code
+              : 'JS_EXECUTION',
+        );
       }
       return data;
     } finally {
@@ -545,6 +608,7 @@ globalThis.__evalAsync = async function(fn) {
   } catch (e) {
     return JSON.stringify({
       __error: true,
+      code: e && e.code ? String(e.code) : "JS_EXECUTION",
       message: e ? (e.message || String(e)) : "Unknown JS error"
     });
   }
