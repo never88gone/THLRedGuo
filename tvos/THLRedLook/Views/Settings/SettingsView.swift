@@ -241,6 +241,27 @@ public struct SettingsView: View {
                     importPlugin()
                 }
             }
+
+            if args.contains("-testCustomSource") {
+                Task {
+                    let dummyJS = """
+                    const plugin = {
+                        meta: {
+                            id: "test_custom_spider",
+                            name: "自定义测试爬虫",
+                            version: "1.0.0",
+                            author: "TestUser"
+                        },
+                        search: async function(keyword, page) { return []; },
+                        detail: async function(id) { return {}; },
+                        play: async function(url) { return { url: url }; }
+                    };
+                    plugin;
+                    """
+                    _ = try? await NativeRepository.shared.jsSourceSaveAndLoad(script: dummyJS, fileName: "test_custom_spider.js", autoSelect: false)
+                    await jsService.refresh()
+                }
+            }
         }
     }
     // MARK: - 1. 站源管理与导入面板
@@ -284,6 +305,7 @@ public struct SettingsView: View {
                     TVButton(title: "清空自定义源", icon: "trash.circle.fill") {
                         showingClearAllAlert = true
                     }
+                    .accessibilityIdentifier("settings.clearAllSources")
                 }
 
                 Spacer()
@@ -1641,6 +1663,7 @@ struct JSSourcePluginCard: View {
             .buttonStyle(TVZeroHighlightButtonStyle())
             .focused($isCardFocused)
             .focusEffectDisabled()
+            .accessibilityIdentifier("settings.source.card.\(id)")
             .contextMenu {
                 Button {
                     onSelect()
