@@ -26,7 +26,7 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var relatedSeasons: [Drama] = []
     @Published public var switchSeasonDrama: Drama?
 
-    public let drama: Drama
+    @Published public private(set) var drama: Drama
     @Published public var allEpisodes: [Episode]
     public var keepControlsVisible: Bool = false
 
@@ -53,6 +53,7 @@ public final class PlayerViewModel: ObservableObject {
     private var prefetchTask: Task<Void, Never>?
     private var prefetchedNextPlan: PlaybackPlan?
     private var prefetchedNextEpisodeIndex: Int?
+    private var identityVerified = false
     private var lifecycleTask: Task<Void, Never>?
     private var preparationTask: Task<Void, Never>?
     private var recoveryTask: Task<Void, Never>?
@@ -106,8 +107,10 @@ public final class PlayerViewModel: ObservableObject {
         lifecycleTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let detail = try await repository.loadDetail(drama: drama)
+                let detail = try await repository.loadDetail(drama: drama, store: store)
                 guard !Task.isCancelled, !closed else { return }
+                drama = detail.drama
+                identityVerified = true
                 if !detail.episodes.isEmpty { allEpisodes = detail.episodes }
             } catch {
                 guard !Task.isCancelled, !closed else { return }
@@ -123,8 +126,11 @@ public final class PlayerViewModel: ObservableObject {
         let baseName = drama.title.replacingOccurrences(of: pattern, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
         guard !baseName.isEmpty else { return }
         let targetSource = drama.source.lowercased()
+        let requestedId = drama.id
         do {
             let result = try await repository.loadCatalog(source: drama.source, query: baseName)
+            guard !closed, !Task.isCancelled, drama.id == requestedId else { return }
+            store.refreshDramas(result.items)
             let filtered = result.items.filter { 
                 $0.id != drama.id &&
                 $0.source.lowercased() == targetSource &&
@@ -261,9 +267,11 @@ public final class PlayerViewModel: ObservableObject {
         func current() -> Bool { !closed && !Task.isCancelled && generation == playbackGeneration }
         do {
             var episode = allEpisodes.first { $0.number == episodeIndex }
-            if episode?.raw == nil {
-                let detail = try await repository.loadDetail(drama: drama)
+            if episode?.raw == nil || (!identityVerified && HongguoSeriesIdentity.isRounded(drama)) {
+                let detail = try await repository.loadDetail(drama: drama, store: store)
                 guard current() else { return }
+                drama = detail.drama
+                identityVerified = true
                 allEpisodes = detail.episodes
                 episode = allEpisodes.first { $0.number == episodeIndex }
             }

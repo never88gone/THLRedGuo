@@ -157,6 +157,49 @@ public final class LocalStore: ObservableObject {
         }
     }
 
+    @MainActor
+    @discardableResult
+    public func refreshDramas(_ fresh: [Drama]) -> [String: Drama] {
+        let replacements = HongguoSeriesIdentity.replacements(previous: followedDramas + history.map(\.drama), fresh: fresh)
+        let metadata = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+        func updated(_ drama: Drama) -> Drama {
+            let corrected = replacements[drama.id].map { HongguoSeriesIdentity.merge(drama, with: $0) } ?? drama
+            return metadata[corrected.id].map { corrected.merge(with: $0) } ?? corrected
+        }
+        var nextHistory: [String: WatchEntry] = [:]
+        for entry in history {
+            let drama = updated(entry.drama)
+            if let existing = nextHistory[drama.id], existing.updatedAt >= entry.updatedAt { continue }
+            nextHistory[drama.id] = WatchEntry(drama: drama, episode: entry.episode, position: entry.position, duration: entry.duration, updatedAt: entry.updatedAt)
+        }
+        let historyList = nextHistory.values.sorted { $0.updatedAt > $1.updatedAt }
+        var nextDramas: [Drama] = []
+        for drama in followedDramas {
+            let corrected = updated(drama)
+            if let index = nextDramas.firstIndex(where: { $0.id == corrected.id }) {
+                nextDramas[index] = nextDramas[index].merge(with: corrected)
+            } else { nextDramas.append(corrected) }
+        }
+        var nextFollows = follows
+        let ranks: [FollowState: Int] = [.none: 0, .wishlist: 1, .watching: 2, .updated: 3, .watched: 4]
+        for (old, drama) in replacements {
+            guard let state = nextFollows.removeValue(forKey: old) else { continue }
+            let existing = nextFollows[drama.id] ?? .none
+            nextFollows[drama.id] = ranks[state, default: 0] > ranks[existing, default: 0] ? state : existing
+        }
+        guard historyList != history || nextDramas != followedDramas || nextFollows != follows else { return replacements }
+        guard let historyData = try? JSONEncoder().encode(historyList),
+              let followsData = try? JSONEncoder().encode(nextFollows),
+              let dramaData = try? JSONEncoder().encode(nextDramas) else { return [:] }
+        defaults.set(historyData, forKey: historyKey)
+        defaults.set(followsData, forKey: followsKey)
+        defaults.set(dramaData, forKey: followedDramasKey)
+        history = historyList
+        follows = nextFollows
+        followedDramas = nextDramas
+        return replacements
+    }
+
     // MARK: - Search History
     public func addSearchKeyword(_ query: String) {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)

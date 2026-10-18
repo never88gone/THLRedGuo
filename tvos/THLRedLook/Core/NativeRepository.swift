@@ -82,6 +82,38 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
         return DramaDetail(drama: freshDrama, episodes: episodes, warning: warning)
     }
 
+    public func loadDetail(drama: Drama, store: LocalStore) async throws -> DramaDetail {
+        var target = drama
+        if HongguoSeriesIdentity.isRounded(drama) {
+            let result = try? await loadCatalog(source: drama.source, query: HongguoSeriesIdentity.baseTitle(drama.title), force: true)
+            try Task.checkCancellation()
+            if let items = result?.items {
+                if let same = items.first(where: { $0.source == drama.source && $0.cleanSourceId == drama.cleanSourceId }) {
+                    target = drama.merge(with: same)
+                } else if let corrected = HongguoSeriesIdentity.replacements(previous: [drama], fresh: items)[drama.id] {
+                    target = HongguoSeriesIdentity.merge(drama, with: corrected)
+                }
+                await store.refreshDramas(items)
+            }
+        }
+        try Task.checkCancellation()
+        let detail = try await loadDetail(drama: target)
+        try Task.checkCancellation()
+        if HongguoSeriesIdentity.isRounded(detail.drama) {
+            let escaped = NSRegularExpression.escapedPattern(for: detail.drama.cleanSourceId)
+            let pattern = "(?:/player/\(escaped)/|^\(escaped)[_/])\\d{10,30}(?:[/?#]|$)"
+            guard detail.episodes.allSatisfy({ episode in
+                let raw = episode.rawChapter
+                let value = (raw?["url"] as? String) ?? (raw?["raw"] as? String) ?? episode.id
+                return value.range(of: pattern, options: .regularExpression) != nil
+            }) else {
+                throw SourceAPIError.parseError("旧剧集编号需要更新，请重新搜索该季后重试")
+            }
+        }
+        await store.refreshDramas([detail.drama])
+        return detail
+    }
+
     private var playbackSequence = Int64(Date().timeIntervalSince1970 * 1_000_000)
     private let sequenceLock = NSLock()
 

@@ -136,6 +136,7 @@ public final class HomeViewModel: ObservableObject {
                     force: true
                 )
                 guard !Task.isCancelled else { return }
+                store.refreshDramas(res.items)
                 NSLog("🎬 [HomeVM] loadCatalog 成功返回 %ld 部短剧", res.items.count)
                 let filtered = filterAndSort(dramas: res.items)
                 items = filtered
@@ -166,6 +167,8 @@ public final class HomeViewModel: ObservableObject {
                 query: "",
                 force: false
             )
+            guard !Task.isCancelled else { return }
+            store.refreshDramas(res.items)
             let newItems = filterAndSort(dramas: res.items)
             items.append(contentsOf: newItems)
             hasMore = res.hasMore

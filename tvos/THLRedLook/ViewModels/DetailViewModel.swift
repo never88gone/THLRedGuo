@@ -30,6 +30,7 @@ public final class DetailViewModel: ObservableObject {
     @Published public var drama: Drama
     private let repository: NativeRepository
     private let store: LocalStore
+    private var loadGeneration = 0
     private let downloadService: DownloadService
 
     public init(
@@ -73,6 +74,9 @@ public final class DetailViewModel: ObservableObject {
     }
 
     public func loadDetail() async {
+        loadGeneration += 1
+        let generation = loadGeneration
+        let requestedDrama = drama
         let hasRealEpisodes = detail?.episodes.contains(where: { $0.raw != nil }) == true
         if !hasRealEpisodes {
             isLoading = true
@@ -84,9 +88,12 @@ public final class DetailViewModel: ObservableObject {
         }
         do {
             await JSSourceService.shared.initialize()
-            let loaded = try await repository.loadDetail(drama: drama)
+            let loaded = try await repository.loadDetail(drama: requestedDrama, store: store)
+            guard generation == loadGeneration, !Task.isCancelled else { return }
             self.detail = loaded
             self.drama = loaded.drama
+            self.followState = store.followState(for: loaded.drama.id)
+            self.lastWatchEntry = store.getWatchEntry(dramaId: loaded.drama.id)
             // 如果有历史记录，自动切换到对应集所属的 chunk
             if let entry = lastWatchEntry, !loaded.episodeChunks.isEmpty {
                 for (index, chunk) in loaded.episodeChunks.enumerated() {
@@ -96,10 +103,12 @@ public final class DetailViewModel: ObservableObject {
                     }
                 }
             }
-            await loadSeasons()
+            await loadSeasons(generation: generation)
         } catch {
+            guard generation == loadGeneration, !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
+        guard generation == loadGeneration else { return }
         isLoading = false
     }
 
@@ -140,7 +149,7 @@ public final class DetailViewModel: ObservableObject {
         return nil
     }
 
-    private func loadSeasons() async {
+    private func loadSeasons(generation: Int) async {
         let pattern = "(?:第\\s*[0-9零一二两三四五六七八九十百]+\\s*[季部]|\\s*[0-9零一二两三四五六七八九十]+).*$"
         var baseName = drama.title.replacingOccurrences(of: pattern, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
         if baseName.isEmpty { baseName = drama.title }
@@ -148,6 +157,10 @@ public final class DetailViewModel: ObservableObject {
         let targetSource = drama.source.lowercased()
         do {
             let result = try await repository.loadCatalog(source: drama.source, query: baseName)
+            guard generation == loadGeneration, !Task.isCancelled else { return }
+            store.refreshDramas(result.items)
+            self.followState = store.followState(for: drama.id)
+            self.lastWatchEntry = store.getWatchEntry(dramaId: drama.id)
             var candidates = result.items.filter {
                 $0.source.lowercased() == targetSource &&
                 !$0.cover.isEmpty &&

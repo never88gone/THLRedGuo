@@ -108,6 +108,7 @@ public final class SearchViewModel: ObservableObject {
                 force: true
             )
             guard ticket == generation else { return }
+            store.refreshDramas(res.items)
             page = res.page
             submittedQuery = target
             submittedSource = source
@@ -132,6 +133,7 @@ public final class SearchViewModel: ObservableObject {
         do {
             let result = try await repository.loadCatalog(source: submittedSource, page: page + 1, query: submittedQuery)
             guard ticket == generation else { return }
+            store.refreshDramas(result.items)
             let existing = Set(searchResults.map(\.id))
             searchResults.append(contentsOf: result.items.filter { !existing.contains($0.id) && $0.source.lowercased() == submittedSource.lowercased() })
             page = result.page
