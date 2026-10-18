@@ -30,6 +30,7 @@ dependencies:
   http: ^1.6.0
   html: ^0.15.7
   flutter_js: ^0.8.7
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:

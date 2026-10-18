@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
@@ -17,6 +16,8 @@ import 'package:THLRedLook/utils/privacy/privacy_lock_controller.dart';
 import 'package:THLRedLook/utils/settings/settings_backup_helper.dart';
 import 'package:THLRedLook/pages/privacy/privacy_settings_page.dart';
 import 'package:THLRedLook/pages/about/about_page.dart';
+import 'package:THLRedLook/pages/about/contact_page.dart';
+import 'package:THLRedLook/pages/about/third_party_page.dart';
 import 'package:THLRedLook/pages/settings/storage_page.dart';
 import 'package:THLRedLook/pages/settings/js_sources_page.dart';
 import 'package:THLRedLook/pages/settings/source_diagnostics_page.dart';
@@ -435,9 +436,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               ListTile(
                 key: const ValueKey('settings-source-diagnostics'),
-                leading: const Icon(Icons.network_check),
+                leading: const Icon(Icons.network_check_rounded),
                 title: const Text('数据源诊断'),
-                subtitle: const Text('检查游客注册、搜索与详情，复制脱敏报告'),
+                subtitle: const Text('检查网络连接、搜索与详情，复制脱敏报告'),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Navigator.push(
                   context,
@@ -454,25 +455,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () => DiaryService.showDiaryDialog(context),
               ),
               ListTile(
+                key: const ValueKey('settings-contact-entry'),
                 leading: const Icon(Icons.forum_outlined),
-                title: const Text('Telegram 交流与反馈'),
-                subtitle: const Text('https://t.me/tanghulutvos'),
-                trailing: const Icon(Icons.copy_rounded),
-                onTap: () {
-                  Clipboard.setData(
-                    const ClipboardData(text: 'https://t.me/tanghulutvos'),
-                  );
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('已复制 Telegram 地址：https://t.me/tanghulutvos'),
-                      behavior: SnackBarBehavior.floating,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
+                title: const Text('联系方式'),
+                subtitle: const Text('Telegram 官方交流与反馈 · 直接跳转打开'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ContactPage(),
+                  ),
+                ),
               ),
               ListTile(
+                key: const ValueKey('settings-third-party-entry'),
+                leading: const Icon(Icons.extension_outlined),
+                title: const Text('第三方开源组件'),
+                subtitle: const Text('核心开源库、开源许可证与授权声明'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ThirdPartyPage(),
+                  ),
+                ),
+              ),
+              ListTile(
+                key: const ValueKey('settings-about-entry'),
                 leading: const Icon(Icons.verified_outlined),
                 title: const Text('关于 糖葫芦Haw'),
                 subtitle: Text(_appVersion),

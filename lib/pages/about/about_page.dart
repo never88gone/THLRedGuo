@@ -11,6 +11,8 @@ import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/utils/sources/source_gate_taps.dart';
 import 'package:THLRedLook/views/sources/source_switcher_sheet.dart';
+import 'package:THLRedLook/pages/about/contact_page.dart';
+import 'package:THLRedLook/pages/about/third_party_page.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key, required this.store});
@@ -410,97 +412,50 @@ class _AboutPageState extends State<AboutPage> {
                 color: isDark ? AppColors.darkCard : AppColors.greyLight,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.35),
-                    width: 1.2,
-                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.asset(
-                          'assets/branding/telegram_qr.png',
-                          width: 82,
-                          height: 82,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            width: 82,
-                            height: 82,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.send_rounded,
-                              size: 36,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    ListTile(
+                      key: const ValueKey('about-contact-tile'),
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.darkSurfaceHighest,
+                        child: Icon(
+                          Icons.forum_rounded,
+                          color: theme.colorScheme.primary,
                         ),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.forum_rounded,
-                                  size: 18,
-                                  color: theme.colorScheme.primary,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Telegram 交流与反馈',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            SelectableText(
-                              'https://t.me/tanghulutvos',
-                              style: TextStyle(
-                                color: theme.colorScheme.primary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '手机扫码或点击右侧复制链接',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontSize: 11,
-                                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
-                              ),
-                            ),
-                          ],
+                      title: const Text('联系方式'),
+                      subtitle: const Text('Telegram 官方交流与反馈 · 一键直接跳转'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ContactPage(),
                         ),
                       ),
-                      IconButton.filledTonal(
-                        icon: const Icon(Icons.copy_rounded, size: 18),
-                        tooltip: '复制 Telegram 地址',
-                        onPressed: () {
-                          Clipboard.setData(
-                            const ClipboardData(text: 'https://t.me/tanghulutvos'),
-                          );
-                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('已复制 Telegram 地址：https://t.me/tanghulutvos'),
-                              behavior: SnackBarBehavior.floating,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    ListTile(
+                      key: const ValueKey('about-third-party-tile'),
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.darkSurfaceHighest,
+                        child: Icon(
+                          Icons.extension_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
                       ),
-                    ],
-                  ),
+                      title: const Text('第三方开源组件'),
+                      subtitle: const Text('查看核心组件依赖、开源协议与授权声明'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ThirdPartyPage(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
