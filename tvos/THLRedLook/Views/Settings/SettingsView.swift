@@ -57,6 +57,7 @@ public struct SettingsView: View {
     @EnvironmentObject private var jsService: JSSourceService
     @State private var showingSourceDiagnostics = false
     @State private var showingImportAlert = false
+    @State private var showingClearAllAlert = false
     @State private var importURLString = ""
     @State private var isImporting = false
 
@@ -193,6 +194,23 @@ public struct SettingsView: View {
         )) {
             Alert(title: Text("提示"), message: Text(saveNotice ?? ""), dismissButton: .default(Text("好的")))
         }
+        .alert("清空自定义数据源", isPresented: $showingClearAllAlert) {
+            Button("取消", role: .cancel) {}
+            Button("全部清空", role: .destructive) {
+                Task {
+                    let ok = await jsService.clearAllSources()
+                    await MainActor.run {
+                        if ok {
+                            saveNotice = "已成功清空所有自定义数据源，并重置为官方默认源。"
+                        } else {
+                            saveNotice = "清空数据源失败，请重试。"
+                        }
+                    }
+                }
+            }
+        } message: {
+            Text("确定要清空所有自定义导入的 JS 数据源吗？官方内置数据源将保留，此操作不可撤销。")
+        }
         .sheet(isPresented: $showingSourceDiagnostics) {
             SourceDiagnosticsView()
         }
@@ -261,6 +279,13 @@ public struct SettingsView: View {
                     showingImportAlert = true
                 }
 
+                let hasCustomSources = jsService.sources.contains(where: { (($0["id"] as? String) ?? "").lowercased() != "hongguo" })
+                if hasCustomSources {
+                    TVButton(title: "清空自定义源", icon: "trash.circle.fill") {
+                        showingClearAllAlert = true
+                    }
+                }
+
                 Spacer()
             }
             .padding(.bottom, 16)
@@ -314,7 +339,16 @@ public struct SettingsView: View {
                                 }
                             },
                             onRemove: {
-                                Task { await jsService.removeSource(id) }
+                                Task {
+                                    let ok = await jsService.removeSource(id)
+                                    await MainActor.run {
+                                        if ok {
+                                            saveNotice = "已成功删除数据源：\(name)"
+                                        } else {
+                                            saveNotice = "删除数据源失败，请重试。"
+                                        }
+                                    }
+                                }
                             }
                         )
                     }
@@ -1607,6 +1641,20 @@ struct JSSourcePluginCard: View {
             .buttonStyle(TVZeroHighlightButtonStyle())
             .focused($isCardFocused)
             .focusEffectDisabled()
+            .contextMenu {
+                Button {
+                    onSelect()
+                } label: {
+                    Label("激活此数据源", systemImage: "checkmark.circle")
+                }
+                if !isBuiltIn {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("删除此数据源", systemImage: "trash")
+                    }
+                }
+            }
 
             // 右侧：自定义数据源独立删除按钮（支持遥控器向右切换焦点选中）
             if !isBuiltIn {
@@ -1635,6 +1683,7 @@ struct JSSourcePluginCard: View {
                 .buttonStyle(TVZeroHighlightButtonStyle())
                 .focused($isTrashFocused)
                 .focusEffectDisabled()
+                .accessibilityIdentifier("settings.source.delete.\(id)")
                 .alert("删除数据源", isPresented: $showDeleteConfirm) {
                     Button("取消", role: .cancel) {}
                     Button("确认删除", role: .destructive) {

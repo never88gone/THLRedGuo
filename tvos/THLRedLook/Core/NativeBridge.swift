@@ -456,14 +456,69 @@ public actor NativeBridge {
             return ["ok": true, "count": installedSources.count]
 
         case "jsSource.remove":
-            let sourceId = payload["source"] as? String ?? ""
-            if !sourceId.isEmpty {
-                let candidate1 = sourcesDirURL.appendingPathComponent("\(sourceId).js")
-                try? FileManager.default.removeItem(at: candidate1)
-                scanSourcesDirectory()
-                return ["ok": true]
+            let sourceId = (payload["source"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !sourceId.isEmpty, sourceId.lowercased() != "hongguo" else {
+                return ["ok": false, "reason": "官方内置源受保护或源标识为空"]
             }
-            return ["ok": false]
+
+            var removedAny = false
+            // 1. 精确删除 sourceId.js
+            let exactFile = sourcesDirURL.appendingPathComponent("\(sourceId).js")
+            if FileManager.default.fileExists(atPath: exactFile.path) {
+                try? FileManager.default.removeItem(at: exactFile)
+                removedAny = true
+            }
+
+            // 2. 遍历 sourcesDirURL 目录中的所有 js 文件，彻底匹配并清理
+            if let files = try? FileManager.default.contentsOfDirectory(at: sourcesDirURL, includingPropertiesForKeys: nil) {
+                for file in files where file.pathExtension.lowercased() == "js" {
+                    let baseName = file.deletingPathExtension().lastPathComponent
+                    if baseName == "hongguo" { continue }
+                    if baseName == sourceId {
+                        try? FileManager.default.removeItem(at: file)
+                        removedAny = true
+                        continue
+                    }
+                    if let script = try? String(contentsOf: file, encoding: .utf8), !script.isEmpty {
+                        if let meta = extractScriptMeta(script: script, fallbackId: baseName) {
+                            let sid = (meta["id"] as? String) ?? baseName
+                            if sid == sourceId {
+                                try? FileManager.default.removeItem(at: file)
+                                removedAny = true
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. 清除内存上下文与脚本缓存
+            installedSources.removeValue(forKey: sourceId)
+            sourceScripts.removeValue(forKey: sourceId)
+            jsContexts.removeValue(forKey: sourceId)
+
+            // 4. 若删除的是当前活跃源，安全回退至官方内置源或首选可用源
+            scanSourcesDirectory()
+            if activeSourceId == sourceId || !installedSources.keys.contains(activeSourceId) {
+                activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : (installedSources.keys.first ?? "")
+            }
+            return ["ok": true, "removed": removedAny, "active": activeSourceId]
+
+        case "jsSource.clearAll":
+            // 清空所有非官方内置的自定义数据源插件
+            if let files = try? FileManager.default.contentsOfDirectory(at: sourcesDirURL, includingPropertiesForKeys: nil) {
+                for file in files where file.pathExtension.lowercased() == "js" {
+                    let baseName = file.deletingPathExtension().lastPathComponent
+                    if baseName.lowercased() != "hongguo" {
+                        try? FileManager.default.removeItem(at: file)
+                    }
+                }
+            }
+            installedSources.removeAll()
+            sourceScripts.removeAll()
+            jsContexts.removeAll()
+            scanSourcesDirectory()
+            activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : ""
+            return ["ok": true, "active": activeSourceId]
 
         case "categories":
             let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? activeSourceId

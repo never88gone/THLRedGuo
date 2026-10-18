@@ -323,9 +323,23 @@ public final class JSSourceService: ObservableObject {
         return ok
     }
 
-    public func removeSource(_ id: String) async {
-        _ = try? await repository.jsSourceRemove(sourceId: id)
+    @discardableResult
+    public func removeSource(_ id: String) async -> Bool {
+        guard id.lowercased() != "hongguo" else { return false }
+        let ok = (try? await repository.jsSourceRemove(sourceId: id)) ?? false
         await refresh()
+        if self.activeSourceId == id || self.activeSourceId.isEmpty {
+            await setActiveSource("hongguo")
+        }
+        return ok
+    }
+
+    @discardableResult
+    public func clearAllSources() async -> Bool {
+        let ok = (try? await repository.jsSourceClearAll()) ?? false
+        await refresh()
+        await setActiveSource("hongguo")
+        return ok
     }
 }
 public let BuiltInHongguoJSContent = #"""
