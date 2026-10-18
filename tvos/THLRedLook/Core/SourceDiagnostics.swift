@@ -1,6 +1,6 @@
-import Foundation
 import Combine
 import CryptoKit
+import Foundation
 
 public struct SourceDiagnosticEntry: Identifiable {
     public let id = UUID()
@@ -53,11 +53,16 @@ public final class SourceDiagnostics: ObservableObject {
     public static func safeCode(_ value: Any?) -> String {
         guard let value else { return "" }
         let code = String(describing: value)
-        return code.range(of: "^-?[A-Za-z0-9_.:-]{1,64}$", options: .regularExpression) != nil && code.range(of: "\\d{10,}", options: .regularExpression) == nil ? code : ""
+        return code.range(of: "^-?[A-Za-z0-9_.:-]{1,64}$", options: .regularExpression) != nil
+            && code.range(of: "\\d{10,}", options: .regularExpression) == nil ? code : ""
     }
     public static func stage(for url: URL) -> String? {
         let host = url.host ?? ""
-        if host == "log.snssdk.com" && url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "service/2/device_register" { return "游客注册" }
+        if host == "log.snssdk.com"
+            && url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "service/2/device_register"
+        {
+            return "游客注册"
+        }
         if host == "reading.snssdk.com" && url.path == "/reading/bookapi/search/tab/v" { return "搜索" }
         if host.hasSuffix(".fqnovel.com") || host == "reading.snssdk.com" {
             if url.path.contains("/video_detail/") { return "详情" }
@@ -83,29 +88,41 @@ public final class SourceDiagnostics: ObservableObject {
     }
     public func record(url: URL, context: String, elapsedMs: Int, status: Int, body: String, errorCode: String = "") {
         guard let stage = Self.stage(for: url) else { return }
-        var entry = SourceDiagnosticEntry(context: context, stage: stage, host: url.host ?? "", status: status, errorCode: Self.safeCode(errorCode), elapsedMs: elapsedMs)
+        var entry = SourceDiagnosticEntry(
+            context: context, stage: stage, host: url.host ?? "", status: status, errorCode: Self.safeCode(errorCode),
+            elapsedMs: elapsedMs)
         if entry.errorCode.isEmpty && status != 200 { entry.errorCode = "HTTP_\(status)" }
         if entry.errorCode.isEmpty {
-            if body.utf8.count <= 2 * 1024 * 1024, let data = body.data(using: .utf8), let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            if body.utf8.count <= 2 * 1024 * 1024, let data = body.data(using: .utf8),
+                let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            {
                 entry.businessCode = Self.safeCode(parsed["code"] ?? parsed["Code"] ?? parsed["status_code"])
-                if !entry.businessCode.isEmpty && entry.businessCode != "0" { entry.errorCode = "BUSINESS_REJECTED" }
-                else if stage == "游客注册" {
+                if !entry.businessCode.isEmpty && entry.businessCode != "0" {
+                    entry.errorCode = "BUSINESS_REJECTED"
+                } else if stage == "游客注册" {
                     let valid = [parsed["device_id_str"], parsed["install_id_str"]].allSatisfy { value in
                         guard let string = value as? String else { return false }
                         return string.range(of: "^\\d{10,24}$", options: .regularExpression) != nil
                     }
                     if !valid { entry.errorCode = "GUEST_REGISTRATION_FAILED" }
-                } else if stage == "搜索" && !(parsed["search_tabs"] is [Any]) { entry.errorCode = "INVALID_RESPONSE" }
-            } else { entry.errorCode = "INVALID_RESPONSE" }
+                } else if stage == "搜索" && !(parsed["search_tabs"] is [Any]) {
+                    entry.errorCode = "INVALID_RESPONSE"
+                }
+            } else {
+                entry.errorCode = "INVALID_RESPONSE"
+            }
         }
         add(entry)
     }
     public static var version: String {
         let info = Bundle.main.infoDictionary ?? [:]
-        return "\(info["CFBundleShortVersionString"] as? String ?? "1.0.0")+\(info["CFBundleVersion"] as? String ?? "未知")"
+        return
+            "\(info["CFBundleShortVersionString"] as? String ?? "1.0.0")+\(info["CFBundleVersion"] as? String ?? "未知")"
     }
     public static var sourceHash: String {
-        SHA256.hash(data: Data(BuiltInHongguoJSContent.trimmingCharacters(in: .whitespacesAndNewlines).utf8)).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: Data(BuiltInHongguoJSContent.trimmingCharacters(in: .whitespacesAndNewlines).utf8)).map {
+            String(format: "%02x", $0)
+        }.joined()
     }
     public static func advice(_ entry: SourceDiagnosticEntry) -> String {
         if entry.errorCode.hasPrefix("DNS") || (entry.stage == "游客注册" && entry.failed) {
@@ -117,15 +134,29 @@ public final class SourceDiagnostics: ObservableObject {
         return "请结合失败阶段、HTTP 状态和错误码反馈；单次检测不能判断是否被网络规则拦截。"
     }
     public var report: String {
-        (["THL 数据源诊断", "应用：\(Self.version)", "系统：tvOS \(ProcessInfo.processInfo.operatingSystemVersionString)", "数据源：hongguo · SHA256 \(Self.sourceHash)", "报告时间：\(ISO8601DateFormatter().string(from: Date()))", "报告不含请求参数、设备标识、Cookie、签名和响应原文。"] + entries.map(\.text)).joined(separator: "\n")
+        ([
+            "THL 数据源诊断", "应用：\(Self.version)", "系统：tvOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
+            "数据源：hongguo · SHA256 \(Self.sourceHash)", "报告时间：\(ISO8601DateFormatter().string(from: Date()))",
+            "报告不含请求参数、设备标识、Cookie、签名和响应原文。",
+        ] + entries.map(\.text)).joined(separator: "\n")
     }
     public var qrText: String {
         var recent = Array(entries.suffix(8))
         while true {
-            let payload: [String: Any] = ["app": "THL", "version": Self.version, "os": ProcessInfo.processInfo.operatingSystemVersionString, "source": "hongguo", "sha256": Self.sourceHash, "at": ISO8601DateFormatter().string(from: Date()), "recent": recent.map { entry -> [String: Any] in
-                ["at": ISO8601DateFormatter().string(from: entry.at), "stage": entry.stage, "host": entry.host, "http": entry.status, "business": entry.businessCode, "error": entry.errorCode, "ms": entry.elapsedMs]
-            }]
-            guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else { return "" }
+            let payload: [String: Any] = [
+                "app": "THL", "version": Self.version, "os": ProcessInfo.processInfo.operatingSystemVersionString,
+                "source": "hongguo", "sha256": Self.sourceHash, "at": ISO8601DateFormatter().string(from: Date()),
+                "recent": recent.map { entry -> [String: Any] in
+                    [
+                        "at": ISO8601DateFormatter().string(from: entry.at), "stage": entry.stage, "host": entry.host,
+                        "http": entry.status, "business": entry.businessCode, "error": entry.errorCode,
+                        "ms": entry.elapsedMs,
+                    ]
+                },
+            ]
+            guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else {
+                return ""
+            }
             if data.count <= 2300 || recent.isEmpty { return String(decoding: data, as: UTF8.self) }
             recent.removeFirst()
         }
@@ -148,19 +179,24 @@ public final class SourceDiagnosticRunner: ObservableObject {
         var stage = "搜索第一页"
         defer { running = false }
         do {
-            let first = try await bridge.request(action: "catalog", payload: ["source": "hongguo", "query": "短剧", "page": 1])
+            let first = try await bridge.request(
+                action: "catalog", payload: ["source": "hongguo", "query": "短剧", "page": 1])
             let items = first["items"] as? [[String: Any]] ?? []
             recorder.add(SourceDiagnosticEntry(context: context, stage: stage, count: items.count))
             let more = first["hasMore"] as? Bool == true
             if more {
                 stage = "搜索分页"
-                let next = try await bridge.request(action: "catalog", payload: ["source": "hongguo", "query": "短剧", "page": 2])
-                recorder.add(SourceDiagnosticEntry(context: context, stage: stage, count: (next["items"] as? [Any])?.count ?? 0))
+                let next = try await bridge.request(
+                    action: "catalog", payload: ["source": "hongguo", "query": "短剧", "page": 2])
+                recorder.add(
+                    SourceDiagnosticEntry(context: context, stage: stage, count: (next["items"] as? [Any])?.count ?? 0))
             }
             if let drama = items.first {
                 stage = "详情解析"
                 let detail = try await bridge.request(action: "detail", payload: ["drama": drama])
-                guard let chapters = detail["chapters"] as? [Any], !chapters.isEmpty else { throw NSError(domain: "SourceDiagnostic", code: 1) }
+                guard let chapters = detail["chapters"] as? [Any], !chapters.isEmpty else {
+                    throw NSError(domain: "SourceDiagnostic", code: 1)
+                }
             }
             result = "检测完成：注册、搜索\(more ? "、分页" : "")\(items.isEmpty ? "（无结果）" : "、详情")通过"
         } catch {

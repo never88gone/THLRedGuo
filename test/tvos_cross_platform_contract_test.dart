@@ -13,6 +13,7 @@ void main() {
       try {
         final main = File('${directory.path}/DiagnosticsRegression.swift');
         await main.writeAsString(r'''import Foundation
+import CoreImage.CIFilterBuiltins
 
 public let BuiltInHongguoJSContent = try! String(contentsOfFile: "assets/sources/hongguo.js", encoding: .utf8)
 final class StubProtocol: URLProtocol {
@@ -79,7 +80,15 @@ struct Regression {
             }
             for _ in 0..<70 { recorder.add(SourceDiagnosticEntry(context:"测试",stage:"搜索",errorCode:"HTTP_403")) }
             precondition(recorder.entries.count == 60)
-            precondition(recorder.qrText.utf8.count <= 2300)
+            let qrText = recorder.qrText
+            precondition(qrText.utf8.count <= 2300)
+            let filter = CIFilter.qrCodeGenerator()
+            filter.message = Data(qrText.utf8)
+            filter.correctionLevel = "L"
+            let image = filter.outputImage!.transformed(by: CGAffineTransform(scaleX: 4, y: 4))
+            let detector = CIDetector(ofType: CIDetectorTypeQRCode, context: CIContext(), options: [CIDetectorAccuracy: CIDetectorAccuracyHigh])!
+            let decoded = detector.features(in: image).compactMap { ($0 as? CIQRCodeFeature)?.messageString }
+            precondition(decoded.contains(qrText))
             recorder.clear()
             precondition(recorder.entries.isEmpty)
         }
