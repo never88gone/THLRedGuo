@@ -1329,11 +1329,11 @@ struct AboutDisclaimerCard: View {
                     .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("合规与隐私承诺")
+                    Text("免责声明与合规承诺")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
 
-                    Text("本项目为独立 Apple tvOS 客户端系统。短剧与影视数据请求、协议解析及流媒体播放全部在您的 Apple TV 设备本地闭环运行，不搭建任何中转服务器，不收集任何用户使用行为与隐私数据，旨在提供纯粹、流畅的家庭大屏视听体验。")
+                    Text("1. 本项目为独立 Apple tvOS 客户端系统，仅供大屏原生开发技术学习与非商业研究使用；\n2. 短剧及流媒体数据均来源于网络公开接口，开发者不搭建中转服务、不存储任何音视频内容；版权归原版权方所有；\n3. 视频解析与播放均在 Apple TV 设备本地沙箱闭环执行，零隐私数据上报，使用者需对自配内容自行承担法律责任。")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.65))
                         .lineSpacing(4)

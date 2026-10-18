@@ -519,10 +519,10 @@ class _AboutPageState extends State<AboutPage> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.info_outline_rounded, size: 20, color: AppColors.warning),
+                          const Icon(Icons.gavel_rounded, size: 20, color: AppColors.warning),
                           const SizedBox(width: 8),
                           Text(
-                            '免责声明与致谢',
+                            '免责声明 (Disclaimer)',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -531,9 +531,12 @@ class _AboutPageState extends State<AboutPage> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        '本项目源码来自网上大名鼎鼎的鱼佬（原作者）。仅用于个人学习研究、打包测试与多端适配体验，不保证任何可用性，随时可能删库。',
+                        '1. 本软件仅供移动端与大屏端跨平台编程技术学习、个人研究及非商业测试使用；\n'
+                        '2. 本软件为纯本地客户端工具，开发者不提供、不存储、不修改任何网络音视频内容，所有媒体数据均来源于网络公开接口；\n'
+                        '3. 媒体内容及相关版权均归原版权方所有，请自觉支持正版内容；\n'
+                        '4. 使用者因个人使用行为产生的一切法律责任及版权纠纷均由使用者自行承担，与软件开发者无关。',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          height: 1.5,
+                          height: 1.6,
                         ),
                       ),
                     ],
