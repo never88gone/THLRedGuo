@@ -50,9 +50,14 @@ public final class PlayerViewModel: ObservableObject {
     private var danmakuRequestSequence = 0
     public private(set) var playbackClockDate = Date()
     
+    private struct PreloadedEpisode {
+        let episodeIndex: Int
+        let plan: PlaybackPlan
+        let playerItem: AVPlayerItem
+        let decryptedURL: URL?
+    }
     private var prefetchTask: Task<Void, Never>?
-    private var prefetchedNextPlan: PlaybackPlan?
-    private var prefetchedNextEpisodeIndex: Int?
+    private var preloadedEpisode: PreloadedEpisode?
     private var identityVerified = false
     private var lifecycleTask: Task<Void, Never>?
     private var preparationTask: Task<Void, Never>?
@@ -155,8 +160,12 @@ public final class PlayerViewModel: ObservableObject {
         recoveryTask = nil
         prefetchTask?.cancel()
         prefetchTask = nil
-        prefetchedNextPlan = nil
-        prefetchedNextEpisodeIndex = nil
+        if let preloaded = preloadedEpisode {
+            if let dec = preloaded.decryptedURL, dec != decryptedURL {
+                CENCMP4Decryptor.shared.removePlaybackCache(at: dec)
+            }
+            preloadedEpisode = nil
+        }
         saveCurrentProgress()
         progressSaveTimer?.invalidate()
         progressSaveTimer = nil
@@ -245,7 +254,45 @@ public final class PlayerViewModel: ObservableObject {
             }
         }
         reachedEnd = false
-        releasePlayer()
+
+        // 优先检查是否命中已提前全链路预加载就绪的下一集
+        if !recovering, let preloaded = preloadedEpisode, preloaded.episodeIndex == episodeIndex {
+            preloadedEpisode = nil
+            currentEpisodeIndex = episodeIndex
+            currentTime = max(0, seekTo)
+            duration = 0
+            nextEpisodeCountdown = nil
+            errorMessage = nil
+            plan = preloaded.plan
+            selectedQuality = preloaded.plan.quality
+            if let oldDec = decryptedURL, oldDec != preloaded.decryptedURL {
+                CENCMP4Decryptor.shared.removePlaybackCache(at: oldDec)
+            }
+            decryptedURL = preloaded.decryptedURL
+
+            await configureAudioSession()
+            guard !closed, generation == playbackGeneration, !Task.isCancelled else {
+                if let dec = preloaded.decryptedURL {
+                    CENCMP4Decryptor.shared.removePlaybackCache(at: dec)
+                }
+                return
+            }
+            startPlaybackWithItem(item: preloaded.playerItem, seekTo: seekTo)
+            NSLog("🎬 [PlayerVM] 命中第%d集全链路预热，实现无缝秒开起播", episodeIndex)
+            updateActiveDanmakus()
+            return
+        }
+
+        // 未命中则清理已有预载缓存（若跳集）
+        if let preloaded = preloadedEpisode {
+            if let dec = preloaded.decryptedURL, dec != decryptedURL {
+                CENCMP4Decryptor.shared.removePlaybackCache(at: dec)
+            }
+            preloadedEpisode = nil
+        }
+
+        releasePlayerObservers()
+        player?.pause()
         await configureAudioSession()
         guard !closed, generation == playbackGeneration, !Task.isCancelled else { return }
         currentEpisodeIndex = episodeIndex
@@ -289,17 +336,8 @@ public final class PlayerViewModel: ObservableObject {
                 startPlaybackWithItem(item: AVPlayerItem(url: localURL), seekTo: seekTo)
                 return
             }
-            let resolved: PlaybackPlan
-            if !recovering, let prefetched = prefetchedNextPlan,
-               prefetchedNextEpisodeIndex == episodeIndex,
-               prefetched.expiresAt == 0 || prefetched.expiresAt > Int64(Date().timeIntervalSince1970 * 1000) + 5000 {
-                resolved = prefetched
-            } else {
-                resolved = try await repository.resolvePlayback(drama: drama, episode: episode, episodeIndex: episodeIndex, quality: selectedQuality, avoidURL: failedURL)
-            }
+            let resolved = try await repository.resolvePlayback(drama: drama, episode: episode, episodeIndex: episodeIndex, quality: selectedQuality, avoidURL: failedURL)
             guard current() else { return }
-            prefetchedNextPlan = nil
-            prefetchedNextEpisodeIndex = nil
             plan = resolved
             selectedQuality = resolved.quality
             guard let url = URL(string: resolved.url), ["https", "http", "file"].contains(url.scheme ?? "") else {
@@ -308,13 +346,21 @@ public final class PlayerViewModel: ObservableObject {
             let playbackURL: URL
             var options: [String: Any] = [:]
             if !resolved.decryptionKey.isEmpty {
+                let oldDec = decryptedURL
                 playbackURL = try await CENCMP4Decryptor.shared.decrypt(remoteURL: url, headers: resolved.headers, hexKey: resolved.decryptionKey, mediaBytes: resolved.mediaBytes)
                 guard current() else {
                     CENCMP4Decryptor.shared.removePlaybackCache(at: playbackURL)
                     return
                 }
+                if let old = oldDec, old != playbackURL {
+                    CENCMP4Decryptor.shared.removePlaybackCache(at: old)
+                }
                 decryptedURL = playbackURL
             } else {
+                if let oldDec = decryptedURL {
+                    CENCMP4Decryptor.shared.removePlaybackCache(at: oldDec)
+                    decryptedURL = nil
+                }
                 playbackURL = url
                 if !resolved.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = resolved.headers }
             }
@@ -359,10 +405,16 @@ public final class PlayerViewModel: ObservableObject {
 
     func startPlaybackWithItem(item: AVPlayerItem, seekTo: Double) {
         releasePlayerObservers()
-        player?.pause()
-        let av = AVPlayer(playerItem: item)
-        av.automaticallyWaitsToMinimizeStalling = true
-        player = av
+        let av: AVPlayer
+        if let existing = player {
+            existing.replaceCurrentItem(with: item)
+            av = existing
+        } else {
+            let newPlayer = AVPlayer(playerItem: item)
+            newPlayer.automaticallyWaitsToMinimizeStalling = true
+            player = newPlayer
+            av = newPlayer
+        }
         isSeeking = seekTo > 0
         let generation = playbackGeneration
         timeControlObserver = av.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self, weak av] _, _ in
@@ -403,6 +455,15 @@ public final class PlayerViewModel: ObservableObject {
                 }
             }
         }
+        if item.status == .readyToPlay {
+            self.errorMessage = nil
+            let seconds = item.duration.seconds
+            if seconds.isFinite && seconds > 0 { self.duration = seconds }
+            self.isLoading = false
+            self.samplePlaybackClock()
+            self.lastProgressTime = Date()
+            if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
+        }
         timeObserverToken = av.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self, weak av] time in
             Task { @MainActor in
                 guard let self, let av, self.player === av, generation == self.playbackGeneration, !self.closed, !self.isSeeking else { return }
@@ -413,10 +474,11 @@ public final class PlayerViewModel: ObservableObject {
                     self.lastObservedPosition = seconds
                     self.lastProgressTime = Date()
                 }
-                if let seconds = av.currentItem?.duration.seconds, seconds.isFinite && seconds > 0 { self.duration = seconds }
+                if let dur = av.currentItem?.duration.seconds, dur.isFinite && dur > 0 { self.duration = dur }
                 let remaining = self.duration - seconds
-                if remaining <= 5 && remaining > 0 && self.currentEpisodeIndex < self.allEpisodes.count {
-                    if self.prefetchTask == nil { self.prefetchNextEpisodePlan() }
+                let shouldPrefetch = (seconds >= 3.0 || (remaining <= 30 && remaining > 0)) && self.currentEpisodeIndex < self.allEpisodes.count
+                if shouldPrefetch && self.preloadedEpisode?.episodeIndex != (self.currentEpisodeIndex + 1) && self.prefetchTask == nil {
+                    self.prefetchNextEpisode()
                 }
                 self.nextEpisodeCountdown = nil
                 self.updateActiveDanmakus()
@@ -469,26 +531,80 @@ public final class PlayerViewModel: ObservableObject {
         if let token = timeObserverToken { player?.removeTimeObserver(token); timeObserverToken = nil }
     }
 
-    private func prefetchNextEpisodePlan() {
+    private func prefetchNextEpisode() {
         let nextIndex = currentEpisodeIndex + 1
         guard nextIndex <= allEpisodes.count else { return }
-        
-        prefetchTask = Task {
+        guard preloadedEpisode?.episodeIndex != nextIndex, prefetchTask == nil else { return }
+        let targetEpisode = allEpisodes.indices.contains(nextIndex - 1) ? allEpisodes[nextIndex - 1] : nil
+        let targetDrama = self.drama
+        let targetQuality = self.selectedQuality
+        let currentGen = self.playbackGeneration
+
+        prefetchTask = Task { [weak self] in
+            defer {
+                Task { @MainActor in
+                    self?.prefetchTask = nil
+                }
+            }
             do {
-                let nextEp = allEpisodes.indices.contains(nextIndex - 1) ? allEpisodes[nextIndex - 1] : nil
-                let plan = try await repository.resolvePlayback(
-                    drama: drama,
-                    episode: nextEp,
+                let resolvedPlan = try await self?.repository.resolvePlayback(
+                    drama: targetDrama,
+                    episode: targetEpisode,
                     episodeIndex: nextIndex,
-                    quality: selectedQuality
+                    quality: targetQuality
                 )
-                if !Task.isCancelled {
-                    self.prefetchedNextPlan = plan
-                    self.prefetchedNextEpisodeIndex = nextIndex
-                    NSLog("🎬 [PlayerVM] 成功提前加载第%d集的播放方案", nextIndex)
+                guard let resolvedPlan, !Task.isCancelled else { return }
+
+                guard let url = URL(string: resolvedPlan.url), ["https", "http", "file"].contains(url.scheme ?? "") else { return }
+
+                let playbackURL: URL
+                var decryptedTempURL: URL? = nil
+                var options: [String: Any] = [:]
+
+                if !resolvedPlan.decryptionKey.isEmpty {
+                    let decrypted = try await CENCMP4Decryptor.shared.decrypt(
+                        remoteURL: url,
+                        headers: resolvedPlan.headers,
+                        hexKey: resolvedPlan.decryptionKey,
+                        mediaBytes: resolvedPlan.mediaBytes
+                    )
+                    guard !Task.isCancelled else {
+                        CENCMP4Decryptor.shared.removePlaybackCache(at: decrypted)
+                        return
+                    }
+                    decryptedTempURL = decrypted
+                    playbackURL = decrypted
+                } else {
+                    playbackURL = url
+                    if !resolvedPlan.headers.isEmpty {
+                        options["AVURLAssetHTTPHeaderFieldsKey"] = resolvedPlan.headers
+                    }
+                }
+
+                let asset = AVURLAsset(url: playbackURL, options: options.isEmpty ? nil : options)
+                let item = AVPlayerItem(asset: asset)
+                item.preferredForwardBufferDuration = 10.0
+
+                await MainActor.run {
+                    guard let self, !self.closed, currentGen == self.playbackGeneration, !Task.isCancelled else {
+                        if let temp = decryptedTempURL {
+                            CENCMP4Decryptor.shared.removePlaybackCache(at: temp)
+                        }
+                        return
+                    }
+                    if let old = self.preloadedEpisode, let oldDec = old.decryptedURL, oldDec != decryptedTempURL {
+                        CENCMP4Decryptor.shared.removePlaybackCache(at: oldDec)
+                    }
+                    self.preloadedEpisode = PreloadedEpisode(
+                        episodeIndex: nextIndex,
+                        plan: resolvedPlan,
+                        playerItem: item,
+                        decryptedURL: decryptedTempURL
+                    )
+                    NSLog("🎬 [PlayerVM] 成功提前加载并解密第%d集(媒体预缓冲就绪)", nextIndex)
                 }
             } catch {
-                NSLog("🎬 [PlayerVM] 提前加载下一集失败: %@", error.localizedDescription)
+                NSLog("🎬 [PlayerVM] 提前预载第%d集失败: %@", nextIndex, error.localizedDescription)
             }
         }
     }
