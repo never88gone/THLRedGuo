@@ -71,7 +71,7 @@ public struct TVPlayerControlsOverlay: View {
                         title: viewModel.danmakuEnabled ? "弹幕：开" : "弹幕：关",
                         icon: viewModel.danmakuEnabled ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right",
                         target: .danmaku,
-                        isProminent: viewModel.danmakuEnabled
+                        isProminent: false
                     ) {
                         viewModel.toggleDanmaku()
                     }

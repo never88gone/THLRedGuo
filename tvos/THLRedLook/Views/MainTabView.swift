@@ -150,7 +150,7 @@ public struct MainTabView: View {
                 initTab = .library
             case "downloads", "testDownload":
                 initTab = .downloads
-            case "settings", "importFlow":
+            case "settings", "importFlow", "settings_sources", "settings_about", "settings_cache", "settings_community", "settings_network":
                 initTab = .settings
             case "settingsActive":
                 initTab = .settings
@@ -391,9 +391,12 @@ public struct MainTabView: View {
         case "cleanBlank":
             selectedTab = .catalog
             focusedNavTab = .catalog
-        case "importFlow", "settings", "settings_cache", "settings_about":
+        case "importFlow", "settings", "settingsActive", "settings_cache", "settings_about", "settings_sources", "settings_community", "settings_network":
             selectedTab = .settings
             focusedNavTab = .settings
+            if page == "settingsActive" {
+                isSettingsActiveDemo = true
+            }
         case "catalog", "cardFocused":
             selectedTab = .catalog
             isCardFocusedDemo = (page == "cardFocused")
