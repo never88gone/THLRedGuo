@@ -410,34 +410,113 @@ jobs:
             tag="v${base_version}"
           fi
           
+          # 从生成产物中提取实际构建号
+          sample_pkg=$(find release -maxdepth 1 \( -name "THLRedLook-*.apk" -o -name "THLRedLook-*.zip" -o -name "THLRedLook-*.dmg" \) | head -n1)
+          if [ -n "$sample_pkg" ]; then
+            latest_build=$(basename "$sample_pkg" | grep -oE '\+[0-9]+' | tr -d '+' || echo "")
+          else
+            latest_build=""
+          fi
+          if [ -z "$latest_build" ]; then
+            latest_build=$(TZ='Asia/Shanghai' date '+%y%j%H%M')
+          fi
+          bj_time=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M')
+
+          # 如果已存在该 Release，安全清理本次被替换平台的历史旧包（防止历史过期安装包堆积）
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "正在同步清理历史同名平台过期安装包..."
+            existing_assets=$(gh release view "$tag" --json assets --jq '.assets[].name' || true)
+            for new_file in release/*; do
+              [ -f "$new_file" ] || continue
+              fname=$(basename "$new_file")
+              [ "$fname" = "SHA256SUMS.txt" ] && continue
+              suffix=$(echo "$fname" | sed -E 's/.*THLRedLook-[0-9.]+[^-\.]*-(.*)/\1/')
+              if [ -n "$suffix" ] && [ "$suffix" != "$fname" ]; then
+                for old_asset in $existing_assets; do
+                  if [[ "$old_asset" == *"$suffix" ]] && [ "$old_asset" != "$fname" ]; then
+                    echo "清理过期旧包: $old_asset"
+                    gh release delete-asset "$tag" "$old_asset" -y || true
+                  fi
+                done
+              fi
+            done
+          fi
+
+          # 动态生成包含直接下载直链与精准北京时间戳的 Release Notes
+          repo="${{ github.repository }}"
+          base_url="https://github.com/${repo}/releases/download/${tag}"
+          
           {
             printf '%s\n\n' "## 糖葫芦Haw (THLRedLook) v${base_version} 正式发布"
-            printf '%s\n\n' "全平台独立运行的短剧与流媒体聚合播放器，内置官方标准规范的数据源，支持端侧独立解析与在线播放。"
-            printf '%s\n\n' "### 📦 跨平台安装包下载："
+            printf '> 🕒 **最近滚动更新**：%s (北京时间) · **最新构建号**：`Build %s` · **Git 提交**：`%s`\n' "$bj_time" "$latest_build" "${{ github.sha }}"
+            printf '> 💡 *本项目采用持续集成，每次提交均自动构建各端安装包并更新发布。若页面缓存显示较早时间，请以本说明和安装包构建号为准。*\n\n'
+            printf '%s\n\n' "全平台独立运行的短剧与流媒体聚合播放器，内置官方标准规范的数据源，支持端侧独立解析与在线播放。无需注册登录，开箱即用。"
+            printf '%s\n\n' "### 📦 最新跨平台安装包直接下载（Build ${latest_build}）"
+            
+            # 列出 Android 安装包直链
             printf '%s\n' "#### 📱 Android (手机 / 平板 / 电视盒子)"
-            printf '%s\n' "- \`*-arm64-v8a.apk\`：绝大多数现代 64 位手机与平板设备（推荐）"
-            printf '%s\n' "- \`*-armeabi-v7a.apk\`：较老的 32 位手机或部分电视盒子"
-            printf '%s\n' "- \`*-x86_64.apk\`：PC 端 Android 模拟器"
+            for f in release/*-arm64-v8a.apk release/*-armeabi-v7a.apk release/*-x86_64.apk; do
+              if [ -f "$f" ]; then
+                fn=$(basename "$f")
+                encoded_fn=$(echo "$fn" | sed 's/+/%2B/g')
+                desc="常规安装包"
+                [[ "$fn" == *"arm64-v8a"* ]] && desc="绝大多数现代 64 位手机与平板设备（**推荐**）"
+                [[ "$fn" == *"armeabi-v7a"* ]] && desc="较老的 32 位手机或部分电视盒子"
+                [[ "$fn" == *"x86_64"* ]] && desc="PC 端 Android 模拟器"
+                printf -- '- [%s](%s/%s)（%s）\n' "$fn" "$base_url" "$encoded_fn" "$desc"
+              fi
+            done
+            
+            # 列出 Windows 安装包直链
             printf '\n%s\n' "#### 🖥️ Windows (桌面端)"
-            printf '%s\n' "- \`*-windows-x64.zip\`：Windows 10 / 11 64 位绿色便携版，解压后直接双击运行主程序，支持专属 Shader 滤镜画质增强"
+            for f in release/*-windows-x64.zip; do
+              if [ -f "$f" ]; then
+                fn=$(basename "$f")
+                encoded_fn=$(echo "$fn" | sed 's/+/%2B/g')
+                printf -- '- [%s](%s/%s)（Windows 10 / 11 64 位绿色免安装便携版，解压后直接双击运行主程序，支持专属 Shader 滤镜画质增强）\n' "$fn" "$base_url" "$encoded_fn"
+              fi
+            done
+
+            # 列出 macOS 安装包直链
             printf '\n%s\n' "#### 💻 macOS (Mac 电脑)"
-            printf '%s\n' "- \`*-macos.dmg\`：macOS 原生磁盘映像安装包，双击打开后拖拽至 Applications 即可安装（推荐）"
+            for f in release/*-macos.dmg; do
+              if [ -f "$f" ]; then
+                fn=$(basename "$f")
+                encoded_fn=$(echo "$fn" | sed 's/+/%2B/g')
+                printf -- '- [%s](%s/%s)（macOS 原生磁盘映像安装包，双击打开后拖拽至 Applications 即可安装）\n' "$fn" "$base_url" "$encoded_fn"
+              fi
+            done
+
+            # 列出 iOS 安装包直链
             printf '\n%s\n' "#### 🍏 iOS (iPhone / iPad)"
-            printf '%s\n' "- \`*-ios-unsigned.ipa\`：iOS 离线安装包（可通过 AltStore / Sideloadly / TrollStore / 爱思助手直接自签安装）"
+            for f in release/*-ios*.ipa; do
+              if [ -f "$f" ]; then
+                fn=$(basename "$f")
+                encoded_fn=$(echo "$fn" | sed 's/+/%2B/g')
+                printf -- '- [%s](%s/%s)（iOS 离线安装包，可通过 AltStore / Sideloadly / TrollStore / 爱思助手直接自签安装）\n' "$fn" "$base_url" "$encoded_fn"
+              fi
+            done
+            printf -- '- **官方 TestFlight 公测**：[立即加入 TestFlight 公测 (iOS / iPadOS / tvOS)](https://testflight.apple.com/join/rkvvdp7J)\n'
+
+            # 保持 tvOS 链接说明
+            printf '\n%s\n' "#### 📺 Apple tvOS (大屏原生客厅端)"
+            printf -- '- [THLRedLook-1.0.0-tvos-signed.ipa](%s/THLRedLook-1.0.0-tvos-signed.ipa)（已签名 tvOS 原生大屏安装包）\n' "$base_url"
+            printf -- '- [THLRedLook-1.0.0-tvos-unsigned.ipa](%s/THLRedLook-1.0.0-tvos-unsigned.ipa)（tvOS 未签名自签包）\n' "$base_url"
+
             printf '\n%s\n' "---"
             printf '%s\n' "### 🔒 安全校验与哈希"
-            printf '%s\n' "本次发布产物的完整性哈希已记录于 \`SHA256SUMS.txt\`。"
+            printf '本次发布产物的完整性哈希已记录于 [SHA256SUMS.txt](%s/SHA256SUMS.txt)。\n' "$base_url"
           } > notes.md
 
-          # 自动创建或增量更新 GitHub Release（--clobber 覆盖同名文件，并安全保留已有的其他平台安装包）
+          # 上传与更新 Release
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "更新已有 Release: $tag"
             gh release upload "$tag" release/* --clobber
-            gh release edit "$tag" --title "糖葫芦Haw v${base_version}" --notes-file notes.md
+            gh release edit "$tag" --title "糖葫芦Haw v${base_version} (Build ${latest_build})" --notes-file notes.md --target "${{ github.sha }}"
           else
             echo "创建新 Release: $tag (Target: ${{ github.sha }})"
             gh release create "$tag" release/* \
-              --title "糖葫芦Haw v${base_version}" \
+              --title "糖葫芦Haw v${base_version} (Build ${latest_build})" \
               --notes-file notes.md \
               --target "${{ github.sha }}"
           fi
