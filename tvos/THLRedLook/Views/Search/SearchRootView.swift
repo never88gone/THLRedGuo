@@ -9,11 +9,9 @@ public struct SearchRootView: View {
     private enum SearchFocus: Hashable {
         case query
         case submit
-        case more
         case drama(String)
     }
     @FocusState private var focusedTarget: SearchFocus?
-    @State private var moreReturnDramaId: String?
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 32), count: 6)
 
@@ -164,15 +162,7 @@ public struct SearchRootView: View {
                                             isExternalFocused: focusedTarget == .drama(drama.id),
                                             onUpCommand: {
                                                 if index < columns.count {
-
                                                     focusedTarget = .query
-                                                }
-                                            },
-                                            onDownCommand: {
-                                                if viewModel.hasMore && index >= (viewModel.searchResults.count - 1) / columns.count * columns.count {
-                                                    moreReturnDramaId = drama.id
-
-                                                    focusedTarget = .more
                                                 }
                                             }
                                         ) {
@@ -182,35 +172,43 @@ public struct SearchRootView: View {
                                         .focused($focusedTarget, equals: .drama(drama.id))
                                         .id("search_card_\(drama.id)")
                                         .accessibilityIdentifier("search.result.\(index)")
+                                        .onAppear {
+                                            // 瀑布流智能触底：滑到倒数 8 部短剧时自动提前异步请求下一页
+                                            if index >= viewModel.searchResults.count - 8 && viewModel.hasMore && !viewModel.isLoadingMore {
+                                                Task { await viewModel.loadMore() }
+                                            }
+                                        }
                                     }
                                 }
                                 .padding(.horizontal, 48)
                                 .padding(.vertical, 24)
+
                                 if let message = viewModel.errorMessage {
-                                    Text(message).foregroundColor(.secondary)
+                                    Text(message)
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.secondary)
                                 }
-                                if viewModel.hasMore {
-                                    TVButton(title: viewModel.isLoadingMore ? "正在加载" : "加载更多", icon: "arrow.down") {
-                                        Task {
-                                            let previousCount = viewModel.searchResults.count
-                                            await viewModel.loadMore()
-                                            if viewModel.searchResults.count > previousCount {
 
-                                                focusedTarget = .drama(viewModel.searchResults[previousCount].id)
-                                            }
-                                        }
+                                if viewModel.isLoadingMore {
+                                    HStack(spacing: 12) {
+                                        ProgressView()
+                                        Text("正在加载更多短剧...")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.white.opacity(0.6))
                                     }
-                                    .accessibilityIdentifier("search.more")
-                                    .focused($focusedTarget, equals: .more)
-                                    .onMoveCommand { direction in
-                                        if direction == .up {
-
-                                            focusedTarget = (moreReturnDramaId ?? viewModel.searchResults.last?.id).map(SearchFocus.drama)
-                                        }
-                                    }
-                                    .frame(minWidth: 280)
-                                    .padding(.bottom, 40)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 28)
                                 }
+                            }
+                        }
+                        .onChange(of: focusedTarget) { target in
+                            // 遥控器焦点向下滑动推进到后半段时，双保险静默预热下一页
+                            if case .drama(let id) = target,
+                               let idx = viewModel.searchResults.firstIndex(where: { $0.id == id }),
+                               idx >= viewModel.searchResults.count - 6,
+                               viewModel.hasMore,
+                               !viewModel.isLoadingMore {
+                                Task { await viewModel.loadMore() }
                             }
                         }
                     }

@@ -179,7 +179,8 @@ public struct CatalogView: View {
                             }
                             .focused($focusedTarget, equals: .card(drama.id))
                             .onAppear {
-                                if drama.id == viewModel.items.last?.id {
+                                // 瀑布流智能触底：滑动至倒数 10 部短剧时提前自动请求下一页
+                                if index >= viewModel.items.count - 10 && viewModel.hasMore && !viewModel.isLoadingMore {
                                     Task { await viewModel.loadNextPage() }
                                 }
                             }
@@ -189,14 +190,14 @@ public struct CatalogView: View {
                     .padding(.vertical, 28)
 
                     if viewModel.isLoadingMore {
-                        HStack {
-                            Spacer()
+                        HStack(spacing: 12) {
                             ProgressView()
-                            Text("正在加载更多...")
-                                .font(.caption)
-                            .foregroundColor(.secondary)
-                            Spacer()
+                            Text("正在加载更多短剧...")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 28)
                     }
                 }
                 .focusSection()
@@ -212,6 +213,13 @@ public struct CatalogView: View {
         }
         .onChange(of: focusedTarget) { target in
             NSLog("🎯 [FOCUS_TRACE] Catalog focusedTarget = %@", String(describing: target))
+            if case .card(let id) = target,
+               let idx = viewModel.items.firstIndex(where: { $0.id == id }),
+               idx >= viewModel.items.count - 6,
+               viewModel.hasMore,
+               !viewModel.isLoadingMore {
+                Task { await viewModel.loadNextPage() }
+            }
         }
         .onChange(of: focusCategoryTrigger) { _ in
             let target = "all"

@@ -170,7 +170,8 @@ public final class HomeViewModel: ObservableObject {
             guard !Task.isCancelled else { return }
             store.refreshDramas(res.items)
             let newItems = filterAndSort(dramas: res.items)
-            items.append(contentsOf: newItems)
+            let existing = Set(items.map(\.id))
+            items.append(contentsOf: newItems.filter { !existing.contains($0.id) })
             hasMore = res.hasMore
             currentPage = nextPage
         } catch {
