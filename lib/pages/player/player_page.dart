@@ -57,6 +57,7 @@ class PlayerScreen extends StatefulWidget {
     this.videoBuilder,
     this.handoff,
     this.initialSeriesEntries,
+    this.onSeasonChanged,
   });
   final DramaDetail detail;
   final int initialIndex;
@@ -68,6 +69,7 @@ class PlayerScreen extends StatefulWidget {
   final LocalStore store;
   final LanIncomingPlayback? handoff;
   final List<HongguoSeriesEntry>? initialSeriesEntries;
+  final ValueChanged<DramaDetail>? onSeasonChanged;
   @visibleForTesting
   final Player Function()? playerFactory;
   @visibleForTesting
@@ -478,6 +480,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
       ScaffoldMessenger.maybeOf(context)?.removeCurrentSnackBar();
 
+      widget.onSeasonChanged?.call(nextDetail);
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => PlayerScreen(
@@ -491,6 +494,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             playerFactory: widget.playerFactory,
             videoBuilder: widget.videoBuilder,
             initialSeriesEntries: _currentSeriesEntries,
+            onSeasonChanged: widget.onSeasonChanged,
           ),
         ),
       );

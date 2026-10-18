@@ -2,9 +2,76 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/player/luna_exo_player.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/pages/detail/detail_page.dart';
+import 'package:THLRedLook/pages/player/player_page.dart';
 import 'package:THLRedLook/core/series/hongguo_series.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/views/search/search_input.dart';
+
+const _fifth = Drama(
+  id: 'hongguo:synthetic5',
+  source: 'hongguo',
+  title: '合成短剧第五季',
+  episodes: 2,
+);
+const _fourth = Drama(
+  id: 'hongguo:synthetic4',
+  source: 'hongguo',
+  title: '合成短剧第四季',
+  episodes: 2,
+);
+DramaDetail _detail(Drama drama) => DramaDetail(drama, [
+  for (var i = 1; i <= 2; i++)
+    Episode({'id': '${drama.cleanSourceId}_$i', 'title': '第 $i 集'}, i),
+]);
+
+class _SeriesRepository extends AppRepository {
+  @override
+  Future<String> cover(Drama drama, {bool force = false}) async => '';
+
+  @override
+  Future<DramaDetail> detail(Drama drama) async => _detail(drama);
+  @override
+  Future<CatalogPage> catalog(
+    String source, {
+    int page = 1,
+    String query = '',
+    String category = '',
+    bool force = false,
+  }) async => CatalogPage(const [_fourth, _fifth], hasMore: false);
+  @override
+  Future<PlaybackPlan> resolve(
+    Drama drama,
+    Episode episode, {
+    int quality = 0,
+  }) async => const PlaybackPlan(url: 'https://example.invalid/synthetic.mp4');
+  @override
+  Future<void> cancelPlayback() async {}
+  @override
+  Future<void> release(String session) async {}
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+class _SeriesPlayer extends LunaExoPlayer {
+  @override
+  Future<void> open(Playable playable, {bool play = true}) async {
+    state = state.copyWith(
+      playing: play,
+      duration: const Duration(minutes: 2),
+      position: const Duration(seconds: 5),
+      width: 360,
+      height: 640,
+    );
+    stream.durationController.add(state.duration);
+    stream.positionController.add(state.position);
+  }
+}
 
 void main() {
   testWidgets('提交新搜索词时不能选中尚未刷新的旧联想', (tester) async {
@@ -62,6 +129,74 @@ void main() {
     expect(controller.text, '合成短剧第五季');
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
+  });
+
+  testWidgets('播放器跨季后返回详情和再次播放使用当前季度', (tester) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore(await SharedPreferences.getInstance());
+    final repository = _SeriesRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DetailScreen(
+          drama: _fifth,
+          initialDetail: _detail(_fifth),
+          repository: repository,
+          store: store,
+          initialSeriesEntries: hongguoSeriesEntries(_fifth, const [
+            _fourth,
+            _fifth,
+          ]),
+          playerFactory: _SeriesPlayer.new,
+          videoBuilder: (controls) => controls,
+        ),
+      ),
+    );
+    Future<void> advance() async {
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    final start = find.byKey(const ValueKey('start-play'));
+    await tester.tap(start);
+    await advance();
+    expect(
+      tester.widget<PlayerScreen>(find.byType(PlayerScreen)).detail.drama.id,
+      _fifth.id,
+    );
+    final fourth = find.byKey(
+      const ValueKey('player-season-hongguo:synthetic4'),
+    );
+    await tester.ensureVisible(fourth);
+    await tester.tap(fourth);
+    await advance();
+    expect(
+      tester.widget<PlayerScreen>(find.byType(PlayerScreen)).detail.drama.id,
+      _fourth.id,
+    );
+    Navigator.of(tester.element(find.byType(PlayerScreen))).pop();
+    await advance();
+    expect(
+      tester
+          .widget<InkWell>(
+            find.byKey(const ValueKey('series-hongguo:synthetic4')),
+          )
+          .onTap,
+      isNull,
+    );
+    await tester.tap(start);
+    await advance();
+    expect(
+      tester.widget<PlayerScreen>(find.byType(PlayerScreen)).detail.drama.id,
+      _fourth.id,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await advance();
+    store.dispose();
   });
 
   group('官方多季剧集识别与聚合引擎 (Hongguo Multi-Season Engine) 测试', () {

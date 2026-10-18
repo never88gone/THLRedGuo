@@ -66,7 +66,7 @@ class _DetailScreenState extends State<DetailScreen> {
       ? SourceDiagnosticsButton(
           repository: widget.repository,
           store: widget.store,
-          drama: widget.drama,
+          drama: _detail?.drama ?? widget.drama,
         )
       : null;
 
@@ -108,20 +108,21 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _load() async {
+    final drama = _detail?.drama ?? widget.drama;
     final generation = ++_generation;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final detail = await widget.repository.detail(widget.drama);
+      final detail = await widget.repository.detail(drama);
       if (!mounted ||
           generation != _generation ||
           _profileEpoch != widget.store.profileEpoch) {
         return;
       }
       final merged = widget.repository.catalogUpdates
-          .current(widget.drama)
+          .current(drama)
           .merge(detail.drama);
       final finalEpisodes = detail.episodes.isNotEmpty
           ? detail.episodes
@@ -178,7 +179,7 @@ class _DetailScreenState extends State<DetailScreen> {
         _loading = false;
       });
       widget.repository.catalogUpdates.publish(
-        widget.repository.catalogUpdates.current(widget.drama),
+        widget.repository.catalogUpdates.current(drama),
         retryCover: true,
       );
     }
@@ -316,12 +317,30 @@ class _DetailScreenState extends State<DetailScreen> {
           playerFactory: widget.playerFactory,
           videoBuilder: widget.videoBuilder,
           initialSeriesEntries: _seriesEntries,
+          onSeasonChanged: _playerSeasonChanged,
         ),
       ),
     );
     if (mounted) {
       setState(() {});
     }
+  }
+
+  void _playerSeasonChanged(DramaDetail detail) {
+    if (!mounted || _profileEpoch != widget.store.profileEpoch) return;
+    _generation++;
+    setState(() {
+      _detail = detail;
+      _loading = false;
+      _error = null;
+      _expandedDescription = false;
+      _episodePage =
+          resumeEpisodeIndex(
+            detail.episodes,
+            widget.store.watched(detail.drama.id),
+          ) ~/
+          episodePageSize;
+    });
   }
 
   Future<void> _openSeriesDrama(Drama drama) async {
