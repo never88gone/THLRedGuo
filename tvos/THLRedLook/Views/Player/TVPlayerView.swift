@@ -4,6 +4,7 @@ import AVKit
 public struct TVPlayerView: View {
     @StateObject private var viewModel: PlayerViewModel
     @Environment(\.presentationMode) var presentationMode
+    @Environment(\.scenePhase) private var scenePhase
     @FocusState private var isWakeupFocused: Bool
     @State private var lastExitTime: TimeInterval = 0
     public var onDismiss: (() -> Void)? = nil
@@ -61,15 +62,15 @@ public struct TVPlayerView: View {
 
             // 弹幕层
             if viewModel.danmakuEnabled {
-                TVDanmakuView(danmakus: viewModel.activeDanmakus)
+                TVDanmakuView(danmakus: viewModel.activeDanmakus, position: viewModel.currentTime, anchor: viewModel.playbackClockDate, rate: Double(viewModel.playbackRate), moving: viewModel.isPlaying && viewModel.player?.timeControlStatus == .playing)
             }
 
             // 正在缓冲/加载遮罩
-            if viewModel.isLoading {
+            if viewModel.isLoading || viewModel.isBuffering {
                 VStack(spacing: 16) {
                     ProgressView()
                         .scaleEffect(1.8)
-                    Text("正在准备视频流...")
+                    Text(viewModel.isLoading ? "正在准备视频流..." : "正在缓冲...")
                         .font(.headline)
                         .foregroundColor(.white)
                 }
@@ -81,9 +82,6 @@ public struct TVPlayerView: View {
             // 播放错误提示
             if let err = viewModel.errorMessage {
                 let friendlyMsg: String = {
-                    if err.contains("找不到所请求的URL") || err.contains("404") || err.lowercased().contains("not found") {
-                        return "本集暂无官方公网流（官方通常仅开放前 3~4 集免费试看）\n请返回选集切换其他集数观看"
-                    }
                     return "播放失败：\(err)"
                 }()
 
@@ -212,13 +210,13 @@ public struct TVPlayerView: View {
                 }
                 .buttonStyle(TvTransparentButtonStyle())
                 .focused($isWakeupFocused)
+                .accessibilityIdentifier("player.wake")
+                .accessibilityLabel("显示播放控制")
                 .ignoresSafeArea()
                 .onMoveCommand { _ in
                     viewModel.showControls()
                 }
-                .onExitCommand {
-                    handleExit()
-                }
+
             }
 
             // 遥控器悬浮控制条（有错误提示或打开选集抽屉时隐藏控制条，防止焦点冲突与视觉重叠）
@@ -238,6 +236,7 @@ public struct TVPlayerView: View {
         }
         .onAppear {
             viewModel.onAppear()
+            viewModel.setSceneActive(scenePhase == .active)
             if !viewModel.isControlsVisible {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isWakeupFocused = true
@@ -246,6 +245,9 @@ public struct TVPlayerView: View {
         }
         .onDisappear {
             viewModel.onDisappear()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            viewModel.setSceneActive(phase == .active)
         }
         // 遥控器硬件 Play/Pause 按键直接映射
         .onPlayPauseCommand {
@@ -304,7 +306,8 @@ public struct TVPlayerView: View {
         viewModel.onDisappear()
         if let onDismiss = onDismiss {
             onDismiss()
+        } else {
+            presentationMode.wrappedValue.dismiss()
         }
-        presentationMode.wrappedValue.dismiss()
     }
 }

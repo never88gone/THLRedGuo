@@ -99,12 +99,7 @@ class PlayerDialogHelper {
     return showDialog<int>(
       context: context,
       builder: (menuContext) => AnimatedBuilder(
-        animation: Listenable.merge([
-          menuRevision,
-          store,
-          danmaku,
-          preloader,
-        ]),
+        animation: Listenable.merge([menuRevision, store, danmaku, preloader]),
         builder: (_, _) => Theme(
           data: menuTheme,
           child: PlayerMenu(
@@ -114,7 +109,7 @@ class PlayerDialogHelper {
             preferences: preferences,
             qualities: plan?.qualities ?? [],
             actualQuality: plan?.quality ?? 0,
-            local: plan?.local == true,
+            local: plan?.offline == true,
             favorite: store.isFavorite(detail.drama.id),
             mobile: mobile,
             onEpisode: (index) => Navigator.pop(menuContext, index),

@@ -42,10 +42,12 @@ class PlayerControls extends StatefulWidget {
     this.onRetryDanmaku,
     this.onPush,
     this.onPictureInPicture,
+    this.playbackRequested,
     this.enhancement,
   });
 
   final Player player;
+  final bool? playbackRequested;
   final PlayerInteractions interactions;
   final bool enabled;
   final bool fullscreen;
@@ -147,7 +149,10 @@ class _PlayerControlsState extends State<PlayerControls> {
     _hideTimer?.cancel();
     if (!widget.player.state.playing || widget.panelOpen) return;
     _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && _visible && widget.player.state.playing && !widget.panelOpen) {
+      if (mounted &&
+          _visible &&
+          widget.player.state.playing &&
+          !widget.panelOpen) {
         setState(() => _visible = false);
       }
     });
@@ -225,10 +230,24 @@ class _PlayerControlsState extends State<PlayerControls> {
                     widget.onTogglePlayback();
                     _show();
                   },
+                  child: Semantics(
+                    identifier: 'player-surface',
+                    label: '显示或隐藏播放控制',
+                    button: true,
+                  ),
                 ),
               ),
               if (state.buffering && widget.enabled)
-                const Center(child: CircularProgressIndicator()),
+                Center(
+                  child: Transform.translate(
+                    offset: const Offset(0, -76),
+                    child: const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(semanticsLabel: '正在缓冲'),
+                    ),
+                  ),
+                ),
               AnimatedOpacity(
                 opacity: _visible ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 200),
@@ -255,84 +274,91 @@ class _PlayerControlsState extends State<PlayerControls> {
                         ),
                       ),
 
-                        // 顶部导航栏
-                        PlayerTopBarView(
-                          title: widget.title,
-                          fullscreen: widget.fullscreen,
-                          compact: compact,
-                          onBack: widget.onBack,
-                          onFullscreen: widget.onFullscreen,
+                      // 顶部导航栏
+                      PlayerTopBarView(
+                        title: widget.title,
+                        fullscreen: widget.fullscreen,
+                        compact: compact,
+                        onBack: widget.onBack,
+                        onFullscreen: widget.onFullscreen,
+                      ),
+
+                      // 中央大播放/切集控制
+                      if (widget.enabled)
+                        PlayerCenterView(
+                          playing: widget.playbackRequested ?? state.playing,
+                          showSkip: true,
+                          onTogglePlayback: () {
+                            widget.onTogglePlayback();
+                            _show();
+                          },
+                          onPrevious: widget.onPrevious,
+                          onNext: widget.onNext,
                         ),
 
-                        // 中央大播放/切集控制
-                        if (!state.buffering && widget.enabled)
-                          PlayerCenterView(
-                            playing: state.playing,
-                            showSkip: true,
-                            onTogglePlayback: () {
-                              widget.onTogglePlayback();
-                              _show();
-                            },
-                            onPrevious: widget.onPrevious,
-                            onNext: widget.onNext,
-                          ),
-
-                        // 右上方轻量弹幕开关（避让中央按键）
-                        if (widget.showDanmaku)
-                          PlayerDanmakuButtonView(
-                            enabled: widget.enabled,
-                            danmakuEnabled: widget.danmakuEnabled,
-                            danmakuStatus: widget.danmakuStatus,
-                            swipeEnabled: widget.swipeEnabled,
-                            canRetry: widget.onRetryDanmaku != null,
-                            onTap: widget.enabled && (widget.onRetryDanmaku != null || widget.onDanmaku != null)
-                                ? () => _panel(widget.onRetryDanmaku ?? widget.onDanmaku!)
-                                : null,
-                          ),
-
-                        // 底部控制与进度条
-                        PlayerBottomBarView(
-                          constraints: constraints,
-                          fullscreen: widget.fullscreen,
-                          swipeEnabled: widget.swipeEnabled,
+                      // 右上方轻量弹幕开关（避让中央按键）
+                      if (widget.showDanmaku)
+                        PlayerDanmakuButtonView(
                           enabled: widget.enabled,
-                          speed: widget.speed,
-                          qualityLabel: widget.qualityLabel,
-                          duration: duration,
-                          position: position,
-                          buffered: buffered,
-                          seekValue: _seekValue,
-                          onSpeed: () => _panel(widget.onSpeed),
-                          onQuality: () => _panel(widget.onQuality),
-                          onFullscreen: widget.onFullscreen,
-                          onEpisodes: () => _panel(widget.onEpisodes),
-                          onPush: widget.onPush != null ? () => _panel(widget.onPush!) : null,
-                          onPictureInPicture: widget.onPictureInPicture != null
-                              ? () => _panel(widget.onPictureInPicture!)
+                          danmakuEnabled: widget.danmakuEnabled,
+                          danmakuStatus: widget.danmakuStatus,
+                          swipeEnabled: widget.swipeEnabled,
+                          canRetry: widget.onRetryDanmaku != null,
+                          onTap:
+                              widget.enabled &&
+                                  (widget.onRetryDanmaku != null ||
+                                      widget.onDanmaku != null)
+                              ? () => _panel(
+                                  widget.onRetryDanmaku ?? widget.onDanmaku!,
+                                )
                               : null,
-                          onSeekStart: (_) {
-                            _hideTimer?.cancel();
-                          },
-                          onSeekChange: (val) {
-                            _hideTimer?.cancel();
-                            setState(() => _seekValue = val);
-                          },
-                          onSeekEnd: (val) {
-                            _seekTo(Duration(milliseconds: (val * 1000).toInt()));
-                            setState(() => _seekValue = null);
-                            _scheduleHide();
-                          },
                         ),
-                      ],
-                    ),
+
+                      // 底部控制与进度条
+                      PlayerBottomBarView(
+                        constraints: constraints,
+                        fullscreen: widget.fullscreen,
+                        swipeEnabled: widget.swipeEnabled,
+                        enabled: widget.enabled,
+                        speed: widget.speed,
+                        qualityLabel: widget.qualityLabel,
+                        duration: duration,
+                        position: position,
+                        buffered: buffered,
+                        seekValue: _seekValue,
+                        onSpeed: () => _panel(widget.onSpeed),
+                        onQuality: () => _panel(widget.onQuality),
+                        onFullscreen: widget.onFullscreen,
+                        onEpisodes: () => _panel(widget.onEpisodes),
+                        onPush: widget.onPush != null
+                            ? () => _panel(widget.onPush!)
+                            : null,
+                        onPictureInPicture: widget.onPictureInPicture != null
+                            ? () => _panel(widget.onPictureInPicture!)
+                            : null,
+                        onSeekStart: (_) {
+                          _hideTimer?.cancel();
+                        },
+                        onSeekChange: (val) {
+                          _hideTimer?.cancel();
+                          setState(() => _seekValue = val);
+                        },
+                        onSeekEnd: (val) {
+                          _seekTo(Duration(milliseconds: (val * 1000).toInt()));
+                          setState(() => _seekValue = null);
+                          _scheduleHide();
+                        },
+                      ),
+                    ],
                   ),
                 ),
-                _GestureHudOverlay(interactions: widget.interactions),
-              ],
-            );
-          },
-        ),
-      );
+              ),
+              _GestureHudOverlay(interactions: widget.interactions),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -358,8 +384,8 @@ class _GestureHudOverlay extends StatelessWidget {
               child: hud.type == SwipeAction.seek
                   ? _buildSeekCard(hud)
                   : hud.type == SwipeAction.brightness
-                      ? _buildBrightnessCard(hud)
-                      : const SizedBox.shrink(),
+                  ? _buildBrightnessCard(hud)
+                  : const SizedBox.shrink(),
             ),
           ),
         );
@@ -370,7 +396,10 @@ class _GestureHudOverlay extends StatelessWidget {
   Widget _buildSeekCard(GestureHudState hud) {
     final isForward = hud.deltaSeconds >= 0;
     final totalSec = hud.duration.inSeconds.toDouble();
-    final posSec = hud.position.inSeconds.toDouble().clamp(0.0, totalSec > 0 ? totalSec : 0.0);
+    final posSec = hud.position.inSeconds.toDouble().clamp(
+      0.0,
+      totalSec > 0 ? totalSec : 0.0,
+    );
     final ratio = totalSec > 0 ? (posSec / totalSec).clamp(0.0, 1.0) : 0.0;
     final sign = hud.deltaSeconds > 0 ? '+' : '';
 
@@ -380,10 +409,7 @@ class _GestureHudOverlay extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.playerGestureHudBackground,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.playerGestureHudBorder,
-          width: 0.5,
-        ),
+        border: Border.all(color: AppColors.playerGestureHudBorder, width: 0.5),
         boxShadow: const [
           BoxShadow(
             color: AppColors.playerGestureHudShadow,
@@ -399,7 +425,9 @@ class _GestureHudOverlay extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                isForward ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
+                isForward
+                    ? Icons.fast_forward_rounded
+                    : Icons.fast_rewind_rounded,
                 color: AppColors.white,
                 size: 28,
               ),
@@ -445,7 +473,9 @@ class _GestureHudOverlay extends StatelessWidget {
                 value: ratio,
                 minHeight: 3.5,
                 backgroundColor: AppColors.playerGestureHudTrack,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.playerGestureHudHighlight),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.playerGestureHudHighlight,
+                ),
               ),
             ),
           ),
@@ -462,10 +492,7 @@ class _GestureHudOverlay extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.playerGestureHudBackground,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.playerGestureHudBorder,
-          width: 0.5,
-        ),
+        border: Border.all(color: AppColors.playerGestureHudBorder, width: 0.5),
         boxShadow: const [
           BoxShadow(
             color: AppColors.playerGestureHudShadow,
@@ -478,7 +505,9 @@ class _GestureHudOverlay extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            hud.value > 0.5 ? Icons.brightness_7_rounded : Icons.brightness_medium_rounded,
+            hud.value > 0.5
+                ? Icons.brightness_7_rounded
+                : Icons.brightness_medium_rounded,
             color: AppColors.white,
             size: 26,
           ),
@@ -500,7 +529,9 @@ class _GestureHudOverlay extends StatelessWidget {
                 value: hud.value.clamp(0.0, 1.0),
                 minHeight: 3.5,
                 backgroundColor: AppColors.playerGestureHudTrack,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.white),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.white,
+                ),
               ),
             ),
           ),
@@ -509,4 +540,3 @@ class _GestureHudOverlay extends StatelessWidget {
     );
   }
 }
-

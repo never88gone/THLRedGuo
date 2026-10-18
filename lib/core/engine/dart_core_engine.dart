@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -73,7 +72,10 @@ class DartCoreEngine {
     }
   }
 
-  Future<dynamic> _handleAction(String action, Map<String, dynamic> input) async {
+  Future<dynamic> _handleAction(
+    String action,
+    Map<String, dynamic> input,
+  ) async {
     switch (action) {
       case 'initialize':
         return _initialize(input);
@@ -84,18 +86,13 @@ class DartCoreEngine {
         systemProxy = input['systemProxy'] as String? ?? '';
         return true;
       case 'resourceSettings':
-        return {
-          'concurrency': _concurrency,
-          'intervalMs': _intervalMs,
-        };
+        return {'concurrency': _concurrency, 'intervalMs': _intervalMs};
       case 'saveResourceSettings':
         final settings = input['settings'] as Map? ?? {};
-        _concurrency = (settings['concurrency'] as num?)?.toInt() ?? _concurrency;
+        _concurrency =
+            (settings['concurrency'] as num?)?.toInt() ?? _concurrency;
         _intervalMs = (settings['intervalMs'] as num?)?.toInt() ?? _intervalMs;
-        return {
-          'concurrency': _concurrency,
-          'intervalMs': _intervalMs,
-        };
+        return {'concurrency': _concurrency, 'intervalMs': _intervalMs};
 
       // JS 数据源插件管理
       case 'jsSource.list':
@@ -112,10 +109,7 @@ class DartCoreEngine {
         return {'ok': false, 'active': _activeSourceId};
       case 'jsSource.getActive':
         final activeMeta = _installedSources[_activeSourceId];
-        return {
-          'active': _activeSourceId,
-          'meta': activeMeta?.toJson(),
-        };
+        return {'active': _activeSourceId, 'meta': activeMeta?.toJson()};
       case 'jsSource.load':
         final script = input['script'] as String? ?? '';
         final fileName = input['fileName'] as String? ?? 'custom.js';
@@ -149,7 +143,9 @@ class DartCoreEngine {
         _installedSources.remove(source);
         _sourceScripts.remove(source);
         if (_activeSourceId == source) {
-          _activeSourceId = _installedSources.isNotEmpty ? _installedSources.keys.first : '';
+          _activeSourceId = _installedSources.isNotEmpty
+              ? _installedSources.keys.first
+              : '';
         }
         return {'ok': true};
       case 'jsSource.clearAll':
@@ -237,6 +233,8 @@ class DartCoreEngine {
       case 'fallback':
         return _fallbackPlayback(input);
       case 'cancelPlayback':
+        _spiderPool.cancelPending();
+        return true;
       case 'release':
       case 'cancelRead':
         return true;
@@ -246,7 +244,10 @@ class DartCoreEngine {
       case 'prepareCover':
         final drama = input['drama'] as Map? ?? {};
         final coverUrl = drama['cover'] as String? ?? '';
-        return {'path': coverUrl.isNotEmpty ? coverUrl : 'assets/icons/app_icon.png', 'heic': false};
+        return {
+          'path': coverUrl.isNotEmpty ? coverUrl : 'assets/icons/app_icon.png',
+          'heic': false,
+        };
 
       // 下载管理
       case 'downloads':
@@ -288,10 +289,14 @@ class DartCoreEngine {
         final index = (input['index'] as num?)?.toInt() ?? 1;
         final dramaId = drama['id'] as String? ?? '';
         final localJob = _downloadJobs.values.firstWhere(
-          (j) => (j['drama'] as Map)['id'] == dramaId && j['index'] == index && j['status'] == 'completed',
+          (j) =>
+              (j['drama'] as Map)['id'] == dramaId &&
+              j['index'] == index &&
+              j['status'] == 'completed',
           orElse: () => {},
         );
-        if (localJob.isNotEmpty && (localJob['path'] as String? ?? '').isNotEmpty) {
+        if (localJob.isNotEmpty &&
+            (localJob['path'] as String? ?? '').isNotEmpty) {
           return {
             'url': localJob['path'],
             'session': 'local_${DateTime.now().millisecondsSinceEpoch}',
@@ -304,20 +309,17 @@ class DartCoreEngine {
 
       // 弹幕支持
       case 'danmaku':
-        final episodeId = input['episodeId'] as String? ?? (input['playbackSession'] as String? ?? '');
-        final startMs = (input['startMs'] as num?)?.toInt() ?? 0;
-        final durationMs = (input['durationMs'] as num?)?.toInt() ?? 86400000;
-        final nextMs = math.min(startMs + 30000, durationMs > 0 ? durationMs : startMs + 30000);
-        return {
-          'episodeId': episodeId,
-          'startMs': startMs,
-          'nextMs': nextMs,
-          'items': <Map<String, dynamic>>[
-            {'id': '${episodeId}_${startMs}_1', 'timeMs': startMs + 1200, 'text': '剧情好精彩！', 'color': 0xFFFFFFFF},
-            {'id': '${episodeId}_${startMs}_2', 'timeMs': startMs + 3500, 'text': '打脸来得太快了！', 'color': 0xFFFFEEEE},
-            {'id': '${episodeId}_${startMs}_3', 'timeMs': startMs + 8000, 'text': '男女主好般配啊', 'color': 0xFF00EEFF},
-          ],
-        };
+        final episodeId = input['episodeId'] as String? ?? '';
+        if (!RegExp(r'^hongguo:\d{10,30}:\d{10,30}$').hasMatch(episodeId)) {
+          throw StateError('本集暂不支持弹幕');
+        }
+        final runtime = await _getSpiderRuntime('hongguo');
+        if (runtime == null) throw StateError('弹幕数据源不可用');
+        return runtime.danmaku(
+          episodeId,
+          (input['startMs'] as num?)?.toInt() ?? 0,
+          (input['durationMs'] as num?)?.toInt() ?? 0,
+        );
 
       // 设备互联与任务租约
       case 'lan':
@@ -354,7 +356,9 @@ class DartCoreEngine {
     try {
       final dir = Directory(_sourcesDir);
       if (await dir.exists()) {
-        final files = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.js'));
+        final files = dir.listSync().whereType<File>().where(
+          (f) => f.path.endsWith('.js'),
+        );
         for (final file in files) {
           try {
             final content = await file.readAsString();
@@ -368,7 +372,8 @@ class DartCoreEngine {
       }
     } catch (_) {}
 
-    if (_installedSources.isNotEmpty && !_installedSources.containsKey(_activeSourceId)) {
+    if (_installedSources.isNotEmpty &&
+        !_installedSources.containsKey(_activeSourceId)) {
       _activeSourceId = _installedSources.keys.first;
     } else if (_installedSources.isEmpty) {
       _activeSourceId = '';
@@ -377,21 +382,31 @@ class DartCoreEngine {
 
   JsSourceMeta? _parseScriptMeta(String script, String fileName) {
     try {
-      final idMatch = RegExp(r'id:\s*["\x27]([^"\x27]+)["\x27]').firstMatch(script);
-      final nameMatch = RegExp(r'name:\s*["\x27]([^"\x27]+)["\x27]').firstMatch(script);
+      final idMatch = RegExp(
+        r'id:\s*["\x27]([^"\x27]+)["\x27]',
+      ).firstMatch(script);
+      final nameMatch = RegExp(
+        r'name:\s*["\x27]([^"\x27]+)["\x27]',
+      ).firstMatch(script);
       if (idMatch == null || nameMatch == null) return null;
 
       final id = idMatch.group(1)!.trim();
       final name = nameMatch.group(1)!.trim();
 
-      final versionMatch = RegExp(r'version:\s*["\x27]([^"\x27]+)["\x27]').firstMatch(script);
-      final descMatch = RegExp(r'description:\s*["\x27]([^"\x27]+)["\x27]').firstMatch(script);
+      final versionMatch = RegExp(
+        r'version:\s*["\x27]([^"\x27]+)["\x27]',
+      ).firstMatch(script);
+      final descMatch = RegExp(
+        r'description:\s*["\x27]([^"\x27]+)["\x27]',
+      ).firstMatch(script);
 
       final features = <String>[];
       final featMatch = RegExp(r'features:\s*\[(.*?)\]').firstMatch(script);
       if (featMatch != null) {
         final featsRaw = featMatch.group(1)!;
-        for (final f in RegExp(r'["\x27]([^"\x27]+)["\x27]').allMatches(featsRaw)) {
+        for (final f in RegExp(
+          r'["\x27]([^"\x27]+)["\x27]',
+        ).allMatches(featsRaw)) {
           features.add(f.group(1)!.trim());
         }
       }
@@ -421,16 +436,22 @@ class DartCoreEngine {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _getCategoriesForSourceAsync(String source) async {
+  Future<List<Map<String, dynamic>>> _getCategoriesForSourceAsync(
+    String source,
+  ) async {
     final rt = await _getSpiderRuntime(source);
     if (rt != null) {
       try {
         final homeRes = await rt.home();
         if (homeRes.classes.isNotEmpty) {
-          return homeRes.classes.map((c) => {
-            'id': c['type_id']?.toString() ?? '',
-            'name': c['type_name']?.toString() ?? '分类',
-          }).toList();
+          return homeRes.classes
+              .map(
+                (c) => {
+                  'id': c['type_id']?.toString() ?? '',
+                  'name': c['type_name']?.toString() ?? '分类',
+                },
+              )
+              .toList();
         }
       } catch (_) {}
     }
@@ -453,19 +474,30 @@ class DartCoreEngine {
     }
   }
 
-  Map<String, dynamic> _mapVodToDrama(String source, Map<String, dynamic> vod, String category) {
-    final rawId = vod['vod_id']?.toString() ?? '${DateTime.now().millisecondsSinceEpoch}';
+  Map<String, dynamic> _mapVodToDrama(
+    String source,
+    Map<String, dynamic> vod,
+    String category,
+  ) {
+    final rawId =
+        vod['vod_id']?.toString() ?? '${DateTime.now().millisecondsSinceEpoch}';
     final fullId = rawId.contains(':') ? rawId : '$source:$rawId';
     final remarks = vod['vod_remarks']?.toString() ?? '';
     final epMatch = RegExp(r'(\d+)').firstMatch(remarks);
-    final episodes = epMatch != null ? int.tryParse(epMatch.group(1)!) ?? 60 : 60;
+    final episodes = epMatch != null
+        ? int.tryParse(epMatch.group(1)!) ?? 60
+        : 60;
 
     final tags = <String>[];
     final rawTags = vod['vod_tag'] ?? vod['tags'];
     if (rawTags is String) {
-      tags.addAll(rawTags.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
+      tags.addAll(
+        rawTags.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty),
+      );
     } else if (rawTags is List) {
-      tags.addAll(rawTags.map((e) => e.toString().trim()).where((s) => s.isNotEmpty));
+      tags.addAll(
+        rawTags.map((e) => e.toString().trim()).where((s) => s.isNotEmpty),
+      );
     }
     if (tags.isEmpty) {
       tags.addAll(['热播', '精选']);
@@ -527,20 +559,15 @@ class DartCoreEngine {
 
     // 1. 若为搜索关键词
     if (query.isNotEmpty) {
-      List<Map<String, dynamic>> searchResults = [];
       final rt = await _getSpiderRuntime(source);
-      if (rt != null) {
-        try {
-          final res = await rt.search(query, page: page);
-          if (res.list.isNotEmpty) {
-            searchResults = res.list.map((vod) => _mapVodToDrama(source, vod, category)).toList();
-          }
-        } catch (_) {}
-      }
+      if (rt == null) throw StateError('搜索数据源不可用');
+      final result = await rt.search(query, page: page);
       return {
-        'items': searchResults,
-        'page': page,
-        'hasMore': false,
+        'items': result.list
+            .map((vod) => _mapVodToDrama(source, vod, category))
+            .toList(),
+        'page': result.page,
+        'hasMore': result.hasMore,
         'warning': '',
       };
     }
@@ -554,7 +581,9 @@ class DartCoreEngine {
       try {
         final res = await rt.category(category, page);
         if (res.list.isNotEmpty) {
-          dramas = res.list.map((vod) => _mapVodToDrama(source, vod, category)).toList();
+          dramas = res.list
+              .map((vod) => _mapVodToDrama(source, vod, category))
+              .toList();
           hasMore = res.hasMore;
         }
       } catch (_) {}
@@ -575,7 +604,9 @@ class DartCoreEngine {
     return const [];
   }
 
-  Future<Map<String, dynamic>> _getRecommendations(Map<String, dynamic> input) async {
+  Future<Map<String, dynamic>> _getRecommendations(
+    Map<String, dynamic> input,
+  ) async {
     final rawCategory = input['category'] as String? ?? 'short_play';
     final page = (input['page'] as num?)?.toInt() ?? 1;
     String source = input['source'] as String? ?? '';
@@ -611,7 +642,9 @@ class DartCoreEngine {
 
     try {
       final res = await rt.category(targetCat, page);
-      final items = res.list.map((vod) => _mapVodToDrama(source, vod, targetCat)).toList();
+      final items = res.list
+          .map((vod) => _mapVodToDrama(source, vod, targetCat))
+          .toList();
       return {
         'items': items,
         'page': page,
@@ -689,13 +722,11 @@ class DartCoreEngine {
       for (final vod in res.list) {
         final drama = _mapVodToDrama(source, vod, category);
         final remarks = vod['vod_remarks']?.toString().trim() ?? '';
-        final heat = (99.5 - (rank - 1) * 0.8).clamp(62.0, 99.8).toStringAsFixed(1);
+        final heat = (99.5 - (rank - 1) * 0.8)
+            .clamp(62.0, 99.8)
+            .toStringAsFixed(1);
         final metric = remarks.isNotEmpty ? remarks : '热度 $heat万';
-        items.add({
-          'rank': rank++,
-          'drama': drama,
-          'metric': metric,
-        });
+        items.add({'rank': rank++, 'drama': drama, 'metric': metric});
       }
       return {
         'items': items,
@@ -726,7 +757,8 @@ class DartCoreEngine {
     }
     if (rawSourceId.contains(':')) {
       rawSourceId = rawSourceId.split(':').last;
-    } else if (rawSourceId.contains('_') && !RegExp(r'^\d+$').hasMatch(rawSourceId)) {
+    } else if (rawSourceId.contains('_') &&
+        !RegExp(r'^\d+$').hasMatch(rawSourceId)) {
       rawSourceId = rawSourceId.split('_').last;
     }
     final sourceId = rawSourceId.trim();
@@ -776,7 +808,8 @@ class DartCoreEngine {
       }
     }
 
-    final accessibleCount = (spiderVod?['accessible_count'] as num?)?.toInt() ??
+    final accessibleCount =
+        (spiderVod?['accessible_count'] as num?)?.toInt() ??
         (spiderVod?['accessible_episode_cnt'] as num?)?.toInt() ??
         (spiderVod?['accessibleCount'] as num?)?.toInt() ??
         0;
@@ -794,13 +827,12 @@ class DartCoreEngine {
 
     fullDrama['episodes'] = chapters.length;
 
-    return {
-      'drama': fullDrama,
-      'chapters': chapters,
-    };
+    return {'drama': fullDrama, 'chapters': chapters};
   }
 
-  Future<Map<String, dynamic>> _resolvePlayback(Map<String, dynamic> input) async {
+  Future<Map<String, dynamic>> _resolvePlayback(
+    Map<String, dynamic> input,
+  ) async {
     final drama = input['drama'] as Map? ?? {};
     final dramaId = drama['id']?.toString() ?? '';
     final source = (drama['source']?.toString().isNotEmpty == true)
@@ -816,13 +848,16 @@ class DartCoreEngine {
     }
     final sourceId = rawSourceId.trim();
     final episodeIndex = (input['index'] as num?)?.toInt() ?? 1;
-    final quality = (input['quality'] as num?)?.toInt() ?? 0;
     final chapter = input['chapter'];
 
     final rt = await _getSpiderRuntime(source);
     if (rt != null) {
       try {
-        var playTarget = (chapter is Map ? (chapter['raw'] ?? chapter['id'])?.toString() : null) ??
+        var playTarget =
+            (chapter is Map
+                ? (chapter['raw'] ?? chapter['url'] ?? chapter['id'])
+                      ?.toString()
+                : null) ??
             (chapter is String ? chapter : null) ??
             '$episodeIndex';
         if (!playTarget.startsWith('http://') &&
@@ -832,81 +867,72 @@ class DartCoreEngine {
             sourceId.isNotEmpty) {
           playTarget = '${sourceId}_$playTarget';
         }
-        var playRes = await rt.play('flag', playTarget);
+        final flags = <Map<String, String>>[
+          if (input['avoidUrl'] is String &&
+              (input['avoidUrl'] as String).isNotEmpty)
+            {'avoidUrl': input['avoidUrl'] as String},
+        ];
+        var playRes = await rt.play('flag', playTarget, flags: flags);
         if (playRes.url.isEmpty && sourceId.isNotEmpty) {
           final fallbackTarget = '${sourceId}_$episodeIndex';
           if (fallbackTarget != playTarget) {
-            playRes = await rt.play('flag', fallbackTarget);
-          }
-          if (playRes.url.isEmpty) {
-            playRes = await rt.play('flag', sourceId);
+            playRes = await rt.play('flag', fallbackTarget, flags: flags);
           }
         }
         if (playRes.url.isNotEmpty) {
           final streamUrl = playRes.url;
-          final mimeType = streamUrl.contains('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
-          final detectedQuality = streamUrl.contains('1080') ? 1080 : (streamUrl.contains('720') ? 720 : 360);
-          final effectiveQuality = quality > 0 ? quality : (detectedQuality > 0 ? detectedQuality : 720);
+          final mimeType = streamUrl.contains('.m3u8')
+              ? 'application/x-mpegURL'
+              : 'video/mp4';
+          final detected = RegExp(
+            r'/(2160|1080|720|480|360)p[./]',
+          ).firstMatch(streamUrl);
+          final effectiveQuality = playRes.quality > 0
+              ? playRes.quality
+              : int.tryParse(detected?.group(1) ?? '') ?? 0;
           return {
             'url': streamUrl,
             'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
             'headers': playRes.header,
+            'decryptionKey': playRes.decryptionKey,
+            'mediaBytes': playRes.mediaBytes,
+            'expiresAt': playRes.expiresAt,
             'quality': effectiveQuality,
-            'qualities': const [1080, 720, 360],
+            'qualities': playRes.qualities.isNotEmpty
+                ? playRes.qualities
+                : [if (effectiveQuality > 0) effectiveQuality],
             'local': false,
             'mimeType': mimeType,
-            'danmakuId': '$dramaId:$episodeIndex',
+            'danmakuId': playRes.danmakuId,
           };
         }
       } catch (_) {}
     }
 
-    if (chapter is Map && chapter['url'] != null && (chapter['url'] as String).isNotEmpty) {
+    if (chapter is Map &&
+        chapter['url'] is String &&
+        RegExp(
+          r'^https?://.+\.(mp4|m3u8)(?:[?#]|$)',
+          caseSensitive: false,
+        ).hasMatch(chapter['url'] as String)) {
       final streamUrl = chapter['url'] as String;
-      final mimeType = streamUrl.contains('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
-      final detectedQuality = streamUrl.contains('1080') ? 1080 : (streamUrl.contains('720') ? 720 : 360);
-      final effectiveQuality = quality > 0 ? quality : (detectedQuality > 0 ? detectedQuality : 720);
+      final mimeType = streamUrl.contains('.m3u8')
+          ? 'application/x-mpegURL'
+          : 'video/mp4';
+      final detected = RegExp(
+        r'/(2160|1080|720|480|360)p[./]',
+      ).firstMatch(streamUrl);
+      final effectiveQuality = int.tryParse(detected?.group(1) ?? '') ?? 0;
       return {
         'url': streamUrl,
         'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
         'headers': const <String, String>{},
         'quality': effectiveQuality,
-        'qualities': const [1080, 720, 360],
+        'qualities': [if (effectiveQuality > 0) effectiveQuality],
         'local': false,
         'mimeType': mimeType,
-        'danmakuId': '$dramaId:$episodeIndex',
+        'danmakuId': '',
       };
-    }
-
-    if (source == 'hongguo') {
-      final candidates = [
-        chapter is Map ? chapter['raw']?.toString() : null,
-        chapter is Map ? chapter['id']?.toString() : null,
-        chapter is String ? chapter : null,
-      ];
-      for (final text in candidates) {
-        if (text == null || text.isEmpty) continue;
-        final match = RegExp(r'\d{15,}').firstMatch(text);
-        if (match != null) {
-          final vid = match.group(0)!;
-          if (vid.endsWith('000') || vid == sourceId) continue;
-          final streamUrl = 'https://hongguoduanju.com/video/public/$vid/360p.mp4';
-          final effectiveQuality = quality > 0 ? quality : 720;
-          return {
-            'url': streamUrl,
-            'session': 'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
-            'headers': <String, String>{
-              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-              'Referer': 'https://hongguoduanju.com/player/$sourceId/$vid',
-            },
-            'quality': effectiveQuality,
-            'qualities': const [1080, 720, 360],
-            'local': false,
-            'mimeType': 'video/mp4',
-            'danmakuId': '$dramaId:$episodeIndex',
-          };
-        }
-      }
     }
 
     throw StateError('无法从数据源 [$source] 获取真实播放流');
@@ -920,7 +946,9 @@ class DartCoreEngine {
     final drama = input['drama'] as Map? ?? {};
     final entries = (input['entries'] as List? ?? []).cast<Map>();
     final quality = (input['quality'] as num?)?.toInt() ?? 0;
-    final dramaId = drama['id'] as String? ?? 'drama_${DateTime.now().millisecondsSinceEpoch}';
+    final dramaId =
+        drama['id'] as String? ??
+        'drama_${DateTime.now().millisecondsSinceEpoch}';
 
     var added = 0;
     for (final entry in entries) {
@@ -977,4 +1005,3 @@ class DartCoreEngine {
     }
   }
 }
-

@@ -583,6 +583,7 @@ public struct TVTopNavigationBar: View {
                     selectedTab = tab
                 }
                 .focused(focusedNavTab, equals: tab)
+                .accessibilityIdentifier("nav.\(tab.rawValue)")
             }
         }
         .padding(.horizontal, 28)

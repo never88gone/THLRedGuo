@@ -10,6 +10,10 @@ target 'THLRedLook' do
   pod 'Kingfisher'
   pod 'Alamofire'
   pod 'SwiftUIIntrospect'
+
+  target 'THLRedLookTests' do
+    inherit! :search_paths
+  end
 end
 
 post_install do |installer|

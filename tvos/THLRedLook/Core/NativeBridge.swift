@@ -7,6 +7,7 @@ public actor NativeBridge {
     public static let shared = NativeBridge()
 
     private var isInitialized = false
+    private let httpSession: URLSession
 
     // 沙盒路径
     private var baseDirURL: URL
@@ -20,10 +21,11 @@ public actor NativeBridge {
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
 
-    private init() {
+    init(baseDirectory: URL? = nil, httpSession: URLSession = .shared) {
+        self.httpSession = httpSession
         let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        self.baseDirURL = cachesDir.appendingPathComponent("THLRedLook_Data")
+        self.baseDirURL = baseDirectory ?? cachesDir.appendingPathComponent("THLRedLook_Data")
         self.sourcesDirURL = self.baseDirURL.appendingPathComponent("sources")
 
         try? FileManager.default.createDirectory(at: self.sourcesDirURL, withIntermediateDirectories: true)
@@ -136,6 +138,9 @@ public actor NativeBridge {
             return nil
         }
 
+        let entropy = (0..<64).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
+        context.evaluateScript("globalThis.__hongguoEntropy = '\(entropy)';")
+
         // 1. 注入控制台日志
         let logBlock: @convention(block) (String) -> Void = { msg in
             NSLog("🎬 [CatPawOpen JS:%@] %@", sourceId, msg)
@@ -143,12 +148,14 @@ public actor NativeBridge {
         context.setObject(logBlock, forKeyedSubscript: "__console_log" as NSString)
 
         // 2. 注入原生高性能 HTTP 请求桥接
+        let session = httpSession
         let fetchBlock: @convention(block) (String, [String: Any]?) -> [String: Any] = { urlStr, opts in
             guard let url = URL(string: urlStr) else {
                 return ["status": 0, "headers": [:], "body": "", "error": "无效的 URL"]
             }
             var req = URLRequest(url: url)
-            req.timeoutInterval = 10.0
+            let timeout = min(12.0, max(0.001, (opts?["timeoutMs"] as? Double ?? 10000) / 1000))
+            req.timeoutInterval = timeout
             let method = (opts?["method"] as? String ?? "GET").uppercased()
             req.httpMethod = method
             if let headers = opts?["headers"] as? [String: Any] {
@@ -161,15 +168,15 @@ public actor NativeBridge {
             }
 
             let semaphore = DispatchSemaphore(value: 0)
-            var statusCode = 200
+            var statusCode = 0
             var respHeaders = [String: String]()
             var respBody = ""
 
-            let task = URLSession.shared.dataTask(with: req) { data, response, _ in
+            let task = session.dataTask(with: req) { data, response, _ in
                 if let http = response as? HTTPURLResponse {
                     statusCode = http.statusCode
                     for (k, v) in http.allHeaderFields {
-                        respHeaders[String(describing: k)] = String(describing: v)
+                        respHeaders[String(describing: k).lowercased()] = String(describing: v)
                     }
                 }
                 if let data = data {
@@ -178,7 +185,7 @@ public actor NativeBridge {
                 semaphore.signal()
             }
             task.resume()
-            _ = semaphore.wait(timeout: .now() + 10.0)
+            if semaphore.wait(timeout: .now() + timeout) == .timedOut { task.cancel() }
 
             return [
                 "status": statusCode,
@@ -214,7 +221,7 @@ public actor NativeBridge {
         globalThis.fetch = async function(url, opts) {
             opts = opts || {};
             var res = __native_fetch(String(url), opts);
-            var status = res.status || 200;
+            var status = typeof res.status === "number" ? res.status : 0;
             var respBody = res.body || "";
             var respHeaders = res.headers || {};
             return {
@@ -288,6 +295,11 @@ public actor NativeBridge {
         return context
     }
 
+    private func spiderExpression(_ method: String, _ arguments: [Any]) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: arguments, options: [.fragmentsAllowed])
+        return "spider.\(method).apply(spider, \(String(decoding: data, as: UTF8.self)))"
+    }
+
     /// 在 JS 运行时中异步评估 Promise 并等待结果
     private func evalAsync(context: JSContext, scriptExpr: String) -> [String: Any]? {
         let sem = DispatchSemaphore(value: 0)
@@ -315,7 +327,7 @@ public actor NativeBridge {
         """
         context.evaluateScript(wrapper)
 
-        _ = sem.wait(timeout: .now() + 12.0)
+        _ = sem.wait(timeout: .now() + 60.0)
         context.setObject(nil, forKeyedSubscript: doneKey as NSString)
 
         return resultData
@@ -340,9 +352,9 @@ public actor NativeBridge {
         }
 
         return [
-            "id": vid,
+            "id": vid.hasPrefix("\(sourceId):") ? vid : "\(sourceId):\(vid)",
             "source": sourceId,
-            "sourceId": sourceId,
+            "sourceId": vid.hasPrefix("\(sourceId):") ? String(vid.dropFirst(sourceId.count + 1)) : vid,
             "title": title,
             "description": desc,
             "cover": cover,
@@ -463,27 +475,32 @@ public actor NativeBridge {
             let pg = payload["page"] as? Int ?? 1
 
             if !query.isEmpty {
-                let scriptExpr = "spider.search(\"\(query)\", false, \(pg))"
-                let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
+                let scriptExpr = try spiderExpression("search", [query, false, pg])
+                guard let res = evalAsync(context: ctx, scriptExpr: scriptExpr), res["ok"] as? Bool == true else {
+                    throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "官方搜索请求失败，请重试"])
+                }
                 var searchItems: [[String: Any]] = []
-                if let data = res?["data"] as? [String: Any] {
+                var searchHasMore = false
+                if let data = res["data"] as? [String: Any] {
+                    let pageCount = (data["pagecount"] as? Int) ?? (data["pageCount"] as? Int) ?? pg
+                    searchHasMore = pg < pageCount
                     let list = data["list"] as? [[String: Any]] ?? []
                     for vod in list {
                         searchItems.append(mapVodToDrama(vod: vod, sourceId: targetSrc))
                     }
-                } else if let list = res?["data"] as? [[String: Any]] {
+                } else if let list = res["data"] as? [[String: Any]] {
                     for vod in list {
                         searchItems.append(mapVodToDrama(vod: vod, sourceId: targetSrc))
                     }
                 }
                 return [
                     "items": searchItems,
-                    "hasMore": false,
+                    "hasMore": searchHasMore,
                     "page": pg
                 ]
             }
 
-            let scriptExpr = "spider.category(\"\(cat)\", \(pg), false, {})"
+            let scriptExpr = try spiderExpression("category", [cat, pg, false, [:]])
             let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
 
             var dramas: [[String: Any]] = []
@@ -510,7 +527,7 @@ public actor NativeBridge {
                 return ["items": []]
             }
 
-            let scriptExpr = "spider.search(\"\(query)\", false, 1)"
+            let scriptExpr = try spiderExpression("search", [query, false, 1])
             let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
 
             var dramas: [[String: Any]] = []
@@ -538,7 +555,7 @@ public actor NativeBridge {
                 throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "数据源未就绪"])
             }
 
-            let scriptExpr = "spider.detail(\"\(dramaId)\")"
+            let scriptExpr = try spiderExpression("detail", [dramaId])
             let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
 
             var freshDrama = dramaDict
@@ -554,7 +571,8 @@ public actor NativeBridge {
                     vod = data
                 }
 
-                let mapped = mapVodToDrama(vod: vod, sourceId: targetSrc)
+                let mapped = vod["vod_id"] != nil || vod["id"] != nil
+                    ? mapVodToDrama(vod: vod, sourceId: targetSrc) : [:]
                 for (k, v) in mapped {
                     if let str = v as? String, !str.isEmpty {
                         freshDrama[k] = str
@@ -587,21 +605,6 @@ public actor NativeBridge {
                 }
             }
 
-            // 如果分集列表为空，按照总集数兜底补全
-            if chapters.isEmpty {
-                let count = max(20, (freshDrama["episodes"] as? Int) ?? 20)
-                for i in 1...count {
-                    chapters.append([
-                        "id": "\(dramaId)_\(i)",
-                        "title": "第 \(i) 集",
-                        "currentEpisode": i,
-                        "index": i,
-                        "vip": false,
-                        "url": "https://example.com/play/\(dramaId)/\(i)"
-                    ])
-                }
-            }
-
             return [
                 "drama": freshDrama,
                 "chapters": chapters,
@@ -619,16 +622,32 @@ public actor NativeBridge {
 
             var targetUrl = ""
             var targetHeaders: [String: String] = [:]
+            var contentKey = ""
+            var expiresAt: Int64 = 0
+            var mediaBytes: Int64 = 0
+            var danmakuId = ""
+            var reportedQuality = 0
+            var reportedQualities: [Int] = []
 
             if !targetSrc.isEmpty, let ctx = getOrCreateContext(sourceId: targetSrc) {
                 let chapterDict = payload["chapter"] as? [String: Any]
                 let rawUrl = (chapterDict?["url"] as? String) ?? "\(dramaId)/\(epIndex)"
 
-                let scriptExpr = "spider.play(\"\", \"\(rawUrl)\", [])"
+                let flags: [[String: Any]] = [[
+                    "quality": payload["quality"] as? Int ?? 0,
+                    "avoidUrl": payload["avoidUrl"] as? String ?? ""
+                ]]
+                let scriptExpr = try spiderExpression("play", ["", rawUrl, flags])
                 let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
 
                 if let data = res?["data"] as? [String: Any] {
                     targetUrl = data["url"] as? String ?? ""
+                    danmakuId = data["danmakuId"] as? String ?? ""
+                    contentKey = data["decryptionKey"] as? String ?? ""
+                    expiresAt = (data["expiresAt"] as? NSNumber)?.int64Value ?? 0
+                    mediaBytes = (data["mediaBytes"] as? NSNumber)?.int64Value ?? 0
+                    reportedQuality = data["quality"] as? Int ?? 0
+                    reportedQualities = data["qualities"] as? [Int] ?? []
                     if let hdr = (data["header"] as? [String: String]) ?? (data["headers"] as? [String: String]) {
                         targetHeaders = hdr
                     }
@@ -636,10 +655,13 @@ public actor NativeBridge {
             }
 
             if targetUrl.isEmpty || targetUrl.contains("example.com") {
-                targetUrl = "https://hongguoduanju.com/video/public/\(dramaId)/360p.mp4"
+                throw NSError(domain: "CatPawOpen", code: -2, userInfo: [NSLocalizedDescriptionKey: "无法从数据源获取当前分集的真实播放流，请重试"])
             }
 
-            var detectedQuality = 360
+            if !contentKey.isEmpty && contentKey.range(of: "^[0-9a-fA-F]{32}$", options: .regularExpression) == nil {
+                throw NSError(domain: "CatPawOpen", code: -3, userInfo: [NSLocalizedDescriptionKey: "站源内容密钥无效"])
+            }
+            var detectedQuality = reportedQuality
             if targetUrl.contains("4k") || targetUrl.contains("2160p") {
                 detectedQuality = 2160
             } else if targetUrl.contains("1080p") {
@@ -652,14 +674,30 @@ public actor NativeBridge {
                 detectedQuality = 360
             }
 
-            let effectiveQuality = detectedQuality > 360 ? detectedQuality : 720
+            let effectiveQuality = detectedQuality
             return [
                 "url": targetUrl,
                 "headers": targetHeaders,
+                "decryptionKey": contentKey,
+                "expiresAt": expiresAt,
+                "danmakuId": danmakuId,
+                "mediaBytes": mediaBytes,
                 "quality": effectiveQuality,
-                "qualities": [1080, 720, 360],
+                "qualities": reportedQualities.isEmpty ? (detectedQuality > 0 ? [detectedQuality] : []) : reportedQualities,
                 "session": "\(Date().timeIntervalSince1970)"
             ]
+
+        case "danmaku":
+            let id = payload["episodeId"] as? String ?? ""
+            guard id.hasPrefix("hongguo:"), let context = getOrCreateContext(sourceId: "hongguo") else {
+                throw NSError(domain: "THLRedLook.Danmaku", code: -1, userInfo: [NSLocalizedDescriptionKey: "本集暂不支持弹幕"])
+            }
+            let expression = try spiderExpression("danmaku", [id, payload["startMs"] as? Int64 ?? 0, payload["durationMs"] as? Int64 ?? 0])
+            guard let response = evalAsync(context: context, scriptExpr: expression), response["ok"] as? Bool == true,
+                  let result = response["data"] as? [String: Any], result["items"] is [[String: Any]] else {
+                throw NSError(domain: "THLRedLook.Danmaku", code: -2, userInfo: [NSLocalizedDescriptionKey: "官方弹幕暂不可用"])
+            }
+            return result
 
         case "rankingBoards":
             let src = activeSourceId.isEmpty ? "hongguo" : activeSourceId

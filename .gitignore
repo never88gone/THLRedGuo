@@ -4,6 +4,7 @@
 build/
 dist/
 android/.gradle/
+android/.kotlin/
 android/local.properties
 android/app/src/main/jniLibs/
 *.log
@@ -45,3 +46,8 @@ ios/Flutter/flutter_export_environment.sh
 .claude/
 fastlane/
 
+tvos/THLRedLookTests
+tvos/THLRedLookUITests
+scripts
+test
+integration_test

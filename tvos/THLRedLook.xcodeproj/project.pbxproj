@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */; };
+		3B9F1C5ADE795910FBD0AD03 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6299EBC862612C3A90774337 /* Foundation.framework */; };
+		3EB52B87EAB6FA6FA6506647 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6299EBC862612C3A90774337 /* Foundation.framework */; };
+		3F654B7E4306B53376917E16 /* CENCDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */; };
+		528D7CCDCE1C7AF18D3AC99E /* Pods_THLRedLookTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 221C9DFACA76E6DED5DC2B01 /* Pods_THLRedLookTests.framework */; };
 		6A2238549A7893510B3D7A7C /* Pods_THLRedLook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */; };
 		A10000012C00000100000001 /* THLRedLookApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000012C00000100000001 /* THLRedLookApp.swift */; };
 		A10000022C00000100000001 /* SourceSite.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022C00000100000001 /* SourceSite.swift */; };
@@ -29,7 +34,6 @@
 		A10000192C00000100000001 /* RankingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000192C00000100000001 /* RankingsViewModel.swift */; };
 		A10000202C00000100000001 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000202C00000100000001 /* LibraryViewModel.swift */; };
 		A10000212C00000100000001 /* DramaCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000212C00000100000001 /* DramaCardView.swift */; };
-		A10000452C00000100000001 /* TVBlankStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000452C00000100000001 /* TVBlankStateView.swift */; };
 		A10000222C00000100000001 /* FilterSortSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000222C00000100000001 /* FilterSortSheet.swift */; };
 		A10000232C00000100000001 /* CatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000232C00000100000001 /* CatalogView.swift */; };
 		A10000242C00000100000001 /* TVDanmakuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000242C00000100000001 /* TVDanmakuView.swift */; };
@@ -45,13 +49,42 @@
 		A10000352C00000100000001 /* TVTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000352C00000100000001 /* TVTheme.swift */; };
 		A10000382C00000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000382C00000100000001 /* Assets.xcassets */; };
 		A10000392C00000100000001 /* AVPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000392C00000100000001 /* AVPlayerView.swift */; };
+		A10000452C00000100000001 /* TVBlankStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000452C00000100000001 /* TVBlankStateView.swift */; };
 		A10000982C00000100000001 /* CENCMP4Decryptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000982C00000100000001 /* CENCMP4Decryptor.swift */; };
 		A10000992C00000100000001 /* PlatformProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000992C00000100000001 /* PlatformProtocols.swift */; };
+		BC5B31CB27136862380FB32F /* PlaybackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF46F916F921E87B28F33AB /* PlaybackTests.swift */; };
+		CABD071B5C68D672495450B9 /* LocalLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */; };
+		DFB5B536F10F369514C3C5B4 /* RemoteNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		164C6B5EE789306CFFCFAAFE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 010000012C00000100000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E10000012C00000100000001;
+			remoteInfo = THLRedLook;
+		};
+		1ABB1E948FDB5AEB97775F0D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 010000012C00000100000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E10000012C00000100000001;
+			remoteInfo = THLRedLook;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLook.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		1D9437790F04A5D01FEC2D84 /* Pods-THLRedLookTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLookTests.debug.xcconfig"; path = "Target Support Files/Pods-THLRedLookTests/Pods-THLRedLookTests.debug.xcconfig"; sourceTree = "<group>"; };
+		221C9DFACA76E6DED5DC2B01 /* Pods_THLRedLookTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLookTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3311D255B0226B0543DC9491 /* Pods-THLRedLook.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLook.debug.xcconfig"; path = "Target Support Files/Pods-THLRedLook/Pods-THLRedLook.debug.xcconfig"; sourceTree = "<group>"; };
+		3A2AC2E0C811128FF9CE4D20 /* Pods-THLRedLookTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLookTests.release.xcconfig"; path = "Target Support Files/Pods-THLRedLookTests/Pods-THLRedLookTests.release.xcconfig"; sourceTree = "<group>"; };
+		5DEF076423A4DDD1829FFF47 /* THLRedLookUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = THLRedLookUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6299EBC862612C3A90774337 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		6A9AED8C8EB9E35575961261 /* THLRedLookTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = THLRedLookTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CENCDecoderTests.swift; sourceTree = "<group>"; };
+		9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalLibraryTests.swift; sourceTree = "<group>"; };
 		B10000002C00000100000001 /* THLRedLook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = THLRedLook.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000012C00000100000001 /* THLRedLookApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = THLRedLookApp.swift; sourceTree = "<group>"; };
 		B10000022C00000100000001 /* SourceSite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceSite.swift; sourceTree = "<group>"; };
@@ -74,7 +107,6 @@
 		B10000192C00000100000001 /* RankingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingsViewModel.swift; sourceTree = "<group>"; };
 		B10000202C00000100000001 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
 		B10000212C00000100000001 /* DramaCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DramaCardView.swift; sourceTree = "<group>"; };
-		B10000452C00000100000001 /* TVBlankStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVBlankStateView.swift; sourceTree = "<group>"; };
 		B10000222C00000100000001 /* FilterSortSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterSortSheet.swift; sourceTree = "<group>"; };
 		B10000232C00000100000001 /* CatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogView.swift; sourceTree = "<group>"; };
 		B10000242C00000100000001 /* TVDanmakuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVDanmakuView.swift; sourceTree = "<group>"; };
@@ -92,12 +124,24 @@
 		B10000382C00000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B10000392C00000100000001 /* AVPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerView.swift; sourceTree = "<group>"; };
 		B10000402C00000100000001 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		B10000452C00000100000001 /* TVBlankStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVBlankStateView.swift; sourceTree = "<group>"; };
 		B10000982C00000100000001 /* CENCMP4Decryptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CENCMP4Decryptor.swift; sourceTree = "<group>"; };
 		B10000992C00000100000001 /* PlatformProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformProtocols.swift; sourceTree = "<group>"; };
+		B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CENCMediaDownloader.swift; sourceTree = "<group>"; };
+		DDF46F916F921E87B28F33AB /* PlaybackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackTests.swift; sourceTree = "<group>"; };
 		EA0AC74BAC1238FE7FC98B9C /* Pods-THLRedLook.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLook.release.xcconfig"; path = "Target Support Files/Pods-THLRedLook/Pods-THLRedLook.release.xcconfig"; sourceTree = "<group>"; };
+		FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteNavigationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		78D013FA03EC819CA9491BFB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3EB52B87EAB6FA6FA6506647 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C10000012C00000100000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -106,15 +150,43 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D00C7BB1302B630B76F3F7C0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3B9F1C5ADE795910FBD0AD03 /* Foundation.framework in Frameworks */,
+				528D7CCDCE1C7AF18D3AC99E /* Pods_THLRedLookTests.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		05D057238BF0376567EE6F32 /* THLRedLookUITests */ = {
+			isa = PBXGroup;
+			children = (
+				FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */,
+			);
+			name = THLRedLookUITests;
+			path = THLRedLookUITests;
+			sourceTree = "<group>";
+		};
 		60221B46C52FED984663019F /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */,
+				7B92ED8A1A32014644A6282E /* tvOS */,
+				221C9DFACA76E6DED5DC2B01 /* Pods_THLRedLookTests.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		7B92ED8A1A32014644A6282E /* tvOS */ = {
+			isa = PBXGroup;
+			children = (
+				6299EBC862612C3A90774337 /* Foundation.framework */,
+			);
+			name = tvOS;
 			sourceTree = "<group>";
 		};
 		8252C3BA2257AD604EA74E22 /* Pods */ = {
@@ -122,9 +194,22 @@
 			children = (
 				3311D255B0226B0543DC9491 /* Pods-THLRedLook.debug.xcconfig */,
 				EA0AC74BAC1238FE7FC98B9C /* Pods-THLRedLook.release.xcconfig */,
+				3A2AC2E0C811128FF9CE4D20 /* Pods-THLRedLookTests.release.xcconfig */,
+				1D9437790F04A5D01FEC2D84 /* Pods-THLRedLookTests.debug.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		B10A80F99E2D9849B8980719 /* THLRedLookTests */ = {
+			isa = PBXGroup;
+			children = (
+				DDF46F916F921E87B28F33AB /* PlaybackTests.swift */,
+				83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */,
+				9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */,
+			);
+			name = THLRedLookTests;
+			path = THLRedLookTests;
 			sourceTree = "<group>";
 		};
 		D10000012C00000100000001 = {
@@ -134,6 +219,8 @@
 				D10000032C00000100000001 /* Products */,
 				8252C3BA2257AD604EA74E22 /* Pods */,
 				60221B46C52FED984663019F /* Frameworks */,
+				B10A80F99E2D9849B8980719 /* THLRedLookTests */,
+				05D057238BF0376567EE6F32 /* THLRedLookUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -154,6 +241,8 @@
 			isa = PBXGroup;
 			children = (
 				B10000002C00000100000001 /* THLRedLook.app */,
+				6A9AED8C8EB9E35575961261 /* THLRedLookTests.xctest */,
+				5DEF076423A4DDD1829FFF47 /* THLRedLookUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -193,6 +282,7 @@
 				B10000992C00000100000001 /* PlatformProtocols.swift */,
 				B10000132C00000100000001 /* LanSyncService.swift */,
 				B10000142C00000100000001 /* DownloadService.swift */,
+				B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -308,6 +398,43 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		2DB907560187AB68629A55B3 /* THLRedLookUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B57DF4762B82F68E939E5F8C /* Build configuration list for PBXNativeTarget "THLRedLookUITests" */;
+			buildPhases = (
+				A5BC591CE29619E33DFD18DD /* Sources */,
+				78D013FA03EC819CA9491BFB /* Frameworks */,
+				2B859E4C7D21A4F57C22006E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3E6D73E38459414090E17C86 /* PBXTargetDependency */,
+			);
+			name = THLRedLookUITests;
+			productName = THLRedLookUITests;
+			productReference = 5DEF076423A4DDD1829FFF47 /* THLRedLookUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A0FCE0A5957CECE798BE3AAB /* THLRedLookTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E30753B84D45452BD672C9B8 /* Build configuration list for PBXNativeTarget "THLRedLookTests" */;
+			buildPhases = (
+				92047315940EE47D9858EA8B /* [CP] Check Pods Manifest.lock */,
+				1997A7132B35ACFF04978600 /* Sources */,
+				D00C7BB1302B630B76F3F7C0 /* Frameworks */,
+				EBA2B474C870E5B0BC42CAFD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A8842986900EAFD253D59F70 /* PBXTargetDependency */,
+			);
+			name = THLRedLookTests;
+			productName = THLRedLookTests;
+			productReference = 6A9AED8C8EB9E35575961261 /* THLRedLookTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		E10000012C00000100000001 /* THLRedLook */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F10000012C00000100000001 /* Build configuration list for PBXNativeTarget "THLRedLook" */;
@@ -356,16 +483,32 @@
 			projectRoot = "";
 			targets = (
 				E10000012C00000100000001 /* THLRedLook */,
+				A0FCE0A5957CECE798BE3AAB /* THLRedLookTests */,
+				2DB907560187AB68629A55B3 /* THLRedLookUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		2B859E4C7D21A4F57C22006E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C10000032C00000100000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				A10000382C00000100000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EBA2B474C870E5B0BC42CAFD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -387,6 +530,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-THLRedLook/Pods-THLRedLook-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		92047315940EE47D9858EA8B /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-THLRedLookTests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
 		9F739B8A8652E55E2B80BBA1 /* [CP] Check Pods Manifest.lock */ = {
@@ -433,6 +598,24 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1997A7132B35ACFF04978600 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC5B31CB27136862380FB32F /* PlaybackTests.swift in Sources */,
+				3F654B7E4306B53376917E16 /* CENCDecoderTests.swift in Sources */,
+				CABD071B5C68D672495450B9 /* LocalLibraryTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A5BC591CE29619E33DFD18DD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DFB5B536F10F369514C3C5B4 /* RemoteNavigationTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C10000022C00000100000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -475,10 +658,26 @@
 				A10000322C00000100000001 /* SettingsView.swift in Sources */,
 				A10000332C00000100000001 /* MainTabView.swift in Sources */,
 				A10000352C00000100000001 /* TVTheme.swift in Sources */,
+				308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3E6D73E38459414090E17C86 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = THLRedLook;
+			target = E10000012C00000100000001 /* THLRedLook */;
+			targetProxy = 164C6B5EE789306CFFCFAAFE /* PBXContainerItemProxy */;
+		};
+		A8842986900EAFD253D59F70 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = THLRedLook;
+			target = E10000012C00000100000001 /* THLRedLook */;
+			targetProxy = 1ABB1E948FDB5AEB97775F0D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		010000032C00000100000001 /* Debug */ = {
@@ -533,6 +732,92 @@
 			};
 			name = Release;
 		};
+		0F6EBDDABCB916B75F874BFB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_TARGET_NAME = THLRedLook;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		36464DAC2AA97B060CCA2FBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3A2AC2E0C811128FF9CE4D20 /* Pods-THLRedLookTests.release.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_ALLOWED = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/THLRedLook.app/THLRedLook";
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		6DD0C3D7D10085D28C8CA435 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1D9437790F04A5D01FEC2D84 /* Pods-THLRedLookTests.debug.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_ALLOWED = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/THLRedLook.app/THLRedLook";
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Debug;
+		};
+		A101A72F19BAEC92E536797D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_TARGET_NAME = THLRedLook;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Debug;
+		};
 		F10000022C00000100000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3311D255B0226B0543DC9491 /* Pods-THLRedLook.debug.xcconfig */;
@@ -542,6 +827,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 20261005205413;
 				DEVELOPMENT_TEAM = 876385K952;
+				ENABLE_TESTABILITY = YES;
 				"EXCLUDED_ARCHS[sdk=appletvsimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = THLRedLook/App/Info.plist;
@@ -550,9 +836,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-				);
+				OTHER_LDFLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -578,9 +862,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-				);
+				OTHER_LDFLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = thlredlook_tvOS_dis;
@@ -597,6 +879,24 @@
 			buildConfigurations = (
 				010000032C00000100000001 /* Debug */,
 				010000042C00000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B57DF4762B82F68E939E5F8C /* Build configuration list for PBXNativeTarget "THLRedLookUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0F6EBDDABCB916B75F874BFB /* Release */,
+				A101A72F19BAEC92E536797D /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E30753B84D45452BD672C9B8 /* Build configuration list for PBXNativeTarget "THLRedLookTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				36464DAC2AA97B060CCA2FBB /* Release */,
+				6DD0C3D7D10085D28C8CA435 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

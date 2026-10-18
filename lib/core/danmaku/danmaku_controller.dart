@@ -37,7 +37,7 @@ class DanmakuController extends ChangeNotifier {
 
   bool get supported =>
       _plan != null &&
-      !_plan!.local &&
+      !_plan!.offline &&
       _plan!.session.isNotEmpty &&
       _plan!.danmakuId.isNotEmpty;
   bool get visible =>
@@ -54,7 +54,7 @@ class DanmakuController extends ChangeNotifier {
   bool get canRetry => visible && _failures.isNotEmpty;
   String get status {
     if (!_enabled) return '弹幕已关闭';
-    if (_plan?.local == true) return '本地播放不加载弹幕';
+    if (_plan?.offline == true) return '本地播放不加载弹幕';
     if (_plan != null && !supported) return '本集暂不支持弹幕';
     if (canRetry) return '弹幕暂不可用，可重试';
     if (loading && _pages.isEmpty) return '正在加载弹幕';
@@ -82,9 +82,7 @@ class DanmakuController extends ChangeNotifier {
     if (_closed || _enabled == enabled) return;
     _enabled = enabled;
     _cancel();
-    _failures.clear();
-    _pages.clear();
-    _rebuildItems();
+    if (enabled) _failures.clear();
     _resetMotion();
     notifyListeners();
     _ensureWindow();

@@ -1,28 +1,38 @@
 import SwiftUI
+import UIKit
 
 public struct TVDanmakuView: View {
     public let danmakus: [DanmakuItem]
+    public let position: Double
+    public let anchor: Date
+    public let rate: Double
+    public let moving: Bool
 
     public var body: some View {
         GeometryReader { proxy in
-            ZStack(alignment: .topLeading) {
-                ForEach(danmakus) { item in
-                    Text(item.text)
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundColor(.white)
-                        .shadow(color: .black, radius: 2, x: 1, y: 1)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.3))
-                        .clipShape(Capsule())
-                        .position(
-                            x: proxy.size.width * 0.7,
-                            y: CGFloat((abs(item.id.hashValue) % 4) * 55 + 60)
-                        )
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !moving)) { timeline in
+                let time = position + (moving ? min(0.75, max(0, timeline.date.timeIntervalSince(anchor))) * rate : 0)
+                ZStack(alignment: .topLeading) {
+                    ForEach(danmakus) { item in
+                        let age = time - Double(item.timeMs) / 1000
+                        let width = (item.text as NSString).size(withAttributes: [.font: UIFont.boldSystemFont(ofSize: 26)]).width + 24
+                        if age >= 0 && age < 8 {
+                            Text(item.text)
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundColor(.white)
+                                .shadow(color: .black, radius: 2, x: 1, y: 1)
+                                .fixedSize()
+                                .frame(width: width)
+                                .position(x: proxy.size.width + width / 2 - (proxy.size.width + width) * age / 8,
+                                          y: CGFloat(UInt(bitPattern: item.id.hashValue) % 6) * 52 + 60)
+                        }
+                    }
                 }
             }
         }
+        .clipped()
         .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -103,6 +113,7 @@ public struct TVEpisodeDrawer: View {
                                     isFocused: focusedEpisode == ep.number
                                 ))
                                 .focused($focusedEpisode, equals: ep.number)
+                                .accessibilityIdentifier("drawer.episode.\(ep.number)")
                                 .id(ep.number)
                                 .padding(4)
                             }

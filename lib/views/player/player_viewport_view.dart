@@ -37,6 +37,7 @@ class PlayerViewportView extends StatelessWidget {
     required this.localFailure,
     required this.saveWarning,
     required this.player,
+    required this.playbackRequested,
     required this.videoController,
     required this.danmaku,
     required this.danmakuEnabled,
@@ -88,6 +89,7 @@ class PlayerViewportView extends StatelessWidget {
   final bool localFailure;
   final String? saveWarning;
   final Player player;
+  final bool playbackRequested;
   final VideoController? videoController;
   final DanmakuController danmaku;
   final bool danmakuEnabled;
@@ -128,9 +130,11 @@ class PlayerViewportView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final videoTheme = television ? televisionTheme(AppTheme.dark) : AppTheme.dark;
+    final videoTheme = television
+        ? televisionTheme(AppTheme.dark)
+        : AppTheme.dark;
     final title =
-        '${detail.drama.title} · 第 ${detail.episodes[index].number} 集${plan?.local == true ? ' · 本地' : ''}${detail.episodes[index].vip ? ' · VIP 试看' : ''}${(plan?.routeIndex ?? 0) > 0 ? ' · 线路 ${plan!.routeIndex + 1}' : ''}';
+        '${detail.drama.title} · 第 ${detail.episodes[index].number} 集${plan?.offline == true ? ' · 本地' : ''}${detail.episodes[index].vip ? ' · VIP 试看' : ''}${(plan?.routeIndex ?? 0) > 0 ? ' · 线路 ${plan!.routeIndex + 1}' : ''}';
     final hideOverlayForPictureInPicture = pictureInPictureVisible;
     final Widget controls = hideOverlayForPictureInPicture
         ? const SizedBox.shrink()
@@ -144,13 +148,16 @@ class PlayerViewportView extends StatelessWidget {
             onTogglePlayback: onTogglePlayback,
             onSeek: onSeek,
             onPrevious: index > 0 ? () => onPlay(index - 1) : null,
-            onNext: index + 1 < detail.episodes.length ? () => onPlay(index + 1) : null,
+            onNext: index + 1 < detail.episodes.length
+                ? () => onPlay(index + 1)
+                : null,
             onEpisodes: () => onTelevisionEpisodes(context),
             onSettings: () => onTelevisionSettings(context),
             onBack: onBack,
           )
         : PlayerControls(
             player: player,
+            playbackRequested: playbackRequested,
             interactions: interactions,
             enabled: !loading && error == null,
             enhancement: enhancementForUi,
@@ -172,12 +179,18 @@ class PlayerViewportView extends StatelessWidget {
             onEpisodes: () => onOpenPanel(PlayerMenuSection.episodes),
             onSpeed: () => onOpenPanel(PlayerMenuSection.speed),
             onQuality: () => onOpenPanel(PlayerMenuSection.quality),
-            onDanmaku: detail.drama.source == 'hongguo' ? onToggleDanmaku : null,
+            onDanmaku: detail.drama.source == 'hongguo'
+                ? onToggleDanmaku
+                : null,
             onRetryDanmaku: danmaku.canRetry ? onRetryDanmaku : null,
             onPush: isMediaIdNull ? onPushToDevice : null,
-            onPictureInPicture: canUsePictureInPicture ? onEnterPictureInPicture : null,
+            onPictureInPicture: canUsePictureInPicture
+                ? onEnterPictureInPicture
+                : null,
             onPrevious: index > 0 ? () => onPlay(index - 1) : null,
-            onNext: index + 1 < detail.episodes.length ? () => onPlay(index + 1) : null,
+            onNext: index + 1 < detail.episodes.length
+                ? () => onPlay(index + 1)
+                : null,
           );
 
     final layeredControls = Stack(
@@ -298,7 +311,8 @@ class PlayerViewportView extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         FilledButton.tonalIcon(
-                          onPressed: () => DiaryService.showDiaryDialog(context),
+                          onPressed: () =>
+                              DiaryService.showDiaryDialog(context),
                           icon: const Icon(Icons.receipt_long_rounded),
                           label: const Text('查看播放日记'),
                         ),
@@ -308,7 +322,9 @@ class PlayerViewportView extends StatelessWidget {
                             icon: const Icon(Icons.cloud_outlined),
                             label: const Text('改为在线播放'),
                           )
-                        else if (!localFailure && !localOnly && repository.supportsSourceManagement)
+                        else if (!localFailure &&
+                            !localOnly &&
+                            repository.supportsSourceManagement)
                           SourceDiagnosticsButton(
                             repository: repository,
                             store: store,
@@ -335,7 +351,8 @@ class PlayerViewportView extends StatelessWidget {
                         ),
                         const Spacer(),
                         TextButton(
-                          onPressed: () => onOpenPanel(PlayerMenuSection.episodes),
+                          onPressed: () =>
+                              onOpenPanel(PlayerMenuSection.episodes),
                           child: const Text('选集'),
                         ),
                       ],

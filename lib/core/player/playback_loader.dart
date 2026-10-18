@@ -31,6 +31,15 @@ class PlaybackLoader {
   Future<PlaybackPlan?> fallback(PlaybackPlan current) =>
       _load(() => repository.fallback(current));
 
+  Future<PlaybackPlan?> refresh(
+    Drama drama,
+    Episode episode,
+    PlaybackPlan current, {
+    int quality = 0,
+  }) => _load(
+    () => repository.refreshPlayback(drama, episode, current, quality: quality),
+  );
+
   Future<PlaybackPlan?> use(PlaybackPlan prepared) =>
       _load(() async => prepared);
 

@@ -8,11 +8,15 @@ public final class LocalStore: ObservableObject {
     @Published public private(set) var follows: [String: FollowState] = [:]
     @Published public private(set) var followedDramas: [Drama] = []
     @Published public private(set) var searchHistory: [String] = []
+    @Published public var danmakuEnabled: Bool = true {
+        didSet { defaults.set(danmakuEnabled, forKey: danmakuKey) }
+    }
     @Published public var unlockedSources: Bool = false
     @Published public var resourceSettings: ResourceSettings = ResourceSettings()
     @Published public var currentSourceId: String = ""
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+    private let danmakuKey = "thl_tv_danmaku_enabled"
     private let historyKey = "zgj_tv_history"
     private let followsKey = "zgj_tv_follows"
     private let followedDramasKey = "zgj_tv_followed_dramas"
@@ -21,7 +25,8 @@ public final class LocalStore: ObservableObject {
     private let settingsKey = "zgj_tv_resource_settings"
     private let currentSourceKey = "zgj_tv_current_source"
 
-    public init() {
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         loadFromStorage()
     }
 
@@ -29,6 +34,7 @@ public final class LocalStore: ObservableObject {
         unlockedSources = defaults.bool(forKey: unlockedKey)
         currentSourceId = defaults.string(forKey: currentSourceKey) ?? ""
         searchHistory = defaults.stringArray(forKey: searchHistoryKey) ?? []
+        danmakuEnabled = defaults.object(forKey: danmakuKey) as? Bool ?? true
 
         if let data = defaults.data(forKey: historyKey),
            let list = try? JSONDecoder().decode([WatchEntry].self, from: data) {
@@ -76,13 +82,22 @@ public final class LocalStore: ObservableObject {
 
     // MARK: - Watch History
     public func recordWatch(drama: Drama, episode: Int, position: Double, duration: Double) {
-        let entry = WatchEntry(drama: drama, episode: episode, position: position, duration: duration, updatedAt: Date())
+        guard !drama.id.isEmpty, episode > 0, position.isFinite, duration.isFinite,
+              position >= 0, duration > 0 else { return }
+        let previous = history.first { $0.drama.id == drama.id }?.drama
+            ?? followedDramas.first { $0.id == drama.id }
+        let current = previous?.merge(with: drama) ?? drama
+        let entry = WatchEntry(drama: current, episode: episode, position: min(position, duration), duration: duration, updatedAt: Date())
         history.removeAll { $0.drama.id == drama.id }
         history.insert(entry, at: 0)
         if history.count > 100 {
             history = Array(history.prefix(100))
         }
         saveHistory()
+        if let index = followedDramas.firstIndex(where: { $0.id == drama.id }) {
+            followedDramas[index] = followedDramas[index].merge(with: current)
+            saveFollows()
+        }
     }
 
     public func getWatchEntry(dramaId: String) -> WatchEntry? {
@@ -112,6 +127,7 @@ public final class LocalStore: ObservableObject {
 
     // MARK: - Follow State
     public func setFollowState(drama: Drama, state: FollowState) {
+        guard !drama.id.isEmpty else { return }
         if state == .none {
             follows.removeValue(forKey: drama.id)
             followedDramas.removeAll { $0.id == drama.id }
@@ -121,7 +137,7 @@ public final class LocalStore: ObservableObject {
                 followedDramas.insert(drama, at: 0)
             } else {
                 if let index = followedDramas.firstIndex(where: { $0.id == drama.id }) {
-                    followedDramas[index] = drama
+                    followedDramas[index] = followedDramas[index].merge(with: drama)
                 }
             }
         }

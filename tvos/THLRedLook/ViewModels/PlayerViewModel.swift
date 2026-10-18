@@ -7,6 +7,8 @@ import SwiftUI
 public final class PlayerViewModel: ObservableObject {
     @Published public var player: AVPlayer?
     @Published public var isPlaying: Bool = false
+    @Published public private(set) var wantsPlayback: Bool = true
+    @Published public private(set) var isBuffering: Bool = false
     @Published public var currentTime: Double = 0
     @Published public var duration: Double = 0
     @Published public var currentEpisodeIndex: Int
@@ -32,20 +34,44 @@ public final class PlayerViewModel: ObservableObject {
     private let store: LocalStore
     private var timeObserverToken: Any?
     private var statusObserver: NSKeyValueObservation?
+    private var timeControlObserver: NSKeyValueObservation?
+    private var isSeeking = false
+    private var seekSequence = 0
+    private var isSceneActive = true
+    private var resumeAfterInterruption = false
+    private var reachedEnd = false
     private var progressSaveTimer: Timer?
     private var controlsHideTimer: Timer?
     private var toastHideTimer: Timer?
     private var danmakuCache: [DanmakuItem] = []
+    private var danmakuPages: [Int64: [DanmakuItem]] = [:]
+    private var danmakuRetryAfter: [Int64: Date] = [:]
+    private var danmakuTask: Task<Void, Never>?
+    private var danmakuRequestSequence = 0
+    public private(set) var playbackClockDate = Date()
     
     private var prefetchTask: Task<Void, Never>?
     private var prefetchedNextPlan: PlaybackPlan?
     private var prefetchedNextEpisodeIndex: Int?
-
-    // 智能救流引擎：当目标分集公网流 404 或失效时，无缝降级续播可用流，绝不中断播放弹窗
-    private var lastWorkingStreamURL: URL?
-    private var lastWorkingHeaders: [String: String] = [:]
-    private var hasAttemptedRescue: Bool = false
-    private var isRescuedStream: Bool = false
+    private var lifecycleTask: Task<Void, Never>?
+    private var preparationTask: Task<Void, Never>?
+    private var recoveryTask: Task<Void, Never>?
+    private var playbackGeneration = 0
+    private var isVisible = false
+    private var closed = false
+    private var playIntent: Bool {
+        get { wantsPlayback }
+        set { wantsPlayback = newValue }
+    }
+    private var recoveryAttempts = 0
+    private var failedURL = ""
+    private var decryptedURL: URL?
+    private var itemNotifications: [NSObjectProtocol] = []
+    private var initializationTimer: Timer?
+    private var healthTimer: Timer?
+    private var lastProgressTime = Date()
+    private var lastObservedPosition = 0.0
+    private static let audioSessionQueue = DispatchQueue(label: "THLRedLook.AudioSession")
 
     public init(
         drama: Drama,
@@ -67,29 +93,28 @@ public final class PlayerViewModel: ObservableObject {
         self.keepControlsVisible = keepControlsVisible
         self.repository = repository
         self.store = store
+        self.danmakuEnabled = store.danmakuEnabled
 
         startProgressSaveTimer()
     }
 
-    deinit {
-        // deinit 中清理
-    }
-
     public func onAppear() {
-        configureAudioSession()
-        Task {
+        guard !isVisible else { return }
+        isVisible = true
+        closed = false
+        if progressSaveTimer == nil { startProgressSaveTimer() }
+        lifecycleTask = Task { [weak self] in
+            guard let self else { return }
             do {
-                let detail = try await self.repository.loadDetail(drama: self.drama)
-                if !detail.episodes.isEmpty {
-                    self.allEpisodes = detail.episodes
-                    NSLog("🎬 [PlayerVM] 动态拉取补全剧集列表，共 %d 集", detail.episodes.count)
-                }
+                let detail = try await repository.loadDetail(drama: drama)
+                guard !Task.isCancelled, !closed else { return }
+                if !detail.episodes.isEmpty { allEpisodes = detail.episodes }
             } catch {
-                NSLog("🎬 [PlayerVM] 动态补全剧集列表失败: %@", error.localizedDescription)
+                guard !Task.isCancelled, !closed else { return }
             }
-            
-            await loadSeasons()
             await preparePlayback(episodeIndex: currentEpisodeIndex, seekTo: currentTime)
+            guard !Task.isCancelled, !closed else { return }
+            await loadSeasons()
         }
     }
 
@@ -112,8 +137,20 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     public func onDisappear() {
+        closed = true
+        resumeAfterInterruption = false
+        isVisible = false
+        playbackGeneration += 1
+        lifecycleTask?.cancel()
+        lifecycleTask = nil
+        preparationTask?.cancel()
+        preparationTask = nil
+        recoveryTask?.cancel()
+        recoveryTask = nil
         prefetchTask?.cancel()
         prefetchTask = nil
+        prefetchedNextPlan = nil
+        prefetchedNextEpisodeIndex = nil
         saveCurrentProgress()
         progressSaveTimer?.invalidate()
         progressSaveTimer = nil
@@ -121,22 +158,49 @@ public final class PlayerViewModel: ObservableObject {
         controlsHideTimer = nil
         toastHideTimer?.invalidate()
         toastHideTimer = nil
+        releasePlayer()
+        plan = nil
+    }
+
+    private func releasePlayer() {
+        resetDanmaku()
+        initializationTimer?.invalidate()
+        initializationTimer = nil
+        healthTimer?.invalidate()
+        healthTimer = nil
         statusObserver?.invalidate()
         statusObserver = nil
+        timeControlObserver?.invalidate()
+        timeControlObserver = nil
+        seekSequence += 1
+        isSeeking = false
+        itemNotifications.forEach { NotificationCenter.default.removeObserver($0) }
+        itemNotifications.removeAll()
         if let token = timeObserverToken {
             player?.removeTimeObserver(token)
             timeObserverToken = nil
         }
         player?.pause()
+        player?.replaceCurrentItem(with: nil)
         player = nil
+        isPlaying = false
+        isBuffering = false
+        if let url = decryptedURL {
+            CENCMP4Decryptor.shared.removePlaybackCache(at: url)
+            decryptedURL = nil
+        }
     }
 
-    private func configureAudioSession() {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            // 忽略会话配置告警
+    private func configureAudioSession() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            Self.audioSessionQueue.async {
+                do {
+                    let session = AVAudioSession.sharedInstance()
+                    try session.setCategory(.playback, mode: .moviePlayback)
+                    try session.setActive(true)
+                } catch {}
+                continuation.resume()
+            }
         }
     }
 
@@ -152,288 +216,251 @@ public final class PlayerViewModel: ObservableObject {
         }
     }
 
-    private func triggerStreamRescue(seekTo: Double) {
-        NSLog("🎬 [PlayerVM] 启动智能救流引擎，为第%d集寻找可用精彩试看流...", currentEpisodeIndex)
-        isLoading = true
-        errorMessage = nil
-        isRescuedStream = true
-
-        Task { [weak self] in
-            guard let self = self else { return }
-
-            // 1. 如果已有之前成功播放过的流（比如第 1 集），直接复用
-            if let workingURL = self.lastWorkingStreamURL {
-                NSLog("🎬 [PlayerVM] [救流成功] 复用前序已验证工作流: %@", workingURL.absoluteString)
-                await MainActor.run {
-                    var opts: [String: Any]? = nil
-                    if !self.lastWorkingHeaders.isEmpty {
-                        opts = ["AVURLAssetHTTPHeaderFieldsKey": self.lastWorkingHeaders]
-                    }
-                    let asset = AVURLAsset(url: workingURL, options: opts)
-                    let item = AVPlayerItem(asset: asset)
-                    self.startPlaybackWithItem(item: item, seekTo: 0)
-                    self.showToast("💡 当前集公网流转码优化中，已为您无缝呈现精彩试看")
-                }
-                return
-            }
-
-            // 2. 如果尚未有工作流，尝试异步解析第 1 集作为试看流
-            let firstEp = self.allEpisodes.first
-            if let rescuePlan = try? await self.repository.resolvePlayback(
-                drama: self.drama,
-                episode: firstEp,
-                episodeIndex: 1,
-                quality: self.selectedQuality
-            ), let rescueURL = URL(string: rescuePlan.url), !rescuePlan.url.isEmpty, !rescuePlan.url.contains("example.com") {
-                NSLog("🎬 [PlayerVM] [救流成功] 动态获取第 1 集试看流: %@", rescuePlan.url)
-                await MainActor.run {
-                    self.lastWorkingStreamURL = rescueURL
-                    self.lastWorkingHeaders = rescuePlan.headers
-                    var opts: [String: Any]? = nil
-                    if !rescuePlan.headers.isEmpty {
-                        opts = ["AVURLAssetHTTPHeaderFieldsKey": rescuePlan.headers]
-                    }
-                    let asset = AVURLAsset(url: rescueURL, options: opts)
-                    let item = AVPlayerItem(asset: asset)
-                    self.startPlaybackWithItem(item: item, seekTo: 0)
-                    self.showToast("💡 当前集公网流转码优化中，已为您无缝呈现精彩试看")
-                }
-                return
-            }
-
-            // 3. 终极兜底：使用官方公网高保真短剧媒体流（确保画面永远在播放，绝不黑屏报错）
-            if let fallbackPublicURL = URL(string: "https://hongguoduanju.com/video/public/7694898085759028248/360p.mp4") {
-                NSLog("🎬 [PlayerVM] [救流成功] 使用公共高保真短剧媒体流兜底")
-                await MainActor.run {
-                    let asset = AVURLAsset(url: fallbackPublicURL)
-                    let item = AVPlayerItem(asset: asset)
-                    self.startPlaybackWithItem(item: item, seekTo: 0)
-                    self.showToast("💡 当前集公网流转码优化中，已为您无缝呈现精彩试看")
-                }
-            }
-        }
+    public func preparePlayback(episodeIndex: Int, seekTo: Double = 0) async {
+        await beginPlayback(episodeIndex: episodeIndex, seekTo: seekTo, recovering: false)
     }
 
-    public func preparePlayback(episodeIndex: Int, seekTo: Double = 0) async {
-        configureAudioSession()
-        isLoading = true
-        errorMessage = nil
-        currentEpisodeIndex = episodeIndex
-        hasAttemptedRescue = false
-        isRescuedStream = false
-        
+    private func beginPlayback(episodeIndex: Int, seekTo: Double, recovering: Bool, preservePlayIntent: Bool = false) async {
+        guard !closed, episodeIndex > 0, seekTo.isFinite else { return }
+        saveCurrentProgress()
+        playbackGeneration += 1
+        let generation = playbackGeneration
+        preparationTask?.cancel()
+        recoveryTask?.cancel()
+        recoveryTask = nil
         prefetchTask?.cancel()
         prefetchTask = nil
-
-        // 停止并清理前一个播放器会话
-        statusObserver?.invalidate()
-        statusObserver = nil
-        if let token = timeObserverToken {
-            player?.removeTimeObserver(token)
-            timeObserverToken = nil
+        if !recovering {
+            recoveryAttempts = 0
+            failedURL = ""
+            if !preservePlayIntent {
+                playIntent = isSceneActive
+                resumeAfterInterruption = !isSceneActive
+            }
         }
-        player?.pause()
+        reachedEnd = false
+        releasePlayer()
+        await configureAudioSession()
+        guard !closed, generation == playbackGeneration, !Task.isCancelled else { return }
+        currentEpisodeIndex = episodeIndex
+        currentTime = max(0, seekTo)
+        duration = 0
+        nextEpisodeCountdown = nil
+        isLoading = true
+        errorMessage = nil
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.prepareEpisode(episodeIndex: episodeIndex, seekTo: seekTo, generation: generation, recovering: recovering)
+        }
+        preparationTask = task
+        await task.value
+        if generation == playbackGeneration { preparationTask = nil }
+    }
 
+    private func prepareEpisode(episodeIndex: Int, seekTo: Double, generation: Int, recovering: Bool) async {
+        func current() -> Bool { !closed && !Task.isCancelled && generation == playbackGeneration }
         do {
-            var currentEp = allEpisodes.indices.contains(episodeIndex - 1) ? allEpisodes[episodeIndex - 1] : nil
-            if currentEp == nil || currentEp?.raw == nil {
-                if let freshDetail = try? await self.repository.loadDetail(drama: self.drama), !freshDetail.episodes.isEmpty {
-                    self.allEpisodes = freshDetail.episodes
-                    currentEp = self.allEpisodes.indices.contains(episodeIndex - 1) ? self.allEpisodes[episodeIndex - 1] : nil
-                }
+            var episode = allEpisodes.first { $0.number == episodeIndex }
+            if episode?.raw == nil {
+                let detail = try await repository.loadDetail(drama: drama)
+                guard current() else { return }
+                allEpisodes = detail.episodes
+                episode = allEpisodes.first { $0.number == episodeIndex }
             }
-            let epId = currentEp?.id ?? "\(episodeIndex)"
-
+            guard let episode else {
+                throw NSError(domain: "Player", code: -1, userInfo: [NSLocalizedDescriptionKey: "没有找到当前分集，请重新加载剧集详情"])
+            }
             if drama.id.starts(with: "test_") {
-                self.isLoading = false
-                self.errorMessage = nil
-                self.isPlaying = true
-                self.duration = 180
-                self.currentTime = 35
+                isLoading = false
+                isPlaying = true
+                duration = 180
+                currentTime = 35
                 return
             }
-
-            // 优先检查本地离线下载文件：若存在已完成的本地视频文件，直接秒播
-            if let localURL = DownloadService.shared.completedLocalURL(dramaId: drama.id, episodeId: epId) {
-                NSLog("🎬 [PlayerVM] 命中已下载的本地离线文件，直接秒播: %@", localURL.path)
-                let asset = AVURLAsset(url: localURL)
-                let item = AVPlayerItem(asset: asset)
-                startPlaybackWithItem(item: item, seekTo: seekTo)
+            if let localURL = DownloadService.shared.completedLocalURL(dramaId: drama.id, episodeId: episode.id) {
+                startPlaybackWithItem(item: AVPlayerItem(url: localURL), seekTo: seekTo)
                 return
             }
-
-            let plan: PlaybackPlan
-            if let prefetched = self.prefetchedNextPlan, self.prefetchedNextEpisodeIndex == episodeIndex {
-                plan = prefetched
-                NSLog("🎬 [PlayerVM] 使用提前预加载的播放地址: 第%d集", episodeIndex)
-                self.prefetchedNextPlan = nil
-                self.prefetchedNextEpisodeIndex = nil
+            let resolved: PlaybackPlan
+            if !recovering, let prefetched = prefetchedNextPlan,
+               prefetchedNextEpisodeIndex == episodeIndex,
+               prefetched.expiresAt == 0 || prefetched.expiresAt > Int64(Date().timeIntervalSince1970 * 1000) + 5000 {
+                resolved = prefetched
             } else {
-                plan = try await repository.resolvePlayback(
-                    drama: drama,
-                    episode: currentEp,
-                    episodeIndex: episodeIndex,
-                    quality: selectedQuality
-                )
+                resolved = try await repository.resolvePlayback(drama: drama, episode: episode, episodeIndex: episodeIndex, quality: selectedQuality, avoidURL: failedURL)
             }
-            
-            self.plan = plan
-            self.selectedQuality = plan.quality
-
-            NSLog("🎬 [PlayerVM] 解析得到播放方案: 剧集=%@, 第%d集, URL=%@, decryptionKey='%@'(长度%ld), headers=%@", drama.title, episodeIndex, plan.url, plan.decryptionKey, plan.decryptionKey.count, String(describing: plan.headers))
-
-            guard let url = URL(string: plan.url) else {
+            guard current() else { return }
+            prefetchedNextPlan = nil
+            prefetchedNextEpisodeIndex = nil
+            plan = resolved
+            selectedQuality = resolved.quality
+            guard let url = URL(string: resolved.url), ["https", "http", "file"].contains(url.scheme ?? "") else {
                 throw NSError(domain: "Player", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效播放地址"])
             }
-
-            // 若存在 CENC 解密密钥，通过 CENCMP4Decryptor 进行端侧极速解密为标准明文 MP4
             let playbackURL: URL
-            var assetOptions: [String: Any] = [:]
-            if !plan.decryptionKey.isEmpty {
-                NSLog("🎬 [PlayerVM] 检测到 CENC 加密密钥 (%@)，执行本地原生高速解密...", plan.decryptionKey)
-                playbackURL = try await CENCMP4Decryptor.shared.decrypt(
-                    remoteURL: url,
-                    headers: plan.headers,
-                    hexKey: plan.decryptionKey
-                )
-                NSLog("🎬 [PlayerVM] CENC 解密完成，原生播放目标: %@", playbackURL.path)
+            var options: [String: Any] = [:]
+            if !resolved.decryptionKey.isEmpty {
+                playbackURL = try await CENCMP4Decryptor.shared.decrypt(remoteURL: url, headers: resolved.headers, hexKey: resolved.decryptionKey, mediaBytes: resolved.mediaBytes)
+                guard current() else {
+                    CENCMP4Decryptor.shared.removePlaybackCache(at: playbackURL)
+                    return
+                }
+                decryptedURL = playbackURL
             } else {
                 playbackURL = url
-                if !plan.headers.isEmpty {
-                    assetOptions["AVURLAssetHTTPHeaderFieldsKey"] = plan.headers
-                }
+                if !resolved.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = resolved.headers }
             }
-
-            let asset = AVURLAsset(url: playbackURL, options: assetOptions.isEmpty ? nil : assetOptions)
-            let item = AVPlayerItem(asset: asset)
-            startPlaybackWithItem(item: item, seekTo: seekTo)
-
-            // 加载弹幕
-            if danmakuEnabled {
-                await loadDanmaku()
-            }
+            guard current() else { return }
+            let asset = AVURLAsset(url: playbackURL, options: options.isEmpty ? nil : options)
+            startPlaybackWithItem(item: AVPlayerItem(asset: asset), seekTo: seekTo)
+            NSLog("[PlayerVM] prepared episode=%d encrypted=%d recovery=%d", episodeIndex, resolved.decryptionKey.isEmpty ? 0 : 1, recoveryAttempts)
+            updateActiveDanmakus()
         } catch {
-            NSLog("🎬 [PlayerVM] preparePlayback 异常: %@", error.localizedDescription)
-            if !self.hasAttemptedRescue {
-                self.hasAttemptedRescue = true
-                self.triggerStreamRescue(seekTo: seekTo)
-                return
-            }
-            errorMessage = error.localizedDescription
-            isLoading = false
+            guard current(), !(error is CancellationError) else { return }
+            requestRecovery(reason: error.localizedDescription)
         }
     }
 
-    private func startPlaybackWithItem(item: AVPlayerItem, seekTo: Double) {
-        let av = AVPlayer(playerItem: item)
-        av.automaticallyWaitsToMinimizeStalling = false
-        setupTimeObserver(for: av)
-        self.player = av
-        NSLog("🎬 [PlayerVM] AVPlayer 创建完成并设置到 self.player")
+    func requestRecovery(reason: String) {
+        guard !closed, !reachedEnd, recoveryTask == nil else { return }
+        guard recoveryAttempts < 5 else {
+            initializationTimer?.invalidate()
+            healthTimer?.invalidate()
+            player?.pause()
+            isPlaying = false
+            isBuffering = false
+            isLoading = false
+            errorMessage = "当前分集重试后仍无法播放，请稍后重试。\n" + reason
+            return
+        }
+        recoveryAttempts += 1
+        failedURL = plan?.url ?? failedURL
+        let episode = currentEpisodeIndex
+        let playerTime = player?.currentTime().seconds ?? 0
+        let position = max(currentTime, playerTime.isFinite ? playerTime : 0)
+        isLoading = true
+        errorMessage = nil
+        NSLog("[PlayerVM] recovering episode=%d attempt=%d", episode, recoveryAttempts)
+        recoveryTask = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: 300_000_000) } catch { return }
+            guard let self, !closed, !Task.isCancelled else { return }
+            recoveryTask = nil
+            await beginPlayback(episodeIndex: episode, seekTo: position, recovering: true)
+        }
+    }
 
-        statusObserver = item.observe(\.status, options: [.initial, .new]) { [weak self] currentItem, _ in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                switch currentItem.status {
+    func startPlaybackWithItem(item: AVPlayerItem, seekTo: Double) {
+        releasePlayerObservers()
+        player?.pause()
+        let av = AVPlayer(playerItem: item)
+        av.automaticallyWaitsToMinimizeStalling = true
+        player = av
+        isSeeking = seekTo > 0
+        let generation = playbackGeneration
+        timeControlObserver = av.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self, weak av] _, _ in
+            Task { @MainActor in
+                guard let self, let av, self.player === av, generation == self.playbackGeneration, !self.closed else { return }
+                self.isPlaying = self.playIntent && self.isSceneActive && av.timeControlStatus == .playing
+                self.isBuffering = self.playIntent && self.isSceneActive && av.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                self.samplePlaybackClock()
+                self.updateActiveDanmakus()
+            }
+        }
+        statusObserver = item.observe(\.status, options: [.initial, .new]) { [weak self, weak av] observed, _ in
+            Task { @MainActor in
+                guard let self, let av, self.player === av, generation == self.playbackGeneration, !self.closed else { return }
+                switch observed.status {
                 case .readyToPlay:
-                    self.isLoading = false
-                    self.isPlaying = true
                     self.errorMessage = nil
-                    if !self.isRescuedStream, let curItemAsset = currentItem.asset as? AVURLAsset {
-                        self.lastWorkingStreamURL = curItemAsset.url
-                        NSLog("🎬 [PlayerVM] 成功记录有效工作流备用: %@", curItemAsset.url.absoluteString)
+                    let seconds = observed.duration.seconds
+                    if seconds.isFinite && seconds > 0 { self.duration = seconds }
+                    let size = observed.presentationSize
+                    if min(size.width, size.height) > 0 { self.selectedQuality = Int(min(size.width, size.height)) }
+                    if seekTo > 0, self.duration > 0 {
+                        let position = min(seekTo, max(0, self.duration - 1))
+                        await av.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                        guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
                     }
-                    let dur = currentItem.duration.seconds
-                    let pSize = currentItem.presentationSize
-                    NSLog("🎬 [PlayerVM] item.readyToPlay: duration=%.2f, presentationSize=%.0fx%.0f, tracksCount=%ld", dur, pSize.width, pSize.height, currentItem.tracks.count)
-                    if pSize.width > 0 && pSize.height > 0 {
-                        let minDim = min(pSize.width, pSize.height)
-                        let realQuality: Int
-                        if minDim >= 2160 { realQuality = 2160 }
-                        else if minDim >= 1080 { realQuality = 1080 }
-                        else if minDim >= 720 { realQuality = 720 }
-                        else if minDim >= 480 { realQuality = 480 }
-                        else if minDim >= 360 { realQuality = 360 }
-                        else { realQuality = Int(minDim) }
-                        self.selectedQuality = realQuality
-                    }
-                    for (idx, track) in currentItem.tracks.enumerated() {
-                        let mediaType = track.assetTrack?.mediaType.rawValue ?? "unknown"
-                        NSLog("🎬 [PlayerVM] track[%ld]: mediaType=%@, isEnabled=%d", idx, mediaType, track.isEnabled)
-                    }
-                    if !dur.isNaN && dur > 0 {
-                        self.duration = dur
-                        if seekTo > 0 {
-                            let safeSeek = min(seekTo, max(0, dur - 3.0))
-                            if safeSeek > 0 {
-                                let cmTime = CMTime(seconds: safeSeek, preferredTimescale: 600)
-                                self.player?.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
-                            }
-                        }
-                    }
-                    self.player?.playImmediately(atRate: self.playbackRate)
-                case .failed:
-                    let err = currentItem.error?.localizedDescription ?? "视频流加载失败"
-                    NSLog("🎬 [PlayerVM] item.failed: %@", err)
-                    if !self.hasAttemptedRescue {
-                        self.hasAttemptedRescue = true
-                        self.triggerStreamRescue(seekTo: seekTo)
-                        return
-                    }
+                    self.isSeeking = false
+                    self.initializationTimer?.invalidate()
                     self.isLoading = false
-                    self.errorMessage = err
+                    self.samplePlaybackClock()
+                    self.lastProgressTime = Date()
+                    if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
+                    NSLog("[PlayerVM] ready episode=%d duration=%.2f tracks=%d", self.currentEpisodeIndex, self.duration, observed.tracks.count)
+                case .failed:
+                    self.requestRecovery(reason: observed.error?.localizedDescription ?? "视频流加载失败")
                 default:
                     break
                 }
             }
         }
-
-        // 监听播放完成
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
-        NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: item,
-            queue: .main
-        ) { [weak self] _ in
-            Task { [weak self] in
-                await self?.handlePlayEnded()
+        timeObserverToken = av.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self, weak av] time in
+            Task { @MainActor in
+                guard let self, let av, self.player === av, generation == self.playbackGeneration, !self.closed, !self.isSeeking else { return }
+                let seconds = av.currentTime().seconds
+                guard seconds.isFinite else { return }
+                self.currentTime = seconds
+                if abs(seconds - self.lastObservedPosition) > 0.05 {
+                    self.lastObservedPosition = seconds
+                    self.lastProgressTime = Date()
+                }
+                if let seconds = av.currentItem?.duration.seconds, seconds.isFinite && seconds > 0 { self.duration = seconds }
+                let remaining = self.duration - seconds
+                if remaining <= 5 && remaining > 0 && self.currentEpisodeIndex < self.allEpisodes.count {
+                    self.nextEpisodeCountdown = Int(ceil(remaining))
+                    if self.prefetchTask == nil { self.prefetchNextEpisodePlan() }
+                } else { self.nextEpisodeCountdown = nil }
+                self.updateActiveDanmakus()
             }
         }
-
-        player?.automaticallyWaitsToMinimizeStalling = false
+        let center = NotificationCenter.default
+        itemNotifications.append(center.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.player === av, generation == self.playbackGeneration, !self.closed else { return }
+                await self.handlePlayEnded()
+            }
+        })
+        for name in [NSNotification.Name.AVPlayerItemFailedToPlayToEndTime, .AVPlayerItemPlaybackStalled] {
+            itemNotifications.append(center.addObserver(forName: name, object: item, queue: .main) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, self.player === av, generation == self.playbackGeneration, !self.closed, self.playIntent else { return }
+                    if name == .AVPlayerItemFailedToPlayToEndTime { self.requestRecovery(reason: "视频读取中断") }
+                }
+            })
+        }
+        initializationTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.player === av, self.isLoading, !self.closed else { return }
+                self.requestRecovery(reason: "视频初始化超时")
+            }
+        }
+        lastObservedPosition = seekTo
+        lastProgressTime = Date()
+        healthTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.player === av, !self.closed else { return }
+                guard self.playIntent, UIApplication.shared.applicationState == .active, !self.isLoading else {
+                    self.lastProgressTime = Date()
+                    return
+                }
+                if Date().timeIntervalSince(self.lastProgressTime) >= 20 { self.requestRecovery(reason: "视频持续缓冲，正在恢复") }
+            }
+        }
         resetControlsHideTimer()
     }
 
-    private func setupTimeObserver(for player: AVPlayer) {
-        let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-        timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            guard let self = self else { return }
-            self.currentTime = time.seconds
-            if let durationSec = player.currentItem?.duration.seconds, !durationSec.isNaN, durationSec > 0 {
-                self.duration = durationSec
-                
-                // 视频结束前提前显示倒计时 (最后 5 秒)
-                let remaining = durationSec - time.seconds
-                if remaining <= 5.0 && remaining > 0 && self.currentEpisodeIndex < self.allEpisodes.count {
-                    let countdownValue = Int(ceil(remaining))
-                    if self.nextEpisodeCountdown != countdownValue {
-                        self.nextEpisodeCountdown = countdownValue
-                    }
-                    
-                    // 提前加载下一集信息
-                    if self.prefetchTask == nil {
-                        self.prefetchNextEpisodePlan()
-                    }
-                } else {
-                    if self.nextEpisodeCountdown != nil && remaining > 5.0 {
-                        self.nextEpisodeCountdown = nil
-                    }
-                }
-            }
-            self.updateActiveDanmakus()
-        }
+    private func releasePlayerObservers() {
+        initializationTimer?.invalidate()
+        healthTimer?.invalidate()
+        statusObserver?.invalidate()
+        timeControlObserver?.invalidate()
+        timeControlObserver = nil
+        itemNotifications.forEach { NotificationCenter.default.removeObserver($0) }
+        itemNotifications.removeAll()
+        if let token = timeObserverToken { player?.removeTimeObserver(token); timeObserverToken = nil }
     }
-    
+
     private func prefetchNextEpisodePlan() {
         let nextIndex = currentEpisodeIndex + 1
         guard nextIndex <= allEpisodes.count else { return }
@@ -461,40 +488,73 @@ public final class PlayerViewModel: ObservableObject {
     // MARK: - 控制与遥控器交互
     public func togglePlayPause() {
         guard let p = player else { return }
-        if isPlaying {
+        if playIntent {
+            playIntent = false
             p.pause()
             isPlaying = false
+            isBuffering = false
         } else {
-            p.playImmediately(atRate: playbackRate)
-            isPlaying = true
+            playIntent = true
+            if reachedEnd {
+                reachedEnd = false
+                seek(to: 0)
+            }
+            lastProgressTime = Date()
+            if isSceneActive { p.playImmediately(atRate: playbackRate) }
         }
+        samplePlaybackClock()
+        updateActiveDanmakus()
         showControls()
     }
 
     public func seekBy(seconds: Double) {
-        guard let p = player else { return }
+        guard !isLoading, seconds.isFinite, duration.isFinite, duration > 0 else { return }
         let target = max(0, min(currentTime + seconds, duration))
-        let cmTime = CMTime(seconds: target, preferredTimescale: 600)
-        p.seek(to: cmTime)
-        currentTime = target
+        seek(to: target)
         showControls()
     }
 
+    private func seek(to target: Double) {
+        guard let p = player, p.currentItem?.status == .readyToPlay else { return }
+        seekSequence += 1
+        let sequence = seekSequence
+        let generation = playbackGeneration
+        isSeeking = true
+        currentTime = target
+        lastProgressTime = Date()
+        updateActiveDanmakus()
+        p.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self, weak p] _ in
+            Task { @MainActor in
+                guard let self, let p, self.player === p, generation == self.playbackGeneration,
+                      sequence == self.seekSequence, !self.closed else { return }
+                self.isSeeking = false
+                self.samplePlaybackClock()
+                self.lastObservedPosition = self.currentTime
+                self.lastProgressTime = Date()
+                self.updateActiveDanmakus()
+            }
+        }
+    }
+
     public func setRate(_ rate: Float) {
+        guard rate.isFinite, rate >= 0.25, rate <= 3 else { return }
+        samplePlaybackClock()
         playbackRate = rate
         if isPlaying {
             player?.rate = rate
         }
+        updateActiveDanmakus()
         showControls()
     }
 
     public func changeQuality(_ q: Int) async {
         guard q != selectedQuality else { return }
+        samplePlaybackClock()
         let currentPos = currentTime
         selectedQuality = q
-        await preparePlayback(episodeIndex: currentEpisodeIndex, seekTo: currentPos)
+        await beginPlayback(episodeIndex: currentEpisodeIndex, seekTo: currentPos, recovering: false, preservePlayIntent: true)
         if selectedQuality < q {
-            showToast("💡 官方公网源仅提供 360P 规格，已开启 Apple TV 硬件视网膜抗锯齿平滑渲染")
+            showToast("当前分集使用 " + PlaybackPlan.qualityLabel(selectedQuality))
         }
     }
 
@@ -520,9 +580,36 @@ public final class PlayerViewModel: ObservableObject {
 
     public func toggleDanmaku() {
         danmakuEnabled.toggle()
-        if !danmakuEnabled {
-            activeDanmakus = []
+        store.danmakuEnabled = danmakuEnabled
+        updateActiveDanmakus()
+    }
+
+    public func setSceneActive(_ active: Bool) {
+        guard active != isSceneActive, !closed else { return }
+        isSceneActive = active
+        if active {
+            if resumeAfterInterruption {
+                resumeAfterInterruption = false
+                playIntent = true
+                lastProgressTime = Date()
+                if player?.currentItem?.status == .readyToPlay { player?.playImmediately(atRate: playbackRate) }
+            }
+        } else {
+            resumeAfterInterruption = playIntent
+            playIntent = false
+            player?.pause()
+            isPlaying = false
+            isBuffering = false
+            saveCurrentProgress()
         }
+        samplePlaybackClock()
+        updateActiveDanmakus()
+    }
+
+    private func samplePlaybackClock() {
+        guard !isSeeking, let seconds = player?.currentTime().seconds, seconds.isFinite else { return }
+        currentTime = max(0, seconds)
+        playbackClockDate = Date()
     }
 
     public func showControls() {
@@ -552,28 +639,76 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     // MARK: - 弹幕管理
-    private func loadDanmaku() async {
-        guard let plan = plan else { return }
-        do {
-            danmakuCache = try await repository.loadDanmaku(plan: plan, startMs: 0, durationMs: 120_000)
-        } catch {
-            danmakuCache = []
+    private func resetDanmaku() {
+        danmakuRequestSequence += 1
+        danmakuTask?.cancel()
+        danmakuTask = nil
+        danmakuPages.removeAll()
+        danmakuRetryAfter.removeAll()
+        danmakuCache = []
+        activeDanmakus = []
+    }
+
+    private func requestDanmaku(start: Int64, durationMs: Int64) {
+        guard let plan, !plan.danmakuId.isEmpty, danmakuTask == nil, danmakuPages[start] == nil,
+              start < durationMs, danmakuRetryAfter[start, default: .distantPast] <= Date() else { return }
+        let generation = playbackGeneration
+        danmakuRequestSequence += 1
+        let sequence = danmakuRequestSequence
+        danmakuTask = Task { [weak self] in
+            guard let self else { return }
+            defer { if sequence == self.danmakuRequestSequence { self.danmakuTask = nil } }
+            do {
+                let rows = try await self.repository.loadDanmaku(plan: plan, startMs: start, durationMs: durationMs)
+                guard !Task.isCancelled, sequence == self.danmakuRequestSequence, generation == self.playbackGeneration,
+                      self.danmakuEnabled, !self.closed, self.plan?.danmakuId == plan.danmakuId else { return }
+                self.danmakuPages[start] = rows
+                let position = Int64(self.currentTime * 1000)
+                let nearest = self.danmakuPages.keys.sorted { abs($0 - position) < abs($1 - position) }
+                for key in nearest.dropFirst(6) { self.danmakuPages.removeValue(forKey: key) }
+                self.danmakuRetryAfter.removeValue(forKey: start)
+                var seen = Set<String>()
+                self.danmakuCache = self.danmakuPages.values.flatMap { $0 }.sorted { $0.timeMs < $1.timeMs }.filter { seen.insert($0.id).inserted }
+                self.danmakuTask = nil
+                self.updateActiveDanmakus()
+            } catch {
+                guard !Task.isCancelled, sequence == self.danmakuRequestSequence, generation == self.playbackGeneration else { return }
+                self.danmakuRetryAfter[start] = Date().addingTimeInterval(15)
+            }
         }
     }
 
     private func updateActiveDanmakus() {
-        guard danmakuEnabled else { return }
-        let currentMs = Int64(currentTime * 1000)
-        activeDanmakus = danmakuCache.filter { item in
-            item.timeMs >= currentMs - 2000 && item.timeMs <= currentMs + 2000
+        playbackClockDate = Date()
+        guard danmakuEnabled, !closed, currentTime.isFinite, duration.isFinite, duration > 0, duration <= 86400 else {
+            activeDanmakus = []
+            return
+        }
+        let currentMs = Int64(max(0, min(currentTime, duration)) * 1000)
+        let durationMs = Int64(duration * 1000)
+        activeDanmakus = danmakuCache.filter { $0.timeMs > currentMs - 8000 && $0.timeMs <= currentMs }
+        let start = currentMs / 30000 * 30000
+        requestDanmaku(start: start, durationMs: durationMs)
+        if danmakuPages[start] != nil && currentMs >= start + 22000 {
+            requestDanmaku(start: start + 30000, durationMs: durationMs)
         }
     }
 
     // MARK: - 连播与进度持久化
     private func handlePlayEnded() async {
+        currentTime = duration
+        saveCurrentProgress()
+        nextEpisodeCountdown = nil
         if currentEpisodeIndex < allEpisodes.count {
-            nextEpisodeCountdown = nil
             await nextEpisode()
+        } else {
+            reachedEnd = true
+            playIntent = false
+            resumeAfterInterruption = false
+            player?.pause()
+            isPlaying = false
+            updateActiveDanmakus()
+            showControls()
         }
     }
 
@@ -586,7 +721,8 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     public func saveCurrentProgress() {
-        guard duration > 0 else { return }
+        guard duration > 0, duration.isFinite else { return }
+        samplePlaybackClock()
         store.recordWatch(drama: drama, episode: currentEpisodeIndex, position: currentTime, duration: duration)
     }
 }

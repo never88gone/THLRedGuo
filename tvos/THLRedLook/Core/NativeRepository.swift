@@ -3,6 +3,7 @@ import Foundation
 public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStreamProviderProtocol, DanmakuProviderProtocol {
     public static let shared = NativeRepository()
     private let bridge = NativeBridge.shared
+    private let danmakuBridge = NativeBridge()
 
     public init() {}
 
@@ -73,11 +74,8 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
             episodes.append(Episode(id: id, title: title, number: num, vip: vip, raw: raw))
         }
 
-        if episodes.isEmpty {
-            let total = max(1, freshDrama.episodes > 0 ? freshDrama.episodes : 20)
-            for i in 1...total {
-                episodes.append(Episode(id: "\(freshDrama.id)_\(i)", title: "第 \(i) 集", number: i))
-            }
+        guard !episodes.isEmpty else {
+            throw NSError(domain: "THLRedLook.Detail", code: -1, userInfo: [NSLocalizedDescriptionKey: "站源未返回可播放的分集，请重试"])
         }
 
         let warning = resp["warning"] as? String ?? ""
@@ -102,12 +100,13 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
         return dict
     }
 
-    public func resolvePlayback(drama: Drama, episode: Episode?, episodeIndex: Int, quality: Int = 0) async throws -> PlaybackPlan {
+    public func resolvePlayback(drama: Drama, episode: Episode?, episodeIndex: Int, quality: Int = 0, avoidURL: String) async throws -> PlaybackPlan {
         var payload: [String: Any] = [
             "drama": dramaPayload(drama),
             "index": episodeIndex,
             "quality": quality,
-            "sequence": nextPlaybackSequence()
+            "sequence": nextPlaybackSequence(),
+            "avoidUrl": avoidURL
         ]
         if let chapter = episode?.rawChapter {
             payload["chapter"] = chapter
@@ -119,6 +118,10 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
             throw NSError(domain: "THLRedLook.Playback", code: -1, userInfo: [NSLocalizedDescriptionKey: "站源没有返回播放地址"])
         }
         return plan
+    }
+
+    public func resolvePlayback(drama: Drama, episode: Episode?, episodeIndex: Int, quality: Int = 0) async throws -> PlaybackPlan {
+        try await resolvePlayback(drama: drama, episode: episode, episodeIndex: episodeIndex, quality: quality, avoidURL: "")
     }
 
     public func resolvePlayback(drama: Drama, episodeIndex: Int, quality: Int = 0) async throws -> PlaybackPlan {
@@ -201,22 +204,18 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
     }
 
     public func loadDanmaku(plan: PlaybackPlan, startMs: Int64, durationMs: Int64) async throws -> [DanmakuItem] {
-        if plan.local || plan.session.isEmpty || plan.danmakuId.isEmpty {
-            return []
+        if plan.local || plan.session.isEmpty || plan.danmakuId.isEmpty { return [] }
+        let response = try await danmakuBridge.request(action: "danmaku", payload: [
+            "episodeId": plan.danmakuId, "startMs": startMs, "durationMs": durationMs
+        ])
+        guard response["episodeId"] as? String == plan.danmakuId,
+              response["startMs"] as? Int64 == startMs,
+              let next = response["nextMs"] as? Int64, next > startMs, next <= durationMs,
+              let rows = response["items"] as? [[String: Any]] else {
+            throw NSError(domain: "THLRedLook.Danmaku", code: -3, userInfo: [NSLocalizedDescriptionKey: "弹幕分集或时间范围不符"])
         }
-        let resp = try? await bridge.request(
-            action: "danmaku",
-            payload: [
-                "playbackSession": plan.session,
-                "startMs": startMs,
-                "durationMs": durationMs
-            ]
-        )
-        guard let resp = resp, let items = resp["items"] as? [[String: Any]] else {
-            return []
-        }
-        let data = try JSONSerialization.data(withJSONObject: items)
-        return (try? JSONDecoder().decode([DanmakuItem].self, from: data)) ?? []
+        let data = try JSONSerialization.data(withJSONObject: rows)
+        return try JSONDecoder().decode([DanmakuItem].self, from: data).filter { $0.timeMs >= startMs && $0.timeMs < next }
     }
 
     public func storage() async throws -> [String: Any] {

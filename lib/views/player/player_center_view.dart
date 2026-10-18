@@ -33,10 +33,14 @@ class PlayerCenterView extends StatelessWidget {
                 border: Border.all(color: const Color(0x26FFFFFF), width: 0.8),
               ),
               child: IconButton(
+                key: const ValueKey('player-previous'),
                 tooltip: '上一集',
                 iconSize: 26,
                 onPressed: onPrevious,
-                icon: const Icon(Icons.skip_previous_rounded, color: AppColors.white),
+                icon: const Icon(
+                  Icons.skip_previous_rounded,
+                  color: AppColors.white,
+                ),
               ),
             ),
             const SizedBox(width: 20),
@@ -46,16 +50,10 @@ class PlayerCenterView extends StatelessWidget {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0x80252836),
-                  Color(0x9912141C),
-                ],
+                colors: [Color(0x80252836), Color(0x9912141C)],
               ),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0x40FFFFFF),
-                width: 1.2,
-              ),
+              border: Border.all(color: const Color(0x40FFFFFF), width: 1.2),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x66000000),
@@ -65,6 +63,7 @@ class PlayerCenterView extends StatelessWidget {
               ],
             ),
             child: IconButton.filledTonal(
+              key: const ValueKey('player-toggle'),
               tooltip: playing ? '暂停播放' : '开始播放',
               iconSize: 44,
               style: IconButton.styleFrom(
@@ -73,7 +72,9 @@ class PlayerCenterView extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
               ),
               onPressed: onTogglePlayback,
-              icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+              icon: Icon(
+                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              ),
             ),
           ),
           if (showSkip) ...[
@@ -85,10 +86,14 @@ class PlayerCenterView extends StatelessWidget {
                 border: Border.all(color: const Color(0x26FFFFFF), width: 0.8),
               ),
               child: IconButton(
+                key: const ValueKey('player-next'),
                 tooltip: '下一集',
                 iconSize: 26,
                 onPressed: onNext,
-                icon: const Icon(Icons.skip_next_rounded, color: AppColors.white),
+                icon: const Icon(
+                  Icons.skip_next_rounded,
+                  color: AppColors.white,
+                ),
               ),
             ),
           ],

@@ -148,14 +148,19 @@ class LocalStore extends ChangeNotifier {
     }
     return SourceSite.isAvailable(source) &&
         profile.allows(source) &&
-        (isZhenguojianActivated || _gateOff || _sourcesUnlocked || SourceSite.isPrimary(source));
+        (isZhenguojianActivated ||
+            _gateOff ||
+            _sourcesUnlocked ||
+            SourceSite.isPrimary(source));
   }
+
   List<SourceSite> get sources => SourceSite.visibleValues(
     unlocked: isZhenguojianActivated || _gateOff || _sourcesUnlocked,
   ).where((site) => allowsSource(site.id)).toList();
 
   /// 默认隐藏的站源是否已解锁。解锁状态只在本次运行内有效，重启后恢复隐藏。
-  bool get sourcesUnlocked => isZhenguojianActivated || _gateOff || _sourcesUnlocked;
+  bool get sourcesUnlocked =>
+      isZhenguojianActivated || _gateOff || _sourcesUnlocked;
 
   /// 是否已启用站源密码锁。
   bool get sourceGateEnabled => _gateEnabled;
@@ -203,23 +208,24 @@ class LocalStore extends ChangeNotifier {
   bool isPrivateSource(String sourceId) => _privateSources.contains(sourceId);
 
   /// 设置或取消某个数据源的隐私模式。
-  Future<void> setSourcePrivate(String sourceId, bool isPrivate) => _queue(() async {
-    if (isPrivate) {
-      _privateSources.add(sourceId);
-    } else {
-      _privateSources.remove(sourceId);
-    }
-    await preferences.setStringList(_keyPrivateSources, _privateSources.toList());
-    _notify();
-  });
+  Future<void> setSourcePrivate(String sourceId, bool isPrivate) =>
+      _queue(() async {
+        if (isPrivate) {
+          _privateSources.add(sourceId);
+        } else {
+          _privateSources.remove(sourceId);
+        }
+        await preferences.setStringList(
+          _keyPrivateSources,
+          _privateSources.toList(),
+        );
+        _notify();
+      });
 
   /// 激活全功能模式：解锁全部站源，并使全部站源默认可见。
   Future<void> activateZhenguojian() => _queue(() async {
     SourceSite.activateAllSources();
-    await _commit({
-      'zhenguojianActivated': true,
-      'sourceGateOff': true,
-    });
+    await _commit({'zhenguojianActivated': true, 'sourceGateOff': true});
     _gateOff = true;
     _sourcesUnlocked = true;
     _notify();
@@ -361,10 +367,12 @@ class LocalStore extends ChangeNotifier {
   List<WatchEntry> historyForSource(String sourceId) {
     if (sourceId.isEmpty) return const [];
     return _history.values
-        .where((entry) =>
-            _dramaSource(entry.drama) == sourceId &&
-            allowsSource(entry.drama.source) &&
-            !_privateSources.contains(entry.drama.source))
+        .where(
+          (entry) =>
+              _dramaSource(entry.drama) == sourceId &&
+              allowsSource(entry.drama.source) &&
+              !_privateSources.contains(entry.drama.source),
+        )
         .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
@@ -373,9 +381,10 @@ class LocalStore extends ChangeNotifier {
   List<Drama> favoritesForSource(String sourceId) {
     if (sourceId.isEmpty) return const [];
     return _favorites.values
-        .where((drama) =>
-            _dramaSource(drama) == sourceId &&
-            allowsSource(drama.source))
+        .where(
+          (drama) =>
+              _dramaSource(drama) == sourceId && allowsSource(drama.source),
+        )
         .toList()
         .reversed
         .toList();
@@ -389,9 +398,11 @@ class LocalStore extends ChangeNotifier {
 
   List<WatchEntry> get history =>
       _history.values
-          .where((entry) =>
-              allowsSource(entry.drama.source) &&
-              !_privateSources.contains(entry.drama.source))
+          .where(
+            (entry) =>
+                allowsSource(entry.drama.source) &&
+                !_privateSources.contains(entry.drama.source),
+          )
           .toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   List<Drama> get favorites => _favorites.values
@@ -421,9 +432,7 @@ class LocalStore extends ChangeNotifier {
   bool isFavorite(String id) {
     var drama = _favorites[id];
     if (drama == null && !id.contains(':')) {
-      drama = _favorites.values
-          .where((d) => d.id.endsWith(':$id'))
-          .firstOrNull;
+      drama = _favorites.values.where((d) => d.id.endsWith(':$id')).firstOrNull;
     }
     return drama != null && allowsSource(drama.source);
   }
@@ -439,6 +448,7 @@ class LocalStore extends ChangeNotifier {
     }
     return state;
   }
+
   List<Drama> seriesDramasFor(Drama anchor) {
     if (!allowsSource(anchor.source)) {
       return const [];
@@ -455,7 +465,8 @@ class LocalStore extends ChangeNotifier {
       }
     }
     for (final entry in _history.values) {
-      if (entry.drama.source == anchor.source && allowsSource(entry.drama.source)) {
+      if (entry.drama.source == anchor.source &&
+          allowsSource(entry.drama.source)) {
         items[entry.drama.id] = entry.drama;
       }
     }
@@ -469,8 +480,8 @@ class LocalStore extends ChangeNotifier {
       final cleanId = notice.id.contains(':')
           ? notice.id.split(':').last
           : (notice.id.startsWith('${anchor.source}_')
-              ? notice.id.substring(anchor.source.length + 1)
-              : notice.id);
+                ? notice.id.substring(anchor.source.length + 1)
+                : notice.id);
       items.putIfAbsent(
         notice.id,
         () => Drama(
@@ -511,7 +522,9 @@ class LocalStore extends ChangeNotifier {
       return value;
     }
     final jsActive = JsSourceService.current?.activeSourceId;
-    if (jsActive != null && jsActive.isNotEmpty && sources.any((site) => site.id == jsActive)) {
+    if (jsActive != null &&
+        jsActive.isNotEmpty &&
+        sources.any((site) => site.id == jsActive)) {
       return jsActive;
     }
     return sources.firstOrNull?.id ?? '';
@@ -684,6 +697,7 @@ class LocalStore extends ChangeNotifier {
     await _setting('keepScreenOn', value);
     await ScreenWakeController.instance.sync(value);
   }
+
   Future<void> setPlaybackPreferences(PlaybackPreferences value) {
     PlaybackPreferences.fromJson(value.toJson());
     return _setting(_key('playback'), jsonEncode(value.toJson()));
@@ -775,20 +789,28 @@ class LocalStore extends ChangeNotifier {
     });
   }
 
+  bool _validWatch(WatchEntry entry) =>
+      entry.drama.id.trim().isNotEmpty &&
+      entry.episode > 0 &&
+      entry.position.isFinite &&
+      entry.duration.isFinite &&
+      entry.position >= 0 &&
+      entry.duration > 0;
+
   Future<void> saveWatch(WatchEntry entry) {
+    if (!_validWatch(entry)) return Future.value();
     final epoch = _epoch;
     return _queue(() async {
       if (!allowsSource(entry.drama.source) || epoch != _epoch) return;
-      final previous = _history[entry.drama.id]?.drama;
-      final current = previous == null
-          ? entry
-          : WatchEntry(
-              drama: previous.merge(entry.drama),
-              episode: entry.episode,
-              position: entry.position,
-              duration: entry.duration,
-              updatedAt: entry.updatedAt,
-            );
+      final previous =
+          _history[entry.drama.id]?.drama ?? _favorites[entry.drama.id];
+      final current = WatchEntry(
+        drama: previous?.merge(entry.drama) ?? entry.drama,
+        episode: entry.episode,
+        position: entry.position.clamp(0, entry.duration).toDouble(),
+        duration: entry.duration,
+        updatedAt: entry.updatedAt,
+      );
       final entries = Map.of(_history)..[entry.drama.id] = current;
       final sorted = entries.values.toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -831,6 +853,7 @@ class LocalStore extends ChangeNotifier {
   }
 
   Future<void> saveMediaWatch(String id, WatchEntry entry) {
+    if (id.isEmpty || !_validWatch(entry)) return Future.value();
     final epoch = _epoch;
     return _queue(() async {
       if (!canDownload ||
@@ -840,7 +863,13 @@ class LocalStore extends ChangeNotifier {
       }
       final data = jsonDecode(_string(_key('mediaHistory')) ?? '{}') as Map;
       data.remove(id);
-      data[id] = entry.toJson();
+      data[id] = WatchEntry(
+        drama: entry.drama,
+        episode: entry.episode,
+        position: entry.position.clamp(0, entry.duration).toDouble(),
+        duration: entry.duration,
+        updatedAt: entry.updatedAt,
+      ).toJson();
       while (data.length > 300) {
         data.remove(data.keys.first);
       }
@@ -953,8 +982,8 @@ class LocalStore extends ChangeNotifier {
           final cleanId = notice.id.contains(':')
               ? notice.id.split(':').last
               : (notice.id.startsWith('${SourceSite.hongguo.id}_')
-                  ? notice.id.substring(SourceSite.hongguo.id.length + 1)
-                  : notice.id);
+                    ? notice.id.substring(SourceSite.hongguo.id.length + 1)
+                    : notice.id);
           candidates.putIfAbsent(
             notice.id,
             () => Drama(

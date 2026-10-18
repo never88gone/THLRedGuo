@@ -44,9 +44,11 @@ public final class DetailViewModel: ObservableObject {
         self.downloadService = downloadService
         self.followState = store.followState(for: drama.id)
         self.lastWatchEntry = store.getWatchEntry(dramaId: drama.id)
-        let total = max(20, drama.episodes)
-        let eps = (1...total).map { Episode(id: "\(drama.id)_\($0)", title: "第 \($0) 集", number: $0) }
-        self.detail = DramaDetail(drama: drama, episodes: eps, warning: "")
+        if drama.id.starts(with: "test_") {
+            let total = max(20, drama.episodes)
+            let episodes = (1...total).map { Episode(id: "\(drama.id)_\($0)", title: "第 \($0) 集", number: $0) }
+            self.detail = DramaDetail(drama: drama, episodes: episodes, warning: "")
+        }
     }
 
     public func refreshWatchHistory() {
@@ -64,9 +66,7 @@ public final class DetailViewModel: ObservableObject {
                 SeasonItem(drama: $0.drama, seasonNumber: $0.seasonNumber, title: $0.title, isCurrent: $0.drama.id == newDrama.id)
             }
         }
-        let total = max(20, newDrama.episodes)
-        let eps = (1...total).map { Episode(id: "\(newDrama.id)_\($0)", title: "第 \($0) 集", number: $0) }
-        self.detail = DramaDetail(drama: newDrama, episodes: eps, warning: "")
+        self.detail = nil
         self.isLoading = true
         self.errorMessage = nil
         await loadDetail()
@@ -83,6 +83,7 @@ public final class DetailViewModel: ObservableObject {
             return
         }
         do {
+            await JSSourceService.shared.initialize()
             let loaded = try await repository.loadDetail(drama: drama)
             self.detail = loaded
             self.drama = loaded.drama
@@ -254,17 +255,13 @@ public final class DetailViewModel: ObservableObject {
         }
     }
 
-    public func toggleFollowState() {
-        let next: FollowState
-        switch followState {
-        case .none: next = .wishlist
-        case .wishlist: next = .watching
-        case .watching: next = .watched
-        case .watched: next = .none
-        case .updated: next = .watching
-        }
-        followState = next
-        store.setFollowState(drama: drama, state: next)
+    public func toggleFavorite() {
+        setFollowState(followState == .none ? .wishlist : .none)
+    }
+
+    public func setFollowState(_ state: FollowState) {
+        followState = state
+        store.setFollowState(drama: drama, state: state)
     }
 
     public func downloadAllEpisodes(quality: Int = 1080) {

@@ -98,7 +98,8 @@ abstract class AppRepository {
   Future<bool> jsSourceSetActive(String sourceId) async => false;
   Future<String> jsSourceGetActive() async => '';
   Future<bool> jsSourceLoad(String script, String fileName) async => false;
-  Future<bool> jsSourceSaveAndLoad(String script, String fileName) async => false;
+  Future<bool> jsSourceSaveAndLoad(String script, String fileName) async =>
+      false;
   Future<bool> jsSourceRemove(String sourceId) async => false;
   Future<bool> jsSourceClearAll() async => false;
   Future<int> jsSourceScan() async => 0;
@@ -170,6 +171,12 @@ abstract class AppRepository {
   Future<String> cover(Drama drama, {bool force = false});
   Future<DramaDetail> detail(Drama drama);
   Future<PlaybackPlan> resolve(Drama drama, Episode episode, {int quality = 0});
+  Future<PlaybackPlan> refreshPlayback(
+    Drama drama,
+    Episode episode,
+    PlaybackPlan current, {
+    int quality = 0,
+  }) => resolveOnline(drama, episode, quality: quality);
   Future<PlaybackPlan> fallback(PlaybackPlan current);
   Future<void> cancelPlayback();
   Future<void> release(String session);
@@ -301,7 +308,7 @@ class NativeRepository extends AppRepository {
     required int durationMs,
   }) async {
     _authorize('hongguo');
-    if (plan.local || plan.session.isEmpty || plan.danmakuId.isEmpty) {
+    if (plan.offline || plan.session.isEmpty || plan.danmakuId.isEmpty) {
       throw AppFailure('本集暂不支持弹幕');
     }
     return DanmakuPage.fromJson(
@@ -335,8 +342,9 @@ class NativeRepository extends AppRepository {
     final activeSource = (source != null && source.isNotEmpty)
         ? source
         : (SourceSite.isAvailable('hongguo')
-            ? 'hongguo'
-            : (JsSourceService.current?.sources.firstOrNull?.id ?? 'hongguo'));
+              ? 'hongguo'
+              : (JsSourceService.current?.sources.firstOrNull?.id ??
+                    'hongguo'));
     _authorize(activeSource);
     return CatalogPage.fromJson(
       await _read('recommendations-$activeSource-$genre', {
@@ -527,7 +535,11 @@ class NativeRepository extends AppRepository {
           action != 'activateAllSources' &&
           action != 'initialize') {
         _nativeAllSourcesActivated = true;
-        unawaited(_call({'action': 'activateAllSources'}).catchError((Object _) => <String, dynamic>{}));
+        unawaited(
+          _call({
+            'action': 'activateAllSources',
+          }).catchError((Object _) => <String, dynamic>{}),
+        );
       }
       final epoch = access?.profileEpoch;
       if (!unrestricted && access?.locked == true) throw AppFailure('请先解锁当前用户');
@@ -542,8 +554,9 @@ class NativeRepository extends AppRepository {
         final target = SourceSite.isAvailable(recSource)
             ? recSource
             : (SourceSite.isAvailable('hongguo')
-                ? 'hongguo'
-                : (JsSourceService.current?.sources.firstOrNull?.id ?? 'hongguo'));
+                  ? 'hongguo'
+                  : (JsSourceService.current?.sources.firstOrNull?.id ??
+                        'hongguo'));
         _authorize(target);
       }
       if ({
@@ -587,17 +600,19 @@ class NativeRepository extends AppRepository {
       if (action == 'resolve' && access != null && !access!.canDownload) {
         input['force'] = true;
       }
-      final response = await DartCoreEngine.instance.dispatch(input).timeout(
-        Duration(
-          seconds: action == 'moveDownloads'
-              ? 620
-              : action == 'danmaku'
-              ? 15
-              : action == 'preload'
-              ? 20
-              : 70,
-        ),
-      );
+      final response = await DartCoreEngine.instance
+          .dispatch(input)
+          .timeout(
+            Duration(
+              seconds: action == 'moveDownloads'
+                  ? 620
+                  : action == 'danmaku'
+                  ? 15
+                  : action == 'preload'
+                  ? 20
+                  : 70,
+            ),
+          );
       if (response['ok'] != true) {
         throw AppFailure(
           response['error'] as String? ?? '读取失败，请重试',
@@ -699,7 +714,10 @@ class NativeRepository extends AppRepository {
 
   @override
   Future<bool> jsSourceSetActive(String sourceId) async {
-    final result = await _call({'action': 'jsSource.setActive', 'source': sourceId});
+    final result = await _call({
+      'action': 'jsSource.setActive',
+      'source': sourceId,
+    });
     return result['ok'] as bool? ?? false;
   }
 
@@ -731,7 +749,10 @@ class NativeRepository extends AppRepository {
 
   @override
   Future<bool> jsSourceRemove(String sourceId) async {
-    final result = await _call({'action': 'jsSource.remove', 'source': sourceId});
+    final result = await _call({
+      'action': 'jsSource.remove',
+      'source': sourceId,
+    });
     return result['ok'] as bool? ?? false;
   }
 
@@ -769,6 +790,7 @@ class NativeRepository extends AppRepository {
       }),
     );
   }
+
   @override
   Future<CatalogPage> cached(String source, {String category = ''}) async =>
       CatalogPage.fromJson(
@@ -827,6 +849,24 @@ class NativeRepository extends AppRepository {
           'sequence': ++_playbackSequence,
         }),
       );
+  @override
+  Future<PlaybackPlan> refreshPlayback(
+    Drama drama,
+    Episode episode,
+    PlaybackPlan current, {
+    int quality = 0,
+  }) async => PlaybackPlan.fromJson(
+    await _call({
+      'action': 'resolve',
+      'drama': drama.toJson(),
+      'chapter': episode.raw,
+      'index': episode.number,
+      'quality': quality,
+      'force': true,
+      'avoidUrl': current.url,
+      'sequence': ++_playbackSequence,
+    }),
+  );
   @override
   Future<void> cancelPlayback() async {
     await _call({'action': 'cancelPlayback', 'sequence': ++_playbackSequence});

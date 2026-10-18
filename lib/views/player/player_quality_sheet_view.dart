@@ -100,7 +100,10 @@ class PlayerQualitySheetView extends StatelessWidget {
                 ),
                 IconButton(
                   tooltip: '关闭',
-                  icon: const Icon(Icons.close_rounded, color: AppColors.textSecondaryDark),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: AppColors.textSecondaryDark,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -115,17 +118,21 @@ class PlayerQualitySheetView extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final q = options[index];
                   final isSelected = q == selectedQuality;
-                  final isCurrentActive = !isLocal && (q == actualQuality && q > 0);
+                  final isCurrentActive =
+                      !isLocal && (q == actualQuality && q > 0);
 
                   return InkWell(
+                    key: ValueKey('quality-option-$q'),
                     borderRadius: BorderRadius.circular(16),
                     onTap: () {
                       onQualitySelected(q);
-                      Navigator.pop(context);
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 11,
+                      ),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.hongguoRedWithAlpha(0.12)
@@ -159,17 +166,26 @@ class PlayerQualitySheetView extends StatelessWidget {
                                       qualityTitle(q),
                                       style: TextStyle(
                                         fontSize: 14.5,
-                                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                        color: isSelected ? AppColors.hongguoRed : AppColors.textPrimaryDark,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: isSelected
+                                            ? AppColors.hongguoRed
+                                            : AppColors.textPrimaryDark,
                                       ),
                                     ),
                                     if (isCurrentActive) ...[
                                       const SizedBox(width: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 2.5,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: AppColors.hongguoRed,
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                         ),
                                         child: const Text(
                                           '播放中',

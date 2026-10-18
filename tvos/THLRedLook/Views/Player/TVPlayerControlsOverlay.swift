@@ -58,6 +58,7 @@ public struct TVPlayerControlsOverlay: View {
                         .bold()
                         .foregroundColor(TVTheme.textPrimary)
                     Text("第 \(viewModel.currentEpisodeIndex) 集 · \(PlaybackPlan.qualityLabel(viewModel.selectedQuality))")
+                        .accessibilityIdentifier("player.episode")
                         .font(.subheadline)
                         .foregroundColor(TVTheme.textSecondary)
                 }
@@ -168,7 +169,7 @@ public struct TVPlayerControlsOverlay: View {
                 }
 
                 overlayCircleButton(
-                    icon: viewModel.isPlaying ? "pause.fill" : "play.fill",
+                    icon: viewModel.wantsPlayback ? "pause.fill" : "play.fill",
                     size: 44,
                     padding: 26,
                     target: .playPause,
@@ -220,6 +221,7 @@ public struct TVPlayerControlsOverlay: View {
                 // 进度条
                 HStack(spacing: 16) {
                     Text(formatTime(viewModel.currentTime))
+                        .accessibilityIdentifier("player.position")
                         .font(.caption)
                         .bold()
                         .foregroundColor(.white)
@@ -245,6 +247,7 @@ public struct TVPlayerControlsOverlay: View {
                     .frame(height: 6)
 
                     Text(formatTime(viewModel.duration))
+                        .accessibilityIdentifier("player.duration")
                         .font(.caption)
                         .bold()
                         .foregroundColor(.white)
@@ -327,6 +330,7 @@ public struct TVPlayerControlsOverlay: View {
                 endPoint: .bottom
             )
         )
+        .onChange(of: focusedControl) { _, _ in viewModel.showControls() }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 focusedControl = .playPause
@@ -366,6 +370,7 @@ public struct TVPlayerControlsOverlay: View {
         }
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focused($focusedControl, equals: target)
+        .accessibilityIdentifier("player.\(target)")
         .focusEffectDisabled()
     }
 
@@ -394,6 +399,8 @@ public struct TVPlayerControlsOverlay: View {
         }
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focused($focusedControl, equals: target)
+        .accessibilityIdentifier("player.\(target)")
+        .accessibilityLabel(target == .playPause ? (viewModel.wantsPlayback ? "暂停" : "播放") : target == .seekForward ? "快进10秒" : "后退10秒")
         .focusEffectDisabled()
     }
 

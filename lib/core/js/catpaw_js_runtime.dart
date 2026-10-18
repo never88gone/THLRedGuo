@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter_js/flutter_js.dart';
 import 'package:http/http.dart' as http;
@@ -39,12 +40,36 @@ class CatPawPlayResult {
   final String url;
   final Map<String, String> header;
   final int parse;
-  const CatPawPlayResult({required this.url, required this.header, this.parse = 0});
+  final int quality;
+  final List<int> qualities;
+  final String decryptionKey;
+  final int mediaBytes;
+  final int expiresAt;
+  final String danmakuId;
+  const CatPawPlayResult({
+    required this.url,
+    required this.header,
+    this.parse = 0,
+    this.quality = 0,
+    this.qualities = const [],
+    this.decryptionKey = '',
+    this.mediaBytes = 0,
+    this.expiresAt = 0,
+    this.danmakuId = '',
+  });
 }
 
 class CatPawSearchResult {
   final List<Map<String, dynamic>> list;
-  const CatPawSearchResult({required this.list});
+  final int page;
+  final int pageCount;
+  final bool hasMore;
+  const CatPawSearchResult({
+    required this.list,
+    this.page = 1,
+    this.pageCount = 1,
+    this.hasMore = false,
+  });
 }
 
 class CatPawJsRuntime {
@@ -53,14 +78,15 @@ class CatPawJsRuntime {
   final bool _isOwnedClient;
   bool _ready = false;
   bool _isDisposed = false;
+  final Set<Completer<void>> _requestAborts = {};
   int _activeRequests = 0;
   int _activeEvals = 0;
   Completer<void>? _drainCompleter;
   Completer<void>? _evalDrainCompleter;
 
   CatPawJsRuntime([http.Client? client])
-      : _httpClient = client ?? http.Client(),
-        _isOwnedClient = client == null;
+    : _httpClient = client ?? http.Client(),
+      _isOwnedClient = client == null;
 
   bool get isReady => _ready;
   bool get isDisposed => _isDisposed;
@@ -78,6 +104,7 @@ class CatPawJsRuntime {
 
   void dispose() {
     if (_isDisposed) return;
+    cancelPending();
     _isDisposed = true;
     _ready = false;
 
@@ -99,6 +126,14 @@ class CatPawJsRuntime {
     }
   }
 
+  void cancelPending() {
+    if (_isDisposed || !_ready) return;
+    _rt.evaluate('globalThis.__hongguoCancelled = true;');
+    for (final abort in _requestAborts.toList()) {
+      if (!abort.isCompleted) abort.complete();
+    }
+  }
+
   void _cleanup() {
     try {
       _rt.dispose();
@@ -109,6 +144,12 @@ class CatPawJsRuntime {
   }
 
   void _injectGlobals() {
+    final random = Random.secure();
+    final entropy = List.generate(
+      64,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+    _rt.evaluate('globalThis.__hongguoEntropy = ${jsonEncode(entropy)};');
     _rt.evaluate(r'''
 var JSON = JSON || {};
 if (!JSON.stringify) JSON.stringify = function(o) { return "{}"; };
@@ -169,17 +210,43 @@ if (typeof console === 'undefined') {
         final body = params['body']?.toString();
 
         final uri = Uri.parse(url);
-        http.Response resp;
-        if (method == 'POST') {
-          resp = await _httpClient.post(uri, headers: headers, body: body);
-        } else if (method == 'PUT') {
-          resp = await _httpClient.put(uri, headers: headers, body: body);
-        } else if (method == 'DELETE') {
-          resp = await _httpClient.delete(uri, headers: headers, body: body);
-        } else if (method == 'HEAD') {
-          resp = await _httpClient.head(uri, headers: headers);
-        } else {
-          resp = await _httpClient.get(uri, headers: headers);
+        final abort = Completer<void>();
+        _requestAborts.add(abort);
+        final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 12000)
+            .clamp(1, 12000);
+        final timer = Timer(Duration(milliseconds: timeoutMs), () {
+          if (!abort.isCompleted) abort.complete();
+        });
+        late http.Response resp;
+        try {
+          final request =
+              http.AbortableRequest(method, uri, abortTrigger: abort.future)
+                ..headers.addAll(headers)
+                ..followRedirects = params['redirect'] != 'manual';
+          if (body != null && method != 'HEAD' && method != 'GET') {
+            request.body = body;
+          }
+          final response = await _httpClient
+              .send(request)
+              .timeout(Duration(milliseconds: timeoutMs));
+          final bytes = <int>[];
+          await for (final chunk in response.stream.timeout(
+            Duration(milliseconds: timeoutMs),
+          )) {
+            if (bytes.length + chunk.length > 2 * 1024 * 1024) {
+              throw const FormatException('接口响应超过限制');
+            }
+            bytes.addAll(chunk);
+          }
+          resp = http.Response.bytes(
+            bytes,
+            response.statusCode,
+            headers: response.headers,
+          );
+        } finally {
+          timer.cancel();
+          _requestAborts.remove(abort);
+          if (!abort.isCompleted) abort.complete();
         }
 
         if (_isDisposed) {
@@ -192,7 +259,9 @@ if (typeof console === 'undefined') {
         };
       } catch (e) {
         // ignore: avoid_print
-        print('【FETCH ERROR】url=$url, err=$e');
+        print(
+          '【FETCH ERROR】host=${Uri.tryParse(url)?.host}, type=${e.runtimeType}',
+        );
         if (_isDisposed) {
           return {'status': 0, 'headers': <String, String>{}, 'body': ''};
         }
@@ -200,11 +269,14 @@ if (typeof console === 'undefined') {
           'status': 0,
           'headers': <String, String>{},
           'body': '',
-          'error': e.toString(),
+          'error': e.runtimeType.toString(),
         };
       } finally {
         _activeRequests--;
-        if (_isDisposed && _activeRequests == 0 && _drainCompleter != null && !_drainCompleter!.isCompleted) {
+        if (_isDisposed &&
+            _activeRequests == 0 &&
+            _drainCompleter != null &&
+            !_drainCompleter!.isCompleted) {
           _drainCompleter!.complete();
         }
       }
@@ -249,7 +321,10 @@ if (typeof console === 'undefined') {
     final map = (res is Map) ? res : {};
     final list = _toListOfMaps(map['list'] ?? []);
     final pg = (map['page'] as num?)?.toInt() ?? page;
-    final pageCount = (map['pagecount'] as num?)?.toInt() ?? (map['pageCount'] as num?)?.toInt() ?? 1;
+    final pageCount =
+        (map['pagecount'] as num?)?.toInt() ??
+        (map['pageCount'] as num?)?.toInt() ??
+        1;
     final limit = (map['limit'] as num?)?.toInt() ?? 20;
     final total = (map['total'] as num?)?.toInt() ?? 0;
     return CatPawCategoryResult(
@@ -269,22 +344,37 @@ if (typeof console === 'undefined') {
     );
     final map = (res is Map) ? res : {};
     dynamic vod = map['vod'];
-    if (vod == null && map['list'] is List && (map['list'] as List).isNotEmpty) {
+    if (vod == null &&
+        map['list'] is List &&
+        (map['list'] as List).isNotEmpty) {
       vod = (map['list'] as List).first;
     }
     vod ??= map;
-    return CatPawDetailResult(vod: Map<String, dynamic>.from(vod is Map ? vod : {'vod_id': id}));
+    return CatPawDetailResult(
+      vod: Map<String, dynamic>.from(vod is Map ? vod : {'vod_id': id}),
+    );
   }
 
-  Future<CatPawPlayResult> play(String flag, String id, {List<dynamic>? flags}) async {
+  Future<CatPawPlayResult> play(
+    String flag,
+    String id, {
+    List<dynamic>? flags,
+  }) async {
     _assertReady();
     final flagsJson = jsonEncode(flags ?? []);
     final res = await _evalAsync(
       'typeof spider !== "undefined" && typeof spider.play === "function" ? spider.play(${jsonEncode(flag)}, ${jsonEncode(id)}, $flagsJson) : { parse: 0, url: "" }',
+      timeout: const Duration(seconds: 60),
     );
     final map = (res is Map) ? res : {};
     final url = map['url']?.toString() ?? '';
     final parse = (map['parse'] as num?)?.toInt() ?? 0;
+    final contentKey =
+        map['decryptionKey']?.toString().trim().toLowerCase() ?? '';
+    if (contentKey.isNotEmpty &&
+        !RegExp(r'^[0-9a-f]{32}$').hasMatch(contentKey)) {
+      throw const FormatException('站源内容密钥无效');
+    }
     final header = <String, String>{};
     final rawHeader = map['header'] ?? map['headers'];
     if (rawHeader is Map) {
@@ -292,13 +382,47 @@ if (typeof console === 'undefined') {
         if (k != null && v != null) header[k.toString()] = v.toString();
       });
     }
-    return CatPawPlayResult(url: url, header: header, parse: parse);
+    return CatPawPlayResult(
+      url: url,
+      header: header,
+      parse: parse,
+      decryptionKey: contentKey,
+      mediaBytes: (map['mediaBytes'] as num?)?.toInt() ?? 0,
+      expiresAt: (map['expiresAt'] as num?)?.toInt() ?? 0,
+      danmakuId: map['danmakuId']?.toString() ?? '',
+      quality: (map['quality'] as num?)?.toInt() ?? 0,
+      qualities:
+          (map['qualities'] is List ? map['qualities'] as List : const [])
+              .whereType<num>()
+              .map((value) => value.toInt())
+              .where((value) => value > 0)
+              .toList(),
+    );
   }
 
-  Future<CatPawSearchResult> search(String keyword, {bool quick = false, int page = 1}) async {
+  Future<Map<String, dynamic>> danmaku(
+    String id,
+    int startMs,
+    int durationMs,
+  ) async {
+    _assertReady();
+    final result = await _evalAsync(
+      'typeof spider.danmaku === "function" ? spider.danmaku(${jsonEncode(id)}, $startMs, $durationMs) : Promise.reject(new Error("本集暂不支持弹幕"))',
+      timeout: const Duration(seconds: 20),
+    );
+    if (result is! Map) throw const FormatException('弹幕响应无效');
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<CatPawSearchResult> search(
+    String keyword, {
+    bool quick = false,
+    int page = 1,
+  }) async {
     _assertReady();
     final res = await _evalAsync(
       'typeof spider !== "undefined" && typeof spider.search === "function" ? spider.search(${jsonEncode(keyword)}, $quick, $page) : []',
+      timeout: const Duration(seconds: 60),
     );
     List<Map<String, dynamic>> list = [];
     if (res is List) {
@@ -306,12 +430,28 @@ if (typeof console === 'undefined') {
     } else if (res is Map) {
       list = _toListOfMaps(res['list'] ?? []);
     }
-    return CatPawSearchResult(list: list);
+    final resultPage = res is Map
+        ? (res['page'] as num?)?.toInt() ?? page
+        : page;
+    final pageCount = res is Map
+        ? (res['pagecount'] as num?)?.toInt() ??
+              (res['pageCount'] as num?)?.toInt() ??
+              resultPage
+        : resultPage;
+    return CatPawSearchResult(
+      list: list,
+      page: resultPage,
+      pageCount: pageCount,
+      hasMore: resultPage < pageCount,
+    );
   }
 
   Future<void> _evalQueue = Future.value();
 
-  Future<dynamic> _evalAsync(String jsCode, {Duration timeout = const Duration(seconds: 15)}) async {
+  Future<dynamic> _evalAsync(
+    String jsCode, {
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
     _assertReady();
     final prevQueue = _evalQueue;
     final queueCompleter = Completer<void>();
@@ -323,19 +463,17 @@ if (typeof console === 'undefined') {
 
     _activeEvals++;
     try {
-      final evalResult = _rt.evaluate('__evalAsync(function() { return ($jsCode); })');
+      _rt.evaluate('globalThis.__hongguoCancelled = false;');
+      final evalResult = _rt.evaluate(
+        '__evalAsync(function() { return ($jsCode); })',
+      );
       if (evalResult.isError) {
         throw Exception('JS 表达式执行失败: ${evalResult.rawResult}');
       }
 
-      JsEvalResult resolved;
-      if (evalResult.stringResult == '[object Promise]') {
-        resolved = await _rt.handlePromise(evalResult, timeout: timeout);
-        if (resolved.isError) {
-          throw Exception('JS Promise 异常: ${resolved.rawResult}');
-        }
-      } else {
-        resolved = evalResult;
+      final resolved = await _rt.handlePromise(evalResult, timeout: timeout);
+      if (resolved.isError) {
+        throw Exception('JS Promise 异常: ${resolved.rawResult}');
       }
 
       final raw = resolved.stringResult;
@@ -361,7 +499,10 @@ if (typeof console === 'undefined') {
     } finally {
       queueCompleter.complete();
       _activeEvals--;
-      if (_isDisposed && _activeEvals == 0 && _evalDrainCompleter != null && !_evalDrainCompleter!.isCompleted) {
+      if (_isDisposed &&
+          _activeEvals == 0 &&
+          _evalDrainCompleter != null &&
+          !_evalDrainCompleter!.isCompleted) {
         _evalDrainCompleter!.complete();
       }
     }
@@ -369,17 +510,24 @@ if (typeof console === 'undefined') {
 
   List<Map<String, dynamic>> _toListOfMaps(dynamic raw) {
     if (raw is! List) return [];
-    return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   List<Map<String, dynamic>> _parseFilters(dynamic raw) {
     if (raw is List) {
-      return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return raw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     } else if (raw is Map) {
-      return raw.entries.map((e) => <String, dynamic>{
-        'key': e.key.toString(),
-        'value': e.value,
-      }).toList();
+      return raw.entries
+          .map(
+            (e) => <String, dynamic>{'key': e.key.toString(), 'value': e.value},
+          )
+          .toList();
     }
     return [];
   }
@@ -393,12 +541,12 @@ if (typeof console === 'undefined') {
 globalThis.__evalAsync = async function(fn) {
   try {
     var res = await fn();
-    return res;
+    return JSON.stringify(res);
   } catch (e) {
-    return {
+    return JSON.stringify({
       __error: true,
       message: e ? (e.message || String(e)) : "Unknown JS error"
-    };
+    });
   }
 };
 ''';
@@ -416,7 +564,9 @@ globalThis.fetch = async function(url, opts) {
     url: String(url),
     method: method,
     headers: headers,
-    body: String(body)
+    body: String(body),
+    timeoutMs: opts.timeoutMs || 12000,
+    redirect: opts.redirect || 'follow'
   }));
   var parsed = (typeof raw === 'string') ? JSON.parse(raw) : raw;
   var status = (parsed && typeof parsed.status === 'number') ? parsed.status : 200;
@@ -681,7 +831,7 @@ class CatPawRuntimePool {
   bool _isDisposed = false;
 
   CatPawRuntimePool([http.Client? httpClient])
-      : _httpClient = httpClient ?? http.Client();
+    : _httpClient = httpClient ?? http.Client();
 
   bool get isDisposed => _isDisposed;
 
@@ -701,6 +851,12 @@ class CatPawRuntimePool {
     _pool[sourceId] = rt;
     _scripts[sourceId] = script;
     return rt;
+  }
+
+  void cancelPending() {
+    for (final runtime in _pool.values) {
+      runtime.cancelPending();
+    }
   }
 
   void remove(String sourceId) {

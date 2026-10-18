@@ -3,29 +3,24 @@ import 'package:THLRedLook/models/catalog/models.dart';
 enum PlaybackRecoveryAction { alternative, refresh, stop }
 
 class PlaybackRecovery {
-  static const maxAttempts = 3;
+  static const maxAttempts = 5;
   int _attempts = 0;
-  bool _refreshed = false;
+  int get attempts => _attempts;
 
   void reset() {
     _attempts = 0;
-    _refreshed = false;
   }
 
-  PlaybackRecoveryAction next(PlaybackPlan plan) {
+  PlaybackRecoveryAction next(PlaybackPlan? plan) {
     if (_attempts >= maxAttempts) {
       return PlaybackRecoveryAction.stop;
     }
-    if (plan.hasAlternative) {
+    if (plan?.hasAlternative == true) {
       _attempts++;
       return PlaybackRecoveryAction.alternative;
     }
-    if (!_refreshed) {
-      _attempts++;
-      _refreshed = true;
-      return PlaybackRecoveryAction.refresh;
-    }
-    return PlaybackRecoveryAction.stop;
+    _attempts++;
+    return PlaybackRecoveryAction.refresh;
   }
 }
 
@@ -42,10 +37,11 @@ class PlaybackHealth {
   bool stalled({
     required Duration position,
     required bool playing,
+    bool buffering = false,
     required bool foreground,
     required DateTime now,
   }) {
-    if (!playing || !foreground || position != _position) {
+    if ((!playing && !buffering) || !foreground || position != _position) {
       _position = position;
       _lastProgress = now;
       return false;

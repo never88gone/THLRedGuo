@@ -14,20 +14,30 @@ public struct DramaDetailView: View {
     @Environment(\.presentationMode) var presentationMode
 
     @State private var playingEpisodeIndex: Int?
+    @State private var hasAppeared = false
+    @State private var didLoadDetail = false
+    @State private var playerDismissedAt = Date.distantPast
+    @State private var returningEpisode: Int?
     @State private var selectedEpisodeNumber: Int = 1
     @State private var resumePosition: Double = 0
     @State private var isDescriptionExpanded: Bool = false
     @State private var showingDownloadSuccess: Bool = false
-    @FocusState private var isPlayButtonFocused: Bool
-    @FocusState private var focusedSeasonIndex: Int?
-    @FocusState private var focusedEpisode: Int?
-    @FocusState private var focusedChunkIndex: Int?
+    private enum DetailFocus: Hashable {
+        case play
+        case favorite
+        case followState
+        case season(Int)
+        case chunk(Int)
+        case episode(Int)
+    }
+    @FocusState private var focusedTarget: DetailFocus?
 
     public init(drama: Drama) {
         _viewModel = StateObject(wrappedValue: DetailViewModel(drama: drama))
     }
 
     private var normalizedCoverURL: URL? {
+        guard ProcessInfo.processInfo.environment["DISABLE_REMOTE_IMAGES"] != "1" else { return nil }
         var str = viewModel.drama.cover.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !str.isEmpty else { return nil }
         if str.hasPrefix("//") {
@@ -74,251 +84,297 @@ public struct DramaDetailView: View {
                     }
                 }
             } else if let detail = viewModel.detail {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
-                        // 剧集头部资料区（无顶部多余返回按钮，直接由遥控器实体 Menu/Back 键退出）
-                        HStack(alignment: .top, spacing: 40) {
-                            // 海报视图（严格限定尺寸并剪裁，防止超大图撑爆布局）
-                            PosterArtworkView(drama: detail.drama, cornerRadius: 16)
-                                .frame(width: 220, height: 320)
-                                .clipped()
-                                .shadow(radius: 12)
+                ScrollViewReader { scrollProxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 28) {
+                            // 剧集头部资料区（无顶部多余返回按钮，直接由遥控器实体 Menu/Back 键退出）
+                            HStack(alignment: .top, spacing: 40) {
+                                // 海报视图（严格限定尺寸并剪裁，防止超大图撑爆布局）
+                                PosterArtworkView(drama: detail.drama, cornerRadius: 16)
+                                    .frame(width: 220, height: 320)
+                                    .clipped()
+                                    .shadow(radius: 12)
 
-                            // 标题、标签、简介与动作
-                            VStack(alignment: .leading, spacing: 18) {
-                                Text(detail.drama.title)
-                                    .font(.system(size: 40, weight: .bold))
-                                    .foregroundColor(.white)
+                                // 标题、标签、简介与动作
+                                VStack(alignment: .leading, spacing: 18) {
+                                    Text(detail.drama.title)
+                                        .font(.system(size: 40, weight: .bold))
+                                        .foregroundColor(.white)
 
-                                HStack(spacing: 12) {
-                                    Text(detail.drama.releaseLabel)
-                                        .font(.subheadline)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 4)
-                                        .background(Color.red.opacity(0.8))
-                                        .clipShape(Capsule())
-
-                                    if !detail.drama.heat.isEmpty {
-                                        Text("热度：\(detail.drama.heat)")
+                                    HStack(spacing: 12) {
+                                        Text(detail.drama.releaseLabel)
                                             .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 4)
+                                            .background(Color.red.opacity(0.8))
+                                            .clipShape(Capsule())
 
-                                    if !detail.drama.onlineDate.isEmpty {
-                                        Text("上线：\(detail.drama.onlineDate)")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
+                                        if !detail.drama.heat.isEmpty {
+                                            Text("热度：\(detail.drama.heat)")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
 
-                                // 简介
-                                Text(detail.drama.description)
-                                    .font(.body)
-                                    .foregroundColor(.white.opacity(0.85))
-                                    .lineLimit(isDescriptionExpanded ? nil : 3)
-                                    .onTapGesture {
-                                        withAnimation {
-                                            isDescriptionExpanded.toggle()
+                                        if !detail.drama.onlineDate.isEmpty {
+                                            Text("上线：\(detail.drama.onlineDate)")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
                                         }
                                     }
 
-                                // 动作按钮行（预留上侧、左侧、右侧充足防裁切间距）
-                                HStack(spacing: 32) {
-                                    // 播放按钮
-                                    let resumeEp = viewModel.lastWatchEntry?.episode ?? selectedEpisodeNumber
-                                    let resumePos = viewModel.lastWatchEntry?.position ?? 0
-                                    let playTitle = viewModel.lastWatchEntry != nil ? "继续播放 第 \(resumeEp) 集" : "立即播放"
-
-                                    TVButton(
-                                        title: playTitle,
-                                        icon: "play.fill",
-                                        isProminent: true,
-                                        isExternalFocused: isPlayButtonFocused,
-                                        onDownCommand: {
-                                            isPlayButtonFocused = false
-                                            if viewModel.seasonItems.count > 1 {
-                                                focusedSeasonIndex = viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0
-                                            } else if detail.episodeChunks.count > 1 {
-                                                focusedChunkIndex = viewModel.selectedChunkIndex
-                                            } else if let firstEp = detail.episodes.first {
-                                                focusedEpisode = firstEp.number
+                                    // 简介
+                                    Text(detail.drama.description)
+                                        .font(.body)
+                                        .foregroundColor(.white.opacity(0.85))
+                                        .lineLimit(isDescriptionExpanded ? nil : 3)
+                                        .onTapGesture {
+                                            withAnimation {
+                                                isDescriptionExpanded.toggle()
                                             }
                                         }
-                                    ) {
-                                        selectedEpisodeNumber = resumeEp
-                                        resumePosition = resumePos
-                                        playingEpisodeIndex = resumeEp
-                                    }
-                                    .focused($isPlayButtonFocused)
 
-                                    // 追剧按钮
-                                    TVButton(
-                                        title: viewModel.followState == .none ? "追剧" : viewModel.followState.label,
-                                        icon: viewModel.followState == .none ? "bookmark" : "bookmark.fill"
-                                    ) {
-                                        viewModel.toggleFollowState()
-                                    }
+                                    // 动作按钮行（预留上侧、左侧、右侧充足防裁切间距）
+                                    HStack(spacing: 32) {
+                                        // 播放按钮
+                                        let resumeEp = viewModel.lastWatchEntry?.episode ?? selectedEpisodeNumber
+                                        let resumePos = viewModel.lastWatchEntry?.position ?? 0
+                                        let playTitle = viewModel.lastWatchEntry != nil ? "继续播放 第 \(resumeEp) 集" : "立即播放"
 
-                                    // 下载按钮
-                                    TVButton(title: "缓存全剧", icon: "arrow.down.circle") {
-                                        viewModel.downloadAllEpisodes()
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                            showingDownloadSuccess = true
-                                        }
-                                    }
-                                }
-                                .padding(.top, 16)
-                                .padding(.leading, 6)
-                                .padding(.trailing, 16)
-                            }
-                        }
-                        .padding(.top, 16)
-
-                        // 紧凑型季度选择行（若有多季才显示，绝不显示标题，包含小海报与明确季数标识，绝不挤压下方选集）
-                        if viewModel.seasonItems.count > 1 {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 20) {
-                                    ForEach(Array(viewModel.seasonItems.enumerated()), id: \.element.id) { index, item in
-                                        TVSeasonCapsuleCard(
-                                            item: item,
-                                            isExternalFocused: focusedSeasonIndex == index,
-                                            onUpCommand: {
-                                                focusedSeasonIndex = nil
-                                                isPlayButtonFocused = true
-                                            },
+                                        TVButton(
+                                            title: playTitle,
+                                            icon: "play.fill",
+                                            isProminent: true,
+                                            isExternalFocused: focusedTarget == .play,
                                             onDownCommand: {
-                                                focusedSeasonIndex = nil
-                                                if detail.episodeChunks.count > 1 {
-                                                    focusedChunkIndex = viewModel.selectedChunkIndex
-                                                } else if let firstEp = detail.episodes.first {
-                                                    focusedEpisode = firstEp.number
+                                                if viewModel.seasonItems.count > 1 {
+                                                    focus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0), with: scrollProxy)
+                                                } else if detail.episodeChunks.count > 1 {
+                                                    focus(.chunk(viewModel.selectedChunkIndex), with: scrollProxy)
+                                                } else if let first = detail.episodes.first {
+                                                    focus(.episode(first.number), with: scrollProxy)
                                                 }
                                             }
                                         ) {
-                                            if !item.isCurrent {
-                                                Task {
-                                                    focusedSeasonIndex = index
-                                                    await viewModel.switchToDrama(item.drama)
-                                                    if let entry = viewModel.lastWatchEntry {
-                                                        selectedEpisodeNumber = entry.episode
-                                                    } else {
-                                                        selectedEpisodeNumber = 1
-                                                    }
+                                            selectedEpisodeNumber = resumeEp
+                                            resumePosition = resumePos
+                                            playingEpisodeIndex = resumeEp
+                                        }
+                                        .focused($focusedTarget, equals: .play)
+                                        .id("detail_play")
+                                        .accessibilityIdentifier("detail.play")
+
+                                        // 追剧按钮
+                                        TVButton(
+                                            title: viewModel.followState == .none ? "收藏" : "已收藏",
+                                            icon: viewModel.followState == .none ? "bookmark" : "bookmark.fill",
+                                            isExternalFocused: focusedTarget == .favorite
+                                        ) {
+                                            viewModel.toggleFavorite()
+                                        }
+                                        .focused($focusedTarget, equals: .favorite)
+                                        .id("detail_favorite")
+                                        .accessibilityIdentifier("detail.favorite")
+
+                                        if viewModel.followState != .none {
+                                            Menu {
+                                                ForEach([FollowState.wishlist, .watching, .watched, .updated]) { state in
+                                                    Button(state.label) { viewModel.setFollowState(state) }
                                                 }
+                                            } label: {
+                                                Label(viewModel.followState.label, systemImage: "list.bullet")
+                                            }
+                                            .focused($focusedTarget, equals: .followState)
+                                            .id("detail_follow_state")
+                                            .accessibilityIdentifier("detail.followState")
+                                        }
+
+                                        // 下载按钮
+                                        TVButton(title: "缓存全剧", icon: "arrow.down.circle") {
+                                            viewModel.downloadAllEpisodes()
+                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                showingDownloadSuccess = true
                                             }
                                         }
-                                        .focused($focusedSeasonIndex, equals: index)
-                                        .id("season_card_\(index)")
                                     }
+                                    .padding(.top, 16)
+                                    .padding(.leading, 6)
+                                    .padding(.trailing, 16)
                                 }
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 8)
                             }
-                        }
-                        
-                        Divider()
-                            .padding(.vertical, 4)
+                            .padding(.top, 16)
 
-                        // 选集区
-                        VStack(alignment: .leading, spacing: 24) {
-                            Text("选集播放")
-                                .font(.title2)
-                                .bold()
-
-                            // 分组 Tab (1-50, 51-100)（增加上侧、左侧、右侧间距，保证焦点段完整激活）
-                            if detail.episodeChunks.count > 1 {
+                            // 紧凑型季度选择行（若有多季才显示，绝不显示标题，包含小海报与明确季数标识，绝不挤压下方选集）
+                            if viewModel.seasonItems.count > 1 {
                                 ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 24) {
-                                        ForEach(Array(detail.episodeChunks.enumerated()), id: \.offset) { index, chunk in
-                                            TVCapsuleButton(
-                                                title: chunk.title,
-                                                isSelected: viewModel.selectedChunkIndex == index,
-                                                isExternalFocused: focusedChunkIndex == index,
+                                    HStack(spacing: 20) {
+                                        ForEach(Array(viewModel.seasonItems.enumerated()), id: \.element.id) { index, item in
+                                            TVSeasonCapsuleCard(
+                                                item: item,
+                                                isExternalFocused: focusedTarget == .season(index),
                                                 onUpCommand: {
-                                                    focusedChunkIndex = nil
-                                                    if viewModel.seasonItems.count > 1 {
-                                                        focusedSeasonIndex = viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0
-                                                    } else {
-                                                        isPlayButtonFocused = true
-                                                    }
+
+                                                    focus(.play, with: scrollProxy)
                                                 },
                                                 onDownCommand: {
-                                                    focusedChunkIndex = nil
-                                                    if !detail.episodeChunks.isEmpty && viewModel.selectedChunkIndex < detail.episodeChunks.count {
-                                                        let currentChunk = detail.episodeChunks[viewModel.selectedChunkIndex]
-                                                        if let firstEp = currentChunk.episodes.first {
-                                                            focusedEpisode = firstEp.number
-                                                        }
+
+                                                    if detail.episodeChunks.count > 1 {
+                                                        focus(.chunk(viewModel.selectedChunkIndex), with: scrollProxy)
+                                                    } else if let firstEp = detail.episodes.first {
+                                                        focus(.episode(firstEp.number), with: scrollProxy)
                                                     }
                                                 }
                                             ) {
-                                                viewModel.selectedChunkIndex = index
-                                            }
-                                            .focused($focusedChunkIndex, equals: index)
-                                            .id("detail_chunk_\(index)")
-                                        }
-                                    }
-                                    .padding(.top, 14)
-                                    .padding(.bottom, 14)
-                                    .padding(.leading, 12)
-                                    .padding(.trailing, 24)
-                                }
-                            }
-
-                            // 当前组内的集数列表网格（采用 8 列并预留上、左、右安全间距）
-                            if !detail.episodeChunks.isEmpty && viewModel.selectedChunkIndex < detail.episodeChunks.count {
-                                let currentChunk = detail.episodeChunks[viewModel.selectedChunkIndex]
-                                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 8), spacing: 24) {
-                                    ForEach(currentChunk.episodes) { ep in
-                                        let isCurrentEp = (ep.number == selectedEpisodeNumber) || (viewModel.lastWatchEntry?.episode == ep.number)
-                                        TVEpisodeButton(
-                                            episode: ep,
-                                            isCurrent: isCurrentEp,
-                                            isExternalFocused: focusedEpisode == ep.number,
-                                            onUpCommand: {
-                                                let firstEpNum = currentChunk.episodes.first?.number ?? 1
-                                                let offset = ep.number - firstEpNum
-                                                if offset < 8 {
-                                                    focusedEpisode = nil
-                                                    if detail.episodeChunks.count > 1 {
-                                                        focusedChunkIndex = viewModel.selectedChunkIndex
-                                                    } else if viewModel.seasonItems.count > 1 {
-                                                        focusedSeasonIndex = viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0
-                                                    } else {
-                                                        isPlayButtonFocused = true
+                                                if !item.isCurrent {
+                                                    Task {
+                                                        focus(.season(index), with: scrollProxy)
+                                                        await viewModel.switchToDrama(item.drama)
+                                                        if let entry = viewModel.lastWatchEntry {
+                                                            selectedEpisodeNumber = entry.episode
+                                                        } else {
+                                                            selectedEpisodeNumber = 1
+                                                        }
                                                     }
                                                 }
                                             }
-                                        ) {
-                                            selectedEpisodeNumber = ep.number
-                                            resumePosition = (viewModel.lastWatchEntry?.episode == ep.number) ? (viewModel.lastWatchEntry?.position ?? 0) : 0
-                                            playingEpisodeIndex = ep.number
+                                            .focused($focusedTarget, equals: .season(index))
+                                            .id("season_card_\(index)")
+                                            .accessibilityIdentifier("detail.season.\(index)")
                                         }
-                                        .focused($focusedEpisode, equals: ep.number)
-                                        .id("detail_episode_\(ep.number)")
+                                    }
+                                    .padding(.vertical, 10)
+                                    .padding(.horizontal, 8)
+                                }
+                            }
+
+                            Divider()
+                                .padding(.vertical, 4)
+
+                            // 选集区
+                            VStack(alignment: .leading, spacing: 24) {
+                                Text("选集播放")
+                                    .font(.title2)
+                                    .bold()
+
+                                // 分组 Tab (1-50, 51-100)（增加上侧、左侧、右侧间距，保证焦点段完整激活）
+                                if detail.episodeChunks.count > 1 {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 24) {
+                                            ForEach(Array(detail.episodeChunks.enumerated()), id: \.offset) { index, chunk in
+                                                TVCapsuleButton(
+                                                    title: chunk.title,
+                                                    isSelected: viewModel.selectedChunkIndex == index,
+                                                    isExternalFocused: focusedTarget == .chunk(index),
+                                                    onUpCommand: {
+
+                                                        if viewModel.seasonItems.count > 1 {
+                                                            focus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0), with: scrollProxy)
+                                                        } else {
+                                                            focus(.play, with: scrollProxy)
+                                                        }
+                                                    },
+                                                    onDownCommand: {
+
+                                                        if !detail.episodeChunks.isEmpty && viewModel.selectedChunkIndex < detail.episodeChunks.count {
+                                                            let currentChunk = detail.episodeChunks[viewModel.selectedChunkIndex]
+                                                            if let firstEp = currentChunk.episodes.first {
+                                                                focus(.episode(firstEp.number), with: scrollProxy)
+                                                            }
+                                                        }
+                                                    }
+                                                ) {
+                                                    viewModel.selectedChunkIndex = index
+                                                }
+                                                .focused($focusedTarget, equals: .chunk(index))
+                                                .id("detail_chunk_\(index)")
+                                                .accessibilityIdentifier("detail.chunk.\(index)")
+                                            }
+                                        }
+                                        .padding(.top, 14)
+                                        .padding(.bottom, 14)
+                                        .padding(.leading, 12)
+                                        .padding(.trailing, 24)
                                     }
                                 }
-                                .padding(.top, 12)
-                                .padding(.horizontal, 8)
+
+                                // 当前组内的集数列表网格（采用 8 列并预留上、左、右安全间距）
+                                if !detail.episodeChunks.isEmpty && viewModel.selectedChunkIndex < detail.episodeChunks.count {
+                                    let currentChunk = detail.episodeChunks[viewModel.selectedChunkIndex]
+                                    let rows = stride(from: 0, to: currentChunk.episodes.count, by: 8).map { start in
+                                        Array(currentChunk.episodes[start..<min(start + 8, currentChunk.episodes.count)])
+                                    }
+                                    VStack(spacing: 24) {
+                                        ForEach(Array(rows.enumerated()), id: \.offset) { _, episodes in
+                                            HStack(spacing: 24) {
+                                                ForEach(episodes) { ep in
+                                                    let isCurrentEp = (ep.number == selectedEpisodeNumber) || (viewModel.lastWatchEntry?.episode == ep.number)
+                                                    TVEpisodeButton(
+                                                        episode: ep,
+                                                        isCurrent: isCurrentEp,
+                                                        isExternalFocused: focusedTarget == .episode(ep.number),
+                                                        onUpCommand: {
+                                                            let firstEpNum = currentChunk.episodes.first?.number ?? 1
+                                                            let offset = ep.number - firstEpNum
+                                                            if offset < 8 {
+
+                                                                if detail.episodeChunks.count > 1 {
+                                                                    focus(.chunk(viewModel.selectedChunkIndex), with: scrollProxy)
+                                                                } else if viewModel.seasonItems.count > 1 {
+                                                                    focus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0), with: scrollProxy)
+                                                                } else {
+                                                                    focus(.play, with: scrollProxy)
+                                                                }
+                                                            }
+                                                        }
+                                                    ) {
+                                                        selectedEpisodeNumber = ep.number
+                                                        resumePosition = (viewModel.lastWatchEntry?.episode == ep.number) ? (viewModel.lastWatchEntry?.position ?? 0) : 0
+                                                        playingEpisodeIndex = ep.number
+                                                    }
+                                                    .focused($focusedTarget, equals: .episode(ep.number))
+                                                    .id("detail_episode_\(ep.number)")
+                                                    .accessibilityIdentifier("detail.episode.\(ep.number)")
+                                                    .frame(maxWidth: .infinity)
+                                                }
+                                                if episodes.count < 8 {
+                                                    ForEach(episodes.count..<8, id: \.self) { _ in
+                                                        Color.clear.frame(maxWidth: .infinity)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .padding(.top, 12)
+                                    .padding(.horizontal, 8)
+                                }
                             }
                         }
+                        .padding(.horizontal, 48)
+                        .padding(.top, 16)
+                        .padding(.bottom, 48)
                     }
-                    .padding(.horizontal, 48)
-                    .padding(.top, 16)
-                    .padding(.bottom, 48)
-                }
-                .defaultFocus($isPlayButtonFocused, true)
-                .onAppear {
-                    if let entry = viewModel.lastWatchEntry {
-                        selectedEpisodeNumber = entry.episode
+                    .onChange(of: returningEpisode) { _, number in
+                        guard let number else { return }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            focus(.episode(number), with: scrollProxy)
+                        }
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        isPlayButtonFocused = true
+                    .defaultFocus($focusedTarget, .play)
+                    .onAppear {
+                        guard !hasAppeared else { return }
+                        hasAppeared = true
+                        if let entry = viewModel.lastWatchEntry {
+                            selectedEpisodeNumber = entry.episode
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            focus(.play, with: scrollProxy)
+                        }
                     }
                 }
             }
         }
         .task {
+            guard !didLoadDetail else { return }
+            didLoadDetail = true
             await viewModel.loadDetail()
             if let entry = viewModel.lastWatchEntry {
                 selectedEpisodeNumber = entry.episode
@@ -332,7 +388,17 @@ public struct DramaDetailView: View {
         .fullScreenCover(item: Binding<EpisodeWrapper?>(
             get: { playingEpisodeIndex != nil ? EpisodeWrapper(index: playingEpisodeIndex!) : nil },
             set: { playingEpisodeIndex = $0?.index }
-        )) { wrapper in
+        ), onDismiss: {
+            viewModel.refreshWatchHistory()
+            let number = viewModel.lastWatchEntry?.episode ?? selectedEpisodeNumber
+            selectedEpisodeNumber = number
+            if let detail = viewModel.detail,
+               let chunk = detail.episodeChunks.firstIndex(where: { $0.episodes.contains(where: { $0.number == number }) }) {
+                viewModel.selectedChunkIndex = chunk
+            }
+            returningEpisode = nil
+            DispatchQueue.main.async { returningEpisode = number }
+        }) { wrapper in
             if let detail = viewModel.detail {
                 TVPlayerView(
                     drama: detail.drama,
@@ -340,6 +406,7 @@ public struct DramaDetailView: View {
                     initialEpisodeIndex: wrapper.index,
                     initialPosition: resumePosition,
                     onDismiss: {
+                        playerDismissedAt = Date()
                         playingEpisodeIndex = nil
                         viewModel.refreshWatchHistory()
                         if let entry = viewModel.lastWatchEntry {
@@ -389,9 +456,25 @@ public struct DramaDetailView: View {
             }
         }
         .onExitCommand {
+            guard playingEpisodeIndex == nil, Date().timeIntervalSince(playerDismissedAt) > 0.5 else { return }
             presentationMode.wrappedValue.dismiss()
         }
     }
+    private func focus(_ target: DetailFocus, with proxy: ScrollViewProxy) {
+        let identifier: String
+        switch target {
+        case .play: identifier = "detail_play"
+        case .favorite: identifier = "detail_favorite"
+        case .followState: identifier = "detail_follow_state"
+        case .season(let index): identifier = "season_card_\(index)"
+        case .chunk(let index): identifier = "detail_chunk_\(index)"
+        case .episode(let number): identifier = "detail_episode_\(number)"
+        }
+        focusedTarget = nil
+        proxy.scrollTo(identifier, anchor: .center)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { focusedTarget = target }
+    }
+
 }
 
 /// 紧凑型季度选择卡片（横向排布，无标题，含小海报与明确当前季高亮徽章）

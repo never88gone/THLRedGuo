@@ -49,6 +49,7 @@ class _SavedLibraryState extends State<SavedLibrary> {
 
   Future<void> _clearHistory() async {
     final epoch = widget.store.profileEpoch;
+    final source = widget.store.source;
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -69,7 +70,7 @@ class _SavedLibraryState extends State<SavedLibrary> {
     if (accepted == true && mounted && epoch == widget.store.profileEpoch) {
       await saveUserChange(
         context,
-        () => widget.store.clearHistory(targetSource: widget.store.source),
+        () => widget.store.clearHistory(targetSource: source),
       );
     }
   }
@@ -89,20 +90,28 @@ class _SavedLibraryState extends State<SavedLibrary> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.hongguoRed,
+              ),
               child: const Text('立即设置'),
             ),
           ],
         ),
       );
       if (setup == true && mounted) {
-        final ok = await VaultPasswordSetupDialog.show(context, controller: vaultController);
+        final ok = await VaultPasswordSetupDialog.show(
+          context,
+          controller: vaultController,
+        );
         if (!ok || !mounted) return;
       } else {
         return;
       }
     } else if (!vaultController.isUnlocked) {
-      final verified = await VaultPasswordDialog.show(context, controller: vaultController);
+      final verified = await VaultPasswordDialog.show(
+        context,
+        controller: vaultController,
+      );
       if (!verified || !mounted) return;
     }
 
@@ -167,7 +176,9 @@ class _SavedLibraryState extends State<SavedLibrary> {
           : widget.store.favoritesForSource(currentSource);
       final vaultController = PrivacyVaultController(widget.store.preferences);
       final items = all.where((drama) {
-        if (!widget.history && vaultController.isInVault(drama.id)) return false;
+        if (!widget.history && vaultController.isInVault(drama.id)) {
+          return false;
+        }
         if (!matchesDramaQuery(drama, _search.text)) return false;
         final state = widget.store.following(drama.id);
         return widget.history ||
@@ -200,7 +211,10 @@ class _SavedLibraryState extends State<SavedLibrary> {
               if (!widget.history)
                 IconButton(
                   tooltip: '隐私短剧库',
-                  icon: const Icon(Icons.shield_outlined, color: AppColors.hongguoRed),
+                  icon: const Icon(
+                    Icons.shield_outlined,
+                    color: AppColors.hongguoRed,
+                  ),
                   onPressed: _openPrivacyVault,
                 ),
               if (widget.history && all.isNotEmpty)

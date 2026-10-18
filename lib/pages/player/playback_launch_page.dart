@@ -36,26 +36,6 @@ Future<void> openPlaybackDirectly(
     final watched = store.watched(mergedDrama.id);
     final index = resumeEpisodeIndex(merged.episodes, watched);
     final episode = merged.episodes[index];
-    if (episode.vip) {
-      final accepted = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('这是一集 VIP 内容'),
-          content: const Text('站源可能只提供试看或限制播放。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('尝试播放'),
-            ),
-          ],
-        ),
-      );
-      if (accepted != true || !context.mounted) return;
-    }
     final position =
         watched?.episode == episode.number && watched?.finished == false
         ? watched!.position
@@ -151,33 +131,6 @@ class _PlaybackLaunchScreenState extends State<PlaybackLaunchScreen> {
       final watched = widget.store.watched(drama.id);
       final index = resumeEpisodeIndex(merged.episodes, watched);
       final episode = merged.episodes[index];
-      if (episode.vip) {
-        if (!mounted) return;
-        final accepted = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('这是一集 VIP 内容'),
-            content: const Text('站源可能只提供试看或限制播放。'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('尝试播放'),
-              ),
-            ],
-          ),
-        );
-        if (accepted != true) {
-          if (mounted) Navigator.of(context).maybePop();
-          return;
-        }
-        if (!mounted) {
-          return;
-        }
-      }
       final position =
           watched?.episode == episode.number && watched?.finished == false
           ? watched!.position

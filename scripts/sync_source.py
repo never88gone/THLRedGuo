@@ -49,7 +49,7 @@ EXCLUDED_PATHS = {
 }
 REQUIRED_FILES = {
     'AGENTS.md', 'README.md', 'pubspec.yaml', 'pubspec.lock', 'lib/main.dart',
-    'lib/dart_core_engine.dart', 'lib/catpaw_js_runtime.dart',
+    'lib/core/engine/dart_core_engine.dart', 'lib/core/js/catpaw_js_runtime.dart',
     'android/app/build.gradle.kts', 'android/gradle/wrapper/gradle-wrapper.properties',
     'windows/CMakeLists.txt', 'windows/flutter/CMakeLists.txt',
     '.github/workflows/build-flutter.yml', '.github/workflows/build-tvos.yml', 'scripts/build_native.py',

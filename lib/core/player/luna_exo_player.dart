@@ -2,24 +2,37 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart' as kit;
 import 'package:video_player/video_player.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
 
 /// 模拟与 media_kit.PlayerStream 接口对齐的流集合
 class LunaPlayerStreams implements PlayerStream {
-  final StreamController<Duration> positionController = StreamController<Duration>.broadcast();
-  final StreamController<Duration> durationController = StreamController<Duration>.broadcast();
-  final StreamController<Duration> bufferController = StreamController<Duration>.broadcast();
-  final StreamController<bool> playingController = StreamController<bool>.broadcast();
-  final StreamController<bool> bufferingController = StreamController<bool>.broadcast();
-  final StreamController<bool> completedController = StreamController<bool>.broadcast();
-  final StreamController<String> errorController = StreamController<String>.broadcast();
-  final StreamController<double> volumeController = StreamController<double>.broadcast();
-  final StreamController<double> rateController = StreamController<double>.broadcast();
-  final StreamController<VideoParams> videoParamsController = StreamController<VideoParams>.broadcast();
-  final StreamController<PlayerLog> logController = StreamController<PlayerLog>.broadcast();
-  final StreamController<double> pitchController = StreamController<double>.broadcast();
+  final StreamController<Duration> positionController =
+      StreamController<Duration>.broadcast();
+  final StreamController<Duration> durationController =
+      StreamController<Duration>.broadcast();
+  final StreamController<Duration> bufferController =
+      StreamController<Duration>.broadcast();
+  final StreamController<bool> playingController =
+      StreamController<bool>.broadcast();
+  final StreamController<bool> bufferingController =
+      StreamController<bool>.broadcast();
+  final StreamController<bool> completedController =
+      StreamController<bool>.broadcast();
+  final StreamController<String> errorController =
+      StreamController<String>.broadcast();
+  final StreamController<double> volumeController =
+      StreamController<double>.broadcast();
+  final StreamController<double> rateController =
+      StreamController<double>.broadcast();
+  final StreamController<VideoParams> videoParamsController =
+      StreamController<VideoParams>.broadcast();
+  final StreamController<PlayerLog> logController =
+      StreamController<PlayerLog>.broadcast();
+  final StreamController<double> pitchController =
+      StreamController<double>.broadcast();
 
   @override
   Stream<Duration> get position => positionController.stream;
@@ -84,16 +97,25 @@ class LunaPlayerStreams implements PlayerStream {
 /// 采用和 LunaTV-Mobile 完全相同架构的 ExoPlayer (AndroidX Media3) 播放器封装，
 /// 同时对上层播控 UI (PlayerControls & TelevisionControls) 暴露完全兼容的 Player 契约。
 class LunaExoPlayer implements Player {
-  LunaExoPlayer() {
+  LunaExoPlayer({this.initializationTimeout = const Duration(seconds: 30)}) {
     state = const PlayerState().copyWith(volume: 100.0);
   }
 
   VideoPlayerController? _controller;
+  final Duration initializationTimeout;
   VoidCallback? _valueListener;
   Timer? _positionPollTimer;
 
   int _openGeneration = 0;
+  int _seekSequence = 0;
+  int _pendingSeekSequence = 0;
+  Future<void> _seekOperations = Future<void>.value();
   bool _disposed = false;
+  Future<void>? _disposeFuture;
+  String? _controllerError;
+  Player? _streamPlayer;
+  kit.VideoController? _streamVideo;
+  final List<StreamSubscription<dynamic>> _streamSubscriptions = [];
 
   final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
@@ -104,12 +126,99 @@ class LunaExoPlayer implements Player {
   final LunaPlayerStreams stream = LunaPlayerStreams();
 
   @override
-  PlatformPlayer? get platform => null;
+  PlatformPlayer? get platform => _streamPlayer?.platform;
 
   @override
   Future<int> get handle => Future<int>.value(0);
 
   VideoPlayerController? get controller => _controller;
+  bool get streamingDecryption => _streamPlayer != null;
+  String get mediaUri {
+    final playlist = _streamPlayer?.state.playlist.medias;
+    if (playlist != null && playlist.isNotEmpty) return playlist.first.uri;
+    return _controller?.dataSource ?? '';
+  }
+
+  Future<void> waitForVideoFrame() async {
+    await _streamVideo?.waitUntilFirstFrameRendered;
+  }
+
+  Future<int> audioTrackCount() async {
+    final native = _streamPlayer;
+    if (native != null) {
+      return native.state.tracks.audio
+          .where((track) => track.id != 'auto' && track.id != 'no')
+          .length;
+    }
+    return (await _controller?.getAudioTracks())?.length ?? 0;
+  }
+
+  Future<void> _openEncrypted(Media media, String key, bool play) async {
+    if (!RegExp(r'^[0-9a-fA-F]{32}$').hasMatch(key)) {
+      throw const FormatException('视频内容密钥无效');
+    }
+    await stop();
+    if (_disposed) return;
+    MediaKit.ensureInitialized();
+    final generation = ++_openGeneration;
+    final volume = state.volume;
+    final rate = state.rate;
+    final native = Player(
+      configuration: const PlayerConfiguration(
+        bufferSize: 32 * 1024 * 1024,
+        logLevel: MPVLogLevel.error,
+      ),
+    );
+    _streamPlayer = native;
+    _streamVideo = kit.VideoController(native);
+    WidgetsBinding.instance.scheduleFrame();
+    void mirror<T>(
+      Stream<T> input,
+      StreamController<T> output, {
+      bool repaint = false,
+    }) {
+      _streamSubscriptions.add(
+        input.listen((value) {
+          if (_disposed ||
+              generation != _openGeneration ||
+              !identical(native, _streamPlayer)) {
+            return;
+          }
+          state = native.state;
+          _safeAdd(output, value);
+          if (repaint) revision.value++;
+        }),
+      );
+    }
+
+    mirror(native.stream.position, stream.positionController);
+    mirror(native.stream.duration, stream.durationController);
+    mirror(native.stream.buffer, stream.bufferController);
+    mirror(native.stream.playing, stream.playingController, repaint: true);
+    mirror(native.stream.buffering, stream.bufferingController, repaint: true);
+    mirror(native.stream.completed, stream.completedController, repaint: true);
+    mirror(
+      native.stream.videoParams,
+      stream.videoParamsController,
+      repaint: true,
+    );
+    mirror(native.stream.error, stream.errorController);
+    mirror(native.stream.volume, stream.volumeController);
+    mirror(native.stream.rate, stream.rateController);
+    try {
+      final backend = native.platform as NativePlayer;
+      await backend.setProperty('demuxer-lavf-o', 'decryption_key=$key');
+      await backend.setProperty('network-timeout', '20');
+      await native.setVolume(volume);
+      await native.setRate(rate);
+      if (_disposed || generation != _openGeneration) return;
+      await native.open(media, play: play);
+      if (!_disposed && generation == _openGeneration) revision.value++;
+    } catch (_) {
+      if (identical(native, _streamPlayer)) await stop();
+      rethrow;
+    }
+  }
 
   @override
   Future<void> open(Playable playable, {bool play = true}) async {
@@ -119,8 +228,15 @@ class LunaExoPlayer implements Player {
     final media = playable;
     final url = media.uri;
     if (url.isEmpty) return;
+    final key = media.extras?['decryptionKey']?.toString() ?? '';
+    if (key.isNotEmpty) {
+      return _openEncrypted(media, key, play);
+    }
+    if (_streamPlayer != null) await stop();
 
     final myGen = ++_openGeneration;
+    _pendingSeekSequence = 0;
+    _seekOperations = Future<void>.value();
     _positionPollTimer?.cancel();
 
     // 切换新节目时，旧控制器先静音/暂停，彻底防止新旧双重音频重叠
@@ -153,9 +269,11 @@ class LunaExoPlayer implements Player {
           'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
     }
 
-    bool isHls = url.toLowerCase().contains('.m3u8') ||
+    bool isHls =
+        url.toLowerCase().contains('.m3u8') ||
         url.toLowerCase().contains('hls') ||
         (headers['accept']?.contains('mpegurl') ?? false);
+    var confirmedMp4 = false;
 
     final uri = Uri.tryParse(url);
     if (uri == null && !url.startsWith('/')) {
@@ -164,34 +282,56 @@ class LunaExoPlayer implements Player {
     }
 
     // 先导探测：如果尚未显式判定为 HLS，向网络地址快速嗅探前置响应头与内容，智能识别
-    if (!isHls && uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+    if (!isHls &&
+        uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https')) {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 3);
       try {
-        final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
-        final req = await client.getUrl(uri);
+        final req = await client
+            .getUrl(uri)
+            .timeout(const Duration(seconds: 3));
         headers.forEach((k, v) => req.headers.set(k, v));
         req.headers.set('Range', 'bytes=0-512');
-        final resp = await req.close();
+        final resp = await req.close().timeout(const Duration(seconds: 3));
         final cType = resp.headers.contentType?.toString().toLowerCase() ?? '';
-        final chunks = await resp.take(1).toList();
-        final firstChunk = chunks.isNotEmpty ? String.fromCharCodes(chunks.first) : '';
-        DiaryService.add('[Sniff] 探测结果: status=${resp.statusCode}, contentType=$cType, prefix=${firstChunk.length > 20 ? firstChunk.substring(0, 20) : firstChunk}');
+        final chunks = await resp
+            .take(1)
+            .timeout(const Duration(seconds: 3))
+            .toList();
+        final firstChunk = chunks.isNotEmpty
+            ? String.fromCharCodes(chunks.first)
+            : '';
+        confirmedMp4 =
+            cType.contains('video/mp4') ||
+            firstChunk.length >= 8 && firstChunk.substring(4, 8) == 'ftyp';
+        DiaryService.add(
+          '[Sniff] 探测结果: status=${resp.statusCode}, contentType=$cType, prefix=${firstChunk.length > 20 ? firstChunk.substring(0, 20) : firstChunk}',
+        );
         if (cType.contains('mpegurl') || firstChunk.contains('#EXTM3U')) {
           isHls = true;
-          DiaryService.add('[Sniff] 自动识别为 HLS 流，注入 formatHint: VideoFormat.hls');
+          DiaryService.add(
+            '[Sniff] 自动识别为 HLS 流，注入 formatHint: VideoFormat.hls',
+          );
         }
-        client.close(force: true);
       } catch (e) {
         DiaryService.add('[Sniff] 探测警告 (非致命): $e');
+      } finally {
+        client.close(force: true);
       }
     }
 
     VideoFormat? formatHint = isHls ? VideoFormat.hls : null;
 
-    DiaryService.add('[ExoPlayer] open(gen=$myGen): url=$url, isHls=$isHls, formatHint=$formatHint, headers=${headers.keys.toList()}');
+    DiaryService.add(
+      '[ExoPlayer] open(gen=$myGen): url=$url, isHls=$isHls, formatHint=$formatHint, headers=${headers.keys.toList()}',
+    );
 
     VideoPlayerController c;
     if (url.startsWith('/') || (uri != null && uri.scheme == 'file')) {
-      final filePath = uri != null && uri.scheme == 'file' ? uri.toFilePath() : url;
+      final filePath = uri != null && uri.scheme == 'file'
+          ? uri.toFilePath()
+          : url;
       DiaryService.add('[ExoPlayer] 本地文件播放: $filePath');
       c = VideoPlayerController.file(
         File(filePath),
@@ -207,23 +347,32 @@ class LunaExoPlayer implements Player {
     }
 
     try {
-      DiaryService.add('[ExoPlayer] c.initialize() 开始 (formatHint=$formatHint)...');
-      await c.initialize();
       DiaryService.add(
-          '[ExoPlayer] c.initialize() 成功! duration=${c.value.duration}, size=${c.value.size}, isInitialized=${c.value.isInitialized}');
+        '[ExoPlayer] c.initialize() 开始 (formatHint=$formatHint)...',
+      );
+      await c.initialize().timeout(initializationTimeout);
+      DiaryService.add(
+        '[ExoPlayer] c.initialize() 成功! duration=${c.value.duration}, size=${c.value.size}, isInitialized=${c.value.isInitialized}',
+      );
     } catch (e, stack) {
       DiaryService.add('[ExoPlayer] 首次 initialize 失败: $e');
-      // 如果首次尝试失败，且为网络视频，则原地使用交替格式（HLS <-> MP4）自愈重试
-      if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
-        final alternateFormat = formatHint == VideoFormat.hls ? null : VideoFormat.hls;
-        DiaryService.add('[ExoPlayer] 启动自愈重试，切换格式为 formatHint=$alternateFormat...');
+      if (!confirmedMp4 &&
+          uri != null &&
+          (uri.scheme == 'http' || uri.scheme == 'https')) {
+        final alternateFormat = formatHint == VideoFormat.hls
+            ? null
+            : VideoFormat.hls;
+        DiaryService.add(
+          '[ExoPlayer] 启动自愈重试，切换格式为 formatHint=$alternateFormat...',
+        );
         try {
           await c.dispose();
         } catch (_) {}
 
         final retryHeaders = Map<String, String>.from(headers);
         if (alternateFormat == VideoFormat.hls) {
-          retryHeaders['Accept'] = 'application/vnd.apple.mpegurl,application/x-mpegURL,*/*';
+          retryHeaders['Accept'] =
+              'application/vnd.apple.mpegurl,application/x-mpegURL,*/*';
         }
         c = VideoPlayerController.networkUrl(
           uri,
@@ -232,11 +381,13 @@ class LunaExoPlayer implements Player {
           videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
         );
         try {
-          await c.initialize();
+          await c.initialize().timeout(initializationTimeout);
           formatHint = alternateFormat;
           DiaryService.add('[ExoPlayer] 自愈重试成功! duration=${c.value.duration}');
         } catch (retryErr, retryStack) {
-          DiaryService.add('[ExoPlayer] 自愈重试依然失败! 异常: $retryErr\n堆栈: $retryStack');
+          DiaryService.add(
+            '[ExoPlayer] 自愈重试依然失败! 异常: $retryErr\n堆栈: $retryStack',
+          );
           if (myGen == _openGeneration) {
             _safeAdd(stream.errorController, retryErr.toString());
           }
@@ -278,6 +429,7 @@ class LunaExoPlayer implements Player {
     }
 
     _controller = c;
+    _controllerError = null;
     final dur = c.value.duration;
     final w = c.value.size.width.round();
     final h = c.value.size.height.round();
@@ -327,7 +479,7 @@ class LunaExoPlayer implements Player {
       final c = _controller;
       if (c == null || !c.value.isInitialized) return;
       final pos = c.value.position;
-      if (pos != state.position) {
+      if (_pendingSeekSequence == 0 && pos != state.position) {
         state = state.copyWith(position: pos);
         _safeAdd(stream.positionController, pos);
       }
@@ -352,7 +504,12 @@ class LunaExoPlayer implements Player {
       stateChanged = true;
     }
     if (v.hasError) {
-      DiaryService.add('[ExoPlayer] controller error: ${v.errorDescription}');
+      final error = v.errorDescription ?? '视频读取失败';
+      if (_controllerError != error) {
+        _controllerError = error;
+        DiaryService.add('[ExoPlayer] controller error: $error');
+        _safeAdd(stream.errorController, error);
+      }
     }
     final dur = v.duration;
     if (dur > Duration.zero && dur != state.duration) {
@@ -361,7 +518,7 @@ class LunaExoPlayer implements Player {
       stateChanged = true;
     }
     final pos = v.position;
-    if (pos != state.position) {
+    if (_pendingSeekSequence == 0 && pos != state.position) {
       state = state.copyWith(position: pos);
       _safeAdd(stream.positionController, pos);
     }
@@ -385,6 +542,7 @@ class LunaExoPlayer implements Player {
 
   @override
   Future<void> play() async {
+    if (_streamPlayer != null) return _streamPlayer!.play();
     final c = _controller;
     if (c == null) return;
     try {
@@ -394,6 +552,7 @@ class LunaExoPlayer implements Player {
 
   @override
   Future<void> pause() async {
+    if (_streamPlayer != null) return _streamPlayer!.pause();
     final c = _controller;
     if (c == null) return;
     try {
@@ -403,6 +562,7 @@ class LunaExoPlayer implements Player {
 
   @override
   Future<void> playOrPause() async {
+    if (_streamPlayer != null) return _streamPlayer!.playOrPause();
     final c = _controller;
     if (c == null) return;
     if (c.value.isPlaying) {
@@ -414,21 +574,44 @@ class LunaExoPlayer implements Player {
 
   @override
   Future<void> seek(Duration target) async {
+    if (_streamPlayer != null) return _streamPlayer!.seek(target);
     final c = _controller;
     if (c == null) return;
-    try {
-      await c.seekTo(target);
-      state = state.copyWith(position: target);
-      _safeAdd(stream.positionController, target);
-      if (state.completed) {
-        state = state.copyWith(completed: false);
-        _safeAdd(stream.completedController, false);
+    final generation = _openGeneration;
+    final sequence = ++_seekSequence;
+    final bounded = target < Duration.zero
+        ? Duration.zero
+        : c.value.duration > Duration.zero && target > c.value.duration
+        ? c.value.duration
+        : target;
+    _pendingSeekSequence = sequence;
+    final operation = _seekOperations.catchError((Object _) {}).then((_) async {
+      bool current() =>
+          !_disposed &&
+          _controller == c &&
+          generation == _openGeneration &&
+          sequence == _seekSequence;
+      if (!current()) return;
+      try {
+        await c.seekTo(bounded);
+        if (!current()) return;
+        state = state.copyWith(position: bounded);
+        _safeAdd(stream.positionController, bounded);
+        if (state.completed) {
+          state = state.copyWith(completed: false);
+          _safeAdd(stream.completedController, false);
+        }
+      } finally {
+        if (current()) _pendingSeekSequence = 0;
       }
-    } catch (_) {}
+    });
+    _seekOperations = operation;
+    await operation;
   }
 
   @override
   Future<void> setRate(double rate) async {
+    if (_streamPlayer != null) return _streamPlayer!.setRate(rate);
     final r = rate.clamp(0.25, 4.0);
     state = state.copyWith(rate: r);
     _safeAdd(stream.rateController, r);
@@ -441,6 +624,7 @@ class LunaExoPlayer implements Player {
 
   @override
   Future<void> setVolume(double volume) async {
+    if (_streamPlayer != null) return _streamPlayer!.setVolume(volume);
     final v = volume.clamp(0.0, 100.0);
     state = state.copyWith(volume: v);
     _safeAdd(stream.volumeController, v);
@@ -453,45 +637,55 @@ class LunaExoPlayer implements Player {
 
   @override
   Future<void> stop() async {
-    final c = _controller;
-    if (c == null) return;
-    try {
-      await c.pause();
-      await c.seekTo(Duration.zero);
-    } catch (_) {}
-    state = state.copyWith(
-      playing: false,
-      buffering: false,
-      completed: false,
-      position: Duration.zero,
-    );
-    _safeAdd(stream.playingController, false);
-    _safeAdd(stream.bufferingController, false);
-    _safeAdd(stream.positionController, Duration.zero);
-    revision.value++;
-  }
-
-  @override
-  Future<void> dispose() async {
-    _disposed = true;
+    _openGeneration++;
+    _pendingSeekSequence = 0;
+    _seekOperations = Future<void>.value();
     _positionPollTimer?.cancel();
+    _positionPollTimer = null;
     final c = _controller;
+    _controller = null;
+    _controllerError = null;
+    final native = _streamPlayer;
+    _streamPlayer = null;
+    _streamVideo = null;
+    for (final subscription in _streamSubscriptions) {
+      await subscription.cancel();
+    }
+    _streamSubscriptions.clear();
     final listener = _valueListener;
+    _valueListener = null;
     if (c != null && listener != null) {
       try {
         c.removeListener(listener);
       } catch (_) {}
     }
-    _valueListener = null;
+    state = state.copyWith(
+      playlist: const Playlist([]),
+      playing: false,
+      buffering: false,
+      completed: false,
+      position: Duration.zero,
+      duration: Duration.zero,
+      buffer: Duration.zero,
+    );
+    _safeAdd(stream.playingController, false);
+    _safeAdd(stream.bufferingController, false);
+    _safeAdd(stream.positionController, Duration.zero);
+    if (!_disposed) revision.value++;
     if (c != null) {
-      try {
-        await c.pause();
-      } catch (_) {}
       try {
         await c.dispose();
       } catch (_) {}
-      _controller = null;
     }
+    await native?.dispose();
+  }
+
+  @override
+  Future<void> dispose() => _disposeFuture ??= _disposePlayer();
+
+  Future<void> _disposePlayer() async {
+    _disposed = true;
+    await stop();
     stream.dispose();
   }
 
@@ -525,6 +719,7 @@ class LunaExoVideoView extends StatelessWidget {
     return AnimatedBuilder(
       animation: player.revision,
       builder: (context, _) {
+        final nativeVideo = player._streamVideo;
         final c = player.controller;
         final hasVideo = c != null && c.value.isInitialized;
         final rawRatio = hasVideo ? c.value.aspectRatio : 16 / 9;
@@ -535,12 +730,16 @@ class LunaExoVideoView extends StatelessWidget {
         return Stack(
           fit: StackFit.expand,
           children: [
-            if (hasVideo)
+            if (nativeVideo != null)
+              kit.Video(
+                key: ObjectKey(nativeVideo),
+                controller: nativeVideo,
+                fit: fit,
+                controls: kit.NoVideoControls,
+              )
+            else if (hasVideo)
               Center(
-                child: AspectRatio(
-                  aspectRatio: ratio,
-                  child: VideoPlayer(c),
-                ),
+                child: AspectRatio(aspectRatio: ratio, child: VideoPlayer(c)),
               )
             else
               const ColoredBox(color: AppColors.black),

@@ -126,18 +126,15 @@ class _DetailScreenState extends State<DetailScreen> {
       final finalEpisodes = detail.episodes.isNotEmpty
           ? detail.episodes
           : (merged.episodes > 0
-              ? List.generate(
-                  merged.episodes,
-                  (index) => Episode(
-                    {
+                ? List.generate(
+                    merged.episodes,
+                    (index) => Episode({
                       'id': '${merged.cleanSourceId}_${index + 1}',
                       'title': '第 ${index + 1} 集',
                       'currentEpisode': index + 1,
-                    },
-                    index + 1,
-                  ),
-                )
-              : <Episode>[]);
+                    }, index + 1),
+                  )
+                : <Episode>[]);
       setState(() {
         _detail = DramaDetail(merged, finalEpisodes, warning: detail.warning);
         _loading = false;
@@ -298,44 +295,6 @@ class _DetailScreenState extends State<DetailScreen> {
         !widget.store.allowsSource(detail.drama.source)) {
       return;
     }
-    if (detail.episodes[index].vip) {
-      final accepted = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.workspace_premium_rounded, color: Colors.amber),
-              SizedBox(width: 8),
-              Text('官方试看说明'),
-            ],
-          ),
-          content: Text(
-            '本剧官方当前仅开放前序免登录公开试看，第 ${detail.episodes[index].number} 集为官方 VIP/限制集，官方 Web 暂未开放免登录流。\n\n建议直接观看前序开放集数，或通过多元数据源切换全集线路。',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('我知道了'),
-            ),
-            if (index > 0)
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context, false);
-                  _play(0);
-                },
-                child: const Text('播放第 1 集'),
-              ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('仍尝试播放'),
-            ),
-          ],
-        ),
-      );
-      if (accepted != true || !mounted) {
-        return;
-      }
-    }
     final saved = widget.store.watched(detail.drama.id);
     final position =
         resume &&
@@ -396,7 +355,8 @@ class _DetailScreenState extends State<DetailScreen> {
             releaseStatus: drama.releaseStatus,
           )
         : drama;
-    final currentEntries = (_seriesEntries != null && _seriesEntries!.isNotEmpty)
+    final currentEntries =
+        (_seriesEntries != null && _seriesEntries!.isNotEmpty)
         ? _seriesEntries
         : hongguoSeriesEntries(anchor, widget.store.seriesDramasFor(anchor));
     await Navigator.of(context).pushReplacement(
@@ -420,10 +380,10 @@ class _DetailScreenState extends State<DetailScreen> {
     final dramaSource = drama.source.isNotEmpty
         ? drama.source
         : (widget.drama.source.isNotEmpty
-            ? widget.drama.source
-            : (drama.id.contains(':')
-                ? drama.id.split(':').first
-                : widget.store.source));
+              ? widget.drama.source
+              : (drama.id.contains(':')
+                    ? drama.id.split(':').first
+                    : widget.store.source));
     final television = AppLayout.isTelevision(context);
     final allowed =
         widget.store.profileEpoch == _profileEpoch &&
@@ -519,12 +479,16 @@ class _DetailScreenState extends State<DetailScreen> {
                                   children: [
                                     _seriesSelector(drama),
                                     Expanded(
-                                      child: _loading || _error != null || episodes.isEmpty
+                                      child:
+                                          _loading ||
+                                              _error != null ||
+                                              episodes.isEmpty
                                           ? _episodeStatus()
                                           : EpisodeBrowser(
                                               episodes: episodes,
                                               currentNumber: watched?.episode,
-                                              onSelected: (index) => _play(index),
+                                              onSelected: (index) =>
+                                                  _play(index),
                                             ),
                                     ),
                                   ],
@@ -544,7 +508,12 @@ class _DetailScreenState extends State<DetailScreen> {
                           slivers: [
                             SliverToBoxAdapter(
                               child: Padding(
-                                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  12,
+                                  20,
+                                  8,
+                                ),
                                 child: _overview(drama),
                               ),
                             ),
@@ -557,69 +526,77 @@ class _DetailScreenState extends State<DetailScreen> {
                             else ...[
                               SliverToBoxAdapter(
                                 child: _episodeSummary(
-                            episodes,
-                            currentNumber: watched?.episode,
-                            expanded: showEpisodes,
-                          ),
-                        ),
-                        if (showEpisodes) ...[
-                          SliverToBoxAdapter(
-                            child: EpisodeRangeBar(
-                              key: _episodeAnchor,
-                              episodes: episodes,
-                              page: _episodePage,
-                              title: '分组',
-                              currentNumber: watched?.episode,
-                              onLocate: _locateEpisode,
-                            ),
-                          ),
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-                            sliver: SliverGrid(
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: _episodeColumns(
-                                      constraints.maxWidth,
-                                      episodes,
-                                    ),
-                                    mainAxisExtent: math.max(
-                                      54,
-                                      MediaQuery.textScalerOf(
-                                            context,
-                                          ).scale(20) +
-                                          30,
-                                    ),
-                                    crossAxisSpacing: 10,
-                                    mainAxisSpacing: 10,
+                                  episodes,
+                                  currentNumber: watched?.episode,
+                                  expanded: showEpisodes,
+                                ),
+                              ),
+                              if (showEpisodes) ...[
+                                SliverToBoxAdapter(
+                                  child: EpisodeRangeBar(
+                                    key: _episodeAnchor,
+                                    episodes: episodes,
+                                    page: _episodePage,
+                                    title: '分组',
+                                    currentNumber: watched?.episode,
+                                    onLocate: _locateEpisode,
                                   ),
-                              delegate: SliverChildBuilderDelegate((
-                                context,
-                                index,
-                              ) {
-                                final episode = visible[index];
-                                return RemoteEpisodeButton(
-                                  key: ValueKey('episode-${episode.number}'),
-                                  number: episode.number,
-                                  vip: episode.vip,
-                                  current: episode.number == watched?.episode,
-                                  onPressed: () => _play(start + index),
-                                );
-                              }, childCount: visible.length),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ],
-                  );
-                },
-              ),
+                                ),
+                                SliverPadding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    4,
+                                    20,
+                                    24,
+                                  ),
+                                  sliver: SliverGrid(
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: _episodeColumns(
+                                            constraints.maxWidth,
+                                            episodes,
+                                          ),
+                                          mainAxisExtent: math.max(
+                                            54,
+                                            MediaQuery.textScalerOf(
+                                                  context,
+                                                ).scale(20) +
+                                                30,
+                                          ),
+                                          crossAxisSpacing: 10,
+                                          mainAxisSpacing: 10,
+                                        ),
+                                    delegate: SliverChildBuilderDelegate((
+                                      context,
+                                      index,
+                                    ) {
+                                      final episode = visible[index];
+                                      return RemoteEpisodeButton(
+                                        key: ValueKey(
+                                          'episode-${episode.number}',
+                                        ),
+                                        number: episode.number,
+                                        vip: episode.vip,
+                                        current:
+                                            episode.number == watched?.episode,
+                                        onPressed: () => _play(start + index),
+                                      );
+                                    }, childCount: visible.length),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    ),
-  ),
-  bottomNavigationBar: Container(
+        ),
+        bottomNavigationBar: Container(
           decoration: BoxDecoration(
             gradient: Theme.of(context).brightness == Brightness.dark
                 ? AppGradients.bottomNavGlass
@@ -631,7 +608,9 @@ class _DetailScreenState extends State<DetailScreen> {
               top: BorderSide(
                 color: Theme.of(context).brightness == Brightness.dark
                     ? const Color(0x26FFFFFF)
-                    : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    : Theme.of(
+                        context,
+                      ).colorScheme.outlineVariant.withValues(alpha: 0.5),
                 width: 0.6,
               ),
             ),
@@ -674,7 +653,8 @@ class _DetailScreenState extends State<DetailScreen> {
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(28),
-                            boxShadow: allowed && !_loading && episodes.isNotEmpty
+                            boxShadow:
+                                allowed && !_loading && episodes.isNotEmpty
                                 ? AppShadows.primaryGlow
                                 : null,
                           ),
@@ -684,7 +664,8 @@ class _DetailScreenState extends State<DetailScreen> {
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.hongguoRed,
                               foregroundColor: AppColors.white,
-                              disabledBackgroundColor: AppColors.hongguoRed.withValues(alpha: 0.4),
+                              disabledBackgroundColor: AppColors.hongguoRed
+                                  .withValues(alpha: 0.4),
                               shape: const StadiumBorder(),
                               minimumSize: const Size(0, 52),
                               padding: const EdgeInsets.symmetric(
@@ -695,13 +676,16 @@ class _DetailScreenState extends State<DetailScreen> {
                             onPressed: !allowed || _loading || episodes.isEmpty
                                 ? null
                                 : () => _play(resumeIndex, resume: true),
-                            icon: const Icon(Icons.play_arrow_rounded, size: 28),
+                            icon: const Icon(
+                              Icons.play_arrow_rounded,
+                              size: 28,
+                            ),
                             label: Text(
                               _loading
                                   ? '正在加载...'
                                   : (watched != null && episodes.isNotEmpty
-                                      ? '继续播放 · 第 ${episodes[resumeIndex].number} 集'
-                                      : '立即播放'),
+                                        ? '继续播放 · 第 ${episodes[resumeIndex].number} 集'
+                                        : '立即播放'),
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontSize: 16,
@@ -755,6 +739,7 @@ class _DetailScreenState extends State<DetailScreen> {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () => setState(() => _episodesExpanded = !expanded),
+          key: const ValueKey('detail-episodes-toggle'),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
@@ -876,7 +861,10 @@ class _DetailScreenState extends State<DetailScreen> {
                     runSpacing: 6,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.hongguoRed.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
@@ -896,9 +884,14 @@ class _DetailScreenState extends State<DetailScreen> {
                       ),
                       if (drama.episodes > 0)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: colors.surfaceContainerHighest.withValues(alpha: 0.7),
+                            color: colors.surfaceContainerHighest.withValues(
+                              alpha: 0.7,
+                            ),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -912,9 +905,14 @@ class _DetailScreenState extends State<DetailScreen> {
                         ),
                       if (drama.category.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: colors.surfaceContainerHighest.withValues(alpha: 0.7),
+                            color: colors.surfaceContainerHighest.withValues(
+                              alpha: 0.7,
+                            ),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -927,21 +925,23 @@ class _DetailScreenState extends State<DetailScreen> {
                         ),
                     ],
                   ),
-                  if (drama.releaseStatus.isNotEmpty && drama.releaseStatus != 'unknown')
+                  if (drama.releaseStatus.isNotEmpty &&
+                      drama.releaseStatus != 'unknown')
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         drama.releaseLabel,
-                        style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   if (drama.vipStatus != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        drama.vip
-                            ? 'VIP 内容'
-                            : '免费内容',
+                        drama.vip ? 'VIP 内容' : '免费内容',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -1102,7 +1102,9 @@ class _DetailScreenState extends State<DetailScreen> {
                         padding: const EdgeInsets.only(right: 8),
                         child: InkWell(
                           key: ValueKey('series-${entry.drama.id}'),
-                          onTap: isCurrent ? null : () => _openSeriesDrama(entry.drama),
+                          onTap: isCurrent
+                              ? null
+                              : () => _openSeriesDrama(entry.drama),
                           borderRadius: BorderRadius.circular(14),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
@@ -1121,8 +1123,8 @@ class _DetailScreenState extends State<DetailScreen> {
                                 color: isCurrent
                                     ? AppColors.hongguoRed
                                     : (isNew
-                                        ? AppColors.hongguoRedWithAlpha(0.6)
-                                        : AppColors.whiteWithAlpha(0.12)),
+                                          ? AppColors.hongguoRedWithAlpha(0.6)
+                                          : AppColors.whiteWithAlpha(0.12)),
                                 width: isCurrent ? 1.2 : 0.8,
                               ),
                             ),
@@ -1150,7 +1152,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppColors.whiteWithAlpha(0.25),
-                                          borderRadius: BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: const Text(
                                           '当前',
@@ -1170,7 +1174,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppColors.hongguoRed,
-                                          borderRadius: BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: const Text(
                                           'NEW',
@@ -1186,13 +1192,15 @@ class _DetailScreenState extends State<DetailScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 ConstrainedBox(
-                                  constraints: const BoxConstraints(maxWidth: 160),
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 160,
+                                  ),
                                   child: Text(
                                     watched != null
                                         ? '看至第${watched.episode}集'
                                         : (isCurrent
-                                            ? '正在浏览'
-                                            : entry.drama.title),
+                                              ? '正在浏览'
+                                              : entry.drama.title),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(

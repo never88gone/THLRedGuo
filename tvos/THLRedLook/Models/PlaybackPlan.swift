@@ -10,6 +10,7 @@ public struct PlaybackPlan: Hashable, Codable {
     public let danmakuId: String
     public let prefetchedBytes: Int
     public let expiresAt: Int64
+    public let mediaBytes: Int64
     public let routeIndex: Int
     public let routeCount: Int
     public let local: Bool
@@ -24,6 +25,7 @@ public struct PlaybackPlan: Hashable, Codable {
         danmakuId: String = "",
         prefetchedBytes: Int = 0,
         expiresAt: Int64 = 0,
+        mediaBytes: Int64 = 0,
         routeIndex: Int = 0,
         routeCount: Int = 1,
         local: Bool = false
@@ -37,13 +39,14 @@ public struct PlaybackPlan: Hashable, Codable {
         self.danmakuId = danmakuId
         self.prefetchedBytes = prefetchedBytes
         self.expiresAt = expiresAt
+        self.mediaBytes = max(0, mediaBytes)
         self.routeIndex = routeIndex
         self.routeCount = max(1, routeCount)
         self.local = local
     }
 
     enum CodingKeys: String, CodingKey {
-        case url, headers, decryptionKey, quality, qualities, session, danmakuId, prefetchedBytes, expiresAt, routeIndex, routeCount, local
+        case url, headers, decryptionKey, quality, qualities, session, danmakuId, prefetchedBytes, expiresAt, mediaBytes, routeIndex, routeCount, local
     }
 
     public init(from decoder: Decoder) throws {
@@ -57,6 +60,7 @@ public struct PlaybackPlan: Hashable, Codable {
         self.danmakuId = try container.decodeIfPresent(String.self, forKey: .danmakuId) ?? ""
         self.prefetchedBytes = try container.decodeIfPresent(Int.self, forKey: .prefetchedBytes) ?? 0
         self.expiresAt = try container.decodeIfPresent(Int64.self, forKey: .expiresAt) ?? 0
+        self.mediaBytes = try container.decodeIfPresent(Int64.self, forKey: .mediaBytes) ?? 0
         self.routeIndex = try container.decodeIfPresent(Int.self, forKey: .routeIndex) ?? 0
         self.routeCount = try container.decodeIfPresent(Int.self, forKey: .routeCount) ?? 1
         self.local = try container.decodeIfPresent(Bool.self, forKey: .local) ?? false

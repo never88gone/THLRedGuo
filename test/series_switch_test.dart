@@ -76,7 +76,7 @@ void main() {
       detail1.drama,
       detail1.episodes.first,
     );
-    print('playbackRes url: ${playbackRes.url}');
+    print('playbackRes urlAvailable: ${playbackRes.url.isNotEmpty}');
     expect(playbackRes.url.isNotEmpty, isTrue);
   });
 

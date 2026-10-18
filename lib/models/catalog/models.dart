@@ -9,7 +9,7 @@ class SourceSite {
   final String name;
   final String description;
   bool get onlineSearch => id == 'hongguo';
-  bool get pagedSearch => false;
+  bool get pagedSearch => id == 'hongguo';
   bool get searchSuggestions => id == 'hongguo';
   String get groupId => id;
   String get groupName => name;
@@ -88,7 +88,8 @@ class SourceSite {
       ];
     }
     return [
-      for (final site in (unlocked || isZhenguojianActivated ? knownValues : primaryValues))
+      for (final site
+          in (unlocked || isZhenguojianActivated ? knownValues : primaryValues))
         site,
     ];
   }
@@ -358,6 +359,7 @@ class PlaybackPlan {
     required this.url,
     this.headers = const {},
     this.decryptionKey = '',
+    this.mediaBytes = 0,
     this.quality = 0,
     this.qualities = const [],
     this.session = '',
@@ -367,10 +369,12 @@ class PlaybackPlan {
     this.routeIndex = 0,
     this.routeCount = 1,
     this.local = false,
+    this.onlineCache = false,
   });
   final String url;
   final Map<String, String> headers;
   final String decryptionKey;
+  final int mediaBytes;
   final int quality;
   final List<int> qualities;
   final String session;
@@ -380,14 +384,18 @@ class PlaybackPlan {
   final int routeIndex;
   final int routeCount;
   final bool local;
+  final bool onlineCache;
+  bool get offline => local && !onlineCache;
   bool get hasAlternative => session.isNotEmpty && routeIndex + 1 < routeCount;
   factory PlaybackPlan.fromJson(Map<String, dynamic> json) => PlaybackPlan(
     url: json['url'] as String? ?? '',
     local: json['local'] == true,
+    onlineCache: json['onlineCache'] == true,
     headers: (json['headers'] as Map? ?? {}).map(
       (key, value) => MapEntry(key.toString(), value.toString()),
     ),
     decryptionKey: json['decryptionKey'] as String? ?? '',
+    mediaBytes: intValue(json['mediaBytes']),
     quality: intValue(json['quality']),
     qualities: (json['qualities'] as List? ?? []).map(intValue).toSet().toList()
       ..sort((a, b) => b.compareTo(a)),

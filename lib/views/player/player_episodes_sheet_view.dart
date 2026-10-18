@@ -27,7 +27,8 @@ class PlayerEpisodesSheetView extends StatefulWidget {
   final ValueChanged<Drama>? onSeasonSelected;
 
   @override
-  State<PlayerEpisodesSheetView> createState() => _PlayerEpisodesSheetViewState();
+  State<PlayerEpisodesSheetView> createState() =>
+      _PlayerEpisodesSheetViewState();
 }
 
 class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
@@ -42,8 +43,13 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
   }
 
   void _initSelectedGroup() {
-    final validIndex = widget.currentIndex.clamp(0, max(0, widget.episodes.length - 1));
-    _selectedGroupIndex = widget.episodes.isEmpty ? 0 : validIndex ~/ _groupSize;
+    final validIndex = widget.currentIndex.clamp(
+      0,
+      max(0, widget.episodes.length - 1),
+    );
+    _selectedGroupIndex = widget.episodes.isEmpty
+        ? 0
+        : validIndex ~/ _groupSize;
   }
 
   int get _totalGroups => widget.episodes.isEmpty
@@ -68,7 +74,10 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
   @override
   Widget build(BuildContext context) {
     final episodes = widget.episodes;
-    final currentEp = episodes.isNotEmpty && widget.currentIndex >= 0 && widget.currentIndex < episodes.length
+    final currentEp =
+        episodes.isNotEmpty &&
+            widget.currentIndex >= 0 &&
+            widget.currentIndex < episodes.length
         ? episodes[widget.currentIndex]
         : null;
 
@@ -139,7 +148,10 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                   borderRadius: BorderRadius.circular(20),
                   onTap: () => setState(() => _isReversed = !_isReversed),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.darkSurfaceHigh,
                       borderRadius: BorderRadius.circular(20),
@@ -149,7 +161,9 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _isReversed ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                          _isReversed
+                              ? Icons.arrow_downward_rounded
+                              : Icons.arrow_upward_rounded,
                           size: 13,
                           color: AppColors.textSecondaryDark,
                         ),
@@ -169,7 +183,10 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                 const SizedBox(width: 6),
                 IconButton(
                   tooltip: '关闭',
-                  icon: const Icon(Icons.close_rounded, color: AppColors.textSecondaryDark),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: AppColors.textSecondaryDark,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -179,7 +196,11 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(Icons.layers_rounded, size: 14, color: AppColors.hongguoRed),
+                  const Icon(
+                    Icons.layers_rounded,
+                    size: 14,
+                    color: AppColors.hongguoRed,
+                  ),
                   const SizedBox(width: 4),
                   const Text(
                     '系列多季',
@@ -191,7 +212,10 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                   ),
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.accentTrack35,
                       borderRadius: BorderRadius.circular(8),
@@ -225,7 +249,8 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, sIdx) {
                     final sEntry = widget.seriesEntries[sIdx];
-                    final isCurrentSeason = sEntry.drama.id == widget.currentDramaId;
+                    final isCurrentSeason =
+                        sEntry.drama.id == widget.currentDramaId;
                     return InkWell(
                       borderRadius: BorderRadius.circular(17),
                       onTap: isCurrentSeason
@@ -233,7 +258,10 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                           : () => widget.onSeasonSelected?.call(sEntry.drama),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: isCurrentSeason
                               ? AppColors.hongguoRed
@@ -249,15 +277,23 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (isCurrentSeason) ...[
-                              const Icon(Icons.play_circle_fill_rounded, size: 14, color: AppColors.textPrimaryDark),
+                              const Icon(
+                                Icons.play_circle_fill_rounded,
+                                size: 14,
+                                color: AppColors.textPrimaryDark,
+                              ),
                               const SizedBox(width: 4),
                             ],
                             Text(
                               sEntry.label,
                               style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: isCurrentSeason ? FontWeight.bold : FontWeight.w500,
-                                color: isCurrentSeason ? AppColors.textPrimaryDark : AppColors.textSecondaryDark,
+                                fontWeight: isCurrentSeason
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                                color: isCurrentSeason
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textSecondaryDark,
                               ),
                             ),
                           ],
@@ -304,7 +340,9 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                           _groupLabel(gIdx),
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: isSelected
                                 ? AppColors.hongguoRed
                                 : AppColors.textSecondaryDark,
@@ -323,17 +361,21 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                   ? const Center(
                       child: Text(
                         '暂无可用剧集',
-                        style: TextStyle(color: AppColors.textTertiaryDark, fontSize: 13),
+                        style: TextStyle(
+                          color: AppColors.textTertiaryDark,
+                          fontSize: 13,
+                        ),
                       ),
                     )
                   : GridView.builder(
                       physics: const BouncingScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 5,
-                        crossAxisSpacing: 9,
-                        mainAxisSpacing: 9,
-                        childAspectRatio: 1.25,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 5,
+                            crossAxisSpacing: 9,
+                            mainAxisSpacing: 9,
+                            childAspectRatio: 1.25,
+                          ),
                       itemCount: groupIndices.length,
                       itemBuilder: (context, index) {
                         final epIndex = groupIndices[index];
@@ -341,15 +383,17 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                         final isPlaying = epIndex == widget.currentIndex;
 
                         return InkWell(
+                          key: ValueKey('episode-option-$epIndex'),
                           borderRadius: BorderRadius.circular(12),
                           onTap: () {
                             widget.onEpisodeSelected(epIndex);
-                            Navigator.pop(context);
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 150),
                             decoration: BoxDecoration(
-                              color: isPlaying ? null : AppColors.darkSurfaceHigh,
+                              color: isPlaying
+                                  ? null
+                                  : AppColors.darkSurfaceHigh,
                               gradient: isPlaying
                                   ? const LinearGradient(
                                       begin: Alignment.topLeft,
@@ -370,7 +414,9 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                               boxShadow: isPlaying
                                   ? [
                                       BoxShadow(
-                                        color: AppColors.hongguoRedWithAlpha(0.35),
+                                        color: AppColors.hongguoRedWithAlpha(
+                                          0.35,
+                                        ),
                                         blurRadius: 10,
                                         offset: const Offset(0, 3),
                                       ),

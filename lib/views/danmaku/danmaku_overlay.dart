@@ -114,7 +114,11 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
             color: AppColors.white,
             height: 1.2,
             shadows: const [
-              Shadow(color: AppColors.black, blurRadius: 3, offset: Offset(1, 1)),
+              Shadow(
+                color: AppColors.black,
+                blurRadius: 3,
+                offset: Offset(1, 1),
+              ),
             ],
           );
           return Center(
@@ -231,6 +235,7 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
   void didUpdateWidget(_DanmakuMotion oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.revision != widget.revision ||
+        oldWidget.positionMs != widget.positionMs ||
         oldWidget.width != widget.width ||
         oldWidget.flight.width != widget.flight.width ||
         oldWidget.flight.item.timeMs != widget.flight.item.timeMs) {
@@ -247,11 +252,12 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
     _motion.value = elapsed / danmakuLifetimeMs;
     if (widget.moving && elapsed < danmakuLifetimeMs) {
       _motion.animateTo(
-        1,
+        (elapsed + 750).clamp(0, danmakuLifetimeMs) / danmakuLifetimeMs,
         duration: Duration(
-          microseconds: ((danmakuLifetimeMs - elapsed) * 1000 / widget.rate)
-              .round()
-              .clamp(1, 86400000000),
+          microseconds:
+              ((danmakuLifetimeMs - elapsed).clamp(1, 750) * 1000 / widget.rate)
+                  .round()
+                  .clamp(1, 86400000000),
         ),
         curve: Curves.linear,
       );

@@ -40,19 +40,26 @@ class PlaybackPreloader extends ChangeNotifier {
 
   Future<void> _warmupStream(PlaybackPlan plan) async {
     if (plan.local || plan.url.isEmpty) return;
+    HttpClient? client;
     try {
       final uri = Uri.tryParse(plan.url);
-      if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) return;
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+      if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+        return;
+      }
+      client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
       final request = await client.getUrl(uri);
       for (final entry in plan.headers.entries) {
         request.headers.set(entry.key, entry.value);
       }
       request.headers.set('Range', 'bytes=0-65535');
-      final response = await request.close().timeout(const Duration(seconds: 3));
+      final response = await request.close().timeout(
+        const Duration(seconds: 3),
+      );
       await response.drain<void>().timeout(const Duration(seconds: 2));
-      client.close(force: true);
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      client?.close(force: true);
+    }
   }
 
   void prepare(
@@ -143,18 +150,18 @@ class PlaybackPreloader extends ChangeNotifier {
   }
 
   void pause() {
-    final changed = loading || _delay != null;
-    _generation++;
+    final changed = _delay != null;
     _delay?.cancel();
     _delay = null;
-    if (loading) {
-      unawaited(repository.cancelPreload().catchError((Object _) {}));
-    }
-    loading = false;
     if (changed && !_closed) notifyListeners();
   }
 
   void clear() {
+    _generation++;
+    if (loading) {
+      unawaited(repository.cancelPreload().catchError((Object _) {}));
+    }
+    loading = false;
     pause();
     final old = _ready;
     _ready = null;

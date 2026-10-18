@@ -1,14 +1,21 @@
 import SwiftUI
+import UIKit
 
 public struct SearchRootView: View {
     @StateObject private var viewModel = SearchViewModel()
     @State private var selectedDrama: Drama?
-    @FocusState private var focusedDramaId: String?
-    @FocusState private var isSearchFieldFocused: Bool
+    @State private var handledInitialQuery: String?
+    @State private var returningDramaId: String?
+    private enum SearchFocus: Hashable {
+        case query
+        case submit
+        case more
+        case drama(String)
+    }
+    @FocusState private var focusedTarget: SearchFocus?
+    @State private var moreReturnDramaId: String?
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
-    ]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 32), count: 6)
 
     public var initialQuery: String?
     public var targetEpisode: Int?
@@ -46,8 +53,17 @@ public struct SearchRootView: View {
                                 get: { viewModel.query },
                                 set: { viewModel.onQueryChanged($0) }
                             ))
-                            .focused($isSearchFieldFocused)
+                            .focused($focusedTarget, equals: .query)
+                            .accessibilityIdentifier("search.query")
+                            .onMoveCommand { direction in
+                                if direction == .up { focusedTarget = nil; onRequestFocusTopNav?() }
+                                if direction == .right {
+
+                                    focusSearchButton()
+                                }
+                            }
                             .onSubmit {
+                                focusSearchButton()
                                 Task { await viewModel.executeSearch() }
                             }
                         }
@@ -57,6 +73,12 @@ public struct SearchRootView: View {
 
                         TVButton(title: "搜索", icon: "magnifyingglass", isProminent: true) {
                             Task { await viewModel.executeSearch() }
+                        }
+                        .accessibilityIdentifier("search.submit")
+                        .focused($focusedTarget, equals: .submit)
+                        .onMoveCommand { direction in
+                            if direction == .left { focusedTarget = .query }
+                            if direction == .up { focusedTarget = nil; onRequestFocusTopNav?() }
                         }
                     }
                     .padding(.horizontal, 48)
@@ -123,62 +145,122 @@ public struct SearchRootView: View {
                             Image(systemName: "film.stack")
                                 .font(.system(size: 48))
                                 .foregroundColor(.secondary)
-                            Text("未找到相关剧集，请尝试更简短的名称")
+                            Text(viewModel.errorMessage ?? "未找到相关剧集，请尝试更简短的名称")
                                 .foregroundColor(.secondary)
+                            if viewModel.errorMessage != nil {
+                                TVButton(title: "重试搜索", icon: "arrow.clockwise") {
+                                    Task { await viewModel.executeSearch() }
+                                }
+                            }
                         }
                         Spacer()
                     } else {
                         ScrollView {
-                            LazyVGrid(columns: columns, spacing: 36) {
-                                ForEach(Array(viewModel.searchResults.enumerated()), id: \.element.id) { index, drama in
-                                    DramaCardView(
-                                        drama: drama,
-                                        isExternalFocused: focusedDramaId == drama.id,
-                                        onUpCommand: {
-                                            if index < 4 {
-                                                focusedDramaId = nil
-                                                isSearchFieldFocused = true
+                            VStack(spacing: 24) {
+                                LazyVGrid(columns: columns, spacing: 36) {
+                                    ForEach(Array(viewModel.searchResults.enumerated()), id: \.element.id) { index, drama in
+                                        DramaCardView(
+                                            drama: drama,
+                                            isExternalFocused: focusedTarget == .drama(drama.id),
+                                            onUpCommand: {
+                                                if index < columns.count {
+
+                                                    focusedTarget = .query
+                                                }
+                                            },
+                                            onDownCommand: {
+                                                if viewModel.hasMore && index >= (viewModel.searchResults.count - 1) / columns.count * columns.count {
+                                                    moreReturnDramaId = drama.id
+
+                                                    focusedTarget = .more
+                                                }
+                                            }
+                                        ) {
+                                            returningDramaId = drama.id
+                                            selectedDrama = drama
+                                        }
+                                        .focused($focusedTarget, equals: .drama(drama.id))
+                                        .id("search_card_\(drama.id)")
+                                        .accessibilityIdentifier("search.result.\(index)")
+                                    }
+                                }
+                                .padding(.horizontal, 48)
+                                .padding(.vertical, 24)
+                                if let message = viewModel.errorMessage {
+                                    Text(message).foregroundColor(.secondary)
+                                }
+                                if viewModel.hasMore {
+                                    TVButton(title: viewModel.isLoadingMore ? "正在加载" : "加载更多", icon: "arrow.down") {
+                                        Task {
+                                            let previousCount = viewModel.searchResults.count
+                                            await viewModel.loadMore()
+                                            if viewModel.searchResults.count > previousCount {
+
+                                                focusedTarget = .drama(viewModel.searchResults[previousCount].id)
                                             }
                                         }
-                                    ) {
-                                        selectedDrama = drama
                                     }
-                                    .focused($focusedDramaId, equals: drama.id)
-                                    .id("search_card_\(drama.id)")
+                                    .accessibilityIdentifier("search.more")
+                                    .focused($focusedTarget, equals: .more)
+                                    .onMoveCommand { direction in
+                                        if direction == .up {
+
+                                            focusedTarget = (moreReturnDramaId ?? viewModel.searchResults.last?.id).map(SearchFocus.drama)
+                                        }
+                                    }
+                                    .frame(minWidth: 280)
+                                    .padding(.bottom, 40)
                                 }
                             }
-                            .padding(.horizontal, 48)
-                            .padding(.vertical, 24)
                         }
                     }
                 }
-                .onAppear {
-                    if let q = initialQuery, !q.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Task {
-                            await viewModel.executeSearch(keyword: q)
-                        }
-                    }
-                }
-                .onChange(of: initialQuery) { newQuery in
-                    if let q = newQuery, !q.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Task {
-                            await viewModel.executeSearch(keyword: q)
-                        }
-                    }
-                }
+                .onAppear { runInitialSearchIfNeeded() }
+                .onChange(of: initialQuery) { _ in runInitialSearchIfNeeded() }
                 .onChange(of: focusTrigger) { _ in
                     if let firstId = viewModel.searchResults.first?.id {
-                        focusedDramaId = firstId
-                        isSearchFieldFocused = false
+                        focusedTarget = .drama(firstId)
+
                     } else {
-                        isSearchFieldFocused = true
-                        focusedDramaId = nil
+                        focusedTarget = .query
+
                     }
                 }
             }
         }
-        .fullScreenCover(item: $selectedDrama) { drama in
+        .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidEndEditingNotification)) { _ in
+            guard selectedDrama == nil else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                if focusedTarget == .query { focusSearchButton() }
+            }
+        }
+        .onExitCommand {
+            guard selectedDrama == nil else { return }
+
+
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                onRequestFocusTopNav?()
+            }
+        }
+        .fullScreenCover(item: $selectedDrama, onDismiss: {
+            focusedTarget = returningDramaId.map(SearchFocus.drama)
+
+        }) { drama in
             DramaDetailView(drama: drama)
         }
     }
+    private func focusSearchButton() {
+        focusedTarget = nil
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { focusedTarget = .submit }
+    }
+
+    private func runInitialSearchIfNeeded() {
+        guard let query = initialQuery?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !query.isEmpty, handledInitialQuery != query else { return }
+        handledInitialQuery = query
+        Task { await viewModel.executeSearch(keyword: query) }
+    }
+
 }

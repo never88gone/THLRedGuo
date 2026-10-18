@@ -26,6 +26,7 @@ public struct PosterArtworkView: View {
     }
 
     private var normalizedCoverURL: URL? {
+        guard ProcessInfo.processInfo.environment["DISABLE_REMOTE_IMAGES"] != "1" else { return nil }
         var str = drama.cover.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !str.isEmpty else { return nil }
         if str.hasPrefix("//") {
@@ -157,6 +158,7 @@ public struct DramaCardView: View {
     public var progressText: String? = nil
     public var forceFocused: Bool = false
     public var onUpCommand: (() -> Void)? = nil
+    public var onDownCommand: (() -> Void)? = nil
     public var onSelect: () -> Void
 
     public init(
@@ -167,6 +169,7 @@ public struct DramaCardView: View {
         progressText: String? = nil,
         forceFocused: Bool = false,
         onUpCommand: (() -> Void)? = nil,
+        onDownCommand: (() -> Void)? = nil,
         onSelect: @escaping () -> Void
     ) {
         self.drama = drama
@@ -175,6 +178,7 @@ public struct DramaCardView: View {
         self.progressText = progressText
         self.forceFocused = forceFocused
         self.onUpCommand = onUpCommand
+        self.onDownCommand = onDownCommand
         self.onSelect = onSelect
     }
 
@@ -193,6 +197,8 @@ public struct DramaCardView: View {
         .onMoveCommand { direction in
             if direction == .up {
                 onUpCommand?()
+            } else if direction == .down {
+                onDownCommand?()
             }
         }
     }
