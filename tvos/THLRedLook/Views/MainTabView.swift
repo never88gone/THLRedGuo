@@ -519,21 +519,19 @@ public struct MainTabView: View {
                 }
             }
         case "player", "controls", "drawer":
-            Task {
-                await JSSourceService.shared.initialize()
-                let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
-                guard !sourceId.isEmpty else { return }
-                var baseDrama = self.directPlayerDrama
-                if baseDrama == nil {
-                    baseDrama = (try? await NativeRepository.shared.loadCatalog(source: sourceId, page: 1))?.items.first
-                }
-                if let target = baseDrama {
-                    let detail = (try? await NativeRepository.shared.loadDetail(drama: target))
-                        ?? DramaDetail(drama: target, episodes: (1...max(20, target.episodes)).map { Episode(id: "\(target.id)_\($0)", title: "第 \($0) 集", number: $0) }, warning: "")
-                    let eps = !detail.episodes.isEmpty ? detail.episodes : (1...max(20, target.episodes)).map { Episode(id: "\(target.id)_\($0)", title: "第 \($0) 集", number: $0) }
-                    await MainActor.run {
-                        self.directPlayerEpisodes = eps
-                        self.directPlayerDrama = detail.drama
+            if self.directPlayerDrama == nil {
+                Task {
+                    await JSSourceService.shared.initialize()
+                    let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
+                    guard !sourceId.isEmpty else { return }
+                    if let target = (try? await NativeRepository.shared.loadCatalog(source: sourceId, page: 1))?.items.first {
+                        let detail = (try? await NativeRepository.shared.loadDetail(drama: target))
+                            ?? DramaDetail(drama: target, episodes: (1...max(20, target.episodes)).map { Episode(id: "\(target.id)_\($0)", title: "第 \($0) 集", number: $0) }, warning: "")
+                        let eps = !detail.episodes.isEmpty ? detail.episodes : (1...max(20, target.episodes)).map { Episode(id: "\(target.id)_\($0)", title: "第 \($0) 集", number: $0) }
+                        await MainActor.run {
+                            self.directPlayerEpisodes = eps
+                            self.directPlayerDrama = detail.drama
+                        }
                     }
                 }
             }

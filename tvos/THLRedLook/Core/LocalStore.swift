@@ -1,6 +1,18 @@
 import Foundation
 import Combine
 
+public struct TVDanmakuStyle: Codable, Equatable {
+    public var fontSize: CGFloat = 26.0
+    public var opacity: Double = 1.0
+    public var laneCount: Int = 8
+
+    public init(fontSize: CGFloat = 26.0, opacity: Double = 1.0, laneCount: Int = 8) {
+        self.fontSize = fontSize
+        self.opacity = opacity
+        self.laneCount = laneCount
+    }
+}
+
 public final class LocalStore: ObservableObject {
     public static let shared = LocalStore()
 
@@ -11,12 +23,20 @@ public final class LocalStore: ObservableObject {
     @Published public var danmakuEnabled: Bool = true {
         didSet { defaults.set(danmakuEnabled, forKey: danmakuKey) }
     }
+    @Published public var danmakuStyle: TVDanmakuStyle = TVDanmakuStyle() {
+        didSet {
+            if let data = try? JSONEncoder().encode(danmakuStyle) {
+                defaults.set(data, forKey: danmakuStyleKey)
+            }
+        }
+    }
     @Published public var unlockedSources: Bool = false
     @Published public var resourceSettings: ResourceSettings = ResourceSettings()
     @Published public var currentSourceId: String = ""
 
     private let defaults: UserDefaults
     private let danmakuKey = "thl_tv_danmaku_enabled"
+    private let danmakuStyleKey = "thl_tv_danmaku_style"
     private let historyKey = "zgj_tv_history"
     private let followsKey = "zgj_tv_follows"
     private let followedDramasKey = "zgj_tv_followed_dramas"
@@ -35,6 +55,11 @@ public final class LocalStore: ObservableObject {
         currentSourceId = defaults.string(forKey: currentSourceKey) ?? ""
         searchHistory = defaults.stringArray(forKey: searchHistoryKey) ?? []
         danmakuEnabled = defaults.object(forKey: danmakuKey) as? Bool ?? true
+
+        if let data = defaults.data(forKey: danmakuStyleKey),
+           let style = try? JSONDecoder().decode(TVDanmakuStyle.self, from: data) {
+            danmakuStyle = style
+        }
 
         if let data = defaults.data(forKey: historyKey),
            let list = try? JSONDecoder().decode([WatchEntry].self, from: data) {

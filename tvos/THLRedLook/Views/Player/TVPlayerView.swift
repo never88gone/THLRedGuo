@@ -62,7 +62,14 @@ public struct TVPlayerView: View {
 
             // 弹幕层
             if viewModel.danmakuEnabled {
-                TVDanmakuView(danmakus: viewModel.activeDanmakus, position: viewModel.currentTime, anchor: viewModel.playbackClockDate, rate: Double(viewModel.playbackRate), moving: viewModel.isPlaying && viewModel.player?.timeControlStatus == .playing)
+                TVDanmakuView(
+                    danmakus: viewModel.activeDanmakus,
+                    position: viewModel.currentTime,
+                    anchor: viewModel.playbackClockDate,
+                    rate: Double(viewModel.playbackRate),
+                    moving: viewModel.isPlaying && viewModel.player?.timeControlStatus == .playing,
+                    style: viewModel.danmakuStyle
+                )
             }
 
             // 正在缓冲/加载遮罩
@@ -206,8 +213,8 @@ public struct TVPlayerView: View {
 
             }
 
-            // 遥控器悬浮控制条（有错误提示或打开选集抽屉时隐藏控制条，防止焦点冲突与视觉重叠）
-            if viewModel.isControlsVisible && (viewModel.errorMessage == nil || viewModel.keepControlsVisible) && !viewModel.isEpisodeDrawerVisible {
+            // 遥控器悬浮控制条（有错误提示或打开抽屉时隐藏控制条，防止焦点冲突与视觉重叠）
+            if viewModel.isControlsVisible && (viewModel.errorMessage == nil || viewModel.keepControlsVisible) && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
                 TVPlayerControlsOverlay(viewModel: viewModel, forceFocusPlayButton: viewModel.keepControlsVisible) {
                     handleExit()
                 }
@@ -217,6 +224,20 @@ public struct TVPlayerView: View {
             // 选集抽屉
             if viewModel.isEpisodeDrawerVisible {
                 TVEpisodeDrawer(viewModel: viewModel, isPresented: $viewModel.isEpisodeDrawerVisible)
+                    .ignoresSafeArea()
+                    .zIndex(100)
+            }
+
+            // 弹幕设置抽屉
+            if viewModel.isDanmakuSettingsVisible {
+                TVDanmakuSettingsDrawer(viewModel: viewModel, isPresented: $viewModel.isDanmakuSettingsVisible)
+                    .ignoresSafeArea()
+                    .zIndex(100)
+            }
+
+            // 倍速选择抽屉
+            if viewModel.isSpeedSheetVisible {
+                TVSpeedSelectionDrawer(viewModel: viewModel, isPresented: $viewModel.isSpeedSheetVisible)
                     .ignoresSafeArea()
                     .zIndex(100)
             }
@@ -246,7 +267,17 @@ public struct TVPlayerView: View {
             guard now - lastExitTime > 0.35 else { return }
             lastExitTime = now
 
-            if viewModel.isEpisodeDrawerVisible {
+            if viewModel.isDanmakuSettingsVisible {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.isDanmakuSettingsVisible = false
+                }
+                viewModel.showControls()
+            } else if viewModel.isSpeedSheetVisible {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.isSpeedSheetVisible = false
+                }
+                viewModel.showControls()
+            } else if viewModel.isEpisodeDrawerVisible {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     viewModel.isEpisodeDrawerVisible = false
                 }
@@ -273,8 +304,18 @@ public struct TVPlayerView: View {
                 viewModel.showControls()
             }
         }
+        .onChange(of: viewModel.isDanmakuSettingsVisible) { _, isVisible in
+            if !isVisible {
+                viewModel.showControls()
+            }
+        }
+        .onChange(of: viewModel.isSpeedSheetVisible) { _, isVisible in
+            if !isVisible {
+                viewModel.showControls()
+            }
+        }
         .onChange(of: viewModel.isControlsVisible) { _, isVisible in
-            if !isVisible && !viewModel.isEpisodeDrawerVisible {
+            if !isVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     isWakeupFocused = true
                 }

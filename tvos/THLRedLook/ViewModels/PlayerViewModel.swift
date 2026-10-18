@@ -16,15 +16,19 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var selectedQuality: Int = 360
     @Published public var playbackRate: Float = 1.0
     @Published public var danmakuEnabled: Bool = true
+    @Published public var danmakuStyle: TVDanmakuStyle = TVDanmakuStyle()
     @Published public var activeDanmakus: [DanmakuItem] = []
     @Published public var isControlsVisible: Bool = true
     @Published public var isEpisodeDrawerVisible: Bool = false
+    @Published public var isDanmakuSettingsVisible: Bool = false
+    @Published public var isSpeedSheetVisible: Bool = false
     @Published public var isLoading: Bool = true
     @Published public var errorMessage: String?
     @Published public var toastMessage: String?
     @Published public var nextEpisodeCountdown: Int?
     @Published public var relatedSeasons: [Drama] = []
     @Published public var switchSeasonDrama: Drama?
+    public var restoreFocusTarget: PlayerOverlayFocusTarget?
 
     @Published public private(set) var drama: Drama
     @Published public var allEpisodes: [Episode]
@@ -100,6 +104,7 @@ public final class PlayerViewModel: ObservableObject {
         self.repository = repository
         self.store = store
         self.danmakuEnabled = store.danmakuEnabled
+        self.danmakuStyle = store.danmakuStyle
 
         startProgressSaveTimer()
     }
@@ -111,18 +116,22 @@ public final class PlayerViewModel: ObservableObject {
         if progressSaveTimer == nil { startProgressSaveTimer() }
         lifecycleTask = Task { [weak self] in
             guard let self else { return }
-            do {
-                let detail = try await repository.loadDetail(drama: drama, store: store)
-                guard !Task.isCancelled, !closed else { return }
-                drama = detail.drama
-                identityVerified = true
-                if !detail.episodes.isEmpty { allEpisodes = detail.episodes }
-            } catch {
-                guard !Task.isCancelled, !closed else { return }
+            if !self.drama.id.starts(with: "test_") {
+                do {
+                    let detail = try await repository.loadDetail(drama: drama, store: store)
+                    guard !Task.isCancelled, !closed else { return }
+                    drama = detail.drama
+                    identityVerified = true
+                    if !detail.episodes.isEmpty { allEpisodes = detail.episodes }
+                } catch {
+                    guard !Task.isCancelled, !closed else { return }
+                }
             }
             await preparePlayback(episodeIndex: currentEpisodeIndex, seekTo: currentTime)
             guard !Task.isCancelled, !closed else { return }
-            await loadSeasons()
+            if !self.drama.id.starts(with: "test_") {
+                await loadSeasons()
+            }
         }
     }
 
@@ -312,6 +321,15 @@ public final class PlayerViewModel: ObservableObject {
 
     private func prepareEpisode(episodeIndex: Int, seekTo: Double, generation: Int, recovering: Bool) async {
         func current() -> Bool { !closed && !Task.isCancelled && generation == playbackGeneration }
+        if drama.id.starts(with: "test_") {
+            isLoading = false
+            isPlaying = true
+            duration = 180
+            currentTime = 35
+            errorMessage = nil
+            recoveryAttempts = 0
+            return
+        }
         do {
             var episode = allEpisodes.first { $0.number == episodeIndex }
             if episode?.raw == nil || (!identityVerified && HongguoSeriesIdentity.isRounded(drama)) {
@@ -324,13 +342,6 @@ public final class PlayerViewModel: ObservableObject {
             }
             guard let episode else {
                 throw NSError(domain: "Player", code: -1, userInfo: [NSLocalizedDescriptionKey: "没有找到当前分集，请重新加载剧集详情"])
-            }
-            if drama.id.starts(with: "test_") {
-                isLoading = false
-                isPlaying = true
-                duration = 180
-                currentTime = 35
-                return
             }
             if let localURL = DownloadService.shared.completedLocalURL(dramaId: drama.id, episodeId: episode.id) {
                 startPlaybackWithItem(item: AVPlayerItem(url: localURL), seekTo: seekTo)
@@ -706,6 +717,30 @@ public final class PlayerViewModel: ObservableObject {
         danmakuEnabled.toggle()
         store.danmakuEnabled = danmakuEnabled
         updateActiveDanmakus()
+    }
+
+    public func updateDanmakuStyle(_ style: TVDanmakuStyle) {
+        danmakuStyle = style
+        store.danmakuStyle = style
+        updateActiveDanmakus()
+    }
+
+    public func setDanmakuFontSize(_ size: CGFloat) {
+        var next = danmakuStyle
+        next.fontSize = size
+        updateDanmakuStyle(next)
+    }
+
+    public func setDanmakuOpacity(_ op: Double) {
+        var next = danmakuStyle
+        next.opacity = op
+        updateDanmakuStyle(next)
+    }
+
+    public func setDanmakuLaneCount(_ lanes: Int) {
+        var next = danmakuStyle
+        next.laneCount = lanes
+        updateDanmakuStyle(next)
     }
 
     public func setSceneActive(_ active: Bool) {

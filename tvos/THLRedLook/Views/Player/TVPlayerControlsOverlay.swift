@@ -4,6 +4,7 @@ import SwiftUI
 public enum PlayerOverlayFocusTarget: Hashable {
     case back
     case danmaku
+    case danmakuSettings
     case speed
     case quality
     case seekBackward
@@ -65,8 +66,8 @@ public struct TVPlayerControlsOverlay: View {
 
                 Spacer()
 
-                HStack(spacing: 24) {
-                    // 弹幕开关
+                HStack(spacing: 20) {
+                    // 弹幕快捷开关
                     overlayBarButton(
                         title: viewModel.danmakuEnabled ? "弹幕：开" : "弹幕：关",
                         icon: viewModel.danmakuEnabled ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right",
@@ -80,6 +81,28 @@ public struct TVPlayerControlsOverlay: View {
                         case .left:
                             focusedControl = .back
                         case .right:
+                            focusedControl = .danmakuSettings
+                        case .down:
+                            focusedControl = .playPause
+                        default: break
+                        }
+                    }
+
+                    // 弹幕样式设置
+                    overlayBarButton(
+                        title: "弹幕样式",
+                        icon: "slider.horizontal.3",
+                        target: .danmakuSettings,
+                        isProminent: false
+                    ) {
+                        viewModel.restoreFocusTarget = .danmakuSettings
+                        viewModel.isDanmakuSettingsVisible = true
+                    }
+                    .onMoveCommand { dir in
+                        switch dir {
+                        case .left:
+                            focusedControl = .danmaku
+                        case .right:
                             focusedControl = .speed
                         case .down:
                             focusedControl = .playPause
@@ -87,24 +110,19 @@ public struct TVPlayerControlsOverlay: View {
                         }
                     }
 
-                    // 倍速循环切换
+                    // 倍速选择
                     overlayBarButton(
                         title: "\(String(format: "%.1f", viewModel.playbackRate))x 倍速",
                         icon: "speedometer",
                         target: .speed
                     ) {
-                        let rates: [Float] = [1.0, 1.25, 1.5, 2.0, 0.75]
-                        if let idx = rates.firstIndex(where: { abs($0 - viewModel.playbackRate) < 0.05 }) {
-                            let next = rates[(idx + 1) % rates.count]
-                            viewModel.setRate(next)
-                        } else {
-                            viewModel.setRate(1.0)
-                        }
+                        viewModel.restoreFocusTarget = .speed
+                        viewModel.isSpeedSheetVisible = true
                     }
                     .onMoveCommand { dir in
                         switch dir {
                         case .left:
-                            focusedControl = .danmaku
+                            focusedControl = .danmakuSettings
                         case .right:
                             if let plan = viewModel.plan, !plan.qualities.isEmpty {
                                 focusedControl = .quality
@@ -280,6 +298,7 @@ public struct TVPlayerControlsOverlay: View {
                         target: .episodeDrawer
                     ) {
                         NSLog("🎬 [Overlay] 点击 选集列表 按钮")
+                        viewModel.restoreFocusTarget = .episodeDrawer
                         viewModel.isEpisodeDrawerVisible = true
                     }
                     .onMoveCommand { dir in
@@ -333,7 +352,12 @@ public struct TVPlayerControlsOverlay: View {
         .onChange(of: focusedControl) { _, _ in viewModel.showControls() }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                focusedControl = .playPause
+                if let restore = viewModel.restoreFocusTarget {
+                    focusedControl = restore
+                    viewModel.restoreFocusTarget = nil
+                } else {
+                    focusedControl = .playPause
+                }
             }
         }
     }
