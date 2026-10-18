@@ -155,20 +155,7 @@ public struct TVPlayerView: View {
                 }
             }
 
-            // 自动连播倒计时浮层
-            if let countdown = viewModel.nextEpisodeCountdown {
-                VStack(spacing: 12) {
-                    Text("即将播放第 \(viewModel.currentEpisodeIndex + 1) 集")
-                        .font(.title3)
-                        .bold()
-                    Text("\(countdown) 秒后自动连播")
-                        .font(.headline)
-                        .foregroundColor(.red)
-                }
-                .padding(28)
-                .background(Color.black.opacity(0.8))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
+
 
             // 轻量状态提示 Toast 浮层（救流/切换模式提示，不阻断观看）
             if let toast = viewModel.toastMessage {

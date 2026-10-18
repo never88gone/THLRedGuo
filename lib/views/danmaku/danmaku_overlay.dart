@@ -7,11 +7,25 @@ import 'package:THLRedLook/core/danmaku/danmaku_controller.dart';
 import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
 
 class DanmakuFlight {
-  const DanmakuFlight(this.item, this.text, this.lane, this.width);
+  const DanmakuFlight(
+    this.item,
+    this.text,
+    this.lane,
+    this.width,
+    this.durationMs,
+  );
   final DanmakuItem item;
   final String text;
   final int lane;
   final double width;
+  final int durationMs;
+}
+
+int calculateDanmakuLifetimeMs(DanmakuItem item) {
+  final hash = item.id.hashCode.abs();
+  final factor = (hash % 1000) / 1000.0;
+  final offset = ((factor - 0.5) * 3000).round();
+  return (8000 + offset).clamp(6500, 9800);
 }
 
 List<DanmakuFlight> planDanmaku(
@@ -21,10 +35,12 @@ List<DanmakuFlight> planDanmaku(
   required double Function(String) measure,
 }) {
   if (!width.isFinite || width <= 0 || rows < 1) return const [];
-  final lanes = List<DanmakuFlight?>.filled(rows.clamp(1, 4), null);
+  final laneCount = rows.clamp(1, 8);
+  final lanes = List<DanmakuFlight?>.filled(laneCount, null);
   final sorted = items.toList()..sort((a, b) => a.timeMs.compareTo(b.timeMs));
   final seen = <String>{};
   final flights = <DanmakuFlight>[];
+
   for (final item in sorted) {
     if (item.id.isEmpty ||
         item.text.trim().isEmpty ||
@@ -34,32 +50,61 @@ List<DanmakuFlight> planDanmaku(
     }
     if (flights.reversed
             .takeWhile(
-              (flight) => item.timeMs - flight.item.timeMs < danmakuLifetimeMs,
+              (flight) => item.timeMs - flight.item.timeMs < flight.durationMs,
             )
             .length >=
-        24) {
+        40) {
       continue;
     }
     final runes = item.text.runes;
     final text =
         String.fromCharCodes(runes.take(100)) + (runes.length > 100 ? '…' : '');
     final size = measure(text).ceilToDouble() + 8;
-    final lane = lanes.indexWhere((previous) {
-      if (previous == null) return true;
-      final gap = item.timeMs - previous.item.timeMs;
-      if (gap >= danmakuLifetimeMs) return true;
-      return (width + previous.width) * gap / danmakuLifetimeMs -
-                  previous.width >=
-              24 &&
-          width -
-                  (width + size) *
-                      (danmakuLifetimeMs - gap) /
-                      danmakuLifetimeMs >=
-              24;
-    });
-    if (lane < 0) continue;
-    final flight = DanmakuFlight(item, text, lane, size);
-    lanes[lane] = flight;
+    final durationMs = calculateDanmakuLifetimeMs(item);
+
+    int bestLane = -1;
+    double maxSafetyMargin = -1;
+
+    for (int l = 0; l < laneCount; l++) {
+      final prev = lanes[l];
+      if (prev == null) {
+        bestLane = l;
+        break;
+      }
+      final gap = item.timeMs - prev.item.timeMs;
+      if (gap >= prev.durationMs) {
+        bestLane = l;
+        break;
+      }
+
+      // 条件 1: 入场碰撞检查（后弹幕入场时，前弹幕尾部已完全进入且拉开至少 28px）
+      final prevSpeed = (width + prev.width) / prev.durationMs;
+      final prevMovedAtEntry = prevSpeed * gap;
+      final entryClearance = prevMovedAtEntry - prev.width;
+      if (entryClearance < 28) {
+        continue;
+      }
+
+      // 条件 2: 出场追尾检查（在前弹幕出屏幕前，后弹幕不能追上前弹幕尾部）
+      final currSpeed = (width + size) / durationMs;
+      final remainingTime = prev.durationMs - gap;
+      final currMovedAtPrevExit = currSpeed * remainingTime;
+      final exitClearance = width - currMovedAtPrevExit;
+      if (exitClearance < 28) {
+        continue;
+      }
+
+      final safetyMargin = math.min(entryClearance, exitClearance);
+      if (safetyMargin > maxSafetyMargin) {
+        maxSafetyMargin = safetyMargin;
+        bestLane = l;
+      }
+    }
+
+    if (bestLane < 0) continue;
+
+    final flight = DanmakuFlight(item, text, bestLane, size, durationMs);
+    lanes[bestLane] = flight;
     flights.add(flight);
   }
   return flights;
@@ -107,7 +152,7 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
           final fontSize = width < 600 ? 16.0 : 20.0;
           final scaler = MediaQuery.textScalerOf(context);
           final rowHeight = scaler.scale(fontSize) * 1.5;
-          final rows = ((height * .55 - 8) / rowHeight).floor().clamp(0, 4);
+          final rows = ((height * .65 - 8) / rowHeight).floor().clamp(0, 8);
           final style = TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
@@ -166,7 +211,7 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
                         for (final flight in _schedule)
                           if (controller.positionMs >= flight.item.timeMs &&
                               controller.positionMs <
-                                  flight.item.timeMs + danmakuLifetimeMs)
+                                  flight.item.timeMs + flight.durationMs)
                             Positioned(
                               key: ValueKey('danmaku-item-${flight.item.id}'),
                               left: 0,
@@ -238,24 +283,26 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
         oldWidget.positionMs != widget.positionMs ||
         oldWidget.width != widget.width ||
         oldWidget.flight.width != widget.flight.width ||
-        oldWidget.flight.item.timeMs != widget.flight.item.timeMs) {
+        oldWidget.flight.item.timeMs != widget.flight.item.timeMs ||
+        oldWidget.flight.durationMs != widget.flight.durationMs) {
       _sync();
     }
   }
 
   void _sync() {
     _motion.stop();
+    final lifetime = widget.flight.durationMs;
     final elapsed = (widget.positionMs - widget.flight.item.timeMs).clamp(
       0,
-      danmakuLifetimeMs,
+      lifetime,
     );
-    _motion.value = elapsed / danmakuLifetimeMs;
-    if (widget.moving && elapsed < danmakuLifetimeMs) {
+    _motion.value = elapsed / lifetime;
+    if (widget.moving && elapsed < lifetime) {
       _motion.animateTo(
-        (elapsed + 750).clamp(0, danmakuLifetimeMs) / danmakuLifetimeMs,
+        (elapsed + 750).clamp(0, lifetime) / lifetime,
         duration: Duration(
           microseconds:
-              ((danmakuLifetimeMs - elapsed).clamp(1, 750) * 1000 / widget.rate)
+              ((lifetime - elapsed).clamp(1, 750) * 1000 / widget.rate)
                   .round()
                   .clamp(1, 86400000000),
         ),

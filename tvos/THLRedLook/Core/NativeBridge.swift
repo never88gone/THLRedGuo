@@ -822,7 +822,7 @@ public actor NativeBridge {
     }
 }
 
-private final class NativeHTTPResult {
+private final class NativeHTTPResult: @unchecked Sendable {
     private let lock = NSLock()
     private var status = 0
     private var headers: [String: String] = [:]

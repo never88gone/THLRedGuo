@@ -1680,7 +1680,7 @@ private struct SourceDiagnosticsView: View {
                         .scaledToFit().frame(width: 500, height: 500)
                         .padding(24).background(.white)
                 }
-                Text("包含版本、源指纹和最近 8 条脱敏记录。扫码读取文本后手动反馈，不会自动上传。")
+                Text("包含版本、源指纹和最多最近 8 条脱敏记录。扫码读取文本后手动反馈，不会自动上传。")
                     .font(.system(size: 29)).multilineTextAlignment(.center)
                 TVButton(title: "返回诊断", icon: "arrow.backward", isProminent: true) { showingQR = false }
                     .accessibilityIdentifier("sourceDiagnostics.qrBack")

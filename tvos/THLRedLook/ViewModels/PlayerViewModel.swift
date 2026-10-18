@@ -416,9 +416,9 @@ public final class PlayerViewModel: ObservableObject {
                 if let seconds = av.currentItem?.duration.seconds, seconds.isFinite && seconds > 0 { self.duration = seconds }
                 let remaining = self.duration - seconds
                 if remaining <= 5 && remaining > 0 && self.currentEpisodeIndex < self.allEpisodes.count {
-                    self.nextEpisodeCountdown = Int(ceil(remaining))
                     if self.prefetchTask == nil { self.prefetchNextEpisodePlan() }
-                } else { self.nextEpisodeCountdown = nil }
+                }
+                self.nextEpisodeCountdown = nil
                 self.updateActiveDanmakus()
             }
         }

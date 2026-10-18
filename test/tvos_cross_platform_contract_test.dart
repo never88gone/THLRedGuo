@@ -5,6 +5,113 @@ import 'package:THLRedLook/models/catalog/models.dart';
 
 void main() {
   test(
+    'tvOS 原生诊断保留网络与业务错误且报告脱敏',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'thl-tvos-diagnostics-',
+      );
+      try {
+        final main = File('${directory.path}/DiagnosticsRegression.swift');
+        await main.writeAsString(r'''import Foundation
+
+public let BuiltInHongguoJSContent = try! String(contentsOfFile: "assets/sources/hongguo.js", encoding: .utf8)
+final class StubProtocol: URLProtocol {
+    static var mode = "healthy"
+    static var registrations = 0
+    static var searches = 0
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let registration = request.url!.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "service/2/device_register"
+        if registration { Self.registrations += 1 } else { Self.searches += 1 }
+        if Self.mode == "dns" && registration {
+            client?.urlProtocol(self, didFailWithError: URLError(.cannotFindHost))
+            return
+        }
+        let status = Self.mode == "http" && !registration ? 403 : 200
+        let body = registration
+            ? "{\"device_id_str\":\"7345678901234567100\",\"install_id_str\":\"7345678901234567200\",\"device_token\":\"private-token-secret\"}"
+            : Self.mode == "business" ? "{\"code\":1001,\"message\":\"private-message-secret\"}" : "{\"code\":0,\"search_tabs\":[{\"tab_type\":29,\"data\":[],\"has_more\":false,\"next_offset\":0}]}"
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Set-Cookie":"private-cookie-secret"])!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+@main
+struct Regression {
+    static func main() async throws {
+        for mode in ["healthy", "dns", "http", "business"] {
+            StubProtocol.mode = mode
+            StubProtocol.registrations = 0
+            StubProtocol.searches = 0
+            let recorder = SourceDiagnostics()
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [StubProtocol.self]
+            let session = URLSession(configuration: config)
+            defer { session.invalidateAndCancel() }
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let bridge = NativeBridge(baseDirectory: folder, httpSession: session, diagnostics: recorder)
+            var succeeded = false
+            do {
+                _ = try await bridge.request(action: "catalog", payload: ["source":"hongguo", "query":"private-query-secret", "page":1])
+                succeeded = true
+            } catch {
+                precondition(error.localizedDescription.contains("数据源诊断"), "mode=\(mode) error=\(error.localizedDescription) records=\(recorder.entries.map(\.text))")
+            }
+            precondition(succeeded == (mode == "healthy"), "mode=\(mode) succeeded=\(succeeded) records=\(recorder.entries.map(\.text))")
+            if mode == "dns" {
+                precondition(recorder.entries.first?.stage == "游客注册")
+                precondition(recorder.entries.first?.errorCode == "DNS:-1003")
+                precondition(StubProtocol.searches == 0)
+            }
+            if mode == "http" { precondition(recorder.entries.contains { $0.status == 403 && $0.errorCode == "HTTP_403" }) }
+            if mode == "business" {
+                precondition(StubProtocol.registrations == 2)
+                precondition(recorder.entries.contains { $0.status == 200 && $0.businessCode == "1001" && $0.errorCode == "BUSINESS_REJECTED" })
+            }
+            for text in [recorder.report, recorder.qrText] {
+                precondition(!text.contains("private-"))
+                precondition(!text.contains("7345678901234567100"))
+                precondition(!text.contains("x-medusa"))
+                precondition(!text.contains("aid="))
+            }
+            for _ in 0..<70 { recorder.add(SourceDiagnosticEntry(context:"测试",stage:"搜索",errorCode:"HTTP_403")) }
+            precondition(recorder.entries.count == 60)
+            precondition(recorder.qrText.utf8.count <= 2300)
+            recorder.clear()
+            precondition(recorder.entries.isEmpty)
+        }
+        precondition(SourceDiagnostics.networkCode(URLError(.timedOut)) == "TIMEOUT:-1001")
+        precondition(SourceDiagnostics.networkCode(URLError(.secureConnectionFailed)) == "TLS:-1200")
+        print("THL_TV_DIAGNOSTICS_REGRESSION passed")
+    }
+}
+''');
+        final binary = '${directory.path}/DiagnosticsRegression';
+        final compile = await Process.run('xcrun', [
+          'swiftc',
+          '-parse-as-library',
+          'tvos/THLRedLook/Core/NativeBridge.swift',
+          'tvos/THLRedLook/Core/SourceDiagnostics.swift',
+          main.path,
+          '-o',
+          binary,
+        ]);
+        expect(compile.exitCode, 0, reason: '${compile.stderr}');
+        final result = await Process.run(binary, const []);
+        expect(result.exitCode, 0, reason: '${result.stderr}');
+        expect(result.stdout, contains('THL_TV_DIAGNOSTICS_REGRESSION passed'));
+      } finally {
+        await directory.delete(recursive: true);
+      }
+    },
+    skip: !Platform.isMacOS,
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
     'tvOS Swift 实现修复旧编号并保留持久化收藏和较新历史',
     () async {
       final directory = await Directory.systemTemp.createTemp(

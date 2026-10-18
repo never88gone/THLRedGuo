@@ -1,6 +1,98 @@
 import SwiftUI
 import UIKit
 
+public struct TVPlannedDanmaku: Identifiable {
+    public let id: String
+    public let text: String
+    public let time: Double
+    public let duration: Double
+    public let lane: Int
+    public let width: CGFloat
+}
+
+public enum TVDanmakuPlanner {
+    public static func calculateDuration(for id: String, text: String) -> Double {
+        let hash = Double(UInt(bitPattern: id.hashValue) % 1000) / 1000.0
+        let variance = (hash - 0.5) * 3.1
+        return max(6.5, min(9.6, 8.0 + variance))
+    }
+
+    public static func plan(danmakus: [DanmakuItem], screenWidth: CGFloat, laneCount: Int = 8) -> [TVPlannedDanmaku] {
+        guard screenWidth > 0, !danmakus.isEmpty else { return [] }
+        let lanesTotal = max(1, min(10, laneCount))
+        var lanes = Array<TVPlannedDanmaku?>(repeating: nil, count: lanesTotal)
+        let sorted = danmakus.sorted { $0.timeMs < $1.timeMs }
+        var seen = Set<String>()
+        var planned = [TVPlannedDanmaku]()
+        let font = UIFont.boldSystemFont(ofSize: 26)
+
+        for item in sorted {
+            let cleanText = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleanText.isEmpty, item.timeMs >= 0, seen.insert(item.id).inserted else {
+                continue
+            }
+
+            let time = Double(item.timeMs) / 1000.0
+            let width = (cleanText as NSString).size(withAttributes: [.font: font]).width + 28
+            let duration = calculateDuration(for: item.id, text: cleanText)
+
+            var bestLane = -1
+            var maxSafetyMargin: CGFloat = -1
+
+            for l in 0..<lanesTotal {
+                guard let prev = lanes[l] else {
+                    bestLane = l
+                    break
+                }
+
+                let gap = time - prev.time
+                if gap >= prev.duration {
+                    bestLane = l
+                    break
+                }
+
+                // 条件 1: 入场碰撞检查（当前弹幕入场时，前弹幕尾部已完全进入且拉开至少 32pt 间隙）
+                let prevSpeed = (screenWidth + prev.width) / prev.duration
+                let prevMoved = prevSpeed * gap
+                let entryClearance = prevMoved - prev.width
+                if entryClearance < 32 {
+                    continue
+                }
+
+                // 条件 2: 出场追尾检查（在前弹幕离开屏幕左侧时，当前弹幕头部不能追上前弹幕尾部）
+                let currSpeed = (screenWidth + width) / duration
+                let remaining = prev.duration - gap
+                let currMoved = currSpeed * remaining
+                let exitClearance = screenWidth - currMoved
+                if exitClearance < 32 {
+                    continue
+                }
+
+                let safety = min(entryClearance, exitClearance)
+                if safety > maxSafetyMargin {
+                    maxSafetyMargin = safety
+                    bestLane = l
+                }
+            }
+
+            if bestLane >= 0 {
+                let flight = TVPlannedDanmaku(
+                    id: item.id,
+                    text: cleanText,
+                    time: time,
+                    duration: duration,
+                    lane: bestLane,
+                    width: width
+                )
+                lanes[bestLane] = flight
+                planned.append(flight)
+            }
+        }
+
+        return planned
+    }
+}
+
 public struct TVDanmakuView: View {
     public let danmakus: [DanmakuItem]
     public let position: Double
@@ -10,21 +102,26 @@ public struct TVDanmakuView: View {
 
     public var body: some View {
         GeometryReader { proxy in
+            let w = proxy.size.width > 0 ? proxy.size.width : 1920
+            let planned = TVDanmakuPlanner.plan(danmakus: danmakus, screenWidth: w, laneCount: 8)
+
             TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !moving)) { timeline in
                 let time = position + (moving ? min(0.75, max(0, timeline.date.timeIntervalSince(anchor))) * rate : 0)
                 ZStack(alignment: .topLeading) {
-                    ForEach(danmakus) { item in
-                        let age = time - Double(item.timeMs) / 1000
-                        let width = (item.text as NSString).size(withAttributes: [.font: UIFont.boldSystemFont(ofSize: 26)]).width + 24
-                        if age >= 0 && age < 8 {
+                    ForEach(planned) { item in
+                        let age = time - item.time
+                        if age >= 0 && age < item.duration {
+                            let progress = age / item.duration
                             Text(item.text)
                                 .font(.system(size: 26, weight: .bold))
                                 .foregroundColor(.white)
                                 .shadow(color: .black, radius: 2, x: 1, y: 1)
                                 .fixedSize()
-                                .frame(width: width)
-                                .position(x: proxy.size.width + width / 2 - (proxy.size.width + width) * age / 8,
-                                          y: CGFloat(UInt(bitPattern: item.id.hashValue) % 6) * 52 + 60)
+                                .frame(width: item.width)
+                                .position(
+                                    x: w + item.width / 2 - (w + item.width) * progress,
+                                    y: CGFloat(item.lane) * 54 + 60
+                                )
                         }
                     }
                 }

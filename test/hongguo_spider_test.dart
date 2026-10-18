@@ -2,11 +2,160 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
+import 'package:THLRedLook/pages/settings/source_diagnostics_page.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 
 void main() {
+  final script = File('assets/sources/hongguo.js').readAsStringSync();
+  http.Response registration() => http.Response(
+    '{"device_id_str":"7345678901234567100","install_id_str":"7345678901234567200"}',
+    200,
+  );
+  http.Response page(List<Map<String, Object?>> rows) => http.Response(
+    jsonEncode({
+      'code': 0,
+      'search_tabs': [
+        {'tab_type': 29, 'data': rows, 'has_more': false, 'next_offset': 0},
+      ],
+    }),
+    200,
+  );
+  test('诊断保留注册 DNS 失败，报告不含设备标识或请求参数', () async {
+    final diagnostics = SourceDiagnostics();
+    var searches = 0;
+    final client = MockClient((request) async {
+      if (request.url.path == '/service/2/device_register/') {
+        throw http.ClientException(
+          'Failed host lookup: private-device-cookie-secret',
+          request.url,
+        );
+      }
+      searches++;
+      return page([]);
+    });
+    final runtime = CatPawJsRuntime(client, diagnostics);
+    addTearDown(runtime.dispose);
+    addTearDown(client.close);
+    await runtime.init(script);
+    await expectLater(
+      runtime.search('private-keyword-secret'),
+      throwsA(isA<Exception>()),
+    );
+    final registration = diagnostics.entries.first;
+    expect(registration.stage, '游客注册');
+    expect(registration.errorCode, 'DNS');
+    expect(searches, 0);
+    final report = diagnostics.report(
+      version: '1.0.0+123',
+      sourceHash: 'synthetic',
+    );
+    expect(report, contains('DNS'));
+    expect(report, isNot(contains('private-')));
+    expect(report, isNot(contains('aid=')));
+  });
+
+  test('诊断识别 HTTP 200 内的业务拒绝与会话重建', () async {
+    final diagnostics = SourceDiagnostics();
+    var searches = 0;
+    final client = MockClient((request) async {
+      if (request.url.path == '/service/2/device_register/') {
+        return registration();
+      }
+      searches++;
+      return searches == 1
+          ? http.Response(
+              '{"code":1001,"message":"private-cookie-secret"}',
+              200,
+            )
+          : page([]);
+    });
+    final runtime = CatPawJsRuntime(client, diagnostics);
+    addTearDown(runtime.dispose);
+    addTearDown(client.close);
+    await runtime.init(script);
+    expect((await runtime.search('合成')).list, isEmpty);
+    final denied = diagnostics.entries.firstWhere((e) => e.failed);
+    expect(denied.status, 200);
+    expect(denied.businessCode, '1001');
+    expect(denied.errorCode, 'BUSINESS_REJECTED');
+    expect(diagnostics.entries.where((e) => e.stage == '游客注册').length, 2);
+    final report = diagnostics.report(
+      version: '1.0.0+123',
+      sourceHash: 'synthetic',
+    );
+    expect(report, isNot(contains('7345678901234567100')));
+    expect(report, isNot(contains('private-cookie-secret')));
+    expect(report, isNot(contains('x-medusa')));
+    expect(SourceDiagnostics.safeCode('7345678901234567100'), isEmpty);
+    for (var i = 0; i < 70; i++) {
+      diagnostics.record(
+        url:
+            'https://reading.snssdk.com/reading/bookapi/search/tab/v?secret=private',
+        context: '测试',
+        elapsedMs: 3,
+        status: 403,
+      );
+    }
+    expect(diagnostics.entries.length, 60);
+    diagnostics.clear();
+    expect(diagnostics.entries, isEmpty);
+  });
+
+  testWidgets('诊断页显示失败阶段、复制脱敏报告并清空记录', (tester) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'THL',
+      packageName: 'com.example.test',
+      version: '1.0.0',
+      buildNumber: '123',
+      buildSignature: '',
+    );
+    final recorder = SourceDiagnostics.shared;
+    recorder.clear();
+    recorder.record(
+      url:
+          'https://log.snssdk.com/service/2/device_register/?device_id=private-secret',
+      context: '日常使用',
+      elapsedMs: 12,
+      errorCode: 'DNS',
+    );
+    String clipboard = '';
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboard = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(() {
+      recorder.clear();
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
+    await tester.pumpWidget(const MaterialApp(home: SourceDiagnosticsPage()));
+    await tester.pumpAndSettle();
+    expect(find.text('数据源诊断'), findsOneWidget);
+    expect(find.textContaining('DNS'), findsWidgets);
+    await tester.tap(find.byKey(const ValueKey('source-diagnostics-copy')));
+    await tester.pumpAndSettle();
+    expect(clipboard, contains('1.0.0+123'));
+    expect(clipboard, contains('DNS'));
+    expect(clipboard, isNot(contains('private-secret')));
+    await tester.tap(find.text('清空诊断记录'));
+    await tester.pumpAndSettle();
+    expect(find.text('暂无记录，请先复现问题或开始检测。'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   group('官方数据源 (hongguo.js) 自动化规范与链路测试', () {
     late String hongguoScript;
 

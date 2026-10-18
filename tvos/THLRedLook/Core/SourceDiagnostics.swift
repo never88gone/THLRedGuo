@@ -57,7 +57,7 @@ public final class SourceDiagnostics: ObservableObject {
     }
     public static func stage(for url: URL) -> String? {
         let host = url.host ?? ""
-        if host == "log.snssdk.com" && url.path == "/service/2/device_register/" { return "游客注册" }
+        if host == "log.snssdk.com" && url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "service/2/device_register" { return "游客注册" }
         if host == "reading.snssdk.com" && url.path == "/reading/bookapi/search/tab/v" { return "搜索" }
         if host.hasSuffix(".fqnovel.com") || host == "reading.snssdk.com" {
             if url.path.contains("/video_detail/") { return "详情" }
@@ -68,10 +68,10 @@ public final class SourceDiagnostics: ObservableObject {
     }
     public static func networkCode(_ error: Error?) -> String {
         guard let error else { return "" }
-        let error = error as NSError
-        guard error.domain == NSURLErrorDomain else { return "NETWORK_ERROR" }
+        let networkError = error as NSError
+        guard networkError.domain == NSURLErrorDomain else { return "NETWORK_ERROR" }
         let category: String
-        switch error.code {
+        switch networkError.code {
         case NSURLErrorTimedOut: category = "TIMEOUT"
         case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: category = "DNS"
         case NSURLErrorNotConnectedToInternet: category = "OFFLINE"
@@ -79,7 +79,7 @@ public final class SourceDiagnostics: ObservableObject {
         case -1206 ... -1200: category = "TLS"
         default: category = "CONNECTION"
         }
-        return "\(category):\(error.code)"
+        return "\(category):\(networkError.code)"
     }
     public func record(url: URL, context: String, elapsedMs: Int, status: Int, body: String, errorCode: String = "") {
         guard let stage = Self.stage(for: url) else { return }
@@ -120,12 +120,17 @@ public final class SourceDiagnostics: ObservableObject {
         (["THL 数据源诊断", "应用：\(Self.version)", "系统：tvOS \(ProcessInfo.processInfo.operatingSystemVersionString)", "数据源：hongguo · SHA256 \(Self.sourceHash)", "报告时间：\(ISO8601DateFormatter().string(from: Date()))", "报告不含请求参数、设备标识、Cookie、签名和响应原文。"] + entries.map(\.text)).joined(separator: "\n")
     }
     public var qrText: String {
-        let payload: [String: Any] = ["app": "THL", "version": Self.version, "os": ProcessInfo.processInfo.operatingSystemVersionString, "source": "hongguo", "sha256": Self.sourceHash, "at": ISO8601DateFormatter().string(from: Date()), "recent": entries.suffix(8).map { entry -> [String: Any] in
-            ["at": ISO8601DateFormatter().string(from: entry.at), "stage": entry.stage, "host": entry.host, "http": entry.status, "business": entry.businessCode, "error": entry.errorCode, "ms": entry.elapsedMs]
-        }]
-        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else { return "" }
-        return String(decoding: data, as: UTF8.self)
+        var recent = Array(entries.suffix(8))
+        while true {
+            let payload: [String: Any] = ["app": "THL", "version": Self.version, "os": ProcessInfo.processInfo.operatingSystemVersionString, "source": "hongguo", "sha256": Self.sourceHash, "at": ISO8601DateFormatter().string(from: Date()), "recent": recent.map { entry -> [String: Any] in
+                ["at": ISO8601DateFormatter().string(from: entry.at), "stage": entry.stage, "host": entry.host, "http": entry.status, "business": entry.businessCode, "error": entry.errorCode, "ms": entry.elapsedMs]
+            }]
+            guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else { return "" }
+            if data.count <= 2300 || recent.isEmpty { return String(decoding: data, as: UTF8.self) }
+            recent.removeFirst()
+        }
     }
+
 }
 
 @MainActor
