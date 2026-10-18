@@ -11,6 +11,7 @@ class PlayerDanmakuButtonView extends StatelessWidget {
     required this.danmakuStatus,
     required this.swipeEnabled,
     required this.onTap,
+    this.onSettings,
     this.canRetry = false,
   });
 
@@ -19,12 +20,13 @@ class PlayerDanmakuButtonView extends StatelessWidget {
   final String danmakuStatus;
   final bool swipeEnabled;
   final VoidCallback? onTap;
+  final VoidCallback? onSettings;
   final bool canRetry;
 
   @override
   Widget build(BuildContext context) {
     final tooltip = danmakuStatus.isEmpty
-        ? (danmakuEnabled ? '关闭弹幕' : '打开弹幕')
+        ? (danmakuEnabled ? '轻触关闭弹幕 · 长按设置样式' : '轻触打开弹幕 · 长按设置样式')
         : danmakuStatus;
 
     return Align(
@@ -43,6 +45,7 @@ class PlayerDanmakuButtonView extends StatelessWidget {
               key: const ValueKey('player-danmaku-toggle'),
               behavior: HitTestBehavior.opaque,
               onTap: enabled ? onTap : null,
+              onLongPress: enabled ? onSettings : null,
               child: SizedBox(
                 width: 44,
                 height: 48,

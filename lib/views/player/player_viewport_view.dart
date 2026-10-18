@@ -19,6 +19,7 @@ import 'package:THLRedLook/views/television/television_controls.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 import 'package:THLRedLook/views/player/player_controls_view.dart';
+import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
 
 /// 播放器画面视口组件（视频画面、手势、HUD、弹幕图层、加载中/错误兜底面板）
 class PlayerViewportView extends StatelessWidget {
@@ -41,6 +42,7 @@ class PlayerViewportView extends StatelessWidget {
     required this.videoController,
     required this.danmaku,
     required this.danmakuEnabled,
+    this.danmakuStyle,
     required this.aspectRatio,
     required this.interactions,
     required this.enhancement,
@@ -69,6 +71,7 @@ class PlayerViewportView extends StatelessWidget {
     required this.onSaveProgress,
     required this.onOpenPanel,
     required this.onToggleDanmaku,
+    this.onDanmakuSettings,
     required this.onRetryDanmaku,
     required this.onPushToDevice,
     required this.onEnterPictureInPicture,
@@ -93,6 +96,7 @@ class PlayerViewportView extends StatelessWidget {
   final VideoController? videoController;
   final DanmakuController danmaku;
   final bool danmakuEnabled;
+  final DanmakuStyle? danmakuStyle;
   final double aspectRatio;
   final PlayerInteractions interactions;
   final VideoEnhancementController enhancement;
@@ -122,6 +126,7 @@ class PlayerViewportView extends StatelessWidget {
   final Future<void> Function() onSaveProgress;
   final Future<void> Function(PlayerMenuSection) onOpenPanel;
   final Future<void> Function() onToggleDanmaku;
+  final Future<void> Function()? onDanmakuSettings;
   final Future<void> Function() onRetryDanmaku;
   final Future<void> Function()? onPushToDevice;
   final Future<void> Function()? onEnterPictureInPicture;
@@ -182,6 +187,9 @@ class PlayerViewportView extends StatelessWidget {
             onDanmaku: detail.drama.source == 'hongguo'
                 ? onToggleDanmaku
                 : null,
+            onDanmakuSettings: detail.drama.source == 'hongguo'
+                ? onDanmakuSettings
+                : null,
             onRetryDanmaku: danmaku.canRetry ? onRetryDanmaku : null,
             onPush: isMediaIdNull ? onPushToDevice : null,
             onPictureInPicture: canUsePictureInPicture
@@ -197,7 +205,11 @@ class PlayerViewportView extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         if (!hideOverlayForPictureInPicture)
-          DanmakuOverlay(controller: danmaku, aspectRatio: aspectRatio),
+          DanmakuOverlay(
+            controller: danmaku,
+            aspectRatio: aspectRatio,
+            style: danmakuStyle ?? const DanmakuStyle(),
+          ),
         controls,
       ],
     );

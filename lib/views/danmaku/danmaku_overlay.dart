@@ -115,9 +115,11 @@ class DanmakuOverlay extends StatefulWidget {
     super.key,
     required this.controller,
     required this.aspectRatio,
+    this.style = const DanmakuStyle(),
   });
   final DanmakuController controller;
   final double aspectRatio;
+  final DanmakuStyle style;
 
   @override
   State<DanmakuOverlay> createState() => _DanmakuOverlayState();
@@ -149,20 +151,22 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
             constraints.maxHeight,
             constraints.maxWidth / aspect,
           );
-          final fontSize = width < 600 ? 16.0 : 20.0;
+          final baseFontSize = width < 600 ? 16.0 : 20.0;
+          final fontSize = baseFontSize * widget.style.fontSizeScale;
           final scaler = MediaQuery.textScalerOf(context);
           final rowHeight = scaler.scale(fontSize) * 1.5;
-          final rows = ((height * .65 - 8) / rowHeight).floor().clamp(0, 8);
+          final rows = ((height * widget.style.displayArea - 8) / rowHeight).floor().clamp(0, 10);
+          final opacity = widget.style.opacity.clamp(0.1, 1.0);
           final style = TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
-            color: AppColors.white,
+            color: AppColors.white.withValues(alpha: opacity),
             height: 1.2,
-            shadows: const [
+            shadows: [
               Shadow(
-                color: AppColors.black,
+                color: AppColors.black.withValues(alpha: opacity * 0.85),
                 blurRadius: 3,
-                offset: Offset(1, 1),
+                offset: const Offset(1, 1),
               ),
             ],
           );
@@ -185,6 +189,9 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
                       rows,
                       fontSize,
                       scaler,
+                      widget.style.fontSizeScale,
+                      widget.style.opacity,
+                      widget.style.displayArea,
                     );
                     if (_layout != layout) {
                       _layout = layout;

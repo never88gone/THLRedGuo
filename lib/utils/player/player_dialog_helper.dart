@@ -94,6 +94,7 @@ class PlayerDialogHelper {
     required bool mobile,
     required Listenable menuRevision,
     required Future<void> Function(PlaybackPreferences) onPreferences,
+    VoidCallback? onDanmakuSettings,
   }) async {
     final menuTheme = fullscreen ? AppTheme.dark : Theme.of(context);
     return showDialog<int>(
@@ -116,6 +117,7 @@ class PlayerDialogHelper {
             onPreferences: onPreferences,
             showDanmaku: detail.drama.source == 'hongguo',
             danmakuStatus: danmaku.status,
+            onDanmakuSettings: onDanmakuSettings,
             onRetryDanmaku: danmaku.canRetry ? danmaku.retry : null,
             preloadStatus: preloader.status,
             enhancement: enhancementForUi,

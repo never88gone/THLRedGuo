@@ -40,6 +40,8 @@ import 'package:THLRedLook/views/player/player_mobile_panel_view.dart';
 import 'package:THLRedLook/views/player/player_desktop_panel_view.dart';
 import 'package:THLRedLook/views/player/player_viewport_view.dart';
 import 'package:THLRedLook/views/player/player_quality_sheet_view.dart';
+import 'package:THLRedLook/views/player/player_speed_sheet_view.dart';
+import 'package:THLRedLook/views/player/player_danmaku_sheet_view.dart';
 import 'package:THLRedLook/utils/player/player_dialog_helper.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -1608,6 +1610,17 @@ class _PlayerScreenState extends State<PlayerScreen>
             );
           }
         }
+      } else if (section == PlayerMenuSection.speed) {
+        final chosenSpeed = await PlayerSpeedSheetView.show(
+          context: context,
+          currentSpeed: _preferences.speed,
+          onSpeedSelected: (newSpeed) {
+            unawaited(_setPreferences(_preferences.copyWith(speed: newSpeed)));
+          },
+        );
+        if (chosenSpeed != null && chosenSpeed != _preferences.speed) {
+          await _setPreferences(_preferences.copyWith(speed: chosenSpeed));
+        }
       } else if (_mobile && section == PlayerMenuSection.episodes) {
         final chosenIndex = await PlayerDialogHelper.openEpisodesSheet(
           context: context,
@@ -1641,11 +1654,41 @@ class _PlayerScreenState extends State<PlayerScreen>
           mobile: _mobile,
           menuRevision: _menuRevision,
           onPreferences: _setPreferences,
+          onDanmakuSettings: () {
+            Navigator.pop(context);
+            _openDanmakuSettings();
+          },
         );
         if (mounted && !_closed && index != null && index != _index) {
           await _play(index);
         }
       }
+    } finally {
+      if (mounted && !_closed) {
+        setState(() => _panelOpen = false);
+        _playerFocus.requestFocus();
+      }
+    }
+  }
+
+  Future<void> _openDanmakuSettings() async {
+    if (_panelOpen || _closed) return;
+    _interactions.cancel();
+    setState(() => _panelOpen = true);
+    try {
+      await PlayerDanmakuSheetView.show(
+        context: context,
+        enabled: _danmakuEnabled,
+        style: _preferences.danmakuStyle,
+        onEnabledChanged: (val) {
+          unawaited(_setPreferences(_preferences.copyWith(danmaku: val)));
+        },
+        onStyleChanged: (newStyle) {
+          unawaited(
+            _setPreferences(_preferences.copyWith(danmakuStyle: newStyle)),
+          );
+        },
+      );
     } finally {
       if (mounted && !_closed) {
         setState(() => _panelOpen = false);
@@ -1992,6 +2035,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       videoController: _video,
       danmaku: _danmaku,
       danmakuEnabled: _danmakuEnabled,
+      danmakuStyle: _preferences.danmakuStyle,
       aspectRatio: _aspectRatio,
       interactions: _interactions,
       enhancement: _enhancement,
@@ -2020,6 +2064,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       onSaveProgress: _saveProgress,
       onOpenPanel: _openPanel,
       onToggleDanmaku: _toggleDanmaku,
+      onDanmakuSettings: _openDanmakuSettings,
       onRetryDanmaku: _retryDanmakuFromControls,
       onPushToDevice: _pushToDevice,
       onEnterPictureInPicture: _enterPictureInPicture,

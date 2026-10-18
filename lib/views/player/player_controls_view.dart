@@ -39,6 +39,7 @@ class PlayerControls extends StatefulWidget {
     this.panelOpen = false,
     this.onSeek,
     this.onDanmaku,
+    this.onDanmakuSettings,
     this.onRetryDanmaku,
     this.onPush,
     this.onPictureInPicture,
@@ -71,6 +72,7 @@ class PlayerControls extends StatefulWidget {
   final bool panelOpen;
   final Future<void> Function(Duration)? onSeek;
   final Future<void> Function()? onDanmaku;
+  final Future<void> Function()? onDanmakuSettings;
   final Future<void> Function()? onRetryDanmaku;
   final Future<void> Function()? onPush;
   final Future<void> Function()? onPictureInPicture;
@@ -311,6 +313,9 @@ class _PlayerControlsState extends State<PlayerControls> {
                               ? () => _panel(
                                   widget.onRetryDanmaku ?? widget.onDanmaku!,
                                 )
+                              : null,
+                          onSettings: widget.onDanmakuSettings != null
+                              ? () => _panel(widget.onDanmakuSettings!)
                               : null,
                         ),
 

@@ -78,3 +78,43 @@ class DanmakuPage {
     );
   }
 }
+
+class DanmakuStyle {
+  const DanmakuStyle({
+    this.fontSizeScale = 1.0,
+    this.opacity = 1.0,
+    this.displayArea = 0.5,
+  });
+
+  final double fontSizeScale;
+  final double opacity;
+  final double displayArea;
+
+  DanmakuStyle copyWith({
+    double? fontSizeScale,
+    double? opacity,
+    double? displayArea,
+  }) => DanmakuStyle(
+    fontSizeScale: fontSizeScale ?? this.fontSizeScale,
+    opacity: opacity ?? this.opacity,
+    displayArea: displayArea ?? this.displayArea,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'fontSizeScale': fontSizeScale,
+    'opacity': opacity,
+    'displayArea': displayArea,
+  };
+
+  factory DanmakuStyle.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const DanmakuStyle();
+    final font = (json['fontSizeScale'] as num?)?.toDouble() ?? 1.0;
+    final op = (json['opacity'] as num?)?.toDouble() ?? 1.0;
+    final area = (json['displayArea'] as num?)?.toDouble() ?? 0.5;
+    return DanmakuStyle(
+      fontSizeScale: font.clamp(0.6, 2.0),
+      opacity: op.clamp(0.2, 1.0),
+      displayArea: area.clamp(0.2, 1.0),
+    );
+  }
+}

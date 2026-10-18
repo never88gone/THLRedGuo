@@ -8,7 +8,6 @@ import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/download/download_collections.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
-import 'package:THLRedLook/pages/downloads/local_media_page.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/pages/player/player_page.dart';
 import 'package:THLRedLook/views/remote/remote_widgets.dart';
@@ -398,20 +397,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         tooltip: '多选下载任务',
         onPressed: () => setState(() => _selecting = true),
         icon: const Icon(Icons.checklist_rounded),
-      ),
-      IconButton(
-        key: const ValueKey('download-local-media'),
-        tooltip: '本地媒体与合并',
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (_) => LocalMediaScreen(
-              repository: widget.repository,
-              store: widget.store,
-            ),
-          ),
-        ),
-        icon: const Icon(Icons.video_library_outlined),
       ),
     ],
     PopupMenuButton<String>(

@@ -29,6 +29,7 @@ class PlayerMenu extends StatefulWidget {
     required this.onFavorite,
     this.showDanmaku = false,
     this.danmakuStatus = '',
+    this.onDanmakuSettings,
     this.onRetryDanmaku,
     this.preloadStatus = '',
     this.enhancement,
@@ -46,6 +47,7 @@ class PlayerMenu extends StatefulWidget {
   final bool mobile;
   final bool showDanmaku;
   final String danmakuStatus;
+  final VoidCallback? onDanmakuSettings;
   final VoidCallback? onRetryDanmaku;
   final String preloadStatus;
   final VideoEnhancementController? enhancement;
@@ -61,6 +63,21 @@ class PlayerMenu extends StatefulWidget {
 class _PlayerMenuState extends State<PlayerMenu> {
   bool _busy = false;
   String? _error;
+  late PlaybackPreferences _preferences;
+
+  @override
+  void initState() {
+    super.initState();
+    _preferences = widget.preferences;
+  }
+
+  @override
+  void didUpdateWidget(covariant PlayerMenu oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.preferences != widget.preferences) {
+      _preferences = widget.preferences;
+    }
+  }
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
@@ -148,7 +165,7 @@ class _PlayerMenuState extends State<PlayerMenu> {
   }
 
   Widget _settings() {
-    final preferences = widget.preferences;
+    final preferences = _preferences;
     final all = widget.section == PlayerMenuSection.settings;
     final colors = Theme.of(context).colorScheme;
     final helperStyle = TextStyle(
@@ -186,11 +203,14 @@ class _PlayerMenuState extends State<PlayerMenu> {
                   selected: speed == preferences.speed,
                   onSelected: _busy
                       ? null
-                      : (_) => _run(
-                          () => widget.onPreferences(
-                            preferences.copyWith(speed: speed),
-                          ),
-                        ),
+                      : (_) {
+                          setState(() {
+                            _preferences = _preferences.copyWith(speed: speed);
+                          });
+                          _run(
+                            () => widget.onPreferences(_preferences),
+                          );
+                        },
                 ),
             ],
           ),
@@ -219,11 +239,14 @@ class _PlayerMenuState extends State<PlayerMenu> {
                   selected: quality == preferences.quality,
                   onSelected: _busy
                       ? null
-                      : (_) => _run(
-                          () => widget.onPreferences(
-                            preferences.copyWith(quality: quality),
-                          ),
-                        ),
+                      : (_) {
+                          setState(() {
+                            _preferences = _preferences.copyWith(quality: quality);
+                          });
+                          _run(
+                            () => widget.onPreferences(_preferences),
+                          );
+                        },
                 ),
             ],
           ),
@@ -242,11 +265,14 @@ class _PlayerMenuState extends State<PlayerMenu> {
           VideoEnhancementSettings(
             controller: widget.enhancement!,
             busy: _busy,
-            onChanged: (enhancement) => _run(
-              () => widget.onPreferences(
-                preferences.copyWith(enhancement: enhancement),
-              ),
-            ),
+            onChanged: (enhancement) {
+              setState(() {
+                _preferences = _preferences.copyWith(enhancement: enhancement);
+              });
+              _run(
+                () => widget.onPreferences(_preferences),
+              );
+            },
             onCompare: widget.onCompareEnhancement ?? () {},
           ),
         if (all && widget.showDanmaku) ...[
@@ -258,19 +284,35 @@ class _PlayerMenuState extends State<PlayerMenu> {
             value: preferences.danmaku,
             onChanged: _busy
                 ? null
-                : (value) => _run(
-                    () => widget.onPreferences(
-                      preferences.copyWith(danmaku: value),
-                    ),
-                  ),
+                : (value) {
+                    setState(() {
+                      _preferences = _preferences.copyWith(danmaku: value);
+                    });
+                    _run(
+                      () => widget.onPreferences(_preferences),
+                    );
+                  },
           ),
-          if (widget.onRetryDanmaku != null)
-            TextButton.icon(
-              key: const ValueKey('player-danmaku-retry'),
-              onPressed: _busy ? null : widget.onRetryDanmaku,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('重试弹幕'),
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (widget.onDanmakuSettings != null)
+                TextButton.icon(
+                  key: const ValueKey('player-danmaku-settings'),
+                  onPressed: _busy ? null : widget.onDanmakuSettings,
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label: const Text('弹幕样式设置'),
+                ),
+              if (widget.onRetryDanmaku != null)
+                TextButton.icon(
+                  key: const ValueKey('player-danmaku-retry'),
+                  onPressed: _busy ? null : widget.onRetryDanmaku,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('重试弹幕'),
+                ),
+            ],
+          ),
           const SizedBox(height: 8),
         ],
         if (all) ...[
@@ -282,11 +324,14 @@ class _PlayerMenuState extends State<PlayerMenu> {
             value: preferences.preload,
             onChanged: _busy
                 ? null
-                : (value) => _run(
-                    () => widget.onPreferences(
-                      preferences.copyWith(preload: value),
-                    ),
-                  ),
+                : (value) {
+                    setState(() {
+                      _preferences = _preferences.copyWith(preload: value);
+                    });
+                    _run(
+                      () => widget.onPreferences(_preferences),
+                    );
+                  },
           ),
           const SizedBox(height: 8),
           SwitchListTile.adaptive(
@@ -297,11 +342,14 @@ class _PlayerMenuState extends State<PlayerMenu> {
             value: preferences.autoAdvance,
             onChanged: _busy
                 ? null
-                : (value) => _run(
-                    () => widget.onPreferences(
-                      preferences.copyWith(autoAdvance: value),
-                    ),
-                  ),
+                : (value) {
+                    setState(() {
+                      _preferences = _preferences.copyWith(autoAdvance: value);
+                    });
+                    _run(
+                      () => widget.onPreferences(_preferences),
+                    );
+                  },
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
