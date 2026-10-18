@@ -8,6 +8,15 @@
 
 ---
 
+## 📲 官方公测与交流反馈
+
+- **🍏 Apple TestFlight 官方公测**：[立即加入 TestFlight 公测 (iOS / iPadOS / tvOS)](https://testflight.apple.com/join/rkvvdp7J)
+  > 覆盖 iOS (iPhone / iPad) 与 Apple tvOS 客厅大屏版，点击链接即可通过苹果官方 TestFlight 一键安装并接收版本更新。
+- **💬 Telegram 官方交流与反馈**：[https://t.me/tanghulutvos](https://t.me/tanghulutvos) （频道 / 群组：`@tanghulutvos`）
+  > 欢迎加入 Telegram 官方交流群获取最新动态、交流反馈与建议。
+
+---
+
 ## 界面预览
 
 ### 🖥️ 桌面端宽屏与分栏视窗 (Windows / macOS)
@@ -58,10 +67,10 @@
 | :--- | :--- | :--- |
 | **Android** | 适配手机与折叠屏，支持竖屏短剧滑动手势、画中画（PiP）浮窗、arm64-v8a / armeabi-v7a / x86_64 三架构 | 原生 Flutter + NDK 编译，输出 APK / AAB |
 | **Android TV** | 自动识别大屏电视模式，锁定横屏影院布局，完整适配遥控器方向键与焦点移动 | 共用 Flutter 源码，自适应电视 UI 布局 |
-| **iOS** | 适配 iPhone / iPad，支持深色模式自适应、原生手势返回与后台低功耗下载 | Xcode 编译签名，输出 IPA 归档 |
+| **iOS** | 适配 iPhone / iPad，支持深色模式自适应、原生手势返回与后台低功耗下载 | Xcode 编译签名，输出 IPA 归档；支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装 |
 | **macOS** | 桌面端大屏响应式三栏/分栏布局，键盘方向键与快捷键全面支持 | macOS App / PKG 安装包 |
 | **Windows** | 基于 `media_kit` / libmpv 硬件解码，独家集成专属 Shader 画质增强滤镜 | 独立免安装绿色包 / 便携目录（含完整 DLL 与运行环境） |
-| **Apple tvOS** | 独立原生工程（`tvos/`），纯 SwiftUI + Siri Remote 焦点引擎 + AVKit 原生渲染打造，具备完整客厅大屏交互与原生影院体验 | 独立 Xcode 工程，输出 tvOS IPA |
+| **Apple tvOS** | 独立原生工程（`tvos/`），纯 SwiftUI + Siri Remote 焦点引擎 + AVKit 原生渲染打造，具备完整客厅大屏交互与原生影院体验 | 独立 Xcode 工程，输出 tvOS IPA；支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装 |
 
 ---
 

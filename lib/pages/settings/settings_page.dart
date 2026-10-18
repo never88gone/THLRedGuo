@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
@@ -439,6 +440,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: const Text('查看原生解码、流媒体握手与解密运行轨迹'),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => DiaryService.showDiaryDialog(context),
+              ),
+              ListTile(
+                leading: const Icon(Icons.forum_outlined),
+                title: const Text('Telegram 交流与反馈'),
+                subtitle: const Text('https://t.me/tanghulutvos'),
+                trailing: const Icon(Icons.copy_rounded),
+                onTap: () {
+                  Clipboard.setData(
+                    const ClipboardData(text: 'https://t.me/tanghulutvos'),
+                  );
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('已复制 Telegram 地址：https://t.me/tanghulutvos'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.verified_outlined),
