@@ -232,15 +232,36 @@ class _SourceSwitcherContent extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: selected
-                            ? const Icon(
-                                Icons.check_circle_rounded,
-                                color: AppColors.hongguoRed,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (selected)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 4),
+                                child: Icon(
+                                  Icons.check_circle_rounded,
+                                  color: AppColors.hongguoRed,
+                                  size: 22,
+                                ),
+                              ),
+                            if (site.id != 'hongguo')
+                              IconButton(
+                                key: ValueKey('sheet-delete-source-${site.id}'),
+                                tooltip: '删除数据源',
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: AppColors.hongguoRed,
+                                  size: 22,
+                                ),
+                                onPressed: () => _handleDeleteSource(context, site),
                               )
-                            : const Icon(
+                            else if (!selected)
+                              const Icon(
                                 Icons.chevron_right_rounded,
                                 color: AppColors.grey,
                               ),
+                          ],
+                        ),
                         onTap: () async {
                           if (selected) {
                             Navigator.pop(context, site);
@@ -285,57 +306,7 @@ class _SourceSwitcherContent extends StatelessWidget {
                             ),
                           );
                         },
-                        onLongPress: () async {
-                          final confirmed = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Row(
-                                children: [
-                                  Icon(Icons.warning_amber_rounded, color: AppColors.hongguoRed),
-                                  SizedBox(width: 8),
-                                  Text('删除数据源'),
-                                ],
-                              ),
-                              content: Text('确定要删除数据源「${site.name}」(${site.id}) 吗？\n删除后本地脚本将被移除。'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('取消'),
-                                ),
-                                FilledButton(
-                                  style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('确认删除'),
-                                ),
-                              ],
-                            ),
-                          );
-
-                          if (confirmed == true && context.mounted) {
-                            final service = JsSourceService.current;
-                            if (service != null) {
-                              final ok = await service.removeSource(site.id);
-                              if (ok && context.mounted) {
-                                if (store.source == site.id) {
-                                  final nextSource = service.activeSourceId.isNotEmpty
-                                      ? service.activeSourceId
-                                      : (store.sources.isNotEmpty ? store.sources.first.id : 'hongguo');
-                                  try {
-                                    await store.setSource(nextSource);
-                                  } catch (_) {}
-                                }
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('已成功删除数据源：${site.name}'),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                }
-                              }
-                            }
-                          }
-                        },
+                        onLongPress: () => _handleDeleteSource(context, site),
                       ),
                     );
                   },
@@ -395,5 +366,58 @@ class _SourceSwitcherContent extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _handleDeleteSource(BuildContext context, SourceSite site) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.hongguoRed),
+            SizedBox(width: 8),
+            Text('删除数据源'),
+          ],
+        ),
+        content: Text('确定要删除自定义数据源「${site.name}」(${site.id}) 吗？\n删除后本地脚本文件将被彻底移除。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final service = JsSourceService.current ??
+          (repository != null ? JsSourceService(repository!) : null);
+      if (service != null) {
+        final ok = await service.removeSource(site.id);
+        if (ok && context.mounted) {
+          if (store.source == site.id) {
+            final nextSource = service.activeSourceId.isNotEmpty
+                ? service.activeSourceId
+                : (store.sources.isNotEmpty ? store.sources.first.id : 'hongguo');
+            try {
+              await store.setSource(nextSource);
+            } catch (_) {}
+          }
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('已成功删除数据源：${site.name}'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      }
+    }
   }
 }

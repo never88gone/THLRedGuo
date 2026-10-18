@@ -263,54 +263,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: _chooseDefaultSpeed,
               ),
-              if (widget.store.isZhenguojianActivated || widget.store.sources.length > 1) ...[
-                ListTile(
-                  key: const ValueKey('settings-switch-source'),
-                  leading: const Icon(Icons.swap_horiz_rounded),
-                  title: const Text('切换当前数据源'),
-                  subtitle: Text('当前正在使用：${SourceSite.byId(widget.store.source).name} · 轻触切换可用站源'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => showSourceSwitcherSheet(
-                    context,
-                    store: widget.store,
-                    onSelect: (site) {
-                      saveUserChange(context, () => widget.store.setSource(site.id));
-                    },
+              ListTile(
+                key: const ValueKey('settings-switch-source'),
+                leading: const Icon(Icons.swap_horiz_rounded),
+                title: const Text('切换当前数据源'),
+                subtitle: Text('当前正在使用：${SourceSite.byId(widget.store.source).name} · 轻触切换可用站源'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => showSourceSwitcherSheet(
+                  context,
+                  store: widget.store,
+                  onSelect: (site) {
+                    saveUserChange(context, () => widget.store.setSource(site.id));
+                  },
+                ),
+              ),
+              ListTile(
+                key: const ValueKey('settings-js-sources'),
+                leading: const Icon(Icons.javascript_rounded),
+                title: const Text('JS 数据源插件管理'),
+                subtitle: const Text('独立沙箱运行 · 数据源列表、导入与删除管理'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => JsSourcesPage(
+                      repository: widget.repository,
+                      store: widget.store,
+                    ),
                   ),
                 ),
+              ),
+              if (widget.repository.supportsSourceManagement && (widget.store.isZhenguojianActivated || widget.store.sources.length > 1))
                 ListTile(
-                  key: const ValueKey('settings-js-sources'),
-                  leading: const Icon(Icons.javascript_rounded),
-                  title: const Text('JS 数据源插件管理'),
-                  subtitle: const Text('独立沙箱运行 · 热重载与自定义 JS 插件导入'),
+                  leading: const Icon(Icons.hub_outlined),
+                  title: const Text('站源测速与连通性检测'),
+                  subtitle: const Text('多源站启用状态、健康诊断与网络测速'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(
-                      builder: (_) => JsSourcesPage(
+                      builder: (_) => SourcesScreen(
                         repository: widget.repository,
                         store: widget.store,
                       ),
                     ),
                   ),
                 ),
-                if (widget.repository.supportsSourceManagement)
-                  ListTile(
-                    leading: const Icon(Icons.hub_outlined),
-                    title: const Text('站源测速与连通性检测'),
-                    subtitle: const Text('多源站启用状态、健康诊断与网络测速'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) => SourcesScreen(
-                          repository: widget.repository,
-                          store: widget.store,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
             ],
           ),
 

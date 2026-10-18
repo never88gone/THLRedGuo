@@ -1536,67 +1536,117 @@ struct JSSourcePluginCard: View {
     let onSelect: () -> Void
     let onRemove: () -> Void
 
-    @FocusState private var isFocused: Bool
+    @FocusState private var isCardFocused: Bool
+    @FocusState private var isTrashFocused: Bool
+    @State private var showDeleteConfirm = false
+
+    private var isBuiltIn: Bool {
+        id.lowercased() == "hongguo"
+    }
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 20) {
-                ZStack {
-                    Circle()
-                        .fill(isActive ? TVTheme.primary.opacity(0.25) : Color(red: 0.20, green: 0.20, blue: 0.24))
-                        .frame(width: 52, height: 52)
-                    Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 26))
-                        .foregroundColor(isActive ? TVTheme.primary : Color.white.opacity(0.45))
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 12) {
-                        Text(name)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white)
-                        if isActive {
-                            Text("当前活跃源")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 3)
-                                .background(TVTheme.primary)
-                                .clipShape(Capsule())
-                        }
+        HStack(spacing: 14) {
+            // 左侧：切换选择按钮
+            Button(action: onSelect) {
+                HStack(spacing: 20) {
+                    ZStack {
+                        Circle()
+                            .fill(isActive ? TVTheme.primary.opacity(0.25) : Color(red: 0.20, green: 0.20, blue: 0.24))
+                            .frame(width: 52, height: 52)
+                        Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 26))
+                            .foregroundColor(isActive ? TVTheme.primary : Color.white.opacity(0.45))
                     }
-                    Text("v\(version) · 作者: \(author)")
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.6))
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 12) {
+                            Text(name)
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(.white)
+                            if isActive {
+                                Text("当前活跃源")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 3)
+                                    .background(TVTheme.primary)
+                                    .clipShape(Capsule())
+                            }
+                            if isBuiltIn {
+                                Text("官方内置")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Color.white.opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        Text("v\(version) · 作者: \(author) · 脚本: \(id).js")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(isCardFocused ? TVTheme.primary : Color.white.opacity(0.3))
                 }
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(isCardFocused ? Color(red: 0.20, green: 0.17, blue: 0.22) : Color(red: 0.14, green: 0.14, blue: 0.18))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(isCardFocused ? TVTheme.primary : (isActive ? TVTheme.primary.opacity(0.4) : Color.white.opacity(0.08)), lineWidth: isCardFocused ? 3 : 1)
+                )
+                .tvFocusBorder(isFocused: isCardFocused, cornerRadius: 18)
+            }
+            .buttonStyle(TVZeroHighlightButtonStyle())
+            .focused($isCardFocused)
+            .focusEffectDisabled()
 
-                Spacer()
-
-                Button(action: onRemove) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 18))
-                        .foregroundColor(.red.opacity(0.85))
-                        .padding(12)
-                        .background(Circle().fill(Color.red.opacity(0.12)))
+            // 右侧：自定义数据源独立删除按钮（支持遥控器向右切换焦点选中）
+            if !isBuiltIn {
+                Button(action: {
+                    showDeleteConfirm = true
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundColor(isTrashFocused ? .white : .red.opacity(0.85))
+                        Text("删除")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(isTrashFocused ? .white : .red.opacity(0.75))
+                    }
+                    .frame(width: 80, height: 86)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(isTrashFocused ? Color.red.opacity(0.85) : Color.red.opacity(0.12))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(isTrashFocused ? Color.white : Color.red.opacity(0.3), lineWidth: isTrashFocused ? 3 : 1)
+                    )
+                    .tvFocusBorder(isFocused: isTrashFocused, cornerRadius: 18)
                 }
                 .buttonStyle(TVZeroHighlightButtonStyle())
+                .focused($isTrashFocused)
+                .focusEffectDisabled()
+                .alert("删除数据源", isPresented: $showDeleteConfirm) {
+                    Button("取消", role: .cancel) {}
+                    Button("确认删除", role: .destructive) {
+                        onRemove()
+                    }
+                } message: {
+                    Text("确定要删除数据源「\(name)」(\(id).js) 吗？删除后本地文件将被彻底移除。")
+                }
             }
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(isFocused ? Color(red: 0.20, green: 0.17, blue: 0.22) : Color(red: 0.14, green: 0.14, blue: 0.18))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(isFocused ? TVTheme.primary : (isActive ? TVTheme.primary.opacity(0.4) : Color.white.opacity(0.08)), lineWidth: isFocused ? 3 : 1)
-            )
-            .tvFocusBorder(isFocused: isFocused, cornerRadius: 18)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
-        .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isFocused)
-        .focusEffectDisabled()
     }
 }
 
