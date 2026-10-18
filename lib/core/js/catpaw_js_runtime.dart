@@ -227,138 +227,125 @@ if (!JSON.parse) JSON.parse = function(s) { return {}; };
     return nativeParse(text, reviver);
   };
 })();
-if (typeof console === 'undefined') {
-  globalThis.console = {
-    log: function() {},
-    warn: function() {},
-    error: function() {},
-    info: function() {}
-  };
-}
+// 强制无条件覆盖 console，杜绝宿主注入有缺陷的 C 原生 sendMessage('ConsoleLog', ...) 回调
+globalThis.console = {
+  log: function() {},
+  warn: function() {},
+  error: function() {},
+  info: function() {}
+};
 ''');
 
     _rt.evaluate(_evalAsyncShim);
     _rt.evaluate(_htmlShim);
     _rt.evaluate(_fetchShim);
+  }
 
-    _rt.onMessage('__fetch__', (dynamic args) async {
+  Future<Map<String, dynamic>> _executeFetch(Map<String, dynamic> params) async {
+    if (_isDisposed) {
+      return {'status': 0, 'headers': <String, String>{}, 'body': ''};
+    }
+    _activeRequests++;
+    String url = '';
+    final clock = Stopwatch()..start();
+    var timedOut = false;
+    try {
+      url = params['url']?.toString() ?? '';
+      final method = (params['method']?.toString() ?? 'GET').toUpperCase();
+      final rawHeaders = params['headers'];
+      final headers = <String, String>{};
+      if (rawHeaders is Map) {
+        rawHeaders.forEach((k, v) {
+          if (k != null && v != null) headers[k.toString()] = v.toString();
+        });
+      }
+      final body = params['body']?.toString();
+
+      final uri = Uri.parse(url);
+      final abort = Completer<void>();
+      _requestAborts.add(abort);
+      final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 12000)
+          .clamp(1, 12000);
+      final timer = Timer(Duration(milliseconds: timeoutMs), () {
+        timedOut = true;
+        if (!abort.isCompleted) abort.complete();
+      });
+      late http.Response resp;
+      try {
+        final request =
+            http.AbortableRequest(method, uri, abortTrigger: abort.future)
+              ..headers.addAll(headers)
+              ..followRedirects = params['redirect'] != 'manual';
+        if (body != null && method != 'HEAD' && method != 'GET') {
+          request.body = body;
+        }
+        final response = await _httpClient
+            .send(request)
+            .timeout(Duration(milliseconds: timeoutMs));
+        final bytes = <int>[];
+        await for (final chunk in response.stream.timeout(
+          Duration(milliseconds: timeoutMs),
+        )) {
+          if (bytes.length + chunk.length > 2 * 1024 * 1024) {
+            throw const FormatException('接口响应超过限制');
+          }
+          bytes.addAll(chunk);
+        }
+        resp = http.Response.bytes(
+          bytes,
+          response.statusCode,
+          headers: response.headers,
+        );
+      } finally {
+        timer.cancel();
+        _requestAborts.remove(abort);
+        if (!abort.isCompleted) abort.complete();
+      }
+
       if (_isDisposed) {
         return {'status': 0, 'headers': <String, String>{}, 'body': ''};
       }
-      _activeRequests++;
-      String url = '';
-      final clock = Stopwatch()..start();
-      var timedOut = false;
-      try {
-        Map<String, dynamic> params = {};
-        if (args is Map) {
-          params = Map<String, dynamic>.from(args);
-        } else if (args is String) {
-          try {
-            final decoded = jsonDecode(args);
-            if (decoded is Map) params = Map<String, dynamic>.from(decoded);
-          } catch (_) {}
-        }
-
-        url = params['url']?.toString() ?? '';
-        final method = (params['method']?.toString() ?? 'GET').toUpperCase();
-        final rawHeaders = params['headers'];
-        final headers = <String, String>{};
-        if (rawHeaders is Map) {
-          rawHeaders.forEach((k, v) {
-            if (k != null && v != null) headers[k.toString()] = v.toString();
-          });
-        }
-        final body = params['body']?.toString();
-
-        final uri = Uri.parse(url);
-        final abort = Completer<void>();
-        _requestAborts.add(abort);
-        final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 12000)
-            .clamp(1, 12000);
-        final timer = Timer(Duration(milliseconds: timeoutMs), () {
-          timedOut = true;
-          if (!abort.isCompleted) abort.complete();
-        });
-        late http.Response resp;
-        try {
-          final request =
-              http.AbortableRequest(method, uri, abortTrigger: abort.future)
-                ..headers.addAll(headers)
-                ..followRedirects = params['redirect'] != 'manual';
-          if (body != null && method != 'HEAD' && method != 'GET') {
-            request.body = body;
-          }
-          final response = await _httpClient
-              .send(request)
-              .timeout(Duration(milliseconds: timeoutMs));
-          final bytes = <int>[];
-          await for (final chunk in response.stream.timeout(
-            Duration(milliseconds: timeoutMs),
-          )) {
-            if (bytes.length + chunk.length > 2 * 1024 * 1024) {
-              throw const FormatException('接口响应超过限制');
-            }
-            bytes.addAll(chunk);
-          }
-          resp = http.Response.bytes(
-            bytes,
-            response.statusCode,
-            headers: response.headers,
-          );
-        } finally {
-          timer.cancel();
-          _requestAborts.remove(abort);
-          if (!abort.isCompleted) abort.complete();
-        }
-
-        if (_isDisposed) {
-          return {'status': 0, 'headers': <String, String>{}, 'body': ''};
-        }
-        diagnostics.record(
-          url: url,
-          context: diagnosticContext,
-          elapsedMs: clock.elapsedMilliseconds,
-          status: resp.statusCode,
-          body: resp.body,
-        );
-        return {
-          'status': resp.statusCode,
-          'headers': resp.headers,
-          'body': resp.body,
-        };
-      } catch (e) {
-        diagnostics.record(
-          url: url,
-          context: diagnosticContext,
-          elapsedMs: clock.elapsedMilliseconds,
-          errorCode: SourceDiagnostics.networkCode(e, timedOut: timedOut),
-        );
-        // ignore: avoid_print
-        print(
-          '【FETCH ERROR】host=${Uri.tryParse(url)?.host}, type=${e.runtimeType}',
-        );
-        if (_isDisposed) {
-          return {'status': 0, 'headers': <String, String>{}, 'body': ''};
-        }
-        return {
-          'status': 0,
-          'headers': <String, String>{},
-          'body': '',
-          'error': e.runtimeType.toString(),
-        };
-      } finally {
-        _activeRequests--;
-        if (_isDisposed &&
-            _activeRequests == 0 &&
-            _drainCompleter != null &&
-            !_drainCompleter!.isCompleted) {
-          _drainCompleter!.complete();
-        }
+      diagnostics.record(
+        url: url,
+        context: diagnosticContext,
+        elapsedMs: clock.elapsedMilliseconds,
+        status: resp.statusCode,
+        body: resp.body,
+      );
+      return {
+        'status': resp.statusCode,
+        'headers': resp.headers,
+        'body': resp.body,
+      };
+    } catch (e) {
+      diagnostics.record(
+        url: url,
+        context: diagnosticContext,
+        elapsedMs: clock.elapsedMilliseconds,
+        errorCode: SourceDiagnostics.networkCode(e, timedOut: timedOut),
+      );
+      // ignore: avoid_print
+      print(
+        '【FETCH ERROR】host=${Uri.tryParse(url)?.host}, type=${e.runtimeType}',
+      );
+      if (_isDisposed) {
+        return {'status': 0, 'headers': <String, String>{}, 'body': ''};
       }
-    });
-
-    _rt.evaluate(_fetchShim);
+      return {
+        'status': 0,
+        'headers': <String, String>{},
+        'body': '',
+        'error': e.runtimeType.toString(),
+      };
+    } finally {
+      _activeRequests--;
+      if (_isDisposed &&
+          _activeRequests == 0 &&
+          _drainCompleter != null &&
+          !_drainCompleter!.isCompleted) {
+        _drainCompleter!.complete();
+      }
+    }
   }
 
   Future<Map<String, dynamic>> getMeta() async {
@@ -558,22 +545,80 @@ if (typeof console === 'undefined') {
     final cancellation = _cancellation;
     try {
       _rt.evaluate('globalThis.__hongguoCancelled = false;');
-      final evalResult = _rt.evaluate(
-        '__evalAsync(function() { return ($jsCode); })',
+      final evalStart = _rt.evaluate(
+        '__startEval(function() { return ($jsCode); })',
       );
-      if (evalResult.isError) {
-        throw Exception('JS 表达式执行失败: ${evalResult.rawResult}');
+      if (evalStart.isError) {
+        throw Exception('JS 表达式启动失败: ${evalStart.rawResult}');
       }
 
-      final resolved = await _rt.handlePromise(evalResult, timeout: timeout);
-      if (cancellation != _cancellation) {
-        throw CatPawSourceFailure.playback('cancelled');
-      }
-      if (resolved.isError) {
-        throw Exception('JS Promise 异常: ${resolved.rawResult}');
+      final taskId = int.tryParse(evalStart.stringResult) ?? 0;
+      if (taskId == 0) {
+        throw Exception('JS 任务初始化失败: ${evalStart.rawResult}');
       }
 
-      final raw = resolved.stringResult;
+      final stopwatch = Stopwatch()..start();
+      dynamic rawResult;
+
+      while (true) {
+        if (cancellation != _cancellation) {
+          throw CatPawSourceFailure.playback('cancelled');
+        }
+        if (stopwatch.elapsed > timeout) {
+          throw TimeoutException('JS 表达式执行超时', timeout);
+        }
+
+        // 1. 处理待发起的网络请求
+        final drainResult = _rt.evaluate('__drainFetches()');
+        final drainStr = drainResult.stringResult;
+        if (drainStr.isNotEmpty && drainStr != '[]' && drainStr != 'null') {
+          try {
+            final dynamic list = jsonDecode(drainStr);
+            if (list is List) {
+              for (final item in list) {
+                if (item is Map) {
+                  final req = Map<String, dynamic>.from(item);
+                  final id = req['id'];
+                  unawaited(
+                    _executeFetch(req).then((resp) {
+                      if (!_isDisposed && cancellation == _cancellation) {
+                        final safeJson = jsonEncode(resp)
+                            .replaceAll('\u2028', '\\u2028')
+                            .replaceAll('\u2029', '\\u2029');
+                        _rt.evaluate('__resolveFetch($id, $safeJson);');
+                      }
+                    }).catchError((err) {
+                      if (!_isDisposed && cancellation == _cancellation) {
+                        _rt.evaluate(
+                          '__rejectFetch($id, ${jsonEncode(err.toString())});',
+                        );
+                      }
+                    }),
+                  );
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        // 2. 检查主异步任务是否完成
+        final pollResult = _rt.evaluate('__pollEval($taskId)');
+        final pollStr = pollResult.stringResult;
+        if (pollStr.isNotEmpty && pollStr != 'null') {
+          try {
+            final dynamic pollJson = jsonDecode(pollStr);
+            if (pollJson is Map && pollJson['done'] == true) {
+              rawResult = pollJson['result'];
+              break;
+            }
+          } catch (_) {}
+        }
+
+        _rt.executePendingJob();
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
+
+      final raw = rawResult?.toString() ?? '';
       if (raw.isEmpty || raw == 'null' || raw == 'undefined') {
         return null;
       }
@@ -641,22 +686,47 @@ if (typeof console === 'undefined') {
   }
 
   static const _evalAsyncShim = r'''
-globalThis.__evalAsync = async function(fn) {
-  try {
-    var res = await fn();
-    return JSON.stringify(res);
-  } catch (e) {
-    return JSON.stringify({
-      __error: true,
-      code: e && e.code ? String(e.code) : "JS_EXECUTION",
-      message: e ? (e.message || String(e)) : "Unknown JS error"
-    });
+globalThis.__evalTaskCounter = 0;
+globalThis.__evalTasks = {};
+
+globalThis.__startEval = function(fn) {
+  var id = ++globalThis.__evalTaskCounter;
+  globalThis.__evalTasks[id] = { done: false, result: null };
+  (async function() {
+    try {
+      var res = await fn();
+      globalThis.__evalTasks[id].result = JSON.stringify(res);
+      globalThis.__evalTasks[id].done = true;
+    } catch (e) {
+      globalThis.__evalTasks[id].result = JSON.stringify({
+        __error: true,
+        code: e && e.code ? String(e.code) : "JS_EXECUTION",
+        message: e ? (e.message || String(e)) : "Unknown JS error"
+      });
+      globalThis.__evalTasks[id].done = true;
+    }
+  })();
+  return id;
+};
+
+globalThis.__pollEval = function(id) {
+  var task = globalThis.__evalTasks[id];
+  if (!task) return '{"done":true,"result":null}';
+  if (task.done) {
+    var res = task.result;
+    delete globalThis.__evalTasks[id];
+    return JSON.stringify({ done: true, result: res });
   }
+  return '{"done":false}';
 };
 ''';
 
   static const _fetchShim = r'''
-globalThis.fetch = async function(url, opts) {
+globalThis.__fetchReqId = 0;
+globalThis.__fetchPendingQueue = [];
+globalThis.__fetchWaiters = {};
+
+globalThis.fetch = function(url, opts) {
   opts = opts || {};
   var method = (opts.method || 'GET').toUpperCase();
   var headers = opts.headers || {};
@@ -664,33 +734,59 @@ globalThis.fetch = async function(url, opts) {
   if (typeof body === 'object') {
     try { body = JSON.stringify(body); } catch (_) {}
   }
-  var raw = await sendMessage("__fetch__", JSON.stringify({
-    url: String(url),
-    method: method,
-    headers: headers,
-    body: String(body),
-    timeoutMs: opts.timeoutMs || 12000,
-    redirect: opts.redirect || 'follow'
-  }));
-  var parsed = (typeof raw === 'string') ? JSON.parse(raw) : raw;
-  var status = (parsed && typeof parsed.status === 'number') ? parsed.status : 200;
-  var respBody = (parsed && parsed.body != null) ? String(parsed.body) : '';
-  var respHeaders = (parsed && parsed.headers) ? parsed.headers : {};
-  return {
-    status: status,
-    ok: status >= 200 && status < 300,
-    headers: respHeaders,
-    body: respBody,
-    text: async function() { return respBody; },
-    json: async function() {
-      try {
-        if (typeof respBody === 'object' && respBody !== null) return respBody;
-        return JSON.parse(respBody);
-      } catch (e) {
-        return {};
+  var id = ++globalThis.__fetchReqId;
+  return new Promise(function(resolve, reject) {
+    globalThis.__fetchWaiters[id] = { resolve: resolve, reject: reject };
+    globalThis.__fetchPendingQueue.push({
+      id: id,
+      url: String(url),
+      method: method,
+      headers: headers,
+      body: String(body),
+      timeoutMs: opts.timeoutMs || 12000,
+      redirect: opts.redirect || 'follow'
+    });
+  });
+};
+
+globalThis.__drainFetches = function() {
+  if (globalThis.__fetchPendingQueue.length === 0) return '[]';
+  var list = globalThis.__fetchPendingQueue;
+  globalThis.__fetchPendingQueue = [];
+  return JSON.stringify(list);
+};
+
+globalThis.__resolveFetch = function(id, respObj) {
+  var waiter = globalThis.__fetchWaiters[id];
+  if (waiter) {
+    delete globalThis.__fetchWaiters[id];
+    var status = (respObj && typeof respObj.status === 'number') ? respObj.status : 200;
+    var respBody = (respObj && respObj.body != null) ? String(respObj.body) : '';
+    var respHeaders = (respObj && respObj.headers) ? respObj.headers : {};
+    waiter.resolve({
+      status: status,
+      ok: status >= 200 && status < 300,
+      headers: respHeaders,
+      body: respBody,
+      text: async function() { return respBody; },
+      json: async function() {
+        try {
+          if (typeof respBody === 'object' && respBody !== null) return respBody;
+          return JSON.parse(respBody);
+        } catch (e) {
+          return {};
+        }
       }
-    }
-  };
+    });
+  }
+};
+
+globalThis.__rejectFetch = function(id, errMsg) {
+  var waiter = globalThis.__fetchWaiters[id];
+  if (waiter) {
+    delete globalThis.__fetchWaiters[id];
+    waiter.reject(new Error(errMsg || 'Network request failed'));
+  }
 };
 ''';
 
