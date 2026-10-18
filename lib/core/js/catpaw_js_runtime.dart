@@ -5,6 +5,8 @@ import 'dart:math';
 import 'package:flutter_js/flutter_js.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
+
 class CatPawHomeResult {
   final List<Map<String, dynamic>> classes;
   final List<Map<String, dynamic>> filters;
@@ -103,6 +105,8 @@ class CatPawJsRuntime {
   late final JavascriptRuntime _rt;
   final http.Client _httpClient;
   final bool _isOwnedClient;
+  final SourceDiagnostics diagnostics;
+  final String diagnosticContext;
   bool _ready = false;
   bool _isDisposed = false;
   final Set<Completer<void>> _requestAborts = {};
@@ -112,9 +116,13 @@ class CatPawJsRuntime {
   Completer<void>? _drainCompleter;
   Completer<void>? _evalDrainCompleter;
 
-  CatPawJsRuntime([http.Client? client])
-    : _httpClient = client ?? http.Client(),
-      _isOwnedClient = client == null;
+  CatPawJsRuntime([
+    http.Client? client,
+    SourceDiagnostics? recorder,
+    this.diagnosticContext = '日常使用',
+  ]) : _httpClient = client ?? http.Client(),
+       _isOwnedClient = client == null,
+       diagnostics = recorder ?? SourceDiagnostics.shared;
 
   bool get isReady => _ready;
   bool get isDisposed => _isDisposed;
@@ -239,6 +247,8 @@ if (typeof console === 'undefined') {
       }
       _activeRequests++;
       String url = '';
+      final clock = Stopwatch()..start();
+      var timedOut = false;
       try {
         Map<String, dynamic> params = {};
         if (args is Map) {
@@ -267,6 +277,7 @@ if (typeof console === 'undefined') {
         final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 12000)
             .clamp(1, 12000);
         final timer = Timer(Duration(milliseconds: timeoutMs), () {
+          timedOut = true;
           if (!abort.isCompleted) abort.complete();
         });
         late http.Response resp;
@@ -304,12 +315,25 @@ if (typeof console === 'undefined') {
         if (_isDisposed) {
           return {'status': 0, 'headers': <String, String>{}, 'body': ''};
         }
+        diagnostics.record(
+          url: url,
+          context: diagnosticContext,
+          elapsedMs: clock.elapsedMilliseconds,
+          status: resp.statusCode,
+          body: resp.body,
+        );
         return {
           'status': resp.statusCode,
           'headers': resp.headers,
           'body': resp.body,
         };
       } catch (e) {
+        diagnostics.record(
+          url: url,
+          context: diagnosticContext,
+          elapsedMs: clock.elapsedMilliseconds,
+          errorCode: SourceDiagnostics.networkCode(e, timedOut: timedOut),
+        );
         // ignore: avoid_print
         print(
           '【FETCH ERROR】host=${Uri.tryParse(url)?.host}, type=${e.runtimeType}',
@@ -473,10 +497,26 @@ if (typeof console === 'undefined') {
     int page = 1,
   }) async {
     _assertReady();
-    final res = await _evalAsync(
-      'typeof spider !== "undefined" && typeof spider.search === "function" ? spider.search(${jsonEncode(keyword)}, $quick, $page) : []',
-      timeout: const Duration(seconds: 60),
-    );
+    final dynamic res;
+    try {
+      res = await _evalAsync(
+        'typeof spider !== "undefined" && typeof spider.search === "function" ? spider.search(${jsonEncode(keyword)}, $quick, $page) : []',
+        timeout: const Duration(seconds: 60),
+      );
+    } catch (error) {
+      final code = error is CatPawSourceFailure
+          ? SourceDiagnostics.safeCode(error.code)
+          : 'SEARCH_EXECUTION';
+      diagnostics.add(
+        SourceDiagnosticEntry(
+          at: DateTime.now().toUtc(),
+          context: diagnosticContext,
+          stage: '搜索执行',
+          errorCode: code.isEmpty ? 'SEARCH_EXECUTION' : code,
+        ),
+      );
+      rethrow;
+    }
     List<Map<String, dynamic>> list = [];
     if (res is List) {
       list = _toListOfMaps(res);

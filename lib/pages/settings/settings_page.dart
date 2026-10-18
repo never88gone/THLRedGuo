@@ -19,6 +19,7 @@ import 'package:THLRedLook/pages/privacy/privacy_settings_page.dart';
 import 'package:THLRedLook/pages/about/about_page.dart';
 import 'package:THLRedLook/pages/settings/storage_page.dart';
 import 'package:THLRedLook/pages/settings/js_sources_page.dart';
+import 'package:THLRedLook/pages/settings/source_diagnostics_page.dart';
 
 export 'storage_page.dart' show storageSize;
 
@@ -434,6 +435,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: '关于与系统诊断',
             icon: Icons.info_outline_rounded,
             children: [
+              ListTile(
+                key: const ValueKey('settings-source-diagnostics'),
+                leading: const Icon(Icons.network_check),
+                title: const Text('数据源诊断'),
+                subtitle: const Text('检查游客注册、搜索与详情，复制脱敏报告'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SourceDiagnosticsPage(),
+                  ),
+                ),
+              ),
               ListTile(
                 leading: const Icon(Icons.receipt_long_rounded),
                 title: const Text('播放诊断日记'),

@@ -97,7 +97,7 @@ class _SourceSwitcherContent extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '当前共有 ${sources.length} 个可用数据源，轻触即可切换',
+                          '当前共有 ${sources.length} 个可用数据源，轻触切换，长按可删除',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.textTheme.bodySmall?.color,
                           ),
@@ -284,6 +284,57 @@ class _SourceSwitcherContent extends StatelessWidget {
                               duration: const Duration(seconds: 2),
                             ),
                           );
+                        },
+                        onLongPress: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Row(
+                                children: [
+                                  Icon(Icons.warning_amber_rounded, color: AppColors.hongguoRed),
+                                  SizedBox(width: 8),
+                                  Text('删除数据源'),
+                                ],
+                              ),
+                              content: Text('确定要删除数据源「${site.name}」(${site.id}) 吗？\n删除后本地脚本将被移除。'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('取消'),
+                                ),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('确认删除'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirmed == true && context.mounted) {
+                            final service = JsSourceService.current;
+                            if (service != null) {
+                              final ok = await service.removeSource(site.id);
+                              if (ok && context.mounted) {
+                                if (store.source == site.id) {
+                                  final nextSource = service.activeSourceId.isNotEmpty
+                                      ? service.activeSourceId
+                                      : (store.sources.isNotEmpty ? store.sources.first.id : 'hongguo');
+                                  try {
+                                    await store.setSource(nextSource);
+                                  } catch (_) {}
+                                }
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('已成功删除数据源：${site.name}'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              }
+                            }
+                          }
                         },
                       ),
                     );

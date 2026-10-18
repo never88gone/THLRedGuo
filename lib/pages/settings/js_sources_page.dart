@@ -313,6 +313,109 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
     }
   }
 
+  Future<void> _confirmDeleteSource(JsSourceMeta meta) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.hongguoRed),
+            SizedBox(width: 8),
+            Text('删除数据源'),
+          ],
+        ),
+        content: Text(
+          '确定要删除数据源「${meta.name}」(${meta.id}.js) 吗？\n删除后本地脚本文件将被移除。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final ok = await _service.removeSource(meta.id);
+      if (!mounted) return;
+      if (ok) {
+        if (widget.store.source == meta.id) {
+          final nextSource = _service.activeSourceId.isNotEmpty
+              ? _service.activeSourceId
+              : (widget.store.sources.isNotEmpty ? widget.store.sources.first.id : 'hongguo');
+          try {
+            await widget.store.setSource(nextSource);
+          } catch (_) {}
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已成功删除数据源：${meta.name}'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('删除数据源 ${meta.name} 失败'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmClearAllSources() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_rounded, color: AppColors.hongguoRed),
+            SizedBox(width: 8),
+            Text('清空所有数据源'),
+          ],
+        ),
+        content: const Text(
+          '确定要清空所有已导入的 JS 数据源插件吗？\n此操作将删除本地所有插件脚本文件，不可恢复。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('全部清空'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _service.clearAll();
+      if (!mounted) return;
+      try {
+        await widget.store.setSource('hongguo');
+      } catch (_) {}
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已清空所有数据源插件'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -350,6 +453,9 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                   break;
                 case 'code':
                   _showImportDialog();
+                  break;
+                case 'clear_all':
+                  _confirmClearAllSources();
                   break;
               }
             },
@@ -401,6 +507,17 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                     Icon(Icons.code_rounded, size: 20),
                     SizedBox(width: 12),
                     Text('粘贴插件源码导入'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                value: 'clear_all',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_forever_rounded, size: 20, color: AppColors.hongguoRed),
+                    SizedBox(width: 12),
+                    Text('清空所有数据源', style: TextStyle(color: AppColors.hongguoRed)),
                   ],
                 ),
               ),
@@ -641,24 +758,40 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                                     ],
                                   ),
                                 ),
-                                if (isActive)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      gradient: AppGradients.primary,
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: AppShadows.pillGlow,
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isActive)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          gradient: AppGradients.primary,
+                                          borderRadius: BorderRadius.circular(20),
+                                          boxShadow: AppShadows.pillGlow,
+                                        ),
+                                        child: const Text(
+                                          '当前激活',
+                                          style: TextStyle(color: AppColors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                        ),
+                                      )
+                                    else
+                                      TextButton(
+                                        onPressed: () => _handleSwitchSource(meta),
+                                        child: const Text('激活', style: TextStyle(color: AppColors.hongguoRed)),
+                                      ),
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      key: ValueKey('delete-source-${meta.id}'),
+                                      tooltip: '删除数据源',
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        size: 20,
+                                        color: AppColors.grey,
+                                      ),
+                                      onPressed: () => _confirmDeleteSource(meta),
                                     ),
-                                    child: const Text(
-                                      '当前激活',
-                                      style: TextStyle(color: AppColors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                  )
-                                else
-                                  TextButton(
-                                    onPressed: () => _handleSwitchSource(meta),
-                                    child: const Text('激活', style: TextStyle(color: AppColors.hongguoRed)),
-                                  ),
+                                  ],
+                                ),
                               ],
                             ),
                             if (meta.description.isNotEmpty) ...[

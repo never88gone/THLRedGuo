@@ -151,6 +151,28 @@ class DartCoreEngine {
               ? _installedSources.keys.first
               : '';
         }
+        try {
+          final dir = Directory(_sourcesDir);
+          if (dir.existsSync()) {
+            final files = dir.listSync().whereType<File>().where(
+              (f) => f.path.endsWith('.js'),
+            );
+            for (final file in files) {
+              try {
+                final base = p.basenameWithoutExtension(file.path);
+                if (base == source) {
+                  file.deleteSync();
+                } else {
+                  final content = file.readAsStringSync();
+                  final meta = _parseScriptMeta(content, p.basename(file.path));
+                  if (meta?.id == source) {
+                    file.deleteSync();
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+        } catch (_) {}
         return {'ok': true};
       case 'jsSource.clearAll':
         _spiderPool.clear();

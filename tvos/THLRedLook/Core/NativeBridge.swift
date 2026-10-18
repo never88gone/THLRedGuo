@@ -8,6 +8,8 @@ public actor NativeBridge {
 
     private var isInitialized = false
     private let httpSession: URLSession
+    private let diagnostics: SourceDiagnostics
+    private let diagnosticContext: String
 
     // 沙盒路径
     private var baseDirURL: URL
@@ -21,8 +23,10 @@ public actor NativeBridge {
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
 
-    init(baseDirectory: URL? = nil, httpSession: URLSession = .shared) {
+    init(baseDirectory: URL? = nil, httpSession: URLSession = .shared, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用") {
         self.httpSession = httpSession
+        self.diagnostics = diagnostics
+        self.diagnosticContext = diagnosticContext
         let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
         self.baseDirURL = baseDirectory ?? cachesDir.appendingPathComponent("THLRedLook_Data")
@@ -149,6 +153,8 @@ public actor NativeBridge {
 
         // 2. 注入原生高性能 HTTP 请求桥接
         let session = httpSession
+        let recorder = diagnostics
+        let diagnosticContext = diagnosticContext
         let fetchBlock: @convention(block) (String, [String: Any]?) -> [String: Any] = { urlStr, opts in
             guard let url = URL(string: urlStr) else {
                 return ["status": 0, "headers": [:], "body": "", "error": "无效的 URL"]
@@ -168,30 +174,19 @@ public actor NativeBridge {
             }
 
             let semaphore = DispatchSemaphore(value: 0)
-            var statusCode = 0
-            var respHeaders = [String: String]()
-            var respBody = ""
-
-            let task = session.dataTask(with: req) { data, response, _ in
-                if let http = response as? HTTPURLResponse {
-                    statusCode = http.statusCode
-                    for (k, v) in http.allHeaderFields {
-                        respHeaders[String(describing: k).lowercased()] = String(describing: v)
-                    }
-                }
-                if let data = data {
-                    respBody = String(data: data, encoding: .utf8) ?? ""
-                }
+            let started = ProcessInfo.processInfo.systemUptime
+            let result = NativeHTTPResult()
+            let task = session.dataTask(with: req) { data, response, error in
+                result.complete(data: data, response: response, error: error)
                 semaphore.signal()
             }
             task.resume()
-            if semaphore.wait(timeout: .now() + timeout) == .timedOut { task.cancel() }
+            let timedOut = semaphore.wait(timeout: .now() + timeout) == .timedOut
+            if timedOut { task.cancel() }
+            let response = result.snapshot(timedOut: timedOut)
+            recorder.record(url: url, context: diagnosticContext, elapsedMs: Int((ProcessInfo.processInfo.systemUptime - started) * 1000), status: response.status, body: response.body, errorCode: response.error)
+            return ["status": response.status, "headers": response.headers, "body": response.body]
 
-            return [
-                "status": statusCode,
-                "headers": respHeaders,
-                "body": respBody
-            ]
         }
         context.setObject(fetchBlock, forKeyedSubscript: "__native_fetch" as NSString)
 
@@ -347,7 +342,7 @@ public actor NativeBridge {
                 var res = await (\(scriptExpr));
                 \(doneKey)(JSON.stringify({ ok: true, data: res }));
             } catch (err) {
-                \(doneKey)(JSON.stringify({ ok: false, error: err ? (err.message || String(err)) : "Error" }));
+                \(doneKey)(JSON.stringify({ ok: false, error: err ? (err.message || String(err)) : "Error", code: err && err.code ? String(err.code) : "JS_EXECUTION" }));
             }
         })();
         """
@@ -502,8 +497,12 @@ public actor NativeBridge {
 
             if !query.isEmpty {
                 let scriptExpr = try spiderExpression("search", [query, false, pg])
-                guard let res = evalAsync(context: ctx, scriptExpr: scriptExpr), res["ok"] as? Bool == true else {
-                    throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "官方搜索请求失败，请重试"])
+                let evaluated = evalAsync(context: ctx, scriptExpr: scriptExpr)
+                guard let res = evaluated, res["ok"] as? Bool == true else {
+                    let candidate = SourceDiagnostics.safeCode(evaluated?["code"])
+                    let code = candidate.isEmpty ? "JS_TIMEOUT" : candidate
+                    diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "搜索执行", errorCode: code))
+                    throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "官方搜索失败（\(code)），请到设置的数据源诊断查看记录"])
                 }
                 var searchItems: [[String: Any]] = []
                 var searchHasMore = false
@@ -820,5 +819,28 @@ public actor NativeBridge {
         default:
             return ["ok": true]
         }
+    }
+}
+
+private final class NativeHTTPResult {
+    private let lock = NSLock()
+    private var status = 0
+    private var headers: [String: String] = [:]
+    private var body = ""
+    private var error = ""
+    func complete(data: Data?, response: URLResponse?, error: Error?) {
+        lock.lock()
+        defer { lock.unlock() }
+        status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if let response = response as? HTTPURLResponse {
+            for (key, value) in response.allHeaderFields { headers[String(describing: key).lowercased()] = String(describing: value) }
+        }
+        if let data { body = String(data: data, encoding: .utf8) ?? "" }
+        self.error = SourceDiagnostics.networkCode(error)
+    }
+    func snapshot(timedOut: Bool) -> (status: Int, headers: [String: String], body: String, error: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        return timedOut ? (0, [:], "", "TIMEOUT:-1001") : (status, headers, body, error)
     }
 }

@@ -156,7 +156,6 @@ class JsSourceService extends ChangeNotifier {
 
   Future<bool> removeSource(String sourceId) async {
     if (_activeSourceId == sourceId) {
-      // 不能删除当前活跃源，除非有其他源可切换
       final other = _sources.firstWhere(
         (s) => s.id != sourceId,
         orElse: () => const JsSourceMeta(id: '', name: ''),
@@ -172,6 +171,17 @@ class JsSourceService extends ChangeNotifier {
     final ok = await _repository.jsSourceRemove(sourceId);
     if (ok) {
       _sources = await _repository.jsSourceList();
+      if (!_sources.any((s) => s.id == _activeSourceId)) {
+        _activeSourceId = _sources.isNotEmpty ? _sources.first.id : '';
+        try {
+          _preferences ??= await SharedPreferences.getInstance();
+          if (_activeSourceId.isNotEmpty) {
+            await _preferences?.setString(_activeSourceKey, _activeSourceId);
+          } else {
+            await _preferences?.remove(_activeSourceKey);
+          }
+        } catch (_) {}
+      }
     }
 
     _loading = false;

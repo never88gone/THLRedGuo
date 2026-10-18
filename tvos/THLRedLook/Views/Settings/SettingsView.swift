@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreImage.CIFilterBuiltins
 
 public enum SettingsCategory: String, CaseIterable, Identifiable {
     case sources = "sources"
@@ -54,6 +55,7 @@ public struct SettingsView: View {
     @State private var wasInContentPanel: Bool = false
 
     @EnvironmentObject private var jsService: JSSourceService
+    @State private var showingSourceDiagnostics = false
     @State private var showingImportAlert = false
     @State private var importURLString = ""
     @State private var isImporting = false
@@ -191,6 +193,9 @@ public struct SettingsView: View {
         )) {
             Alert(title: Text("提示"), message: Text(saveNotice ?? ""), dismissButton: .default(Text("好的")))
         }
+        .sheet(isPresented: $showingSourceDiagnostics) {
+            SourceDiagnosticsView()
+        }
         .overlay(
             Group {
                 if showingImportAlert {
@@ -225,6 +230,11 @@ public struct SettingsView: View {
         VStack(alignment: .leading, spacing: 32) {
             panelHeader(title: "站源管理", desc: "配置并选择当前要使用的影视数据源。内置支持官方标准短剧源，也可导入自定义 JS 插件。")
             
+            TVButton(title: "数据源诊断", icon: "stethoscope", isProminent: true) {
+                showingSourceDiagnostics = true
+            }
+            .accessibilityIdentifier("settings.sourceDiagnostics")
+
             // 顶部操作栏
             HStack(spacing: 20) {
                 let isHongguoInstalled = jsService.sources.contains(where: { ($0["id"] as? String) == "hongguo" })
@@ -1590,3 +1600,93 @@ struct JSSourcePluginCard: View {
     }
 }
 
+
+@MainActor
+private struct SourceDiagnosticsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var recorder = SourceDiagnostics.shared
+    @ObservedObject private var runner = SourceDiagnosticRunner.shared
+    @FocusState private var focusedAction: String?
+    @State private var showingQR = false
+    @State private var reportImage: UIImage?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            Text("数据源诊断").font(.system(size: 48, weight: .bold))
+            Text("红果官方源 · 应用 \(SourceDiagnostics.version) · 源指纹 \(SourceDiagnostics.sourceHash.prefix(12))")
+                .font(.system(size: 29))
+            Text("检测使用独立游客会话，不影响收藏、历史和当前数据源。最近 60 条记录保留在本次应用进程中。")
+                .font(.system(size: 29)).foregroundStyle(.secondary)
+            HStack(spacing: 24) {
+                TVButton(title: runner.running ? "检测中…" : "开始检测", icon: "network", isProminent: true) {
+                    Task { await runner.run() }
+                }
+                .disabled(runner.running)
+                .focused($focusedAction, equals: "run")
+                .accessibilityIdentifier("sourceDiagnostics.run")
+                TVButton(title: "反馈二维码", icon: "qrcode") {
+                    let filter = CIFilter.qrCodeGenerator()
+                    filter.message = Data(recorder.qrText.utf8)
+                    filter.correctionLevel = "L"
+                    if let output = filter.outputImage,
+                       let image = CIContext().createCGImage(output.transformed(by: CGAffineTransform(scaleX: 4, y: 4)), from: output.extent.applying(CGAffineTransform(scaleX: 4, y: 4))) {
+                        reportImage = UIImage(cgImage: image)
+                        showingQR = true
+                    }
+                }
+                .focused($focusedAction, equals: "qr")
+                .accessibilityIdentifier("sourceDiagnostics.qr")
+                TVButton(title: "清空记录", icon: "trash") { recorder.clear() }
+                    .disabled(runner.running)
+                    .accessibilityIdentifier("sourceDiagnostics.clear")
+                TVButton(title: "返回", icon: "arrow.backward") { dismiss() }
+                    .accessibilityIdentifier("sourceDiagnostics.back")
+            }
+            Text(runner.result).font(.system(size: 29, weight: .semibold))
+                .accessibilityIdentifier("sourceDiagnostics.result")
+            if runner.running { ProgressView() }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 24) {
+                    if let failure = recorder.entries.last(where: { $0.failed && !$0.host.isEmpty }) {
+                        Text("最近失败提示：" + SourceDiagnostics.advice(failure))
+                            .font(.system(size: 29)).foregroundStyle(.orange).focusable()
+                    }
+                    if recorder.entries.isEmpty {
+                        Text("暂无记录，请先复现问题或开始检测。")
+                            .font(.system(size: 29)).focusable()
+                    }
+                    ForEach(recorder.entries.reversed()) { entry in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text((entry.failed ? "失败 · " : "完成 · ") + entry.stage)
+                                .font(.system(size: 31, weight: .bold))
+                                .foregroundStyle(entry.failed ? .orange : .green)
+                            Text(entry.text).font(.system(size: 29))
+                        }
+                        .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+                        .focusable()
+                    }
+                }.padding(12)
+            }
+        }
+        .padding(60)
+        .defaultFocus($focusedAction, "run")
+        .onExitCommand { dismiss() }
+        .sheet(isPresented: $showingQR, onDismiss: { focusedAction = "qr" }) {
+            VStack(spacing: 24) {
+                Text("扫码获取诊断报告").font(.system(size: 42, weight: .bold))
+                if let reportImage {
+                    Image(uiImage: reportImage).interpolation(.none).resizable()
+                        .scaledToFit().frame(width: 500, height: 500)
+                        .padding(24).background(.white)
+                }
+                Text("包含版本、源指纹和最近 8 条脱敏记录。扫码读取文本后手动反馈，不会自动上传。")
+                    .font(.system(size: 29)).multilineTextAlignment(.center)
+                TVButton(title: "返回诊断", icon: "arrow.backward", isProminent: true) { showingQR = false }
+                    .accessibilityIdentifier("sourceDiagnostics.qrBack")
+            }
+            .padding(60)
+            .onExitCommand { showingQR = false }
+        }
+    }
+}
