@@ -18,6 +18,7 @@ import 'package:THLRedLook/pages/privacy/privacy_settings_page.dart';
 import 'package:THLRedLook/pages/about/about_page.dart';
 import 'package:THLRedLook/pages/about/contact_page.dart';
 import 'package:THLRedLook/pages/about/third_party_page.dart';
+import 'package:THLRedLook/pages/about/app_intro_page.dart';
 import 'package:THLRedLook/pages/settings/storage_page.dart';
 import 'package:THLRedLook/pages/settings/js_sources_page.dart';
 import 'package:THLRedLook/pages/settings/source_diagnostics_page.dart';
@@ -453,6 +454,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: const Text('查看原生解码、流媒体握手与解密运行轨迹'),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => DiaryService.showDiaryDialog(context),
+              ),
+              ListTile(
+                key: const ValueKey('settings-app-intro-entry'),
+                leading: const Icon(Icons.menu_book_outlined),
+                title: const Text('应用说明'),
+                subtitle: const Text('核心功能特性、架构说明与使用技巧'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AppIntroPage(),
+                  ),
+                ),
               ),
               ListTile(
                 key: const ValueKey('settings-contact-entry'),

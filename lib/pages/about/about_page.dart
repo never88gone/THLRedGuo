@@ -13,6 +13,7 @@ import 'package:THLRedLook/utils/sources/source_gate_taps.dart';
 import 'package:THLRedLook/views/sources/source_switcher_sheet.dart';
 import 'package:THLRedLook/pages/about/contact_page.dart';
 import 'package:THLRedLook/pages/about/third_party_page.dart';
+import 'package:THLRedLook/pages/about/app_intro_page.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key, required this.store});
@@ -186,7 +187,7 @@ class _AboutPageState extends State<AboutPage> {
                 ),
               ),
               const SizedBox(height: 28),
-
+              // 2. 版本号卡片
               Card(
                 elevation: 0,
                 color: isDark ? AppColors.darkCard : AppColors.greyLight,
@@ -208,259 +209,9 @@ class _AboutPageState extends State<AboutPage> {
                 ),
               ),
 
-              if (isActivated) ...[
-                const SizedBox(height: 16),
-                Card(
-                  key: const ValueKey('about-zhenguojian-card'),
-                  elevation: 0,
-                  color: isDark ? AppColors.darkCard : AppColors.greyLight,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: AppColors.accentBorder40,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.all_inclusive_rounded,
-                              color: AppColors.hongguoRed,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '糖葫芦Haw · 数据源管理',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.hongguoRed,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '共 ${widget.store.sources.length} 个站源',
-                                style: const TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentSubtle08,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.check_circle_rounded, color: AppColors.hongguoRed, size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '当前正在使用：${currentSource.name} (${currentSource.description})',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        const Text(
-                          '快速选择站源：',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final site in widget.store.sources)
-                              ChoiceChip(
-                                key: ValueKey('chip-${site.id}'),
-                                label: Text(site.name),
-                                selected: site.id == currentSource.id,
-                                onSelected: (selected) {
-                                  if (selected) {
-                                    unawaited(widget.store.setSource(site.id));
-                                    setState(() {});
-                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('已切换至数据源：${site.name}'),
-                                        behavior: SnackBarBehavior.floating,
-                                        duration: const Duration(seconds: 1),
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                key: const ValueKey('about-open-source-switcher'),
-                                icon: const Icon(Icons.swap_horiz_rounded),
-                                label: const Text('打开完整切换数据源面板'),
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: () {
-                                  showSourceSwitcherSheet(
-                                    context,
-                                    store: widget.store,
-                                    onSelect: (site) {
-                                      unawaited(widget.store.setSource(site.id));
-                                      setState(() {});
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-
               const SizedBox(height: 16),
 
-              Card(
-                elevation: 0,
-                color: isDark ? AppColors.darkCard : AppColors.greyLight,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.stars_rounded, color: theme.colorScheme.primary, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            '核心特性',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildFeatureRow(
-                        icon: Icons.offline_bolt_rounded,
-                        title: '端侧闭环解析',
-                        description: '站源请求、协议解析与播放完全在设备本地完成，无需云端中心服务。',
-                      ),
-                      const Divider(height: 20),
-                      _buildFeatureRow(
-                        icon: Icons.devices_rounded,
-                        title: '全平台深度适配',
-                        description: '覆盖 Android、iOS、macOS、Windows、Android TV 与 Apple tvOS。',
-                      ),
-                      const Divider(height: 20),
-                      _buildFeatureRow(
-                        icon: Icons.download_rounded,
-                        title: '高速离线下载',
-                        description: '多并发调度与断点续传引擎，支持离线零流量播放与全集无损合并。',
-                      ),
-                      const Divider(height: 20),
-                      _buildFeatureRow(
-                        icon: Icons.security_rounded,
-                        title: '数据私密保护',
-                        description: '观看历史与收藏仅存储于本地，支持九宫格手势锁与独立私密保险箱。',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              Card(
-                elevation: 0,
-                color: isDark ? AppColors.darkCard : AppColors.greyLight,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    ListTile(
-                      key: const ValueKey('about-contact-tile'),
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.darkSurfaceHighest,
-                        child: Icon(
-                          Icons.forum_rounded,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                      title: const Text('联系方式'),
-                      subtitle: const Text('Telegram 官方交流与反馈 · 一键直接跳转'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => const ContactPage(),
-                        ),
-                      ),
-                    ),
-                    const Divider(height: 1, indent: 56),
-                    ListTile(
-                      key: const ValueKey('about-third-party-tile'),
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.darkSurfaceHighest,
-                        child: Icon(
-                          Icons.extension_rounded,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                      title: const Text('第三方开源组件'),
-                      subtitle: const Text('查看核心组件依赖、开源协议与授权声明'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => const ThirdPartyPage(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
+              // 3. 免责说明
               Card(
                 elevation: 0,
                 color: isDark ? AppColors.darkCard : AppColors.greyLight,
@@ -499,6 +250,107 @@ class _AboutPageState extends State<AboutPage> {
                 ),
               ),
 
+              const SizedBox(height: 16),
+
+              // 4. 其他内容收纳至子页面入口
+              Card(
+                elevation: 0,
+                color: isDark ? AppColors.darkCard : AppColors.greyLight,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    ListTile(
+                      key: const ValueKey('about-app-intro-tile'),
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.darkSurfaceHighest,
+                        child: Icon(
+                          Icons.menu_book_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      title: const Text('应用说明'),
+                      subtitle: const Text('查看核心特性、端侧架构与常用操作技巧'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const AppIntroPage(),
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    ListTile(
+                      key: const ValueKey('about-contact-tile'),
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.darkSurfaceHighest,
+                        child: Icon(
+                          Icons.forum_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      title: const Text('联系方式'),
+                      subtitle: const Text('Telegram 官方交流与反馈'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ContactPage(),
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    ListTile(
+                      key: const ValueKey('about-third-party-tile'),
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.darkSurfaceHighest,
+                        child: Icon(
+                          Icons.extension_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      title: const Text('第三方开源组件'),
+                      subtitle: const Text('核心开源库、开源协议与授权声明'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ThirdPartyPage(),
+                        ),
+                      ),
+                    ),
+                    if (isActivated) ...[
+                      const Divider(height: 1, indent: 56),
+                      ListTile(
+                        key: const ValueKey('about-sources-subpage-tile'),
+                        leading: CircleAvatar(
+                          backgroundColor: AppColors.darkSurfaceHighest,
+                          child: const Icon(
+                            Icons.all_inclusive_rounded,
+                            color: AppColors.hongguoRed,
+                          ),
+                        ),
+                        title: const Text('数据源管理'),
+                        subtitle: Text('当前正在使用：${currentSource.name} (${widget.store.sources.length} 个可用站源)'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () {
+                          showSourceSwitcherSheet(
+                            context,
+                            store: widget.store,
+                            onSelect: (site) {
+                              unawaited(widget.store.setSource(site.id));
+                              setState(() {});
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 24),
               Center(
                 child: Text(
@@ -518,39 +370,4 @@ class _AboutPageState extends State<AboutPage> {
   },
 );
 }
-
-  Widget _buildFeatureRow({
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
-    final theme = Theme.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20, color: theme.colorScheme.primary),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                description,
-                style: TextStyle(
-                  color: theme.textTheme.bodySmall?.color,
-                  fontSize: 12,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }

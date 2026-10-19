@@ -1260,6 +1260,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onPressed: () => _onNavSelected(entry.$1),
                               ),
                             ),
+                          const Spacer(),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: RemoteButton(
+                              key: const ValueKey('tv-nav-settings'),
+                              label: '设置',
+                              icon: Icons.settings_rounded,
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => SettingsScreen(
+                                    repository: widget.repository,
+                                    store: widget.store,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1271,6 +1289,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     onDestinationSelected: _onNavSelected,
                     labelType: NavigationRailLabelType.all,
                     groupAlignment: -.8,
+                    trailing: Expanded(
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: IconButton(
+                            key: const ValueKey('desktop-nav-settings'),
+                            icon: const Icon(Icons.settings_rounded),
+                            tooltip: '设置',
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (_) => SettingsScreen(
+                                  repository: widget.repository,
+                                  store: widget.store,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                     destinations: [
                       NavigationRailDestination(
                         icon: Icon(Icons.explore_outlined),
