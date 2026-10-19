@@ -206,26 +206,6 @@ class HomeAppBarView extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-              const PopupMenuItem(
-                value: 'display',
-                child: Row(
-                  children: [
-                    Icon(Icons.palette_outlined, size: 20),
-                    SizedBox(width: 10),
-                    Text('界面模式'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'about',
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded, size: 20),
-                    SizedBox(width: 10),
-                    Text('关于$appName'),
-                  ],
-                ),
-              ),
             ],
           ),
         ],
