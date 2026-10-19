@@ -23,6 +23,7 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var isDanmakuSettingsVisible: Bool = false
     @Published public var isSpeedSheetVisible: Bool = false
     @Published public var isLoading: Bool = true
+    @Published public var isSeamlessTransitioning: Bool = false
     @Published public var errorMessage: String?
     @Published public var toastMessage: String?
     @Published public var nextEpisodeCountdown: Int?
@@ -47,6 +48,7 @@ public final class PlayerViewModel: ObservableObject {
     private var progressSaveTimer: Timer?
     private var controlsHideTimer: Timer?
     private var toastHideTimer: Timer?
+    private var bufferingDebounceTimer: Timer?
     private var danmakuCache: [DanmakuItem] = []
     private var danmakuPages: [Int64: [DanmakuItem]] = [:]
     private var danmakuRetryAfter: [Int64: Date] = [:]
@@ -247,13 +249,19 @@ public final class PlayerViewModel: ObservableObject {
     private func beginPlayback(episodeIndex: Int, seekTo: Double, recovering: Bool, preservePlayIntent: Bool = false) async {
         guard !closed, episodeIndex > 0, seekTo.isFinite else { return }
         saveCurrentProgress()
-        playbackGeneration += 1
-        let generation = playbackGeneration
         preparationTask?.cancel()
         recoveryTask?.cancel()
         recoveryTask = nil
-        prefetchTask?.cancel()
-        prefetchTask = nil
+
+        if let task = prefetchTask, episodeIndex == currentEpisodeIndex + 1 {
+            _ = await task.value
+        } else {
+            prefetchTask?.cancel()
+            prefetchTask = nil
+        }
+
+        playbackGeneration += 1
+        let generation = playbackGeneration
         if !recovering {
             recoveryAttempts = 0
             failedURL = ""
@@ -264,7 +272,6 @@ public final class PlayerViewModel: ObservableObject {
         }
         reachedEnd = false
 
-        // 优先检查是否命中已提前全链路预加载就绪的下一集
         if !recovering, let preloaded = preloadedEpisode, preloaded.episodeIndex == episodeIndex {
             preloadedEpisode = nil
             currentEpisodeIndex = episodeIndex
@@ -279,7 +286,6 @@ public final class PlayerViewModel: ObservableObject {
             }
             decryptedURL = preloaded.decryptedURL
 
-            await configureAudioSession()
             guard !closed, generation == playbackGeneration, !Task.isCancelled else {
                 if let dec = preloaded.decryptedURL {
                     CENCMP4Decryptor.shared.removePlaybackCache(at: dec)
@@ -292,7 +298,6 @@ public final class PlayerViewModel: ObservableObject {
             return
         }
 
-        // 未命中则清理已有预载缓存（若跳集）
         if let preloaded = preloadedEpisode {
             if let dec = preloaded.decryptedURL, dec != decryptedURL {
                 CENCMP4Decryptor.shared.removePlaybackCache(at: dec)
@@ -301,14 +306,18 @@ public final class PlayerViewModel: ObservableObject {
         }
 
         releasePlayerObservers()
-        player?.pause()
-        await configureAudioSession()
+        if !isSeamlessTransitioning {
+            player?.pause()
+            await configureAudioSession()
+        }
         guard !closed, generation == playbackGeneration, !Task.isCancelled else { return }
         currentEpisodeIndex = episodeIndex
         currentTime = max(0, seekTo)
         duration = 0
         nextEpisodeCountdown = nil
-        isLoading = true
+        if !isSeamlessTransitioning {
+            isLoading = true
+        }
         errorMessage = nil
         let task = Task { [weak self] in
             guard let self else { return }
@@ -326,6 +335,13 @@ public final class PlayerViewModel: ObservableObject {
             isPlaying = true
             duration = 180
             currentTime = 35
+            let testQuality = selectedQuality > 0 ? selectedQuality : 1080
+            selectedQuality = testQuality
+            plan = PlaybackPlan(
+                url: "http://localhost/test.mp4",
+                quality: testQuality,
+                qualities: [1080, 720, 480]
+            )
             errorMessage = nil
             recoveryAttempts = 0
             return
@@ -431,8 +447,30 @@ public final class PlayerViewModel: ObservableObject {
         timeControlObserver = av.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self, weak av] _, _ in
             Task { @MainActor in
                 guard let self, let av, self.player === av, generation == self.playbackGeneration, !self.closed else { return }
-                self.isPlaying = self.playIntent && self.isSceneActive && av.timeControlStatus == .playing
-                self.isBuffering = self.playIntent && self.isSceneActive && av.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                let playing = self.playIntent && self.isSceneActive && av.timeControlStatus == .playing
+                let buffering = self.playIntent && self.isSceneActive && av.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                self.isPlaying = playing
+                if playing {
+                    self.bufferingDebounceTimer?.invalidate()
+                    self.bufferingDebounceTimer = nil
+                    self.isBuffering = false
+                    self.isSeamlessTransitioning = false
+                } else if buffering && !self.isSeamlessTransitioning {
+                    if self.bufferingDebounceTimer == nil {
+                        self.bufferingDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: false) { [weak self] _ in
+                            Task { @MainActor in
+                                guard let self, self.player === av, generation == self.playbackGeneration, !self.closed else { return }
+                                if self.playIntent && self.isSceneActive && av.timeControlStatus == .waitingToPlayAtSpecifiedRate && !self.isSeamlessTransitioning {
+                                    self.isBuffering = true
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    self.bufferingDebounceTimer?.invalidate()
+                    self.bufferingDebounceTimer = nil
+                    self.isBuffering = false
+                }
                 self.samplePlaybackClock()
                 self.updateActiveDanmakus()
             }
@@ -455,11 +493,13 @@ public final class PlayerViewModel: ObservableObject {
                     self.isSeeking = false
                     self.initializationTimer?.invalidate()
                     self.isLoading = false
+                    self.isSeamlessTransitioning = false
                     self.samplePlaybackClock()
                     self.lastProgressTime = Date()
                     if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
                     NSLog("[PlayerVM] ready episode=%d duration=%.2f tracks=%d", self.currentEpisodeIndex, self.duration, observed.tracks.count)
                 case .failed:
+                    self.isSeamlessTransitioning = false
                     self.requestRecovery(reason: observed.error?.localizedDescription ?? "视频流加载失败")
                 default:
                     break
@@ -471,6 +511,7 @@ public final class PlayerViewModel: ObservableObject {
             let seconds = item.duration.seconds
             if seconds.isFinite && seconds > 0 { self.duration = seconds }
             self.isLoading = false
+            self.isSeamlessTransitioning = false
             self.samplePlaybackClock()
             self.lastProgressTime = Date()
             if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
@@ -534,6 +575,8 @@ public final class PlayerViewModel: ObservableObject {
     private func releasePlayerObservers() {
         initializationTimer?.invalidate()
         healthTimer?.invalidate()
+        bufferingDebounceTimer?.invalidate()
+        bufferingDebounceTimer = nil
         statusObserver?.invalidate()
         timeControlObserver?.invalidate()
         timeControlObserver = nil
@@ -593,8 +636,13 @@ public final class PlayerViewModel: ObservableObject {
                 }
 
                 let asset = AVURLAsset(url: playbackURL, options: options.isEmpty ? nil : options)
+                _ = try? await asset.load(.isPlayable, .duration, .tracks)
+                guard !Task.isCancelled else {
+                    if let temp = decryptedTempURL { CENCMP4Decryptor.shared.removePlaybackCache(at: temp) }
+                    return
+                }
                 let item = AVPlayerItem(asset: asset)
-                item.preferredForwardBufferDuration = 10.0
+                item.preferredForwardBufferDuration = 15.0
 
                 await MainActor.run {
                     guard let self, !self.closed, currentGen == self.playbackGeneration, !Task.isCancelled else {
@@ -622,6 +670,12 @@ public final class PlayerViewModel: ObservableObject {
 
     // MARK: - 控制与遥控器交互
     public func togglePlayPause() {
+        if drama.id.starts(with: "test_") {
+            playIntent.toggle()
+            isPlaying = playIntent
+            showControls()
+            return
+        }
         guard let p = player else { return }
         if playIntent {
             playIntent = false
@@ -859,6 +913,7 @@ public final class PlayerViewModel: ObservableObject {
         saveCurrentProgress()
         nextEpisodeCountdown = nil
         if currentEpisodeIndex < allEpisodes.count {
+            isSeamlessTransitioning = true
             await nextEpisode()
         } else {
             reachedEnd = true

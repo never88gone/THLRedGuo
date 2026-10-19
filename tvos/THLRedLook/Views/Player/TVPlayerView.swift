@@ -73,7 +73,7 @@ public struct TVPlayerView: View {
             }
 
             // 正在缓冲/加载遮罩
-            if viewModel.isLoading || viewModel.isBuffering {
+            if (viewModel.isLoading || viewModel.isBuffering) && !viewModel.isSeamlessTransitioning {
                 VStack(spacing: 16) {
                     ProgressView()
                         .scaleEffect(1.8)
