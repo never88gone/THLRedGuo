@@ -186,8 +186,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ListTile(
                     key: const ValueKey('settings-source-diagnostics'),
                     leading: const Icon(Icons.network_check_rounded),
-                    title: const Text('数据源诊断'),
-                    subtitle: const Text('检查网络连接、搜索与详情，复制脱敏报告'),
+                    title: const Text('网络与数据源诊断'),
+                    subtitle: const Text('检测网络连通性、DNS、JS引擎与搜索详情，生成详细报告'),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,

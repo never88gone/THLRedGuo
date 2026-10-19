@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
@@ -8,65 +10,157 @@ class SourceDiagnosticRunner extends ChangeNotifier {
   static final shared = SourceDiagnosticRunner();
   bool running = false;
   String result = '尚未检测';
+  int successCount = 0;
+  int failureCount = 0;
 
   Future<void> run() async {
     if (running) return;
     running = true;
-    result = '正在检查游客注册、搜索、分页和详情…';
+    successCount = 0;
+    failureCount = 0;
+    result = '正在执行网络连接、JS引擎、搜索、详情与播放解析全链路诊断…';
     notifyListeners();
+
     final recorder = SourceDiagnostics.shared;
     final context = '主动检测 ${DateTime.now().toUtc().toIso8601String()}';
     final runtime = CatPawJsRuntime(null, recorder, context);
-    var stage = '初始化';
+
+    var currentStage = 'JS 脚本与引擎初始化';
+    final stopwatch = Stopwatch()..start();
+
     try {
+      // 1. JS 脚本加载与引擎初始化
+      currentStage = 'JS 脚本与引擎初始化';
+      stopwatch.reset();
+      stopwatch.start();
       await runtime.init(
         kPresetJsSources.firstWhere((s) => s.id == 'hongguo').script,
       );
-      stage = '搜索第一页';
-      final first = await runtime.search('短剧');
+      successCount++;
       recorder.add(
         SourceDiagnosticEntry(
           at: DateTime.now().toUtc(),
           context: context,
-          stage: stage,
+          stage: currentStage,
+          elapsedMs: stopwatch.elapsedMilliseconds,
+          count: 1,
+        ),
+      );
+
+      // 2. 搜索第一页探测
+      currentStage = '短剧搜索与检索';
+      stopwatch.reset();
+      stopwatch.start();
+      final first = await runtime.search('短剧');
+      successCount++;
+      recorder.add(
+        SourceDiagnosticEntry(
+          at: DateTime.now().toUtc(),
+          context: context,
+          stage: currentStage,
+          elapsedMs: stopwatch.elapsedMilliseconds,
           count: first.list.length,
         ),
       );
+
+      // 3. 搜索分页探测（若支持分页）
       if (first.hasMore) {
-        stage = '搜索分页';
+        currentStage = '搜索分页与游标';
+        stopwatch.reset();
+        stopwatch.start();
         final next = await runtime.search('短剧', page: 2);
+        successCount++;
         recorder.add(
           SourceDiagnosticEntry(
             at: DateTime.now().toUtc(),
             context: context,
-            stage: stage,
+            stage: currentStage,
+            elapsedMs: stopwatch.elapsedMilliseconds,
             count: next.list.length,
           ),
         );
       }
+
+      // 4. 详情与分集数据探测
+      CatPawDetailResult? detailResult;
+      String sampleVodId = '';
       if (first.list.isNotEmpty) {
-        stage = '详情解析';
-        final id = first.list.first['vod_id']?.toString() ?? '';
-        final detail = await runtime.detail(id);
-        if ((detail.vod['vod_play_url']?.toString() ?? '').isEmpty) {
-          throw const CatPawSourceFailure('详情缺少分集', code: 'MISSING_EPISODE');
+        currentStage = '剧集详情与分集解析';
+        stopwatch.reset();
+        stopwatch.start();
+        sampleVodId = first.list.first['vod_id']?.toString() ?? '';
+        detailResult = await runtime.detail(sampleVodId);
+        final playUrl = detailResult.vod['vod_play_url']?.toString() ?? '';
+        if (playUrl.isEmpty) {
+          throw const CatPawSourceFailure(
+            '剧集详情返回的数据中缺少分集播放列表 (vod_play_url 为空)',
+            code: 'MISSING_EPISODE',
+          );
+        }
+        successCount++;
+        recorder.add(
+          SourceDiagnosticEntry(
+            at: DateTime.now().toUtc(),
+            context: context,
+            stage: currentStage,
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            count: 1,
+          ),
+        );
+      }
+
+      // 5. 播放流解析探针测试
+      if (detailResult != null && sampleVodId.isNotEmpty) {
+        final playUrl = detailResult.vod['vod_play_url']?.toString() ?? '';
+        // 尝试提取第一集的播放标识
+        final parts = playUrl.split('#');
+        if (parts.isNotEmpty) {
+          final firstEpisode = parts.first;
+          final segs = firstEpisode.split(r'$');
+          final episodeId = segs.length > 1 ? segs[1] : segs[0];
+          if (episodeId.isNotEmpty) {
+            currentStage = '播放流媒体解析探针';
+            stopwatch.reset();
+            stopwatch.start();
+            final playResult = await runtime.play('play', episodeId);
+            if (playResult.url.isEmpty) {
+              throw const CatPawSourceFailure(
+                '站源播放接口未能成功解析出有效媒体流播放地址',
+                code: 'NO_STREAM_URL',
+              );
+            }
+            successCount++;
+            recorder.add(
+              SourceDiagnosticEntry(
+                at: DateTime.now().toUtc(),
+                context: context,
+                stage: currentStage,
+                elapsedMs: stopwatch.elapsedMilliseconds,
+                count: 1,
+              ),
+            );
+          }
         }
       }
-      result =
-          '检测完成：注册、搜索${first.hasMore ? '、分页' : ''}${first.list.isNotEmpty ? '、详情' : '（无结果）'}通过';
+
+      result = '检测完成：全链路（脚本、搜索、分页、详情、播放解析）检测通过，网络与数据源正常';
     } catch (error) {
-      final code = error is CatPawSourceFailure
-          ? SourceDiagnostics.safeCode(error.code)
-          : 'DIAGNOSTIC_FAILED';
+      failureCount++;
+      final analysis = SourceDiagnostics.analyzeError(error);
       recorder.add(
         SourceDiagnosticEntry(
           at: DateTime.now().toUtc(),
           context: context,
-          stage: stage,
-          errorCode: code.isEmpty ? 'DIAGNOSTIC_FAILED' : code,
+          stage: currentStage,
+          elapsedMs: stopwatch.elapsedMilliseconds,
+          errorCategory: analysis.category,
+          errorTitle: analysis.title,
+          errorMessage: analysis.message,
+          advice: analysis.advice,
+          errorCode: analysis.code,
         ),
       );
-      result = '检测失败：$stage，请查看下方记录';
+      result = '检测失败：【$currentStage】阶段发生【${analysis.title}】\n失败原因：${analysis.message}';
     } finally {
       runtime.dispose();
       running = false;

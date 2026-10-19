@@ -323,6 +323,7 @@ globalThis.console = {
         context: diagnosticContext,
         elapsedMs: clock.elapsedMilliseconds,
         errorCode: SourceDiagnostics.networkCode(e, timedOut: timedOut),
+        error: e,
       );
       // ignore: avoid_print
       print(
