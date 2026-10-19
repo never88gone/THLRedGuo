@@ -516,17 +516,20 @@ class _DetailScreenState extends State<DetailScreen> {
                                   children: [
                                     _seriesSelector(drama),
                                     Expanded(
-                                      child:
-                                          _loading ||
-                                              _error != null ||
-                                              episodes.isEmpty
-                                          ? _episodeStatus()
-                                          : EpisodeBrowser(
-                                              episodes: episodes,
-                                              currentNumber: watched?.episode,
-                                              onSelected: (index) =>
-                                                  _play(index),
-                                            ),
+                                      child: AnimatedSwitcher(
+                                        duration: const Duration(milliseconds: 200),
+                                        child: _loading ||
+                                                _error != null ||
+                                                episodes.isEmpty
+                                            ? _episodeStatus()
+                                            : EpisodeBrowser(
+                                                key: const ValueKey('episode-browser'),
+                                                episodes: episodes,
+                                                currentNumber: watched?.episode,
+                                                onSelected: (index) =>
+                                                    _play(index),
+                                              ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -555,10 +558,14 @@ class _DetailScreenState extends State<DetailScreen> {
                               ),
                             ),
                             SliverToBoxAdapter(child: _seriesSelector(drama)),
-                            if (_loading || _error != null || episodes.isEmpty)
+                            if (_error != null || (!_loading && episodes.isEmpty))
                               SliverFillRemaining(
                                 hasScrollBody: false,
                                 child: _episodeStatus(),
+                              )
+                            else if (_loading && episodes.isEmpty)
+                              SliverToBoxAdapter(
+                                child: _episodeSummaryPlaceholder(drama),
                               )
                             else ...[
                               SliverToBoxAdapter(
@@ -687,7 +694,9 @@ class _DetailScreenState extends State<DetailScreen> {
                         const SizedBox(width: 12),
                       ],
                       Expanded(
-                        child: Container(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 240),
+                          curve: Curves.easeOutCubic,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(28),
                             boxShadow:
@@ -702,7 +711,8 @@ class _DetailScreenState extends State<DetailScreen> {
                               backgroundColor: AppColors.hongguoRed,
                               foregroundColor: AppColors.white,
                               disabledBackgroundColor: AppColors.hongguoRed
-                                  .withValues(alpha: 0.4),
+                                  .withValues(alpha: 0.65),
+                              disabledForegroundColor: AppColors.whiteWithAlpha(0.85),
                               shape: const StadiumBorder(),
                               minimumSize: const Size(0, 52),
                               padding: const EdgeInsets.symmetric(
@@ -717,17 +727,25 @@ class _DetailScreenState extends State<DetailScreen> {
                               Icons.play_arrow_rounded,
                               size: 28,
                             ),
-                            label: Text(
-                              _loading
-                                  ? '正在加载...'
-                                  : (watched != null && episodes.isNotEmpty
-                                        ? '继续播放 · 第 ${episodes[resumeIndex].number} 集'
-                                        : '立即播放'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
+                            label: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: Text(
+                                _loading
+                                    ? (watched != null
+                                        ? '继续播放 · 第 ${watched.episode} 集'
+                                        : '立即播放')
+                                    : (watched != null && episodes.isNotEmpty
+                                          ? '继续播放 · 第 ${episodes[resumeIndex].number} 集'
+                                          : '立即播放'),
+                                key: ValueKey(
+                                  'play-label-${_loading ? "loading" : "ready"}-${watched?.episode}',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
                             ),
                           ),
@@ -738,6 +756,55 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _episodeSummaryPlaceholder(Drama drama) {
+    final colors = Theme.of(context).colorScheme;
+    final total = drama.episodes > 0 ? ' · 共 ${drama.episodes} 集' : '';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Material(
+        color: colors.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: 0.25),
+              width: 0.8,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.grid_view_rounded,
+                color: colors.onSurfaceVariant.withValues(alpha: 0.6),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '选集$total',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colors.onSurfaceVariant.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -867,7 +934,7 @@ class _DetailScreenState extends State<DetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Hero(
-              tag: 'drama-cover-${drama.id}',
+              tag: 'drama-cover-${widget.drama.id}',
               child: SizedBox(
                 width: 104,
                 height: 156,
@@ -1069,12 +1136,16 @@ class _DetailScreenState extends State<DetailScreen> {
     final entries = (_seriesEntries != null && _seriesEntries!.isNotEmpty)
         ? _seriesEntries!
         : localEntries;
-    if (entries.isEmpty) return const SizedBox.shrink();
 
     final notices = widget.store.following(drama.id)?.seriesSeasons ?? const {};
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      child: entries.isEmpty
+          ? const SizedBox.shrink()
+          : Container(
+              margin: const EdgeInsets.fromLTRB(16, 6, 16, 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.darkSurfaceHighest,
@@ -1261,8 +1332,9 @@ class _DetailScreenState extends State<DetailScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _followingControls(Drama drama) {
     final state = widget.store.following(drama.id);

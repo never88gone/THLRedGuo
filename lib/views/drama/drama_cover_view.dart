@@ -44,7 +44,7 @@ class DramaBackdrop extends StatelessWidget {
               child: Transform.scale(
                 scale: 1.18,
                 child: CachedCoverImage(
-                  key: ValueKey('backdrop-${drama.id}'),
+                  key: ValueKey('backdrop-${drama.cleanSourceId.isNotEmpty ? drama.cleanSourceId : drama.id}'),
                   drama: drama,
                   repository: repository,
                   placeholder: Container(color: fallbackColor),
@@ -156,7 +156,7 @@ class DramaCover extends StatelessWidget {
               placeholder,
               if (!imagesDisabled && drama.id.isNotEmpty)
                 CachedCoverImage(
-                  key: ValueKey('${drama.id}\u0000${drama.cover}'),
+                  key: ValueKey('drama-cover-${drama.cleanSourceId.isNotEmpty ? drama.cleanSourceId : drama.id}'),
                   drama: drama,
                   repository: repository,
                   placeholder: placeholder,
@@ -255,6 +255,7 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
   bool _retryOnFailure = false;
   bool _retryQueued = false;
   String? _failedPath;
+  String? _resolvedPath;
 
   @override
   void initState() {
@@ -263,8 +264,26 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
       widget.drama.id,
     );
     widget.repository.catalogUpdates.addListener(_metadataChanged);
-    _file = widget.repository.cover(widget.drama);
-    _file.ignore();
+    _loadFile(widget.drama);
+  }
+
+  void _loadFile(Drama drama, {bool force = false}) {
+    final future = widget.repository.cover(drama, force: force);
+    _file = future;
+    future.then((path) {
+      if (!mounted || _file != future) return;
+      if (path.isNotEmpty && _resolvedPath != path) {
+        setState(() {
+          _resolvedPath = path;
+          _coverFailed = false;
+        });
+      }
+    }).catchError((_) {
+      if (!mounted || _file != future) return;
+      if (_resolvedPath == null) {
+        setState(() => _coverFailed = true);
+      }
+    });
   }
 
   @override
@@ -283,8 +302,7 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
       _coverRevision = widget.repository.catalogUpdates.coverRevision(
         widget.drama.id,
       );
-      _file = widget.repository.cover(widget.drama);
-      _file.ignore();
+      _loadFile(widget.drama);
     }
   }
 
@@ -328,12 +346,11 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
       setState(() {
         _coverFailed = _retryOnFailure = false;
         _failedPath = null;
-        _file = widget.repository.cover(
-          widget.repository.catalogUpdates.current(widget.drama),
-          force: true,
-        );
-        _file.ignore();
       });
+      _loadFile(
+        widget.repository.catalogUpdates.current(widget.drama),
+        force: true,
+      );
     }
   }
 
@@ -366,7 +383,17 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
         coverUrl,
         fit: BoxFit.cover,
         cacheWidth: 440,
+        gaplessPlayback: true,
         excludeFromSemantics: true,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) return child;
+          return AnimatedOpacity(
+            opacity: frame == null ? 0 : 1,
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            child: child,
+          );
+        },
         loadingBuilder: (_, child, progress) {
           if (progress == null) return child;
           return widget.placeholder;
@@ -377,70 +404,79 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
     return _failed(null);
   }
 
+  Widget _buildImage(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        cacheWidth: 440,
+        gaplessPlayback: true,
+        excludeFromSemantics: true,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) return child;
+          return AnimatedOpacity(
+            opacity: frame == null ? 0 : 1,
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            child: child,
+          );
+        },
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return widget.placeholder;
+        },
+        errorBuilder: (_, _, _) => _failed(null),
+      );
+    }
+    return Image.file(
+      File(path),
+      fit: BoxFit.cover,
+      cacheWidth: 440,
+      gaplessPlayback: true,
+      excludeFromSemantics: true,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) return child;
+        return AnimatedOpacity(
+          opacity: frame == null ? 0 : 1,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          child: child,
+        );
+      },
+      errorBuilder: (_, error, stack) => _networkFallback(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => FutureBuilder<String>(
     future: _file,
+    initialData: _resolvedPath,
     builder: (context, snapshot) {
-      // 1. 本地缓存就绪且文件存在时，优先展示本地图片
-      if (snapshot.connectionState == ConnectionState.done &&
-          !snapshot.hasError &&
-          snapshot.hasData &&
-          snapshot.data != null &&
-          snapshot.data!.isNotEmpty) {
-        final path = snapshot.data!;
-        if (path.startsWith('http://') || path.startsWith('https://')) {
-          return Image.network(
-            path,
-            fit: BoxFit.cover,
-            cacheWidth: 440,
-            excludeFromSemantics: true,
-            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-              if (wasSynchronouslyLoaded) return child;
-              return AnimatedOpacity(
-                opacity: frame == null ? 0 : 1,
-                duration: const Duration(milliseconds: 320),
-                curve: Curves.easeOutCubic,
-                child: child,
-              );
-            },
-            loadingBuilder: (_, child, progress) {
-              if (progress == null) return child;
-              return widget.placeholder;
-            },
-            errorBuilder: (_, _, _) => _failed(null),
-          );
-        }
-        return Image.file(
-          File(path),
-          fit: BoxFit.cover,
-          cacheWidth: 440,
-          excludeFromSemantics: true,
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (wasSynchronouslyLoaded) return child;
-            return AnimatedOpacity(
-              opacity: frame == null ? 0 : 1,
-              duration: const Duration(milliseconds: 320),
-              curve: Curves.easeOutCubic,
-              child: child,
-            );
-          },
-          errorBuilder: (_, error, stack) => _networkFallback(),
-        );
+      final path =
+          (snapshot.hasData &&
+                  snapshot.data != null &&
+                  snapshot.data!.isNotEmpty)
+              ? snapshot.data!
+              : _resolvedPath;
+
+      if (path != null && path.isNotEmpty && !_coverFailed) {
+        return _buildImage(path);
       }
-      // 2. 本地缓存未就绪时，若有网络图片地址，先行网络流式加载并呈现，消除白屏等待
-      if (snapshot.connectionState != ConnectionState.done) {
+
+      if (snapshot.connectionState != ConnectionState.done && !_coverFailed) {
         final coverUrl = widget.drama.cover.trim();
         if (coverUrl.startsWith('http://') || coverUrl.startsWith('https://')) {
           return Image.network(
             coverUrl,
             fit: BoxFit.cover,
             cacheWidth: 440,
+            gaplessPlayback: true,
             excludeFromSemantics: true,
             frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-              if (wasSynchronouslyLoaded) return child;
+              if (wasSynchronouslyLoaded || frame != null) return child;
               return AnimatedOpacity(
                 opacity: frame == null ? 0 : 1,
-                duration: const Duration(milliseconds: 320),
+                duration: const Duration(milliseconds: 240),
                 curve: Curves.easeOutCubic,
                 child: child,
               );
@@ -454,7 +490,7 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
         }
         return widget.placeholder;
       }
-      // 3. 本地缓存失败时，降级使用网络直连加载
+
       return _networkFallback();
     },
   );
