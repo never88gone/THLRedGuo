@@ -157,7 +157,14 @@ public actor NativeBridge {
         let diagnosticContext = diagnosticContext
         let fetchBlock: @convention(block) (String, [String: Any]?) -> [String: Any] = { urlStr, opts in
             guard let url = URL(string: urlStr) else {
-                return ["status": 0, "headers": [:], "body": "", "error": "无效的 URL"]
+                return [
+                    "status": 0,
+                    "headers": [:],
+                    "body": "",
+                    "error": "INVALID_URL",
+                    "errorDetail": "无效目标地址: \(urlStr)",
+                    "category": DiagnosticCategory.unknown.rawValue
+                ]
             }
             var req = URLRequest(url: url)
             let timeout = min(12.0, max(0.001, (opts?["timeoutMs"] as? Double ?? 10000) / 1000))
@@ -184,8 +191,23 @@ public actor NativeBridge {
             let timedOut = semaphore.wait(timeout: .now() + timeout) == .timedOut
             if timedOut { task.cancel() }
             let response = result.snapshot(timedOut: timedOut)
-            recorder.record(url: url, context: diagnosticContext, elapsedMs: Int((ProcessInfo.processInfo.systemUptime - started) * 1000), status: response.status, body: response.body, errorCode: response.error)
-            return ["status": response.status, "headers": response.headers, "body": response.body]
+            recorder.record(
+                url: url,
+                context: diagnosticContext,
+                elapsedMs: Int((ProcessInfo.processInfo.systemUptime - started) * 1000),
+                status: response.status,
+                body: response.body,
+                errorCode: response.error,
+                error: response.rawError
+            )
+            return [
+                "status": response.status,
+                "headers": response.headers,
+                "body": response.body,
+                "error": response.error,
+                "errorDetail": response.errorDetail,
+                "category": response.category.rawValue
+            ]
 
         }
         context.setObject(fetchBlock, forKeyedSubscript: "__native_fetch" as NSString)
@@ -245,6 +267,12 @@ public actor NativeBridge {
             var status = typeof res.status === "number" ? res.status : 0;
             var respBody = res.body || "";
             var respHeaders = res.headers || {};
+            if (status === 0 && (res.error || res.errorDetail)) {
+                var netErr = new Error("网络请求失败: " + (res.errorDetail || res.error || "未知网络错误"));
+                netErr.category = res.category || "network_timeout";
+                netErr.isNetworkError = true;
+                throw netErr;
+            }
             return {
                 status: status,
                 ok: status >= 200 && status < 300,
@@ -252,7 +280,13 @@ public actor NativeBridge {
                 body: respBody,
                 text: async function() { return respBody; },
                 json: async function() {
-                    try { return JSON.parse(respBody || "{}"); } catch(e) { return {}; }
+                    try {
+                        return JSON.parse(respBody || "{}");
+                    } catch(e) {
+                        var jsonErr = new Error("响应数据不是合法 JSON: " + (respBody.slice(0, 100) || "空响应"));
+                        jsonErr.category = "invalid_resp";
+                        throw jsonErr;
+                    }
                 }
             };
         };
@@ -342,7 +376,17 @@ public actor NativeBridge {
                 var res = await (\(scriptExpr));
                 \(doneKey)(JSON.stringify({ ok: true, data: res }));
             } catch (err) {
-                \(doneKey)(JSON.stringify({ ok: false, error: err ? (err.message || String(err)) : "Error", code: err && err.code ? String(err.code) : "JS_EXECUTION" }));
+                var errMsg = err ? (err.message || String(err)) : "未知错误";
+                var errStack = err && err.stack ? String(err.stack) : "";
+                var errCat = err && err.category ? String(err.category) : "js_error";
+                var errCode = err && err.code ? String(err.code) : "JS_EXECUTION";
+                \(doneKey)(JSON.stringify({
+                    ok: false,
+                    error: errMsg,
+                    stack: errStack,
+                    category: errCat,
+                    code: errCode
+                }));
             }
         })();
         """
@@ -554,10 +598,19 @@ public actor NativeBridge {
                 let scriptExpr = try spiderExpression("search", [query, false, pg])
                 let evaluated = evalAsync(context: ctx, scriptExpr: scriptExpr)
                 guard let res = evaluated, res["ok"] as? Bool == true else {
-                    let candidate = SourceDiagnostics.safeCode(evaluated?["code"])
-                    let code = candidate.isEmpty ? "JS_TIMEOUT" : candidate
-                    diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "搜索执行", errorCode: code))
-                    throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "官方搜索失败（\(code)），请到设置的数据源诊断查看记录"])
+                    let errMsg = evaluated?["error"] as? String ?? "JS 执行无响应或超时"
+                    let errCat = DiagnosticCategory(rawValue: evaluated?["category"] as? String ?? "") ?? (errMsg.contains("网络") ? .dnsError : .jsError)
+                    let errDetail = "搜索执行失败: \(errMsg)"
+                    let advice = SourceDiagnostics.advice(SourceDiagnosticEntry(context: diagnosticContext, stage: "搜索执行", category: errCat, errorDetail: errDetail))
+                    diagnostics.add(SourceDiagnosticEntry(
+                        context: diagnosticContext,
+                        stage: "搜索执行",
+                        errorCode: errCat.tag,
+                        category: errCat,
+                        errorDetail: errMsg,
+                        suggestion: advice
+                    ))
+                    throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "【\(errCat.tag)】\(errMsg)"])
                 }
                 var searchItems: [[String: Any]] = []
                 var searchHasMore = false
@@ -636,12 +689,26 @@ public actor NativeBridge {
             }
 
             let scriptExpr = try spiderExpression("detail", [dramaId])
-            let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
+            let evaluated = evalAsync(context: ctx, scriptExpr: scriptExpr)
+            guard let res = evaluated, res["ok"] as? Bool == true else {
+                let errMsg = evaluated?["error"] as? String ?? "详情解析无响应或异常"
+                let errCat = DiagnosticCategory(rawValue: evaluated?["category"] as? String ?? "") ?? (errMsg.contains("网络") ? .dnsError : .jsError)
+                let advice = SourceDiagnostics.advice(SourceDiagnosticEntry(context: diagnosticContext, stage: "详情解析", category: errCat, errorDetail: errMsg))
+                diagnostics.add(SourceDiagnosticEntry(
+                    context: diagnosticContext,
+                    stage: "详情解析",
+                    errorCode: errCat.tag,
+                    category: errCat,
+                    errorDetail: errMsg,
+                    suggestion: advice
+                ))
+                throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "【\(errCat.tag)】\(errMsg)"])
+            }
 
             var freshDrama = dramaDict
             var chapters: [[String: Any]] = []
 
-            if let data = res?["data"] as? [String: Any] {
+            if let data = res["data"] as? [String: Any] {
                 let vod: [String: Any]
                 if let list = data["list"] as? [[String: Any]], let first = list.first {
                     vod = first
@@ -883,19 +950,33 @@ private final class NativeHTTPResult: @unchecked Sendable {
     private var headers: [String: String] = [:]
     private var body = ""
     private var error = ""
+    private var rawError: Error?
+    private var category: DiagnosticCategory = .unknown
+    private var errorDetail: String = ""
+
     func complete(data: Data?, response: URLResponse?, error: Error?) {
         lock.lock()
         defer { lock.unlock() }
+        self.rawError = error
         status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if let response = response as? HTTPURLResponse {
-            for (key, value) in response.allHeaderFields { headers[String(describing: key).lowercased()] = String(describing: value) }
+            for (key, value) in response.allHeaderFields {
+                headers[String(describing: key).lowercased()] = String(describing: value)
+            }
         }
         if let data { body = String(data: data, encoding: .utf8) ?? "" }
         self.error = SourceDiagnostics.networkCode(error)
+        let classified = SourceDiagnostics.classify(error: error, httpStatus: status, body: body)
+        self.category = classified.category
+        self.errorDetail = classified.reason
     }
-    func snapshot(timedOut: Bool) -> (status: Int, headers: [String: String], body: String, error: String) {
+
+    func snapshot(timedOut: Bool) -> (status: Int, headers: [String: String], body: String, error: String, errorDetail: String, category: DiagnosticCategory, rawError: Error?) {
         lock.lock()
         defer { lock.unlock() }
-        return timedOut ? (0, [:], "", "TIMEOUT:-1001") : (status, headers, body, error)
+        if timedOut {
+            return (0, [:], "", "TIMEOUT:-1001", "网络请求超时 (12s)", .networkTimeout, NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
+        }
+        return (status, headers, body, error, errorDetail, category, rawError)
     }
 }

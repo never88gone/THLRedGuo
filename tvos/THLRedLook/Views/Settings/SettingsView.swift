@@ -46,6 +46,7 @@ public struct SettingsView: View {
     @State private var pingLatency: Int? = 28
     @State private var isTestingPing: Bool = false
     @State private var pingStatus: String = "良好 (28ms)"
+    @State private var pingErrorDetail: String? = nil
     @State private var autoSavedTip: String? = nil
 
     public var forceFocusActiveSource: Bool = false
@@ -460,7 +461,8 @@ public struct SettingsView: View {
             NetworkStatusHeroCard(
                 pingStatus: pingStatus,
                 latency: pingLatency,
-                isTesting: isTestingPing
+                isTesting: isTestingPing,
+                errorDetail: pingErrorDetail
             ) {
                 testNetworkPing()
             }
@@ -685,22 +687,46 @@ public struct SettingsView: View {
 
     private func testNetworkPing() {
         isTestingPing = true
+        pingErrorDetail = nil
         let start = Date()
         Task {
-            if let url = URL(string: "https://lf3-shortplay-tos.snssdk.com") {
-                _ = try? await URLSession.shared.data(from: url)
-            }
-            let elapsed = max(16, Int(Date().timeIntervalSince(start) * 1000))
-            await MainActor.run {
-                self.pingLatency = elapsed
-                if elapsed < 50 {
-                    self.pingStatus = "极佳 (\(elapsed)ms)"
-                } else if elapsed < 120 {
-                    self.pingStatus = "良好 (\(elapsed)ms)"
-                } else {
-                    self.pingStatus = "稍慢 (\(elapsed)ms)"
+            do {
+                guard let url = URL(string: "https://lf3-shortplay-tos.snssdk.com") else {
+                    throw NSError(domain: "Network", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效探测目标地址"])
                 }
-                self.isTestingPing = false
+                var req = URLRequest(url: url)
+                req.httpMethod = "HEAD"
+                req.timeoutInterval = 8
+                let (_, response) = try await URLSession.shared.data(for: req)
+                let elapsed = max(16, Int(Date().timeIntervalSince(start) * 1000))
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 200
+
+                await MainActor.run {
+                    self.pingLatency = elapsed
+                    if statusCode >= 400 {
+                        let (cat, reason, _) = SourceDiagnostics.classify(error: nil, httpStatus: statusCode, body: nil, isJS: false)
+                        self.pingStatus = "异常 (\(statusCode))"
+                        self.pingErrorDetail = "【\(cat.tag)】\(reason)"
+                    } else if elapsed < 50 {
+                        self.pingStatus = "极佳 (\(elapsed)ms)"
+                        self.pingErrorDetail = nil
+                    } else if elapsed < 120 {
+                        self.pingStatus = "良好 (\(elapsed)ms)"
+                        self.pingErrorDetail = nil
+                    } else {
+                        self.pingStatus = "稍慢 (\(elapsed)ms)"
+                        self.pingErrorDetail = nil
+                    }
+                    self.isTestingPing = false
+                }
+            } catch {
+                let (cat, reason, advice) = SourceDiagnostics.classify(error: error, httpStatus: nil, body: nil, isJS: false)
+                await MainActor.run {
+                    self.pingLatency = nil
+                    self.pingStatus = "【\(cat.tag)】"
+                    self.pingErrorDetail = "\(reason)。建议：\(advice)"
+                    self.isTestingPing = false
+                }
             }
         }
     }
@@ -961,6 +987,7 @@ struct NetworkStatusHeroCard: View {
     let pingStatus: String
     let latency: Int?
     let isTesting: Bool
+    var errorDetail: String? = nil
     let onTest: () -> Void
 
     @FocusState private var isFocused: Bool
@@ -972,7 +999,9 @@ struct NetworkStatusHeroCard: View {
                     RoundedRectangle(cornerRadius: 20)
                         .fill(
                             LinearGradient(
-                                colors: [Color.blue.opacity(0.35), Color.purple.opacity(0.2)],
+                                colors: errorDetail != nil
+                                    ? [Color.red.opacity(0.35), Color.orange.opacity(0.2)]
+                                    : [Color.blue.opacity(0.35), Color.purple.opacity(0.2)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -980,12 +1009,12 @@ struct NetworkStatusHeroCard: View {
                         .frame(width: 80, height: 80)
                         .overlay(
                             RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.blue.opacity(0.3), lineWidth: 1.5)
+                                .stroke(errorDetail != nil ? Color.red.opacity(0.4) : Color.blue.opacity(0.3), lineWidth: 1.5)
                         )
 
-                    Image(systemName: "wifi")
+                    Image(systemName: errorDetail != nil ? "exclamationmark.triangle.fill" : "wifi")
                         .font(.system(size: 36, weight: .bold))
-                        .foregroundColor(.cyan)
+                        .foregroundColor(errorDetail != nil ? .orange : .cyan)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -994,25 +1023,32 @@ struct NetworkStatusHeroCard: View {
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
 
-                        Text("端侧直连就绪")
+                        Text(errorDetail != nil ? "链路异常" : "端侧直连就绪")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 3)
-                            .background(Color.blue.opacity(0.8))
+                            .background(errorDetail != nil ? Color.red.opacity(0.8) : Color.blue.opacity(0.8))
                             .clipShape(Capsule())
                     }
 
-                    Text("设备端独立网络栈 · 环回调度响应正常 · 短剧专线 CDN")
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
+                    if let err = errorDetail {
+                        Text(err)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.orange)
+                            .lineLimit(2)
+                    } else {
+                        Text("设备端独立网络栈 · 环回调度响应正常 · 短剧专线 CDN")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                 }
 
                 Spacer()
 
                 HStack(spacing: 16) {
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text("CDN 响应延迟")
+                        Text("CDN 响应状态")
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.6))
 
@@ -1022,13 +1058,13 @@ struct NetworkStatusHeroCard: View {
                                     .scaleEffect(0.8)
                             } else {
                                 Circle()
-                                    .fill(Color.green)
+                                    .fill(errorDetail != nil ? Color.red : Color.green)
                                     .frame(width: 8, height: 8)
                             }
 
                             Text(isTesting ? "正在测速..." : pingStatus)
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(isTesting ? .yellow : .green)
+                                .foregroundColor(isTesting ? .yellow : (errorDetail != nil ? .red : .green))
                         }
                     }
 
@@ -1059,7 +1095,7 @@ struct NetworkStatusHeroCard: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(isFocused ? TVTheme.primary : Color.white.opacity(0.08), lineWidth: isFocused ? 2.5 : 1)
+                    .stroke(isFocused ? TVTheme.primary : (errorDetail != nil ? Color.red.opacity(0.3) : Color.white.opacity(0.08)), lineWidth: isFocused ? 2.5 : 1)
             )
             .tvFocusBorder(isFocused: isFocused, cornerRadius: 20)
         }
@@ -1730,6 +1766,7 @@ private struct SourceDiagnosticsView: View {
     @ObservedObject private var runner = SourceDiagnosticRunner.shared
     @FocusState private var focusedAction: String?
     @State private var showingQR = false
+    @State private var showingFullReport = false
     @State private var reportImage: UIImage?
 
     var body: some View {
@@ -1737,8 +1774,10 @@ private struct SourceDiagnosticsView: View {
             Text("数据源诊断").font(.system(size: 48, weight: .bold))
             Text("红果官方源 · 应用 \(SourceDiagnostics.version) · 源指纹 \(SourceDiagnostics.sourceHash.prefix(12))")
                 .font(.system(size: 29))
-            Text("检测使用独立游客会话，不影响收藏、历史和当前数据源。最近 60 条记录保留在本次应用进程中。")
-                .font(.system(size: 29)).foregroundStyle(.secondary)
+            Text("检测使用独立游客会话，不影响收藏、历史和当前数据源。包含网络DNS、JS引擎、游客会话与剧集解析全链路检测。")
+                .font(.system(size: 24)).foregroundStyle(.secondary)
+
+            // 操作按钮栏
             HStack(spacing: 24) {
                 TVButton(title: runner.running ? "检测中…" : "开始检测", icon: "network", isProminent: true) {
                     Task { await runner.run() }
@@ -1746,6 +1785,13 @@ private struct SourceDiagnosticsView: View {
                 .disabled(runner.running)
                 .focused($focusedAction, equals: "run")
                 .accessibilityIdentifier("sourceDiagnostics.run")
+
+                TVButton(title: "详细报告", icon: "doc.text.magnifyingglass") {
+                    showingFullReport = true
+                }
+                .focused($focusedAction, equals: "report")
+                .accessibilityIdentifier("sourceDiagnostics.report")
+
                 TVButton(title: "反馈二维码", icon: "qrcode") {
                     let filter = CIFilter.qrCodeGenerator()
                     filter.message = Data(recorder.qrText.utf8)
@@ -1758,42 +1804,158 @@ private struct SourceDiagnosticsView: View {
                 }
                 .focused($focusedAction, equals: "qr")
                 .accessibilityIdentifier("sourceDiagnostics.qr")
+
                 TVButton(title: "清空记录", icon: "trash") { recorder.clear() }
                     .disabled(runner.running)
                     .accessibilityIdentifier("sourceDiagnostics.clear")
+
                 TVButton(title: "返回", icon: "arrow.backward") { dismiss() }
                     .accessibilityIdentifier("sourceDiagnostics.back")
             }
-            Text(runner.result).font(.system(size: 29, weight: .semibold))
-                .accessibilityIdentifier("sourceDiagnostics.result")
+
+            // 当前诊断状态汇总
+            HStack(spacing: 12) {
+                if runner.result.contains("失败") {
+                    Image(systemName: "exclamationmark.octagon.fill")
+                        .font(.system(size: 26))
+                        .foregroundColor(.red)
+                } else if runner.result.contains("完成") {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundColor(.green)
+                }
+                Text(runner.result)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundColor(runner.result.contains("失败") ? .red : (runner.result.contains("完成") ? .green : .white))
+                    .accessibilityIdentifier("sourceDiagnostics.result")
+            }
+
             if runner.running { ProgressView() }
+
+            // 诊断明细流式列表
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
+                LazyVStack(alignment: .leading, spacing: 20) {
                     if let failure = recorder.entries.last(where: { $0.failed && !$0.host.isEmpty }) {
                         Text("最近失败提示：" + SourceDiagnostics.advice(failure))
-                            .font(.system(size: 29)).foregroundStyle(.orange).focusable()
+                            .font(.system(size: 24, weight: .medium))
+                            .foregroundStyle(.orange)
+                            .focusable()
                     }
                     if recorder.entries.isEmpty {
-                        Text("暂无记录，请先复现问题或开始检测。")
-                            .font(.system(size: 29)).focusable()
+                        Text("暂无记录，请点击上方「开始检测」或在日常使用中复现后查看。")
+                            .font(.system(size: 26))
+                            .foregroundStyle(.secondary)
+                            .focusable()
                     }
                     ForEach(recorder.entries.reversed()) { entry in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text((entry.failed ? "失败 · " : "完成 · ") + entry.stage)
-                                .font(.system(size: 31, weight: .bold))
-                                .foregroundStyle(entry.failed ? .orange : .green)
-                            Text(entry.text).font(.system(size: 29))
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 14) {
+                                Text((entry.failed ? "失败 · " : "完成 · ") + entry.stage)
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundStyle(entry.failed ? Color.red : Color.green)
+
+                                if entry.category != .unknown {
+                                    Text(entry.category.tag)
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(entry.failed ? Color.red.opacity(0.85) : Color.blue.opacity(0.8))
+                                        .clipShape(Capsule())
+                                }
+
+                                if entry.elapsedMs > 0 {
+                                    Text("\(entry.elapsedMs)ms")
+                                        .font(.system(size: 16, weight: .medium, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+                            }
+
+                            Text(entry.text)
+                                .font(.system(size: 22))
+                                .foregroundStyle(.white.opacity(0.9))
+
+                            if !entry.errorDetail.isEmpty {
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("失败原因:")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.orange)
+                                    Text(entry.errorDetail)
+                                        .font(.system(size: 18, weight: .medium, design: .monospaced))
+                                        .foregroundColor(.orange.opacity(0.95))
+                                }
+                            }
+
+                            if !entry.suggestion.isEmpty {
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("排查建议:")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(TVTheme.primaryHover)
+                                    Text(entry.suggestion)
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
                         }
-                        .padding(20).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+                        .padding(20)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(entry.failed ? Color.red.opacity(0.08) : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(entry.failed ? Color.red.opacity(0.35) : Color.white.opacity(0.05), lineWidth: 1)
+                        )
                         .focusable()
                     }
-                }.padding(12)
+                }
+                .padding(12)
             }
         }
         .padding(60)
         .defaultFocus($focusedAction, "run")
         .onExitCommand { dismiss() }
+        .sheet(isPresented: $showingFullReport, onDismiss: { focusedAction = "report" }) {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("完整技术诊断报告")
+                            .font(.system(size: 40, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("包含环境指纹、各链路分段耗时与详细错误堆栈，可供技术排查与社区求助")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white.opacity(0.65))
+                    }
+                    Spacer()
+                    TVButton(title: "关闭报告", icon: "xmark.circle.fill", isProminent: true) {
+                        showingFullReport = false
+                    }
+                    .accessibilityIdentifier("sourceDiagnostics.reportClose")
+                }
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(recorder.report)
+                            .font(.system(size: 22, weight: .medium, design: .monospaced))
+                            .lineSpacing(6)
+                            .foregroundColor(.white.opacity(0.95))
+                            .padding(24)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.black.opacity(0.6))
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                            )
+                            .focusable()
+                            .accessibilityIdentifier("sourceDiagnostics.reportContent")
+                    }
+                    .padding(8)
+                }
+            }
+            .padding(48)
+            .onExitCommand { showingFullReport = false }
+        }
         .sheet(isPresented: $showingQR, onDismiss: { focusedAction = "qr" }) {
             VStack(spacing: 24) {
                 Text("扫码获取诊断报告").font(.system(size: 42, weight: .bold))
