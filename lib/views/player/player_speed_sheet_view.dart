@@ -20,11 +20,9 @@ class PlayerSpeedSheetView extends StatefulWidget {
   }) {
     return showModalBottomSheet<double>(
       context: context,
-      backgroundColor: AppColors.darkSurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      isScrollControlled: false,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      isScrollControlled: true,
       builder: (sheetContext) => PlayerSpeedSheetView(
         currentSpeed: currentSpeed,
         onSpeedSelected: onSpeedSelected,
@@ -64,26 +62,43 @@ class _PlayerSpeedSheetViewState extends State<PlayerSpeedSheetView> {
     final size = MediaQuery.sizeOf(context);
     final isLandscape = size.width > size.height;
 
-    return SafeArea(
-      top: false,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: isLandscape ? 480 : 540,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.speed_rounded,
-                      size: 20,
-                      color: AppColors.hongguoRed,
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.darkSurface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isLandscape ? 460 : 520,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.whiteWithAlpha(0.24),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
+                  ),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.speed_rounded,
+                        size: 20,
+                        color: AppColors.hongguoRed,
+                      ),
                     const SizedBox(width: 8),
                     Text(
                       '播放倍速',
@@ -146,6 +161,7 @@ class _PlayerSpeedSheetViewState extends State<PlayerSpeedSheetView> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

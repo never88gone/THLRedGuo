@@ -184,7 +184,6 @@ class PlayerViewportView extends StatelessWidget {
             onEpisodes: () => onOpenPanel(PlayerMenuSection.episodes),
             onSpeed: () => onOpenPanel(PlayerMenuSection.speed),
             onQuality: () => onOpenPanel(PlayerMenuSection.quality),
-            onSettings: () => onOpenPanel(PlayerMenuSection.settings),
             onDanmaku: detail.drama.source == 'hongguo'
                 ? onToggleDanmaku
                 : null,
