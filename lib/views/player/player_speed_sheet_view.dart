@@ -65,28 +65,18 @@ class _PlayerSpeedSheetViewState extends State<PlayerSpeedSheetView> {
     final isLandscape = size.width > size.height;
 
     return SafeArea(
+      top: false,
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: isLandscape ? 480 : 540,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.whiteWithAlpha(0.24),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
                 Row(
                   children: [
                     const Icon(

@@ -131,12 +131,8 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
             ),
             // 整个浮层内容区域统一可滚动
             Expanded(
-              child: Scrollbar(
-                controller: _scrollController,
-                thumbVisibility: true,
-                interactive: true,
-                thickness: 6,
-                radius: const Radius.circular(3),
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
                 child: CustomScrollView(
                   controller: _scrollController,
                   physics: const BouncingScrollPhysics(
