@@ -105,226 +105,254 @@ public struct TVPlayerControlsOverlay: View {
                         .foregroundColor(.white)
                 }
 
-                // 底部操作栏：播放核心 + 剧集切换 + 播放设置
-                HStack(spacing: 14) {
-                    // 1. 快退10秒
-                    overlayBarButton(
-                        title: "快退10秒",
-                        icon: "gobackward.10",
-                        target: .seekBackward
-                    ) {
-                        viewModel.seekBy(seconds: -10)
-                    }
-                    .onMoveCommand { dir in
-                        switch dir {
-                        case .up: focusedControl = .back
-                        case .right: focusedControl = .playPause
-                        default: break
-                        }
-                    }
-
-                    // 2. 播放/暂停（高亮核心按钮）
-                    overlayBarButton(
-                        title: viewModel.wantsPlayback ? "暂停" : "播放",
-                        icon: viewModel.wantsPlayback ? "pause.fill" : "play.fill",
-                        target: .playPause,
-                        isProminent: true
-                    ) {
-                        NSLog("🎬 [Overlay] 点击 播放/暂停 按钮")
-                        viewModel.togglePlayPause()
-                    }
-                    .accessibilityLabel(viewModel.wantsPlayback ? "暂停" : "播放")
-                    .onMoveCommand { dir in
-                        switch dir {
-                        case .up: focusedControl = .back
-                        case .left: focusedControl = .seekBackward
-                        case .right: focusedControl = .seekForward
-                        case .down: focusedControl = .episodeDrawer
-                        default: break
-                        }
-                    }
-
-                    // 3. 快进10秒
-                    overlayBarButton(
-                        title: "快进10秒",
-                        icon: "goforward.10",
-                        target: .seekForward
-                    ) {
-                        viewModel.seekBy(seconds: 10)
-                    }
-                    .onMoveCommand { dir in
-                        switch dir {
-                        case .up: focusedControl = .back
-                        case .left: focusedControl = .playPause
-                        case .right:
-                            if viewModel.currentEpisodeIndex > 1 {
-                                focusedControl = .prevEpisode
-                            } else {
-                                focusedControl = .episodeDrawer
-                            }
-                        default: break
-                        }
-                    }
-
-                    // 4. 上一集
-                    overlayBarButton(
-                        title: "上一集",
-                        icon: "backward.end.fill",
-                        target: .prevEpisode
-                    ) {
-                        Task { await viewModel.previousEpisode() }
-                    }
-                    .disabled(viewModel.currentEpisodeIndex <= 1)
-                    .opacity(viewModel.currentEpisodeIndex <= 1 ? 0.5 : 1.0)
-                    .onMoveCommand { dir in
-                        switch dir {
-                        case .up: focusedControl = .back
-                        case .left: focusedControl = .seekForward
-                        case .right: focusedControl = .episodeDrawer
-                        default: break
-                        }
-                    }
-
-                    // 5. 选集列表
-                    overlayBarButton(
-                        title: "选集列表",
-                        icon: "list.bullet",
-                        target: .episodeDrawer
-                    ) {
-                        NSLog("🎬 [Overlay] 点击 选集列表 按钮")
-                        viewModel.restoreFocusTarget = .episodeDrawer
-                        viewModel.isEpisodeDrawerVisible = true
-                    }
-                    .onMoveCommand { dir in
-                        switch dir {
-                        case .up: focusedControl = .playPause
-                        case .left:
-                            if viewModel.currentEpisodeIndex > 1 {
-                                focusedControl = .prevEpisode
-                            } else {
-                                focusedControl = .seekForward
-                            }
-                        case .right:
-                            if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
-                                focusedControl = .nextEpisode
-                            } else {
-                                focusedControl = .speed
-                            }
-                        default: break
-                        }
-                    }
-
-                    // 6. 下一集
-                    overlayBarButton(
-                        title: "下一集",
-                        icon: "forward.end.fill",
-                        target: .nextEpisode
-                    ) {
-                        Task { await viewModel.nextEpisode() }
-                    }
-                    .disabled(viewModel.currentEpisodeIndex >= viewModel.allEpisodes.count)
-                    .opacity(viewModel.currentEpisodeIndex >= viewModel.allEpisodes.count ? 0.5 : 1.0)
-                    .onMoveCommand { dir in
-                        switch dir {
-                        case .up: focusedControl = .back
-                        case .left: focusedControl = .episodeDrawer
-                        case .right: focusedControl = .speed
-                        default: break
-                        }
-                    }
-
-                    Spacer()
-
-                    // 7. 播放倍速
-                    overlayBarButton(
-                        title: "\(String(format: "%.1f", viewModel.playbackRate))x 倍速",
-                        icon: "speedometer",
-                        target: .speed
-                    ) {
-                        viewModel.restoreFocusTarget = .speed
-                        viewModel.isSpeedSheetVisible = true
-                    }
-                    .onMoveCommand { dir in
-                        switch dir {
-                        case .up: focusedControl = .back
-                        case .left:
-                            if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
-                                focusedControl = .nextEpisode
-                            } else {
-                                focusedControl = .episodeDrawer
-                            }
-                        case .right:
-                            if let plan = viewModel.plan, !plan.qualities.isEmpty {
-                                focusedControl = .quality
-                            } else {
-                                focusedControl = .danmaku
-                            }
-                        default: break
-                        }
-                    }
-
-                    // 8. 分辨率 / 清晰度
-                    if let plan = viewModel.plan, !plan.qualities.isEmpty {
+                // 底部两层操作栏：第一层（主播放控制） + 第二层（播放设置与增强）
+                VStack(spacing: 14) {
+                    // MARK: - 第一层：播放与选集主控制栏
+                    HStack(spacing: 14) {
+                        // 1. 快退10秒
                         overlayBarButton(
-                            title: PlaybackPlan.qualityLabel(viewModel.selectedQuality),
-                            icon: "sparkles.tv",
-                            target: .quality
+                            title: "快退10秒",
+                            icon: "gobackward.10",
+                            target: .seekBackward
                         ) {
-                            let qs = plan.qualities
-                            if let idx = qs.firstIndex(of: viewModel.selectedQuality) {
-                                let next = qs[(idx + 1) % qs.count]
-                                Task { await viewModel.changeQuality(next) }
-                            }
+                            viewModel.seekBy(seconds: -10)
                         }
                         .onMoveCommand { dir in
                             switch dir {
                             case .up: focusedControl = .back
-                            case .left: focusedControl = .speed
-                            case .right: focusedControl = .danmaku
+                            case .down: focusedControl = .speed
+                            case .right: focusedControl = .playPause
                             default: break
                             }
                         }
-                    }
 
-                    // 9. 弹幕快捷开关
-                    overlayBarButton(
-                        title: viewModel.danmakuEnabled ? "弹幕：开" : "弹幕：关",
-                        icon: viewModel.danmakuEnabled ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right",
-                        target: .danmaku,
-                        isProminent: false
-                    ) {
-                        viewModel.toggleDanmaku()
-                    }
-                    .onMoveCommand { dir in
-                        switch dir {
-                        case .up: focusedControl = .back
-                        case .left:
-                            if let plan = viewModel.plan, !plan.qualities.isEmpty {
-                                focusedControl = .quality
-                            } else {
-                                focusedControl = .speed
+                        // 2. 播放/暂停（高亮核心按钮）
+                        overlayBarButton(
+                            title: viewModel.wantsPlayback ? "暂停" : "播放",
+                            icon: viewModel.wantsPlayback ? "pause.fill" : "play.fill",
+                            target: .playPause,
+                            isProminent: true
+                        ) {
+                            NSLog("🎬 [Overlay] 点击 播放/暂停 按钮")
+                            viewModel.togglePlayPause()
+                        }
+                        .accessibilityLabel(viewModel.wantsPlayback ? "暂停" : "播放")
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up: focusedControl = .back
+                            case .down: focusedControl = .speed
+                            case .left: focusedControl = .seekBackward
+                            case .right: focusedControl = .seekForward
+                            default: break
                             }
-                        case .right: focusedControl = .danmakuSettings
-                        default: break
                         }
+
+                        // 3. 快进10秒
+                        overlayBarButton(
+                            title: "快进10秒",
+                            icon: "goforward.10",
+                            target: .seekForward
+                        ) {
+                            viewModel.seekBy(seconds: 10)
+                        }
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up: focusedControl = .back
+                            case .down:
+                                if let plan = viewModel.plan, !plan.qualities.isEmpty {
+                                    focusedControl = .quality
+                                } else {
+                                    focusedControl = .speed
+                                }
+                            case .left: focusedControl = .playPause
+                            case .right:
+                                if viewModel.currentEpisodeIndex > 1 {
+                                    focusedControl = .prevEpisode
+                                } else {
+                                    focusedControl = .episodeDrawer
+                                }
+                            default: break
+                            }
+                        }
+
+                        // 4. 上一集
+                        overlayBarButton(
+                            title: "上一集",
+                            icon: "backward.end.fill",
+                            target: .prevEpisode
+                        ) {
+                            Task { await viewModel.previousEpisode() }
+                        }
+                        .disabled(viewModel.currentEpisodeIndex <= 1)
+                        .opacity(viewModel.currentEpisodeIndex <= 1 ? 0.5 : 1.0)
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up: focusedControl = .back
+                            case .down:
+                                if let plan = viewModel.plan, !plan.qualities.isEmpty {
+                                    focusedControl = .quality
+                                } else {
+                                    focusedControl = .danmaku
+                                }
+                            case .left: focusedControl = .seekForward
+                            case .right: focusedControl = .episodeDrawer
+                            default: break
+                            }
+                        }
+
+                        // 5. 选集列表
+                        overlayBarButton(
+                            title: "选集列表",
+                            icon: "list.bullet",
+                            target: .episodeDrawer
+                        ) {
+                            NSLog("🎬 [Overlay] 点击 选集列表 按钮")
+                            viewModel.restoreFocusTarget = .episodeDrawer
+                            viewModel.isEpisodeDrawerVisible = true
+                        }
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up: focusedControl = .back
+                            case .down: focusedControl = .danmaku
+                            case .left:
+                                if viewModel.currentEpisodeIndex > 1 {
+                                    focusedControl = .prevEpisode
+                                } else {
+                                    focusedControl = .seekForward
+                                }
+                            case .right:
+                                if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
+                                    focusedControl = .nextEpisode
+                                } else {
+                                    focusedControl = .speed
+                                }
+                            default: break
+                            }
+                        }
+
+                        // 6. 下一集
+                        overlayBarButton(
+                            title: "下一集",
+                            icon: "forward.end.fill",
+                            target: .nextEpisode
+                        ) {
+                            Task { await viewModel.nextEpisode() }
+                        }
+                        .disabled(viewModel.currentEpisodeIndex >= viewModel.allEpisodes.count)
+                        .opacity(viewModel.currentEpisodeIndex >= viewModel.allEpisodes.count ? 0.5 : 1.0)
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up: focusedControl = .back
+                            case .down: focusedControl = .danmakuSettings
+                            case .left: focusedControl = .episodeDrawer
+                            case .right: focusedControl = .speed
+                            default: break
+                            }
+                        }
+
+                        Spacer()
                     }
 
-                    // 10. 弹幕样式设置
-                    overlayBarButton(
-                        title: "弹幕样式",
-                        icon: "slider.horizontal.3",
-                        target: .danmakuSettings,
-                        isProminent: false
-                    ) {
-                        viewModel.restoreFocusTarget = .danmakuSettings
-                        viewModel.isDanmakuSettingsVisible = true
-                    }
-                    .onMoveCommand { dir in
-                        switch dir {
-                        case .up: focusedControl = .back
-                        case .left: focusedControl = .danmaku
-                        default: break
+                    // MARK: - 第二层：播放设置与观影增强栏
+                    HStack(spacing: 14) {
+                        // 7. 播放倍速
+                        overlayBarButton(
+                            title: "\(String(format: "%.1f", viewModel.playbackRate))x 倍速",
+                            icon: "speedometer",
+                            target: .speed
+                        ) {
+                            viewModel.restoreFocusTarget = .speed
+                            viewModel.isSpeedSheetVisible = true
                         }
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up: focusedControl = .playPause
+                            case .left:
+                                if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
+                                    focusedControl = .nextEpisode
+                                } else {
+                                    focusedControl = .episodeDrawer
+                                }
+                            case .right:
+                                if let plan = viewModel.plan, !plan.qualities.isEmpty {
+                                    focusedControl = .quality
+                                } else {
+                                    focusedControl = .danmaku
+                                }
+                            default: break
+                            }
+                        }
+
+                        // 8. 分辨率 / 清晰度
+                        if let plan = viewModel.plan, !plan.qualities.isEmpty {
+                            overlayBarButton(
+                                title: PlaybackPlan.qualityLabel(viewModel.selectedQuality),
+                                icon: "sparkles.tv",
+                                target: .quality
+                            ) {
+                                let qs = plan.qualities
+                                if let idx = qs.firstIndex(of: viewModel.selectedQuality) {
+                                    let next = qs[(idx + 1) % qs.count]
+                                    Task { await viewModel.changeQuality(next) }
+                                }
+                            }
+                            .onMoveCommand { dir in
+                                switch dir {
+                                case .up: focusedControl = .seekForward
+                                case .left: focusedControl = .speed
+                                case .right: focusedControl = .danmaku
+                                default: break
+                                }
+                            }
+                        }
+
+                        // 9. 弹幕快捷开关
+                        overlayBarButton(
+                            title: viewModel.danmakuEnabled ? "弹幕：开" : "弹幕：关",
+                            icon: viewModel.danmakuEnabled ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right",
+                            target: .danmaku,
+                            isProminent: false
+                        ) {
+                            viewModel.toggleDanmaku()
+                        }
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up: focusedControl = .episodeDrawer
+                            case .left:
+                                if let plan = viewModel.plan, !plan.qualities.isEmpty {
+                                    focusedControl = .quality
+                                } else {
+                                    focusedControl = .speed
+                                }
+                            case .right: focusedControl = .danmakuSettings
+                            default: break
+                            }
+                        }
+
+                        // 10. 弹幕样式设置
+                        overlayBarButton(
+                            title: "弹幕样式",
+                            icon: "slider.horizontal.3",
+                            target: .danmakuSettings,
+                            isProminent: false
+                        ) {
+                            viewModel.restoreFocusTarget = .danmakuSettings
+                            viewModel.isDanmakuSettingsVisible = true
+                        }
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up:
+                                if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
+                                    focusedControl = .nextEpisode
+                                } else {
+                                    focusedControl = .episodeDrawer
+                                }
+                            case .left: focusedControl = .danmaku
+                            default: break
+                            }
+                        }
+
+                        Spacer()
                     }
                 }
             }
