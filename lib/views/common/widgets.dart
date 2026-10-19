@@ -173,6 +173,7 @@ class DramaTile extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.white,
                           fontSize: 12,
+                          decoration: TextDecoration.none,
                         ),
                       ),
                     ),

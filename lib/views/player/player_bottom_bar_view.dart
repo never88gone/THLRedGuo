@@ -26,6 +26,8 @@ class PlayerBottomBarView extends StatelessWidget {
     this.onEpisodes,
     this.onPush,
     this.onPictureInPicture,
+    this.onDanmakuSettings,
+    this.onSettings,
   });
 
   final BoxConstraints constraints;
@@ -47,6 +49,8 @@ class PlayerBottomBarView extends StatelessWidget {
   final VoidCallback? onEpisodes;
   final VoidCallback? onPush;
   final VoidCallback? onPictureInPicture;
+  final VoidCallback? onDanmakuSettings;
+  final VoidCallback? onSettings;
 
   Widget _toolButton({
     required BuildContext context,
@@ -232,6 +236,22 @@ class PlayerBottomBarView extends StatelessWidget {
           tooltip: '选集',
           onPressed: enabled ? onEpisodes : null,
           child: const Text('选集'),
+        ),
+      if (onDanmakuSettings != null)
+        _toolButton(
+          context: context,
+          key: const ValueKey('player-danmaku-settings-tool'),
+          tooltip: '弹幕样式设置',
+          onPressed: enabled ? onDanmakuSettings : null,
+          child: const Icon(Icons.tune_rounded),
+        ),
+      if (onSettings != null)
+        _toolButton(
+          context: context,
+          key: const ValueKey('player-settings-tool'),
+          tooltip: '播放设置',
+          onPressed: enabled ? onSettings : null,
+          child: const Icon(Icons.settings_rounded),
         ),
       if (!swipeEnabled)
         _toolButton(

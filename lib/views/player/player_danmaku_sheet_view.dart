@@ -200,60 +200,69 @@ class _PlayerDanmakuSheetViewState extends State<PlayerDanmakuSheetView> {
                 const SizedBox(height: 14),
 
                 // 3. 字体大小
-                _buildSectionTitle('字体大小'),
+                _buildSectionHeader('字体大小', '${_style.fontSizeScale}x'),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                Row(
                   children: [
                     for (final opt in fontSizeOptions)
-                      _buildChip(
-                        key: ValueKey('danmaku-size-${opt['val']}'),
-                        label: opt['label'] as String,
-                        selected: (_style.fontSizeScale - (opt['val'] as double)).abs() < 0.05,
-                        onSelected: () {
-                          _updateStyle(_style.copyWith(fontSizeScale: opt['val'] as double));
-                        },
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: _buildChip(
+                            key: ValueKey('danmaku-size-${opt['val']}'),
+                            label: opt['label'] as String,
+                            selected: (_style.fontSizeScale - (opt['val'] as double)).abs() < 0.05,
+                            onSelected: () {
+                              _updateStyle(_style.copyWith(fontSizeScale: opt['val'] as double));
+                            },
+                          ),
+                        ),
                       ),
                   ],
                 ),
                 const SizedBox(height: 14),
 
                 // 4. 不透明度
-                _buildSectionTitle('不透明度'),
+                _buildSectionHeader('不透明度', '${(_style.opacity * 100).toInt()}%'),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                Row(
                   children: [
                     for (final opt in opacityOptions)
-                      _buildChip(
-                        key: ValueKey('danmaku-opacity-${opt['val']}'),
-                        label: opt['label'] as String,
-                        selected: (_style.opacity - (opt['val'] as double)).abs() < 0.05,
-                        onSelected: () {
-                          _updateStyle(_style.copyWith(opacity: opt['val'] as double));
-                        },
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: _buildChip(
+                            key: ValueKey('danmaku-opacity-${opt['val']}'),
+                            label: opt['label'] as String,
+                            selected: (_style.opacity - (opt['val'] as double)).abs() < 0.05,
+                            onSelected: () {
+                              _updateStyle(_style.copyWith(opacity: opt['val'] as double));
+                            },
+                          ),
+                        ),
                       ),
                   ],
                 ),
                 const SizedBox(height: 14),
 
                 // 5. 显示区域
-                _buildSectionTitle('显示区域'),
+                _buildSectionHeader('显示区域', optAreaLabel(_style.displayArea)),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                Row(
                   children: [
                     for (final opt in areaOptions)
-                      _buildChip(
-                        key: ValueKey('danmaku-area-${opt['val']}'),
-                        label: opt['label'] as String,
-                        selected: (_style.displayArea - (opt['val'] as double)).abs() < 0.05,
-                        onSelected: () {
-                          _updateStyle(_style.copyWith(displayArea: opt['val'] as double));
-                        },
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: _buildChip(
+                            key: ValueKey('danmaku-area-${opt['val']}'),
+                            label: opt['label'] as String,
+                            selected: (_style.displayArea - (opt['val'] as double)).abs() < 0.05,
+                            onSelected: () {
+                              _updateStyle(_style.copyWith(displayArea: opt['val'] as double));
+                            },
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -266,14 +275,34 @@ class _PlayerDanmakuSheetViewState extends State<PlayerDanmakuSheetView> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: AppColors.whiteWithAlpha(0.65),
-      ),
+  String optAreaLabel(double area) {
+    if (area <= 0.3) return '1/4 屏';
+    if (area <= 0.6) return '半屏';
+    if (area <= 0.8) return '3/4 屏';
+    return '全屏';
+  }
+
+  Widget _buildSectionHeader(String title, String current) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.whiteWithAlpha(0.65),
+          ),
+        ),
+        Text(
+          current,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.hongguoRed,
+          ),
+        ),
+      ],
     );
   }
 
@@ -283,28 +312,41 @@ class _PlayerDanmakuSheetViewState extends State<PlayerDanmakuSheetView> {
     required bool selected,
     required VoidCallback onSelected,
   }) {
-    return ChoiceChip(
+    return GestureDetector(
       key: key,
-      label: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-          color: selected ? AppColors.white : AppColors.whiteWithAlpha(0.85),
+      behavior: HitTestBehavior.opaque,
+      onTap: onSelected,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.hongguoRed : AppColors.darkCard,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? AppColors.hongguoRed : AppColors.whiteWithAlpha(0.12),
+            width: 1,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppColors.hongguoRed.withValues(alpha: 0.35),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+            color: selected ? AppColors.white : AppColors.whiteWithAlpha(0.85),
+          ),
         ),
       ),
-      selected: selected,
-      selectedColor: AppColors.hongguoRed,
-      backgroundColor: AppColors.darkCard,
-      side: BorderSide(
-        color: selected ? AppColors.hongguoRed : AppColors.whiteWithAlpha(0.12),
-        width: 1,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-      showCheckmark: false,
-      onSelected: (_) => onSelected(),
     );
   }
 }

@@ -293,6 +293,66 @@ class _PlayerMenuState extends State<PlayerMenu> {
                     );
                   },
           ),
+          if (preferences.danmaku) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '弹幕不透明度',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  '${(preferences.danmakuStyle.opacity * 100).toInt()}%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: colors.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                for (final (op, label) in [
+                  (0.4, '40%'),
+                  (0.6, '60%'),
+                  (0.8, '80%'),
+                  (1.0, '100%'),
+                ])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: ChoiceChip(
+                        key: ValueKey('menu-danmaku-opacity-$op'),
+                        label: Center(
+                          child: Text(
+                            label,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        selected: (preferences.danmakuStyle.opacity - op).abs() < 0.05,
+                        onSelected: _busy
+                            ? null
+                            : (_) {
+                                setState(() {
+                                  _preferences = _preferences.copyWith(
+                                    danmakuStyle: preferences.danmakuStyle.copyWith(opacity: op),
+                                  );
+                                });
+                                _run(() => widget.onPreferences(_preferences));
+                              },
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
           Wrap(
             spacing: 8,
             runSpacing: 8,

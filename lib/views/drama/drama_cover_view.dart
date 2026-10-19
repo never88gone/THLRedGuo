@@ -131,96 +131,101 @@ class DramaCover extends StatelessWidget {
       ),
     );
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: 0.25),
-          width: 0.8,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x3D000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(
+            color: colors.outlineVariant.withValues(alpha: 0.25),
+            width: 0.8,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            placeholder,
-            if (!imagesDisabled && drama.id.isNotEmpty)
-              CachedCoverImage(
-                key: ValueKey('${drama.id}\u0000${drama.cover}'),
-                drama: drama,
-                repository: repository,
-                placeholder: placeholder,
-              ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.posterOverlay,
-                  ),
-                ),
-              ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x3D000000),
+              blurRadius: 10,
+              offset: Offset(0, 4),
             ),
-            if (drama.episodes > 0)
-              Positioned(
-                left: 8,
-                bottom: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0x99000000),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: const Color(0x26FFFFFF),
-                      width: 0.6,
-                    ),
-                  ),
-                  child: Text(
-                    '共 ${drama.episodes} 集',
-                    style: const TextStyle(
-                      color: AppColors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            if (drama.vip)
-              Positioned(
-                left: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.gold,
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x66FFC028),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Text(
-                    'VIP',
-                    style: TextStyle(
-                      color: AppColors.black,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              placeholder,
+              if (!imagesDisabled && drama.id.isNotEmpty)
+                CachedCoverImage(
+                  key: ValueKey('${drama.id}\u0000${drama.cover}'),
+                  drama: drama,
+                  repository: repository,
+                  placeholder: placeholder,
+                ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: AppGradients.posterOverlay,
+                    ),
+                  ),
+                ),
+              ),
+              if (drama.episodes > 0)
+                Positioned(
+                  left: 8,
+                  bottom: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0x99000000),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: const Color(0x26FFFFFF),
+                        width: 0.6,
+                      ),
+                    ),
+                    child: Text(
+                      '共 ${drama.episodes} 集',
+                      style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ),
+              if (drama.vip)
+                Positioned(
+                  left: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      gradient: AppGradients.gold,
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x66FFC028),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'VIP',
+                      style: TextStyle(
+                        color: AppColors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

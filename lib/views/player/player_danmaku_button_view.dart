@@ -26,7 +26,7 @@ class PlayerDanmakuButtonView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tooltip = danmakuStatus.isEmpty
-        ? (danmakuEnabled ? '轻触关闭弹幕 · 长按设置样式' : '轻触打开弹幕 · 长按设置样式')
+        ? (danmakuEnabled ? '轻触关闭弹幕 · 设置样式' : '轻触打开弹幕 · 设置样式')
         : danmakuStatus;
 
     return Align(
@@ -35,55 +35,86 @@ class PlayerDanmakuButtonView extends StatelessWidget {
           : Alignment.centerRight,
       child: Padding(
         padding: EdgeInsets.only(right: swipeEnabled ? 8 : 4),
-        child: Tooltip(
-          message: tooltip,
-          child: Semantics(
-            button: true,
-            enabled: enabled,
-            label: tooltip,
-            child: GestureDetector(
-              key: const ValueKey('player-danmaku-toggle'),
-              behavior: HitTestBehavior.opaque,
-              onTap: enabled ? onTap : null,
-              onLongPress: enabled ? onSettings : null,
-              child: SizedBox(
-                width: 44,
-                height: 48,
-                child: Center(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: danmakuEnabled
-                          ? AppColors.hongguoRedWithAlpha(0.22)
-                          : AppColors.playerOverlayButton,
-                      border: Border.all(
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.playerOverlayButton,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: danmakuEnabled
+                  ? AppColors.hongguoRed.withValues(alpha: 0.6)
+                  : AppColors.whiteWithAlpha(0.24),
+              width: 1.0,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Tooltip(
+                message: tooltip,
+                child: Semantics(
+                  button: true,
+                  enabled: enabled,
+                  label: tooltip,
+                  child: GestureDetector(
+                    key: const ValueKey('player-danmaku-toggle'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: enabled ? onTap : null,
+                    onLongPress: enabled ? onSettings : null,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
                         color: danmakuEnabled
                             ? AppColors.hongguoRed
-                            : AppColors.whiteWithAlpha(0.24),
-                        width: 1.2,
+                            : AppColors.transparent,
                       ),
-                    ),
-                    child: canRetry
-                        ? const Icon(Icons.refresh_rounded, size: 21, color: AppColors.white)
-                        : Text(
-                            '弹',
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1,
-                              fontWeight: FontWeight.w800,
-                              color: danmakuEnabled
-                                  ? AppColors.hongguoRed
-                                  : AppColors.whiteWithAlpha(0.88),
+                      child: canRetry
+                          ? const Icon(Icons.refresh_rounded, size: 18, color: AppColors.white)
+                          : Text(
+                              '弹',
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1,
+                                fontWeight: FontWeight.w800,
+                                color: danmakuEnabled
+                                    ? AppColors.white
+                                    : AppColors.whiteWithAlpha(0.88),
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              if (onSettings != null) ...[
+                const SizedBox(width: 2),
+                Tooltip(
+                  message: '弹幕样式设置',
+                  child: Semantics(
+                    button: true,
+                    enabled: enabled,
+                    label: '弹幕样式设置',
+                    child: GestureDetector(
+                      key: const ValueKey('player-danmaku-settings-button'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: enabled ? onSettings : null,
+                      child: Container(
+                        width: 28,
+                        height: 32,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.tune_rounded,
+                          size: 17,
+                          color: AppColors.whiteWithAlpha(danmakuEnabled ? 0.95 : 0.60),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
