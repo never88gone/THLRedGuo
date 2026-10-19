@@ -135,7 +135,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ListTile(
                     key: const ValueKey('settings-playback-entry'),
                     leading: const Icon(Icons.tune_rounded),
-                    title: const Text('播放偏好'),
+                    title: const Text('播放设置'),
                     subtitle: Text('默认 $qualityLabel · ${playPrefs.speed}x · 弹幕${playPrefs.danmaku ? "开启" : "关闭"}'),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
@@ -200,7 +200,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       (widget.store.isZhenguojianActivated || widget.store.sources.length > 1))
                     ListTile(
                       leading: const Icon(Icons.speed_rounded),
-                      title: const Text('站源测速与连通性检测'),
+                      title: const Text('站源管理'),
                       subtitle: const Text('多源站启用状态、健康诊断与网络测速'),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => Navigator.push(

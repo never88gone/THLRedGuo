@@ -16,7 +16,10 @@ class DownloadPreferencesScreen extends StatelessWidget {
     builder: (context, _) {
       final preferences = store.downloadPreferences;
       return Scaffold(
-        appBar: AppBar(title: const Text('下载偏好')),
+        appBar: AppBar(
+          title: const Text('离线下载偏好'),
+          centerTitle: true,
+        ),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 680),

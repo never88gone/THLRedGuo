@@ -119,7 +119,7 @@ class _AboutPageState extends State<AboutPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('关于'),
+            title: const Text('关于 $appName'),
             centerTitle: true,
           ),
       body: Center(

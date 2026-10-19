@@ -55,7 +55,7 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('数据备份与恢复'),
+        title: const Text('备份与恢复'),
         centerTitle: true,
       ),
       body: ListView(

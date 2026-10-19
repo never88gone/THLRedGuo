@@ -223,7 +223,8 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
           ? AppColors.darkBackground
           : AppColors.lightBackground,
       appBar: AppBar(
-        title: const Text('隐私与安全设置'),
+        title: const Text('手势密码与隐私短剧库'),
+        centerTitle: true,
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
