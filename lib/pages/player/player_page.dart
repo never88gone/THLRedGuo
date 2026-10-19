@@ -857,12 +857,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     final duration = state.duration.inMilliseconds;
     final position = state.position.inMilliseconds;
-    if (duration <= 0 || position < 1500) {
-      return;
-    }
-    final remaining = duration - position;
-    final progress = position / duration;
-    if (remaining > 25000 && progress < 0.35) {
+    if (duration <= 0 || position < 500) {
       return;
     }
     _preloader.prepare(
@@ -1157,9 +1152,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     _resumePosition = position;
     _showControlsOnPlaybackReady = showControlsOnReady;
+    final isSeamlessAdvance = !showControlsOnReady && recoveryAction == null && (index == _index + 1 || warmed != null);
     setState(() {
       _index = index;
-      _loading = warmed == null;
+      _loading = !isSeamlessAdvance && warmed == null;
       _error = null;
       _localFailure = false;
       _loadingMessage = switch (recoveryAction) {
@@ -1187,7 +1183,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         await _enhancement.beforeMedia();
         if (_closed || ticket != _generation) return;
         _openedIndex = -1;
-        await _player.stop();
+        if (!isSeamlessAdvance) {
+          await _player.stop();
+        }
         final previous = _plan ?? recoveryPlan;
         _plan = null;
         if (recoveryAction == PlaybackRecoveryAction.alternative ||

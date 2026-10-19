@@ -84,7 +84,7 @@ class _TelevisionControlsState extends State<TelevisionControls> {
         if (!mounted || !widget.enabled || _panelOpen) return;
         if (playing) {
           _scheduleHide();
-        } else {
+        } else if (widget.showOnPlaybackReady) {
           _show();
         }
       }),

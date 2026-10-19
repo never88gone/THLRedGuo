@@ -110,7 +110,9 @@ class _PlayerControlsState extends State<PlayerControls> {
       widget.player.stream.playing.listen((playing) {
         if (!mounted || !widget.enabled) return;
         if (!playing) {
-          _show();
+          if (widget.showOnPlaybackReady) {
+            _show();
+          }
         } else {
           _scheduleHide();
         }
@@ -122,12 +124,19 @@ class _PlayerControlsState extends State<PlayerControls> {
   @override
   void didUpdateWidget(PlayerControls oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.showOnPlaybackReady && oldWidget.showOnPlaybackReady) {
+      _hide();
+    }
     if (widget.enabled != oldWidget.enabled ||
         widget.panelOpen != oldWidget.panelOpen ||
         widget.fullscreen != oldWidget.fullscreen) {
       _seekValue = null;
       if (widget.enabled && !oldWidget.enabled) {
-        _show();
+        if (widget.showOnPlaybackReady) {
+          _show();
+        } else {
+          _hide();
+        }
       }
     }
   }
@@ -145,6 +154,11 @@ class _PlayerControlsState extends State<PlayerControls> {
     _hideTimer?.cancel();
     if (!_visible) setState(() => _visible = true);
     _scheduleHide();
+  }
+
+  void _hide() {
+    _hideTimer?.cancel();
+    if (_visible) setState(() => _visible = false);
   }
 
   void _scheduleHide() {
