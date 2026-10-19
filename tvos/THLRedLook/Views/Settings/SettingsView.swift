@@ -1848,65 +1848,7 @@ private struct SourceDiagnosticsView: View {
                             .focusable()
                     }
                     ForEach(recorder.entries.reversed()) { entry in
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack(spacing: 14) {
-                                Text((entry.failed ? "失败 · " : "完成 · ") + entry.stage)
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundStyle(entry.failed ? Color.red : Color.green)
-
-                                if entry.category != .unknown {
-                                    Text(entry.category.tag)
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 4)
-                                        .background(entry.failed ? Color.red.opacity(0.85) : Color.blue.opacity(0.8))
-                                        .clipShape(Capsule())
-                                }
-
-                                if entry.elapsedMs > 0 {
-                                    Text("\(entry.elapsedMs)ms")
-                                        .font(.system(size: 16, weight: .medium, design: .monospaced))
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-                            }
-
-                            Text(entry.text)
-                                .font(.system(size: 22))
-                                .foregroundStyle(.white.opacity(0.9))
-
-                            if !entry.errorDetail.isEmpty {
-                                HStack(alignment: .top, spacing: 8) {
-                                    Text("失败原因:")
-                                        .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(.orange)
-                                    Text(entry.errorDetail)
-                                        .font(.system(size: 18, weight: .medium, design: .monospaced))
-                                        .foregroundColor(.orange.opacity(0.95))
-                                }
-                            }
-
-                            if !entry.suggestion.isEmpty {
-                                HStack(alignment: .top, spacing: 8) {
-                                    Text("排查建议:")
-                                        .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(TVTheme.primaryHover)
-                                    Text(entry.suggestion)
-                                        .font(.system(size: 18))
-                                        .foregroundColor(.white.opacity(0.8))
-                                }
-                            }
-                        }
-                        .padding(20)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(entry.failed ? Color.red.opacity(0.08) : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(entry.failed ? Color.red.opacity(0.35) : Color.white.opacity(0.05), lineWidth: 1)
-                        )
-                        .focusable()
+                        SourceDiagnosticEntryCardView(entry: entry)
                     }
                 }
                 .padding(12)
@@ -1916,61 +1858,166 @@ private struct SourceDiagnosticsView: View {
         .defaultFocus($focusedAction, "run")
         .onExitCommand { dismiss() }
         .sheet(isPresented: $showingFullReport, onDismiss: { focusedAction = "report" }) {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("完整技术诊断报告")
-                            .font(.system(size: 40, weight: .bold))
-                            .foregroundColor(.white)
-                        Text("包含环境指纹、各链路分段耗时与详细错误堆栈，可供技术排查与社区求助")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.65))
-                    }
-                    Spacer()
-                    TVButton(title: "关闭报告", icon: "xmark.circle.fill", isProminent: true) {
-                        showingFullReport = false
-                    }
-                    .accessibilityIdentifier("sourceDiagnostics.reportClose")
-                }
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(recorder.report)
-                            .font(.system(size: 22, weight: .medium, design: .monospaced))
-                            .lineSpacing(6)
-                            .foregroundColor(.white.opacity(0.95))
-                            .padding(24)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.black.opacity(0.6))
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                            )
-                            .focusable()
-                            .accessibilityIdentifier("sourceDiagnostics.reportContent")
-                    }
-                    .padding(8)
-                }
+            SourceDiagnosticsFullReportSheet(reportText: recorder.report) {
+                showingFullReport = false
             }
-            .padding(48)
-            .onExitCommand { showingFullReport = false }
         }
         .sheet(isPresented: $showingQR, onDismiss: { focusedAction = "qr" }) {
-            VStack(spacing: 24) {
-                Text("扫码获取诊断报告").font(.system(size: 42, weight: .bold))
-                if let reportImage {
-                    Image(uiImage: reportImage).interpolation(.none).resizable()
-                        .scaledToFit().frame(width: 500, height: 500)
-                        .padding(24).background(.white)
-                }
-                Text("包含版本、源指纹和最多最近 8 条脱敏记录。扫码读取文本后手动反馈，不会自动上传。")
-                    .font(.system(size: 29)).multilineTextAlignment(.center)
-                TVButton(title: "返回诊断", icon: "arrow.backward", isProminent: true) { showingQR = false }
-                    .accessibilityIdentifier("sourceDiagnostics.qrBack")
+            SourceDiagnosticsQRSheet(reportImage: reportImage) {
+                showingQR = false
             }
-            .padding(60)
-            .onExitCommand { showingQR = false }
         }
+    }
+}
+
+@MainActor
+private struct SourceDiagnosticEntryCardView: View {
+    let entry: SourceDiagnosticEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            headerRow
+            Text(entry.text)
+                .font(.system(size: 22))
+                .foregroundStyle(.white.opacity(0.9))
+
+            if !entry.errorDetail.isEmpty {
+                errorDetailRow
+            }
+
+            if !entry.suggestion.isEmpty {
+                suggestionRow
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(entry.failed ? Color.red.opacity(0.08) : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(entry.failed ? Color.red.opacity(0.35) : Color.white.opacity(0.05), lineWidth: 1)
+        )
+        .focusable()
+    }
+
+    private var headerRow: some View {
+        HStack(spacing: 14) {
+            let statusText: String = (entry.failed ? "失败 · " : "完成 · ") + entry.stage
+            let statusColor: Color = entry.failed ? Color.red : Color.green
+            Text(statusText)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(statusColor)
+
+            if entry.category != .unknown {
+                let badgeBg: Color = entry.failed ? Color.red.opacity(0.85) : Color.blue.opacity(0.8)
+                Text(entry.category.tag)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(badgeBg)
+                    .clipShape(Capsule())
+            }
+
+            if entry.elapsedMs > 0 {
+                Text("\(entry.elapsedMs)ms")
+                    .font(.system(size: 16, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+    }
+
+    private var errorDetailRow: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("失败原因:")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(.orange)
+            Text(entry.errorDetail)
+                .font(.system(size: 18, weight: .medium, design: .monospaced))
+                .foregroundColor(.orange.opacity(0.95))
+        }
+    }
+
+    private var suggestionRow: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("排查建议:")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(TVTheme.primaryHover)
+            Text(entry.suggestion)
+                .font(.system(size: 18))
+                .foregroundColor(.white.opacity(0.8))
+        }
+    }
+}
+
+@MainActor
+private struct SourceDiagnosticsFullReportSheet: View {
+    let reportText: String
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("完整技术诊断报告")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("包含环境指纹、各链路分段耗时与详细错误堆栈，可供技术排查与社区求助")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white.opacity(0.65))
+                }
+                Spacer()
+                TVButton(title: "关闭报告", icon: "xmark.circle.fill", isProminent: true) {
+                    onClose()
+                }
+                .accessibilityIdentifier("sourceDiagnostics.reportClose")
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(reportText)
+                        .font(.system(size: 22, weight: .medium, design: .monospaced))
+                        .lineSpacing(6)
+                        .foregroundColor(.white.opacity(0.95))
+                        .padding(24)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.black.opacity(0.6))
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
+                        .focusable()
+                        .accessibilityIdentifier("sourceDiagnostics.reportContent")
+                }
+                .padding(8)
+            }
+        }
+        .padding(48)
+        .onExitCommand { onClose() }
+    }
+}
+
+@MainActor
+private struct SourceDiagnosticsQRSheet: View {
+    let reportImage: UIImage?
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Text("扫码获取诊断报告").font(.system(size: 42, weight: .bold))
+            if let reportImage {
+                Image(uiImage: reportImage).interpolation(.none).resizable()
+                    .scaledToFit().frame(width: 500, height: 500)
+                    .padding(24).background(.white)
+            }
+            Text("包含版本、源指纹和最多最近 8 条脱敏记录。扫码读取文本后手动反馈，不会自动上传。")
+                .font(.system(size: 29)).multilineTextAlignment(.center)
+            TVButton(title: "返回诊断", icon: "arrow.backward", isProminent: true) { onClose() }
+                .accessibilityIdentifier("sourceDiagnostics.qrBack")
+        }
+        .padding(60)
+        .onExitCommand { onClose() }
     }
 }

@@ -490,7 +490,7 @@ public actor NativeBridge {
                 if autoSelect || targetId == "hongguo" || activeSourceId.isEmpty {
                     activeSourceId = targetId
                 }
-            } else if autoSelect, let meta = installedSources[fileId] {
+            } else if autoSelect, installedSources[fileId] != nil {
                 activeSourceId = fileId
             }
             return ["ok": true, "active": activeSourceId]

@@ -487,10 +487,6 @@ public struct MainTabView: View {
                 }
             }
 
-        case "settingsActive":
-            selectedTab = .settings
-            focusedNavTab = .settings
-            isSettingsActiveDemo = true
         case "playDownloaded":
             selectedTab = .downloads
             focusedNavTab = .downloads

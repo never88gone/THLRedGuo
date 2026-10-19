@@ -215,7 +215,7 @@ public final class DetailViewModel: ObservableObject {
                 }
             }
 
-            var mainSeasons = parsedList.filter { $0.mainSeasonNum != nil }.sorted { $0.mainSeasonNum! < $1.mainSeasonNum! }
+            let mainSeasons = parsedList.filter { $0.mainSeasonNum != nil }.sorted { $0.mainSeasonNum! < $1.mainSeasonNum! }
             let unnumbered = parsedList.filter { $0.mainSeasonNum == nil && $0.customTitle == nil }
             let spinOffs = parsedList.filter { $0.customTitle != nil }.sorted { $0.drama.title < $1.drama.title }
 
