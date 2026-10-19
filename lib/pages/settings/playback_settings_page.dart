@@ -171,13 +171,13 @@ class PlaybackSettingsPage extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    SwitchListTile(
+                    SwitchListTile.adaptive(
                       secondary: const Icon(Icons.comment_bank_outlined),
                       title: const Text('弹幕总开关'),
                       subtitle: Text(prefs.danmaku ? '已开启弹幕渲染' : '默认静默不显示弹幕'),
                       value: prefs.danmaku,
-                      activeThumbColor: AppColors.hongguoRed,
-                      activeTrackColor: AppColors.accentTrack35,
+                      activeThumbColor: AppColors.white,
+                      activeTrackColor: AppColors.hongguoRed,
                       onChanged: (val) async {
                         final updated = prefs.copyWith(danmaku: val);
                         await saveUserChange(context, () => store.setPlaybackPreferences(updated));

@@ -177,13 +177,13 @@ class DisplayModePage extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: SwitchListTile(
+                child: SwitchListTile.adaptive(
                   secondary: const Icon(Icons.screen_lock_portrait_rounded),
                   title: const Text('禁止自动锁屏'),
                   subtitle: const Text('保持屏幕常亮，防止离线下载与挂机播放时设备自动息屏休眠'),
                   value: store.keepScreenOn,
-                  activeThumbColor: AppColors.hongguoRed,
-                  activeTrackColor: AppColors.accentTrack35,
+                  activeThumbColor: AppColors.white,
+                  activeTrackColor: AppColors.hongguoRed,
                   onChanged: (val) async {
                     await saveUserChange(
                       context,

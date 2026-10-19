@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:THLRedLook/utils/build/app_build.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
-import 'package:THLRedLook/views/common/widgets.dart';
 
 /// 首页顶部导航栏组件
 class HomeAppBarView extends StatelessWidget implements PreferredSizeWidget {
@@ -168,45 +167,11 @@ class HomeAppBarView extends StatelessWidget implements PreferredSizeWidget {
               onPressed: onToggleSearch,
             ),
           ],
-          if (tab == 0 && !showRecommendations && screenWidth >= 360)
-            RefreshAction(
-              key: const ValueKey('catalog-refresh'),
-              loading: loading,
-              tooltip: '更新剧库',
-              onPressed: sourcesEmpty ? null : onRefreshCatalog,
-            ),
-          PopupMenuButton<String>(
-            tooltip: '更多',
-            onSelected: onMoreAction,
-            itemBuilder: (_) => [
-              if (tab == 0 && !showRecommendations && screenWidth < 400)
-                PopupMenuItem(
-                  value: 'update',
-                  enabled: !sourcesEmpty && !isUpdaterBusy,
-                  child: const Text('更新剧库'),
-                ),
-              if (sourceGroups.length > 1)
-                PopupMenuItem(
-                  value: 'sources',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.swap_horiz_rounded, size: 20, color: AppColors.hongguoRed),
-                      const SizedBox(width: 8),
-                      Text('切换数据源 (当前：${group.name})'),
-                    ],
-                  ),
-                ),
-              const PopupMenuItem(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings_rounded, size: 20),
-                    SizedBox(width: 10),
-                    Text('设置'),
-                  ],
-                ),
-              ),
-            ],
+          IconButton(
+            key: const ValueKey('home-appbar-settings-button'),
+            tooltip: '设置',
+            icon: const Icon(Icons.settings_rounded),
+            onPressed: () => onMoreAction('settings'),
           ),
         ],
       ],

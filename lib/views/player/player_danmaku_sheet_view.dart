@@ -159,11 +159,11 @@ class _PlayerDanmakuSheetViewState extends State<PlayerDanmakuSheetView> {
                         ),
                       ),
                       const Spacer(),
-                      Switch(
+                      Switch.adaptive(
                         key: const ValueKey('danmaku-sheet-switch'),
                         value: _enabled,
-                        activeThumbColor: AppColors.hongguoRed,
-                        activeTrackColor: AppColors.accentTrack35,
+                        activeThumbColor: AppColors.white,
+                        activeTrackColor: AppColors.hongguoRed,
                         onChanged: _updateEnabled,
                       ),
                     ],
