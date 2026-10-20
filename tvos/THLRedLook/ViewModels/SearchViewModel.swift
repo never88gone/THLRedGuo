@@ -53,10 +53,6 @@ public final class SearchViewModel: ObservableObject {
     public func onQueryChanged(_ newQuery: String) {
         query = newQuery
         debounceTask?.cancel()
-        guard !newQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            suggestions = []
-            return
-        }
 
         debounceTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000) // 300ms 防抖
@@ -71,9 +67,13 @@ public final class SearchViewModel: ObservableObject {
             suggestions = []
             return
         }
+        let source = activeSourceId
         do {
-            suggestions = try await repository.loadSuggestions(query: text)
+            let loaded = try await repository.loadSuggestions(query: text)
+            guard !Task.isCancelled, query == text, activeSourceId == source else { return }
+            suggestions = loaded
         } catch {
+            guard !Task.isCancelled, query == text, activeSourceId == source else { return }
             suggestions = []
         }
     }
@@ -81,6 +81,7 @@ public final class SearchViewModel: ObservableObject {
     public func executeSearch(keyword: String? = nil) async {
         let target = (keyword ?? query).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !target.isEmpty else { return }
+        debounceTask?.cancel()
         generation += 1
         let ticket = generation
         submittedSource = !activeSourceId.isEmpty ? activeSourceId : "hongguo"

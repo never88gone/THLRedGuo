@@ -149,6 +149,16 @@ public final class SourceDiagnostics: ObservableObject {
             return "游客注册"
         }
         if host == "reading.snssdk.com" && url.path == "/reading/bookapi/search/tab/v" { return "搜索" }
+        if host == "reading.snssdk.com" {
+            switch url.path {
+            case "/reading/bookapi/search/cue/v": return "猜你想搜"
+            case "/reading/bookapi/search/suggest/v": return "搜索联想"
+            case "/reading/bookapi/plan/v": return "榜单"
+            case "/reading/bookapi/bookmall/tab/v": return "推荐"
+            case "/reading/bookapi/bookmall/cell/change/v": return "列表分页"
+            default: break
+            }
+        }
         if host.hasSuffix(".fqnovel.com") || host == "reading.snssdk.com" {
             if url.path.contains("/video_detail/") { return "详情" }
             if url.path.contains("/video_model/") || url.path.contains("/multi_video_model/") { return "播放解析" }

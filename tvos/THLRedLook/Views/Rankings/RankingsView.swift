@@ -90,9 +90,15 @@ public struct RankingsView: View {
                             Image(systemName: "chart.bar.xaxis")
                                 .font(.system(size: 64))
                                 .foregroundColor(TVTheme.primary.opacity(0.8))
-                            Text("当前数据源暂未收录该榜单剧集")
+                            Text(viewModel.errorMessage ?? "当前榜单暂无可展示剧集")
                                 .font(.system(size: 24, weight: .medium))
                                 .foregroundColor(.white.opacity(0.6))
+                            TVButton(title: "重新加载榜单", icon: "arrow.clockwise") {
+                                Task {
+                                    await viewModel.loadBoards(forSource: currentActiveSource)
+                                    await viewModel.loadRankings()
+                                }
+                            }
                         }
                         Spacer()
                     } else {
@@ -114,7 +120,7 @@ public struct RankingsView: View {
                                         .focused($focusedTarget, equals: .card(drama.id))
 
                                         // 前三名金银铜徽章
-                                        Text("\(index + 1)")
+                                        Text("\(viewModel.ranks[drama.id] ?? index + 1)")
                                             .font(.system(size: 14, weight: .black))
                                             .foregroundColor(.white)
                                             .frame(width: 28, height: 28)
@@ -123,6 +129,18 @@ public struct RankingsView: View {
                                             )
                                             .clipShape(Circle())
                                             .padding(8)
+                                    }
+                                    .onAppear {
+                                        if index >= viewModel.items.count - 4 {
+                                            Task { await viewModel.loadMore() }
+                                        }
+                                    }
+                                }
+                                if viewModel.isLoadingMore { ProgressView("正在加载更多榜单剧集...") }
+                                if let message = viewModel.errorMessage {
+                                    Text(message).foregroundColor(.secondary)
+                                    TVButton(title: "刷新榜单", icon: "arrow.clockwise") {
+                                        Task { await viewModel.loadRankings() }
                                     }
                                 }
                             }
@@ -236,6 +254,14 @@ public struct RecommendationsView: View {
                         Spacer()
                         ProgressView("正在探索精选推荐...")
                         Spacer()
+                    } else if viewModel.items.isEmpty {
+                        Spacer()
+                        Text(viewModel.errorMessage ?? "当前分类暂无推荐剧集")
+                            .foregroundColor(.secondary)
+                        TVButton(title: "重新加载推荐", icon: "arrow.clockwise") {
+                            Task { await viewModel.loadRecommendations(forSource: currentActiveSource) }
+                        }
+                        Spacer()
                     } else {
                         ScrollView {
                             LazyVGrid(columns: columns, spacing: 36) {
@@ -252,6 +278,18 @@ public struct RecommendationsView: View {
                                         selectedDrama = drama
                                     }
                                     .focused($focusedTarget, equals: .card(drama.id))
+                                    .onAppear {
+                                        if index >= viewModel.items.count - 4 {
+                                            Task { await viewModel.loadMore() }
+                                        }
+                                    }
+                                }
+                                if viewModel.isLoadingMore { ProgressView("正在加载更多推荐...") }
+                                if let message = viewModel.errorMessage {
+                                    Text(message).foregroundColor(.secondary)
+                                    TVButton(title: "刷新推荐", icon: "arrow.clockwise") {
+                                        Task { await viewModel.loadRecommendations() }
+                                    }
                                 }
                             }
                             .padding(.horizontal, 48)
@@ -263,10 +301,9 @@ public struct RecommendationsView: View {
                 }
                 .task(id: currentActiveSource) {
                     if let initCat = initialCategory, !initCat.isEmpty {
-                        viewModel.selectSubCategory(initCat)
-                    } else {
-                        await viewModel.loadRecommendations(forSource: currentActiveSource)
+                        viewModel.selectedSubCategory = initCat
                     }
+                    await viewModel.loadRecommendations(forSource: currentActiveSource)
                 }
             }
         }

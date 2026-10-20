@@ -62,10 +62,9 @@ class SourceDiagnosticEntry {
       errorCategory.isNotEmpty ||
       (status > 0 && status != 200);
 
-  String get displayTitle =>
-      errorTitle.isNotEmpty
-          ? errorTitle
-          : (errorCode.isNotEmpty ? errorCode : '正常');
+  String get displayTitle => errorTitle.isNotEmpty
+      ? errorTitle
+      : (errorCode.isNotEmpty ? errorCode : '正常');
 
   String get text => [
     '${at.toIso8601String()} [$context] $stage',
@@ -143,6 +142,17 @@ class SourceDiagnostics extends ChangeNotifier {
         uri.path == '/reading/bookapi/search/tab/v') {
       return '搜索';
     }
+    if (uri.host == 'reading.snssdk.com') {
+      final stage = switch (uri.path) {
+        '/reading/bookapi/search/cue/v' => '猜你想搜',
+        '/reading/bookapi/search/suggest/v' => '搜索联想',
+        '/reading/bookapi/plan/v' => '榜单',
+        '/reading/bookapi/bookmall/tab/v' => '推荐',
+        '/reading/bookapi/bookmall/cell/change/v' => '列表分页',
+        _ => null,
+      };
+      if (stage != null) return stage;
+    }
     if (uri.host.endsWith('.fqnovel.com') || uri.host == 'reading.snssdk.com') {
       if (uri.path.contains('/video_detail/')) {
         return '详情';
@@ -211,7 +221,8 @@ class SourceDiagnostics extends ChangeNotifier {
         category: 'DNS',
         title: 'DNS 解析错误',
         message: '无法解析域名 [$target]，系统未能获取到其 IP 地址',
-        advice: '域名无法被解析，通常为本地 DNS 故障、去广告规则（如 AdGuard/hosts）拦截或分流代理规则阻断，请尝试使用手机热点对照。',
+        advice:
+            '域名无法被解析，通常为本地 DNS 故障、去广告规则（如 AdGuard/hosts）拦截或分流代理规则阻断，请尝试使用手机热点对照。',
         code: 'DNS',
       );
     }
@@ -420,12 +431,7 @@ class SourceDiagnostics extends ChangeNotifier {
         code: failure,
       );
     } else if (status != 0 || body.isNotEmpty) {
-      final res = analyzeHttpResponse(
-        status,
-        body,
-        url: url,
-        stage: stage,
-      );
+      final res = analyzeHttpResponse(status, body, url: url, stage: stage);
       if (res.code.isNotEmpty) {
         analysis = res;
         failure = res.code;
@@ -481,7 +487,10 @@ class SourceDiagnostics extends ChangeNotifier {
         .replaceAll(RegExp(r'device_id=\d+'), 'device_id=***')
         .replaceAll(RegExp(r'install_id=\d+'), 'install_id=***')
         .replaceAll(RegExp(r'token=[A-Za-z0-9_-]+'), 'token=***')
-        .replaceAll(RegExp(r'bearer\s+[A-Za-z0-9_.-]+', caseSensitive: false), 'Bearer ***');
+        .replaceAll(
+          RegExp(r'bearer\s+[A-Za-z0-9_.-]+', caseSensitive: false),
+          'Bearer ***',
+        );
     if (sanitized.length > 200) {
       sanitized = '${sanitized.substring(0, 197)}...';
     }
@@ -499,7 +508,9 @@ class SourceDiagnostics extends ChangeNotifier {
     buffer.writeln('========================================');
     buffer.writeln('【基本信息】');
     buffer.writeln('  - 应用版本: $version');
-    buffer.writeln('  - 操作系统: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
+    buffer.writeln(
+      '  - 操作系统: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+    );
     buffer.writeln('  - 数据源指纹: hongguo · SHA256 $sourceHash');
     buffer.writeln('  - 诊断时间: ${DateTime.now().toUtc().toIso8601String()}');
     buffer.writeln('  - 数据安全说明: 报告仅含脱敏诊断记录，不含设备唯一标识、Token、Cookie 及响应原文');
@@ -509,7 +520,9 @@ class SourceDiagnostics extends ChangeNotifier {
     buffer.writeln('  - 总记录数: ${_entries.length} 项');
     buffer.writeln('  - 正常通过: ${successes.length} 项');
     buffer.writeln('  - 失败异常: ${failures.length} 项');
-    buffer.writeln('  - 整体判定: ${failures.isEmpty ? "✓ 正常，全链路网络连接与数据源通畅" : "✗ 存在异常，具体原因见下方分析"}');
+    buffer.writeln(
+      '  - 整体判定: ${failures.isEmpty ? "✓ 正常，全链路网络连接与数据源通畅" : "✗ 存在异常，具体原因见下方分析"}',
+    );
     buffer.writeln();
 
     if (failures.isNotEmpty) {
@@ -520,10 +533,14 @@ class SourceDiagnostics extends ChangeNotifier {
         final f = failures[i];
         buffer.writeln('【问题 ${i + 1}】阶段: ${f.stage}');
         buffer.writeln('  - 判定结论: ${f.displayTitle}');
-        if (f.errorCategory.isNotEmpty) buffer.writeln('  - 错误分类: ${f.errorCategory}');
+        if (f.errorCategory.isNotEmpty) {
+          buffer.writeln('  - 错误分类: ${f.errorCategory}');
+        }
         if (f.host.isNotEmpty) buffer.writeln('  - 涉及域名: ${f.host}');
         if (f.status > 0) buffer.writeln('  - HTTP 状态: ${f.status}');
-        if (f.errorMessage.isNotEmpty) buffer.writeln('  - 失败原因: ${f.errorMessage}');
+        if (f.errorMessage.isNotEmpty) {
+          buffer.writeln('  - 失败原因: ${f.errorMessage}');
+        }
         if (f.advice.isNotEmpty) buffer.writeln('  - 排查建议: ${f.advice}');
         buffer.writeln('  - 发生时间: ${f.at.toIso8601String()}');
         buffer.writeln('----------------------------------------');

@@ -84,6 +84,11 @@ public struct SearchRootView: View {
 
                     // 联想建议列表 (Suggestions)（增加上侧、左侧、右侧防裁切间距）
                     if !viewModel.suggestions.isEmpty {
+                        Text(viewModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "猜你想搜" : "搜索联想")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 60)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 22) {
                                 ForEach(viewModel.suggestions, id: \.self) { sug in
@@ -213,7 +218,10 @@ public struct SearchRootView: View {
                         }
                     }
                 }
-                .onAppear { runInitialSearchIfNeeded() }
+                .onAppear {
+                    runInitialSearchIfNeeded()
+                    if !viewModel.hasSearched { viewModel.onQueryChanged(viewModel.query) }
+                }
                 .onChange(of: initialQuery) { _ in runInitialSearchIfNeeded() }
                 .onChange(of: focusTrigger) { _ in
                     if let firstId = viewModel.searchResults.first?.id {

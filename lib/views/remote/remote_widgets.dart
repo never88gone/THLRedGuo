@@ -233,12 +233,16 @@ class _RemoteGridState extends State<RemoteGrid> {
         }
       } else if (itemTop < currentOffset + widget.padding.top) {
         targetOffset = itemTop - widget.padding.top;
-      } else if (itemBottom > currentOffset + viewportHeight - widget.padding.bottom) {
+      } else if (itemBottom >
+          currentOffset + viewportHeight - widget.padding.bottom) {
         targetOffset = itemBottom - viewportHeight + widget.padding.bottom;
       }
 
       if (targetOffset != null) {
-        final clamped = targetOffset.clamp(0.0, _scroll.position.maxScrollExtent);
+        final clamped = targetOffset.clamp(
+          0.0,
+          _scroll.position.maxScrollExtent,
+        );
         if (node.context == null) {
           _scroll.jumpTo(clamped);
         } else if ((clamped - currentOffset).abs() > 1.0) {
@@ -262,7 +266,9 @@ class _RemoteGridState extends State<RemoteGrid> {
             _target = null;
           } else {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && generation == _generation && node.context != null) {
+              if (mounted &&
+                  generation == _generation &&
+                  node.context != null) {
                 node.requestFocus();
                 _target = null;
               }
@@ -476,20 +482,48 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
   Timer? _debounce;
 
   static const _keys = [
-    'A', 'B', 'C', 'D', 'E', 'F',
-    'G', 'H', 'I', 'J', 'K', 'L',
-    'M', 'N', 'O', 'P', 'Q', 'R',
-    'S', 'T', 'U', 'V', 'W', 'X',
-    'Y', 'Z', '1', '2', '3', '4',
-    '5', '6', '7', '8', '9', '0',
+    'A',
+    'B',
+    'C',
+    'D',
+    'E',
+    'F',
+    'G',
+    'H',
+    'I',
+    'J',
+    'K',
+    'L',
+    'M',
+    'N',
+    'O',
+    'P',
+    'Q',
+    'R',
+    'S',
+    'T',
+    'U',
+    'V',
+    'W',
+    'X',
+    'Y',
+    'Z',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    '0',
   ];
 
   @override
   void initState() {
     super.initState();
-    if (_query.isNotEmpty) {
-      _fetchSuggestions(_query);
-    }
+    _fetchSuggestions(_query.trim());
   }
 
   @override
@@ -516,17 +550,13 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
         _query = '';
         _results = [];
       });
-      _debounce?.cancel();
+      _onQueryChanged();
     }
   }
 
   void _onQueryChanged() {
     _debounce?.cancel();
     final trimmed = _query.trim();
-    if (trimmed.isEmpty) {
-      setState(() => _results = []);
-      return;
-    }
     _debounce = Timer(const Duration(milliseconds: 250), () {
       _fetchSuggestions(trimmed);
     });
@@ -537,14 +567,14 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
     setState(() => _searching = true);
     try {
       final list = await widget.suggestions!(text);
-      if (mounted) {
+      if (mounted && _query.trim() == text) {
         setState(() {
           _results = list;
           _searching = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _searching = false);
+      if (mounted && _query.trim() == text) setState(() => _searching = false);
     }
   }
 
@@ -568,7 +598,9 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
         children: [
           Icon(Icons.tv_rounded, color: theme.colorScheme.primary),
           const SizedBox(width: 10),
-          Expanded(child: Text(widget.title, style: const TextStyle(fontSize: 20))),
+          Expanded(
+            child: Text(widget.title, style: const TextStyle(fontSize: 20)),
+          ),
           IconButton(
             tooltip: '关闭',
             icon: const Icon(Icons.close_rounded),
@@ -586,20 +618,30 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
               height: 56,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: .5),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: .5,
+                ),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: theme.colorScheme.primary.withValues(alpha: .3)),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: .3),
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.search_rounded, color: theme.colorScheme.primary, size: 28),
+                  Icon(
+                    Icons.search_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 28,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       _query.isEmpty ? '按遥控器输入剧名拼音头字母 (如: BFLC)' : _query,
                       style: TextStyle(
                         fontSize: 20,
-                        fontWeight: _query.isEmpty ? FontWeight.normal : FontWeight.bold,
+                        fontWeight: _query.isEmpty
+                            ? FontWeight.normal
+                            : FontWeight.bold,
                         color: _query.isEmpty
                             ? theme.hintColor
                             : theme.colorScheme.onSurface,
@@ -608,7 +650,10 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
                     ),
                   ),
                   if (_query.isNotEmpty) ...[
-                    Text('${_query.length} 字母', style: TextStyle(color: theme.hintColor, fontSize: 14)),
+                    Text(
+                      '${_query.length} 字母',
+                      style: TextStyle(color: theme.hintColor, fontSize: 14),
+                    ),
                     const SizedBox(width: 8),
                   ],
                 ],
@@ -628,12 +673,13 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
                         Expanded(
                           child: GridView.builder(
                             physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 6,
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
-                              childAspectRatio: 1.4,
-                            ),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 6,
+                                  mainAxisSpacing: 8,
+                                  crossAxisSpacing: 8,
+                                  childAspectRatio: 1.4,
+                                ),
                             itemCount: _keys.length,
                             itemBuilder: (context, index) {
                               final char = _keys[index];
@@ -646,7 +692,10 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
                                 child: Center(
                                   child: Text(
                                     char,
-                                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               );
@@ -661,7 +710,9 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
                               child: RemoteButton(
                                 label: '退格',
                                 icon: Icons.backspace_outlined,
-                                onPressed: _query.isNotEmpty ? _onBackspace : null,
+                                onPressed: _query.isNotEmpty
+                                    ? _onBackspace
+                                    : null,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -695,7 +746,11 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _query.isEmpty ? '历史搜索' : (_searching ? '正在匹配...' : '匹配结果 (${_results.length})'),
+                          _query.isEmpty
+                              ? '猜你想搜与历史搜索'
+                              : (_searching
+                                    ? '正在匹配...'
+                                    : '匹配结果 (${_results.length})'),
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -705,48 +760,59 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
                         const SizedBox(height: 10),
                         Expanded(
                           child: _query.isEmpty
-                              ? (widget.recentSearches.isEmpty
-                                  ? Center(
-                                      child: Text(
-                                        '暂无历史搜索\n用左侧键盘按首字母搜剧',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(color: theme.hintColor),
-                                      ),
-                                    )
-                                  : SingleChildScrollView(
-                                      child: Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: [
-                                          for (final item in widget.recentSearches)
-                                            RemoteButton(
-                                              key: ValueKey('recent-$item'),
-                                              label: item,
-                                              onPressed: () => _submit(item),
-                                            ),
-                                        ],
-                                      ),
-                                    ))
+                              ? (_results.isEmpty &&
+                                        widget.recentSearches.isEmpty
+                                    ? Center(
+                                        child: Text(
+                                          '暂无历史搜索\n用左侧键盘按首字母搜剧',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: theme.hintColor,
+                                          ),
+                                        ),
+                                      )
+                                    : SingleChildScrollView(
+                                        child: Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            for (final item in {
+                                              ..._results,
+                                              ...widget.recentSearches,
+                                            })
+                                              RemoteButton(
+                                                key: ValueKey('recent-$item'),
+                                                label: item,
+                                                onPressed: () => _submit(item),
+                                              ),
+                                          ],
+                                        ),
+                                      ))
                               : (_results.isEmpty
-                                  ? Center(
-                                      child: Text(
-                                        _searching ? '搜索中...' : '按【搜索】直接查找 “$_query”',
-                                        style: TextStyle(color: theme.hintColor),
-                                      ),
-                                    )
-                                  : ListView.separated(
-                                      itemCount: _results.length,
-                                      separatorBuilder: (_, _) => const SizedBox(height: 6),
-                                      itemBuilder: (context, index) {
-                                        final item = _results[index];
-                                        return RemoteButton(
-                                          key: ValueKey('suggest-$index'),
-                                          label: item,
-                                          icon: Icons.movie_outlined,
-                                          onPressed: () => _submit(item),
-                                        );
-                                      },
-                                    )),
+                                    ? Center(
+                                        child: Text(
+                                          _searching
+                                              ? '搜索中...'
+                                              : '按【搜索】直接查找 “$_query”',
+                                          style: TextStyle(
+                                            color: theme.hintColor,
+                                          ),
+                                        ),
+                                      )
+                                    : ListView.separated(
+                                        itemCount: _results.length,
+                                        separatorBuilder: (_, _) =>
+                                            const SizedBox(height: 6),
+                                        itemBuilder: (context, index) {
+                                          final item = _results[index];
+                                          return RemoteButton(
+                                            key: ValueKey('suggest-$index'),
+                                            label: item,
+                                            icon: Icons.movie_outlined,
+                                            onPressed: () => _submit(item),
+                                          );
+                                        },
+                                      )),
                         ),
                       ],
                     ),

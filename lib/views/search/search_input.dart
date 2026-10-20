@@ -31,6 +31,43 @@ class _SearchInputState extends State<SearchInput> {
   Completer<Iterable<String>>? _pending;
   int _generation = 0;
   final _cache = <String, List<String>>{};
+  bool _guessLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocus);
+  }
+
+  void _onFocus() {
+    if (!mounted) return;
+    setState(() {});
+    if (_focus.hasFocus && widget.controller.text.trim().isEmpty) {
+      _loadGuesses();
+    }
+  }
+
+  Future<void> _loadGuesses() async {
+    if (_guessLoading || _cache.containsKey('') || widget.suggestions == null) {
+      return;
+    }
+    _guessLoading = true;
+    try {
+      final words = await widget.suggestions!('');
+      if (mounted && widget.suggestions != null) {
+        setState(() {
+          _cache[''] = words
+              .where((word) => word.trim().isNotEmpty)
+              .toSet()
+              .take(10)
+              .toList();
+        });
+      }
+    } catch (_) {
+    } finally {
+      _guessLoading = false;
+    }
+  }
 
   void _cancel() {
     _timer?.cancel();
@@ -50,6 +87,7 @@ class _SearchInputState extends State<SearchInput> {
   @override
   void dispose() {
     _cancel();
+    _focus.removeListener(_onFocus);
     _focus.dispose();
     super.dispose();
   }
@@ -124,89 +162,128 @@ class _SearchInputState extends State<SearchInput> {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => RawAutocomplete<String>(
-      textEditingController: widget.controller,
-      focusNode: _focus,
-      optionsBuilder: _options,
-      onSelected: _submit,
-      fieldViewBuilder: (context, controller, focus, submitted) => TextField(
-        controller: controller,
-        focusNode: focus,
-        autofocus: widget.autofocus,
-        textInputAction: TextInputAction.search,
-        onChanged: (value) {
-          widget.onChanged?.call(value);
-          setState(() {});
-        },
-        onSubmitted: _submit,
-        decoration: InputDecoration(
-          hintText: widget.hint,
-          prefixIcon: const Icon(Icons.search_rounded),
-          suffixIcon: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (controller.text.isNotEmpty)
-                IconButton(
-                  tooltip: '清空搜索',
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () {
-                    _cancel();
-                    controller.clear();
-                    widget.onChanged?.call('');
-                    setState(() {});
-                  },
+    builder: (context, constraints) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        RawAutocomplete<String>(
+          textEditingController: widget.controller,
+          focusNode: _focus,
+          optionsBuilder: _options,
+          onSelected: _submit,
+          fieldViewBuilder: (context, controller, focus, submitted) =>
+              TextField(
+                controller: controller,
+                focusNode: focus,
+                autofocus: widget.autofocus,
+                textInputAction: TextInputAction.search,
+                onChanged: (value) {
+                  widget.onChanged?.call(value);
+                  setState(() {});
+                  if (value.trim().isEmpty) _loadGuesses();
+                },
+                onSubmitted: _submit,
+                decoration: InputDecoration(
+                  hintText: widget.hint,
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (controller.text.isNotEmpty)
+                        IconButton(
+                          tooltip: '清空搜索',
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () {
+                            _cancel();
+                            controller.clear();
+                            widget.onChanged?.call('');
+                            setState(() {});
+                            _loadGuesses();
+                          },
+                        ),
+                      IconButton(
+                        tooltip: '搜索',
+                        icon: const Icon(Icons.arrow_forward_rounded),
+                        onPressed: () => _submit(controller.text),
+                      ),
+                    ],
+                  ),
                 ),
-              IconButton(
-                tooltip: '搜索',
-                icon: const Icon(Icons.arrow_forward_rounded),
-                onPressed: () => _submit(controller.text),
               ),
-            ],
-          ),
+          optionsViewBuilder: (context, selected, options) {
+            final values = options.toList();
+            final available =
+                MediaQuery.sizeOf(context).height -
+                MediaQuery.viewInsetsOf(context).bottom;
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 8,
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  side: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.35),
+                    width: 0.8,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: SizedBox(
+                  width: constraints.maxWidth,
+                  height: min(
+                    min(300.0, max(96.0, available * .45)),
+                    values.length * 48.0,
+                  ),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemExtent: 48,
+                    itemCount: values.length,
+                    itemBuilder: (context, index) => ListTile(
+                      key: ValueKey('search-suggestion-$index'),
+                      selected:
+                          AutocompleteHighlightedOption.of(context) == index,
+                      leading: const Icon(Icons.search, size: 18),
+                      title: _highlight(values[index]),
+                      onTap: () => selected(values[index]),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
-      ),
-      optionsViewBuilder: (context, selected, options) {
-        final values = options.toList();
-        final available =
-            MediaQuery.sizeOf(context).height -
-            MediaQuery.viewInsetsOf(context).bottom;
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 8,
-            color: Theme.of(context).colorScheme.surfaceContainerHigh,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: BorderSide(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outlineVariant.withValues(alpha: 0.35),
-                width: 0.8,
-              ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: SizedBox(
-              width: constraints.maxWidth,
-              height: min(
-                min(300.0, max(96.0, available * .45)),
-                values.length * 48.0,
-              ),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                itemExtent: 48,
-                itemCount: values.length,
-                itemBuilder: (context, index) => ListTile(
-                  key: ValueKey('search-suggestion-$index'),
-                  selected: AutocompleteHighlightedOption.of(context) == index,
-                  leading: const Icon(Icons.search, size: 18),
-                  title: _highlight(values[index]),
-                  onTap: () => selected(values[index]),
+        if (_focus.hasFocus &&
+            widget.controller.text.trim().isEmpty &&
+            widget.suggestions != null &&
+            (_cache['']?.isNotEmpty ?? false))
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('猜你想搜', style: Theme.of(context).textTheme.labelMedium),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final word in _cache['']!)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ActionChip(
+                            label: Text(word),
+                            onPressed: () => _submit(word),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        );
-      },
+      ],
     ),
   );
 }

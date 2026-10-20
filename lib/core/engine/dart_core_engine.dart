@@ -232,11 +232,11 @@ class DartCoreEngine {
         return {'items': <Map<String, dynamic>>[], 'page': 1, 'hasMore': false};
       case 'suggestions':
         final query = input['query'] as String? ?? '';
-        return {'items': _getSuggestions(query)};
+        return {'items': await _getSuggestions(query)};
       case 'recommendations':
         return await _getRecommendations(input);
       case 'rankingBoards':
-        return {'items': _getRankingBoards()};
+        return {'items': await _getRankingBoards()};
       case 'rankings':
         return await _getRankings(input);
 
@@ -541,7 +541,9 @@ class DartCoreEngine {
       'title': title,
       'cover': vod['vod_pic']?.toString() ?? '',
       'description': desc,
-      'episodes': episodes,
+      'episodes': (vod['vod_episodes'] as num?)?.toInt() ?? episodes,
+      'heat': vod['vod_heat']?.toString() ?? '',
+      'views': vod['vod_views']?.toString() ?? '',
       'category': category.isNotEmpty ? category : '短剧',
       'tags': tags,
     };
@@ -626,149 +628,57 @@ class DartCoreEngine {
     return result;
   }
 
-  List<String> _getSuggestions(String query) {
-    return const [];
+  Future<List<String>> _getSuggestions(String query) async {
+    final runtime = await _getSpiderRuntime('hongguo');
+    if (runtime == null) throw StateError('搜索数据源不可用');
+    return runtime.suggestions(query);
   }
 
   Future<Map<String, dynamic>> _getRecommendations(
     Map<String, dynamic> input,
   ) async {
-    final rawCategory = input['category'] as String? ?? 'short_play';
+    final source = input['source'] as String? ?? 'hongguo';
+    final genre = input['category'] as String? ?? 'short_play';
     final page = (input['page'] as num?)?.toInt() ?? 1;
-    String source = input['source'] as String? ?? '';
-    if (source.isEmpty) {
-      if (_sourceScripts.isNotEmpty) {
-        source = _sourceScripts.keys.first;
-      } else {
-        source = 'hongguo';
-      }
-    }
-
-    String targetCat = 'real-drama';
-    if (source == 'hongguo') {
-      targetCat = switch (rawCategory) {
-        'short_play' || 'real_drama' || 'real-drama' => 'real-drama',
-        'comic_series' || 'comic-drama' || 'comic' => 'comic-drama',
-        'ai_series' || 'ai-drama' => 'ai-drama',
-        _ => 'real-drama',
-      };
-    } else {
-      targetCat = rawCategory == 'short_play' ? 'all' : rawCategory;
-    }
-
-    final rt = await _getSpiderRuntime(source);
-    if (rt == null) {
-      return {
-        'items': <Map<String, dynamic>>[],
-        'page': page,
-        'hasMore': false,
-        'warning': '请先在数据源管理中导入并启用 [$source] 数据源',
-      };
-    }
-
-    try {
-      final res = await rt.category(targetCat, page);
-      final items = res.list
-          .map((vod) => _mapVodToDrama(source, vod, targetCat))
-          .toList();
-      return {
-        'items': items,
-        'page': page,
-        'hasMore': res.hasMore,
-        'warning': '',
-      };
-    } catch (e) {
-      return {
-        'items': <Map<String, dynamic>>[],
-        'page': page,
-        'hasMore': false,
-        'warning': '获取推荐数据失败: $e',
-      };
-    }
+    final runtime = await _getSpiderRuntime(source);
+    if (runtime == null) throw StateError('推荐数据源不可用');
+    final result = await runtime.discoveryPage('recommendations', genre, page);
+    return {
+      'items': result.list
+          .map((vod) => _mapVodToDrama(source, vod, genre))
+          .toList(),
+      'page': result.page,
+      'hasMore': result.hasMore,
+      'warning': '',
+    };
   }
 
-  List<Map<String, dynamic>> _getRankingBoards() {
-    return [
-      {
-        'id': 'hongguo-hot',
-        'name': '热播榜',
-        'description': '全网热播短剧总榜',
-        'source': 'hongguo',
-      },
-      {
-        'id': 'hongguo-new',
-        'name': '新剧榜',
-        'description': '每日精选上线短剧',
-        'source': 'hongguo',
-      },
-      {
-        'id': 'hongguo-search',
-        'name': '热搜榜',
-        'description': '实时用户检索飙升榜',
-        'source': 'hongguo',
-      },
-    ];
+  Future<List<Map<String, dynamic>>> _getRankingBoards() async {
+    final runtime = await _getSpiderRuntime('hongguo');
+    if (runtime == null) throw StateError('榜单数据源不可用');
+    return runtime.rankingBoards();
   }
 
   Future<Map<String, dynamic>> _getRankings(Map<String, dynamic> input) async {
-    final board = input['board'] as String? ?? 'hongguo-hot';
+    final board = input['board'] as String? ?? '';
     final page = (input['page'] as num?)?.toInt() ?? 1;
-
-    String source = 'hongguo';
-    String category = 'real-drama';
-
-    if (board.startsWith('hongguo')) {
-      source = 'hongguo';
-      if (board.contains('new')) {
-        category = 'comic-drama';
-      } else if (board.contains('search')) {
-        category = 'ai-drama';
-      } else {
-        category = 'real-drama';
-      }
-    } else if (board.contains('-')) {
-      source = board.split('-').first;
-      category = 'all';
-    }
-
-    final rt = await _getSpiderRuntime(source);
-    if (rt == null) {
-      return {
-        'items': <Map<String, dynamic>>[],
-        'page': page,
-        'hasMore': false,
-        'warning': '请先在数据源管理中导入并启用 [$source] 数据源',
-      };
-    }
-
-    try {
-      final res = await rt.category(category, page);
-      final items = <Map<String, dynamic>>[];
-      var rank = (page - 1) * 20 + 1;
-      for (final vod in res.list) {
-        final drama = _mapVodToDrama(source, vod, category);
-        final remarks = vod['vod_remarks']?.toString().trim() ?? '';
-        final heat = (99.5 - (rank - 1) * 0.8)
-            .clamp(62.0, 99.8)
-            .toStringAsFixed(1);
-        final metric = remarks.isNotEmpty ? remarks : '热度 $heat万';
-        items.add({'rank': rank++, 'drama': drama, 'metric': metric});
-      }
-      return {
-        'items': items,
-        'page': page,
-        'hasMore': res.hasMore,
-        'updatedText': '今日更新',
-        'warning': '',
-      };
-    } catch (e) {
-      return {
-        'items': <Map<String, dynamic>>[],
-        'page': page,
-        'hasMore': false,
-        'warning': '获取榜单失败: $e',
-      };
-    }
+    final runtime = await _getSpiderRuntime('hongguo');
+    if (runtime == null) throw StateError('榜单数据源不可用');
+    final result = await runtime.discoveryPage('rankings', board, page);
+    return {
+      'items': [
+        for (final vod in result.list)
+          {
+            'rank': (vod['vod_rank'] as num?)?.toInt() ?? 0,
+            'drama': _mapVodToDrama('hongguo', vod, ''),
+            'metric': vod['vod_metric']?.toString() ?? '',
+          },
+      ],
+      'page': result.page,
+      'hasMore': result.hasMore,
+      'updatedText': result.updatedText,
+      'warning': '',
+    };
   }
 
   Future<Map<String, dynamic>> _getDetail(Map<String, dynamic> drama) async {

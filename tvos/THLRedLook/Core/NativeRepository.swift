@@ -48,7 +48,6 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
     }
 
     public func loadSuggestions(query: String) async throws -> [String] {
-        guard !query.isEmpty else { return [] }
         let resp = try await bridge.request(action: "suggestions", payload: ["query": query])
         return resp["items"] as? [String] ?? []
     }
@@ -161,62 +160,46 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
     }
 
     public func loadRankingBoards() async throws -> [RankingBoard] {
-        do {
-            let resp = try await bridge.request(action: "rankingBoards", payload: [:])
-            if let items = resp["items"] as? [[String: Any]] {
-                let data = try JSONSerialization.data(withJSONObject: items)
-                let allBoards = (try? JSONDecoder().decode([RankingBoard].self, from: data)) ?? []
-                // tvOS 平台安全防护：严格过滤不适合客厅大屏的榜单
-                let boards = RankingBoard.filterForTV(allBoards)
-                if !boards.isEmpty {
-                    return boards
-                }
-            }
-        } catch {
-            // 失败时回退到默认有效榜单
-        }
-        return RankingBoard.filterForTV(RankingBoard.defaults)
+        let response = try await bridge.request(action: "rankingBoards", payload: [:])
+        guard let items = response["items"] as? [[String: Any]] else { return [] }
+        let data = try JSONSerialization.data(withJSONObject: items)
+        return RankingBoard.filterForTV(try JSONDecoder().decode([RankingBoard].self, from: data))
     }
 
     public func loadRankings(board: String, page: Int = 1) async throws -> [Drama] {
+        try await loadRankingRows(board: board, page: page).map(\.drama)
+    }
+
+    public func loadRankingRows(board: String, page: Int = 1) async throws -> [RankedDrama] {
+        try await loadRankingPage(board: board, page: page).items
+    }
+
+    public func loadRankingPage(board: String, page: Int = 1) async throws -> DiscoveryPage<RankedDrama> {
         let lowerBoard = board.lowercased()
         if !lowerBoard.hasPrefix("hongguo") {
-            return []
+            return DiscoveryPage(items: [], page: page, hasMore: false)
         }
 
         let resp = try await bridge.request(action: "rankings", payload: [
             "board": board,
             "page": max(1, page)
         ])
-        guard let items = resp["items"] as? [[String: Any]] else { return [] }
+        guard let items = resp["items"] as? [[String: Any]] else {
+            throw NSError(domain: "THLRedLook.Source", code: -1, userInfo: [NSLocalizedDescriptionKey: "官方榜单数据无效"])
+        }
         let data = try JSONSerialization.data(withJSONObject: items)
         
-        func sanitize(_ list: [Drama]) -> [Drama] {
-            list.filter { drama in
-                let src = drama.source.lowercased()
-                return src.isEmpty || src == "hongguo"
-            }
+        let rows = try JSONDecoder().decode([RankedDrama].self, from: data).filter {
+            $0.drama.source.isEmpty || $0.drama.source.lowercased() == "hongguo"
         }
-
-        // 尝试从嵌套结构 [{ "rank": 1, "drama": Drama, ... }] 中提取真实剧集
-        struct RankingRowResponse: Decodable {
-            let rank: Int?
-            let drama: Drama?
-            let metric: String?
-        }
-        if let rows = try? JSONDecoder().decode([RankingRowResponse].self, from: data) {
-            let dramas = rows.compactMap { $0.drama }
-            if !dramas.isEmpty {
-                return sanitize(dramas)
-            }
-        }
-        
-        // 兜底直接解析剧集列表
-        let rawDramas = (try? JSONDecoder().decode([Drama].self, from: data)) ?? []
-        return sanitize(rawDramas)
+        return DiscoveryPage(items: rows, page: resp["page"] as? Int ?? page, hasMore: resp["hasMore"] as? Bool ?? false)
     }
 
     public func loadRecommendations(category: String) async throws -> [Drama] {
+        try await loadRecommendationPage(category: category).items
+    }
+
+    public func loadRecommendationPage(category: String, page: Int = 1) async throws -> DiscoveryPage<Drama> {
         // 将界面分类文案映射为 CatPawOpen Spider 真实分类键值
         let genreKey: String
         switch category {
@@ -229,10 +212,13 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
         default:
             genreKey = "real-drama"
         }
-        let resp = try await bridge.request(action: "recommendations", payload: ["category": genreKey])
-        guard let items = resp["items"] as? [[String: Any]] else { return [] }
+        let resp = try await bridge.request(action: "recommendations", payload: ["category": genreKey, "page": max(1, page)])
+        guard let items = resp["items"] as? [[String: Any]] else {
+            throw NSError(domain: "THLRedLook.Source", code: -1, userInfo: [NSLocalizedDescriptionKey: "官方推荐数据无效"])
+        }
         let data = try JSONSerialization.data(withJSONObject: items)
-        return (try? JSONDecoder().decode([Drama].self, from: data)) ?? []
+        let dramas = try JSONDecoder().decode([Drama].self, from: data)
+        return DiscoveryPage(items: dramas, page: resp["page"] as? Int ?? page, hasMore: resp["hasMore"] as? Bool ?? false)
     }
 
     public func loadDanmaku(plan: PlaybackPlan, startMs: Int64, durationMs: Int64) async throws -> [DanmakuItem] {

@@ -409,7 +409,7 @@ public actor NativeBridge {
         }
         let desc = (vod["vod_content"] as? String) ?? (vod["desc"] as? String) ?? ""
         let remark = (vod["vod_remarks"] as? String) ?? (vod["remarks"] as? String) ?? ""
-        let year = (vod["vod_year"] as? String) ?? "2024"
+        let year = (vod["vod_year"] as? String) ?? ""
 
         var epCount = 0
         if let match = remark.range(of: "(\\d+)", options: .regularExpression) {
@@ -423,12 +423,12 @@ public actor NativeBridge {
             "title": title,
             "description": desc,
             "cover": cover,
-            "episodes": epCount,
+            "episodes": vod["vod_episodes"] as? Int ?? epCount,
             "category": "short_play",
-            "heat": remark.isEmpty ? "热播" : remark,
-            "views": "100万+",
+            "heat": vod["vod_heat"] as? String ?? "",
+            "views": vod["vod_views"] as? String ?? "",
             "onlineDate": year,
-            "tags": ["爽剧", "热门"],
+            "tags": (vod["vod_tag"] as? String)?.components(separatedBy: "·").filter { !$0.isEmpty } ?? [],
             "releaseStatus": remark
         ]
     }
@@ -846,97 +846,42 @@ public actor NativeBridge {
             }
             return result
 
-        case "rankingBoards":
-            let src = activeSourceId.isEmpty ? "hongguo" : activeSourceId
+        case "rankingBoards", "rankings", "recommendations", "suggestions":
+            let source = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? (activeSourceId.isEmpty ? "hongguo" : activeSourceId)
+            guard let context = getOrCreateContext(sourceId: source) else {
+                throw NSError(domain: "THLRedLook.Source", code: -1, userInfo: [NSLocalizedDescriptionKey: "数据源不可用"])
+            }
+            let page = max(1, payload["page"] as? Int ?? 1)
+            let arguments: [Any]
+            switch action {
+            case "rankings": arguments = [payload["board"] as? String ?? "", page]
+            case "recommendations": arguments = [payload["category"] as? String ?? "real-drama", page]
+            case "suggestions": arguments = [payload["query"] as? String ?? ""]
+            default: arguments = []
+            }
+            let expression = try spiderExpression(action, arguments)
+            let evaluated = evalAsync(context: context, scriptExpr: expression)
+            guard evaluated?["ok"] as? Bool == true, let result = evaluated?["data"] as? [String: Any] else {
+                let message = evaluated?["error"] as? String ?? "官方列表响应超时，请重试"
+                let code = SourceDiagnostics.safeCode(evaluated?["code"])
+                diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: action == "suggestions" ? "搜索建议执行" : "发现列表执行", errorCode: code.isEmpty ? "JS_EXECUTION" : code))
+                throw NSError(domain: "THLRedLook.Source", code: -2, userInfo: [NSLocalizedDescriptionKey: message])
+            }
+            if action == "rankingBoards" || action == "suggestions" { return result }
+            let rows = result["list"] as? [[String: Any]] ?? []
+            let items: [[String: Any]] = rows.map { vod in
+                let drama = mapVodToDrama(vod: vod, sourceId: source)
+                if action == "rankings" {
+                    return ["rank": vod["vod_rank"] as? Int ?? 0, "drama": drama, "metric": vod["vod_metric"] as? String ?? ""]
+                }
+                return drama
+            }
             return [
-                "items": [
-                    [
-                        "id": "\(src)-hot",
-                        "name": "总热播榜",
-                        "category": "hot",
-                        "source": src,
-                        "description": "实时综合热度排行榜"
-                    ],
-                    [
-                        "id": "\(src)-real",
-                        "name": "真人剧榜",
-                        "category": "real",
-                        "source": src,
-                        "description": "高口碑真人短剧热门排行"
-                    ],
-                    [
-                        "id": "\(src)-comic",
-                        "name": "漫剧榜",
-                        "category": "comic",
-                        "source": src,
-                        "description": "精彩动态漫剧精选排行"
-                    ],
-                    [
-                        "id": "\(src)-ai",
-                        "name": "AI剧榜",
-                        "category": "ai",
-                        "source": src,
-                        "description": "前沿生成式 AI 剧情剧集排行"
-                    ]
-                ]
+                "items": items, "page": result["page"] as? Int ?? page,
+                "hasMore": result["hasMore"] as? Bool ?? false,
+                "updatedText": result["updatedText"] as? String ?? ""
             ]
-
-        case "rankings":
-            let src = activeSourceId.isEmpty ? "hongguo" : activeSourceId
-            let boardId = ((payload["board"] as? String) ?? "\(src)-hot").lowercased()
-            let catTarget: String
-            let pageNum: Int
-            if boardId.contains("comic") {
-                catTarget = "comic-drama"
-                pageNum = 1
-            } else if boardId.contains("ai") {
-                catTarget = "ai-drama"
-                pageNum = 1
-            } else if boardId.contains("real") {
-                catTarget = "real-drama"
-                pageNum = 1
-            } else {
-                // 总热播榜：综合拉取
-                catTarget = "real-drama"
-                pageNum = 2
-            }
-            let catReq: [String: Any] = ["source": src, "category": catTarget, "page": pageNum]
-            let catRes = try await self.request(action: "catalog", payload: catReq)
-            var items = catRes["items"] as? [[String: Any]] ?? []
-            if items.isEmpty && pageNum > 1 {
-                let fallbackRes = try await self.request(action: "catalog", payload: ["source": src, "category": catTarget, "page": 1])
-                items = fallbackRes["items"] as? [[String: Any]] ?? []
-            }
-
-            var rankItems: [[String: Any]] = []
-            for (idx, drama) in items.prefix(20).enumerated() {
-                rankItems.append([
-                    "rank": idx + 1,
-                    "drama": drama,
-                    "metric": "\(max(1, 999 - idx * 28))万热度"
-                ])
-            }
-            return ["items": rankItems]
-
-        case "recommendations":
-            let src = activeSourceId.isEmpty ? "hongguo" : activeSourceId
-            let rawCat = (payload["category"] as? String) ?? "real-drama"
-            let catTarget: String
-            switch rawCat {
-            case "漫剧", "comic-drama", "comic_series":
-                catTarget = "comic-drama"
-            case "AI 剧", "AI剧", "ai-drama", "ai_series":
-                catTarget = "ai-drama"
-            default:
-                catTarget = "real-drama"
-            }
-            let catReq: [String: Any] = ["source": src, "category": catTarget, "page": 1]
-            let catRes = try await self.request(action: "catalog", payload: catReq)
-            let items = catRes["items"] as? [[String: Any]] ?? []
-            return ["items": items]
-
-        case "suggestions":
-            return ["items": []]
 
         default:
             return ["ok": true]

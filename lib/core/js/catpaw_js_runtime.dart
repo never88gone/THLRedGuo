@@ -20,6 +20,7 @@ class CatPawCategoryResult {
   final int total;
   final List<Map<String, dynamic>> list;
   final bool hasMore;
+  final String updatedText;
 
   const CatPawCategoryResult({
     required this.page,
@@ -28,6 +29,7 @@ class CatPawCategoryResult {
     this.total = 0,
     required this.list,
     required this.hasMore,
+    this.updatedText = '',
   });
 }
 
@@ -241,7 +243,9 @@ globalThis.console = {
     _rt.evaluate(_fetchShim);
   }
 
-  Future<Map<String, dynamic>> _executeFetch(Map<String, dynamic> params) async {
+  Future<Map<String, dynamic>> _executeFetch(
+    Map<String, dynamic> params,
+  ) async {
     if (_isDisposed) {
       return {'status': 0, 'headers': <String, String>{}, 'body': ''};
     }
@@ -264,8 +268,10 @@ globalThis.console = {
       final uri = Uri.parse(url);
       final abort = Completer<void>();
       _requestAborts.add(abort);
-      final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 12000)
-          .clamp(1, 12000);
+      final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 12000).clamp(
+        1,
+        12000,
+      );
       final timer = Timer(Duration(milliseconds: timeoutMs), () {
         timedOut = true;
         if (!abort.isCompleted) abort.complete();
@@ -416,6 +422,54 @@ globalThis.console = {
     vod ??= map;
     return CatPawDetailResult(
       vod: Map<String, dynamic>.from(vod is Map ? vod : {'vod_id': id}),
+    );
+  }
+
+  Future<Map<String, dynamic>> _discovery(
+    String method,
+    List<Object> arguments,
+  ) async {
+    _assertReady();
+    final result = await _evalAsync(
+      'typeof spider.$method === "function" ? spider.$method.apply(spider, ${jsonEncode(arguments)}) : Promise.reject(new Error("当前数据源暂不支持此功能"))',
+      timeout: const Duration(seconds: 60),
+    );
+    if (result is! Map) throw const FormatException('官方列表数据无效');
+    return Map<String, dynamic>.from(result);
+  }
+
+  Future<List<String>> suggestions(String query) async {
+    final result = await _discovery('suggestions', [query]);
+    return (result['items'] as List? ?? const [])
+        .whereType<String>()
+        .where((item) => item.trim().isNotEmpty)
+        .toSet()
+        .take(10)
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> rankingBoards() async {
+    final result = await _discovery('rankingBoards', []);
+    return _toListOfMaps(result['items']);
+  }
+
+  Future<CatPawCategoryResult> discoveryPage(
+    String method,
+    String key,
+    int page,
+  ) async {
+    if (!{'rankings', 'recommendations'}.contains(method)) {
+      throw ArgumentError.value(method);
+    }
+    final result = await _discovery(method, [key, page]);
+    final returnedPage = (result['page'] as num?)?.toInt() ?? page;
+    final pageCount = (result['pagecount'] as num?)?.toInt() ?? returnedPage;
+    return CatPawCategoryResult(
+      list: _toListOfMaps(result['list']),
+      page: returnedPage,
+      pageCount: pageCount,
+      hasMore: result['hasMore'] as bool? ?? returnedPage < pageCount,
+      updatedText: result['updatedText']?.toString() ?? '',
     );
   }
 
@@ -581,20 +635,22 @@ globalThis.console = {
                   final req = Map<String, dynamic>.from(item);
                   final id = req['id'];
                   unawaited(
-                    _executeFetch(req).then((resp) {
-                      if (!_isDisposed && cancellation == _cancellation) {
-                        final safeJson = jsonEncode(resp)
-                            .replaceAll('\u2028', '\\u2028')
-                            .replaceAll('\u2029', '\\u2029');
-                        _rt.evaluate('__resolveFetch($id, $safeJson);');
-                      }
-                    }).catchError((err) {
-                      if (!_isDisposed && cancellation == _cancellation) {
-                        _rt.evaluate(
-                          '__rejectFetch($id, ${jsonEncode(err.toString())});',
-                        );
-                      }
-                    }),
+                    _executeFetch(req)
+                        .then((resp) {
+                          if (!_isDisposed && cancellation == _cancellation) {
+                            final safeJson = jsonEncode(resp)
+                                .replaceAll('\u2028', '\\u2028')
+                                .replaceAll('\u2029', '\\u2029');
+                            _rt.evaluate('__resolveFetch($id, $safeJson);');
+                          }
+                        })
+                        .catchError((err) {
+                          if (!_isDisposed && cancellation == _cancellation) {
+                            _rt.evaluate(
+                              '__rejectFetch($id, ${jsonEncode(err.toString())});',
+                            );
+                          }
+                        }),
                   );
                 }
               }

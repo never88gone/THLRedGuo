@@ -1,5 +1,17 @@
 import Foundation
 
+public struct RankedDrama: Decodable {
+    public let rank: Int
+    public let drama: Drama
+    public let metric: String
+}
+
+public struct DiscoveryPage<Item> {
+    public let items: [Item]
+    public let page: Int
+    public let hasMore: Bool
+}
+
 public struct RankingBoard: Identifiable, Hashable, Codable {
     public let id: String
     public let name: String
@@ -12,13 +24,6 @@ public struct RankingBoard: Identifiable, Hashable, Codable {
         self.description = description
         self.source = source
     }
-
-    public static let defaults: [RankingBoard] = [
-        RankingBoard(id: "hongguo-hot", name: "总热播榜", description: "当下最受欢迎的短剧热播排行", source: "hongguo"),
-        RankingBoard(id: "hongguo-real", name: "真人剧榜", description: "高口碑真人短剧热门排行", source: "hongguo"),
-        RankingBoard(id: "hongguo-comic", name: "漫剧榜", description: "精彩动态漫剧精选排行", source: "hongguo"),
-        RankingBoard(id: "hongguo-ai", name: "AI剧榜", description: "前沿生成式 AI 剧情剧集排行", source: "hongguo")
-    ]
 
     /// 判断榜单是否属于指定的数据源（严格过滤异构数据源类型）
     public func matches(source: String) -> Bool {
@@ -34,13 +39,6 @@ public struct RankingBoard: Identifiable, Hashable, Codable {
             return true
         }
         return false
-    }
-
-    /// 获取特定数据源的专属默认/兜底榜单（未配置数据源时返回空列表）
-    public static func defaults(for source: String) -> [RankingBoard] {
-        let cleanSource = source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard cleanSource.isEmpty || cleanSource == "hongguo" else { return [] }
-        return defaults
     }
 
     public var isAllowedOnTV: Bool {

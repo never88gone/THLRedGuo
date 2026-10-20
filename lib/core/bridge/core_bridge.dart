@@ -190,6 +190,8 @@ class NativeRepository extends AppRepository {
   final _readOwner = DateTime.now().microsecondsSinceEpoch.toString();
   int _readSequence = 0;
   final _activeReads = <String, int>{};
+  final _recommendationPages = <String, CatalogPage>{};
+  final _recommendationRequests = <String, int>{};
 
   @override
   Future<Map<String, dynamic>> lan(
@@ -346,15 +348,35 @@ class NativeRepository extends AppRepository {
               : (JsSourceService.current?.sources.firstOrNull?.id ??
                     'hongguo'));
     _authorize(activeSource);
-    return CatalogPage.fromJson(
+    final key = '$activeSource:$genre';
+    final previous = more && !force ? _recommendationPages[key] : null;
+    final ticket = (_recommendationRequests[key] ?? 0) + 1;
+    _recommendationRequests[key] = ticket;
+    final next = CatalogPage.fromJson(
       await _read('recommendations-$activeSource-$genre', {
         'action': 'recommendations',
         'category': genre,
         'source': activeSource,
         'command': more ? 'more' : '',
         'force': force,
+        'page': previous == null ? 1 : previous.page + 1,
       }),
     );
+    final result = CatalogPage(
+      <String, Drama>{
+        if (previous != null)
+          for (final drama in previous.items) drama.id: drama,
+        for (final drama in next.items) drama.id: drama,
+      }.values.toList(),
+      page: next.page,
+      hasMore: next.hasMore,
+      warning: next.warning,
+      fresh: next.fresh,
+    );
+    if (_recommendationRequests[key] == ticket) {
+      _recommendationPages[key] = result;
+    }
+    return result;
   }
 
   @override
