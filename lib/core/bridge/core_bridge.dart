@@ -115,6 +115,7 @@ abstract class AppRepository {
   Future<SourceStatus> cancelSourceJob(String source) async =>
       throw AppFailure('当前环境不支持站源管理');
   Future<List<String>> suggestions(String query) async => const [];
+  Future<List<SeriesSeason>> seriesSeasons(Drama drama) async => const [];
   Future<Map<String, dynamic>> storage() async => {};
   Future<String> downloadDirectory() async =>
       (await storage())['directory'] as String? ?? '';
@@ -485,6 +486,19 @@ class NativeRepository extends AppRepository {
   }
 
   @override
+  Future<List<SeriesSeason>> seriesSeasons(Drama drama) async {
+    _authorize(drama.source);
+    final result = await _read('seriesSeasons-${drama.id}', {
+      'action': 'seriesSeasons',
+      'drama': drama.toJson(),
+    });
+    return (result['items'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => SeriesSeason.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
+
+  @override
   Future<String> downloadDirectory() async {
     _downloadPermission();
     return (await _call({'action': 'downloadDirectory'}))['directory']
@@ -596,6 +610,7 @@ class NativeRepository extends AppRepository {
         'prepareCover',
         'detail',
         'metadata',
+        'seriesSeasons',
         'resolve',
         'preload',
         'prepareHandoff',
@@ -663,6 +678,7 @@ class NativeRepository extends AppRepository {
             'suggestions',
             'recommendations',
             'metadata',
+            'seriesSeasons',
             'danmaku',
             'preload',
             'prepareHandoff',

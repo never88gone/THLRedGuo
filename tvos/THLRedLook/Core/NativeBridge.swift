@@ -435,7 +435,7 @@ public actor NativeBridge {
             "views": vod["vod_views"] as? String ?? "",
             "onlineDate": year,
             "tags": (vod["vod_tag"] as? String)?.components(separatedBy: "·").filter { !$0.isEmpty } ?? [],
-            "releaseStatus": remark
+            "releaseStatus": vod["vod_release_status"] as? String ?? remark
         ]
     }
 
@@ -859,7 +859,7 @@ public actor NativeBridge {
             }
             return result
 
-        case "rankingBoards", "rankings", "recommendations", "suggestions":
+        case "rankingBoards", "rankings", "recommendations", "suggestions", "seriesSeasons":
             let source = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
                 ?? (activeSourceId.isEmpty ? "hongguo" : activeSourceId)
             guard let context = getOrCreateContext(sourceId: source) else {
@@ -871,6 +871,7 @@ public actor NativeBridge {
             case "rankings": arguments = [payload["board"] as? String ?? "", page]
             case "recommendations": arguments = [payload["category"] as? String ?? "real-drama", page]
             case "suggestions": arguments = [payload["query"] as? String ?? ""]
+            case "seriesSeasons": arguments = [payload["id"] as? String ?? ""]
             default: arguments = []
             }
             let expression = try spiderExpression(action, arguments)
@@ -887,6 +888,10 @@ public actor NativeBridge {
                 let drama = mapVodToDrama(vod: vod, sourceId: source)
                 if action == "rankings" {
                     return ["rank": vod["vod_rank"] as? Int ?? 0, "drama": drama, "metric": vod["vod_metric"] as? String ?? ""]
+                }
+                if action == "seriesSeasons" {
+                    return ["drama": drama, "season": vod["season"] as? Int ?? 0,
+                            "playable": vod["playable"] as? Bool ?? false, "status": vod["status"] as? String ?? ""]
                 }
                 return drama
             }

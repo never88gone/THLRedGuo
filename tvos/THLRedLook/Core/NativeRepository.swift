@@ -48,6 +48,13 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
         return (dramas, hasMore, returnedPage)
     }
 
+    public func loadSeriesSeasons(drama: Drama) async throws -> [SeriesSeason] {
+        guard drama.source == "hongguo" else { return [] }
+        let response = try await bridge.request(action: "seriesSeasons", payload: ["source": drama.source, "id": drama.cleanSourceId])
+        let data = try JSONSerialization.data(withJSONObject: response["items"] as? [[String: Any]] ?? [])
+        return try JSONDecoder().decode([SeriesSeason].self, from: data)
+    }
+
     public func loadSuggestions(query: String) async throws -> [String] {
         let resp = try await bridge.request(action: "suggestions", payload: ["query": query])
         return resp["items"] as? [String] ?? []

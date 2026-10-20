@@ -83,7 +83,7 @@ class PlayerDesktopPanelView extends StatelessWidget {
                       return Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: InkWell(
-                          onTap: isCurrent ? null : () => onSeasonSelected?.call(entry.drama),
+                          onTap: isCurrent || !entry.playable ? null : () => onSeasonSelected?.call(entry.drama),
                           borderRadius: BorderRadius.circular(8),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

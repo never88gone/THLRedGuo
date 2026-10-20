@@ -438,6 +438,11 @@ globalThis.console = {
     return Map<String, dynamic>.from(result);
   }
 
+  Future<List<Map<String, dynamic>>> seriesSeasons(String id) async {
+    final result = await _discovery('seriesSeasons', [id]);
+    return _toListOfMaps(result['list']);
+  }
+
   Future<List<String>> suggestions(String query) async {
     final result = await _discovery('suggestions', [query]);
     return (result['items'] as List? ?? const [])

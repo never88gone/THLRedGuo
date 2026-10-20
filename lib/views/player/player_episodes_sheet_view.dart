@@ -299,7 +299,7 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                                       sEntry.drama.id == widget.currentDramaId;
                                   return InkWell(
                                     borderRadius: BorderRadius.circular(17),
-                                    onTap: isCurrentSeason
+                                    onTap: isCurrentSeason || !sEntry.playable
                                         ? null
                                         : () => widget.onSeasonSelected?.call(
                                               sEntry.drama,

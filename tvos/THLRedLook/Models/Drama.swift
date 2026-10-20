@@ -1,5 +1,12 @@
 import Foundation
 
+public struct SeriesSeason: Decodable {
+    public let drama: Drama
+    public let season: Int
+    public let playable: Bool
+    public let status: String
+}
+
 public struct Drama: Identifiable, Hashable, Codable {
     public let id: String
     public let source: String
@@ -65,6 +72,8 @@ public struct Drama: Identifiable, Hashable, Codable {
             return "已完结"
         case "ongoing":
             return "连载中"
+        case "upcoming":
+            return "待上线"
         default:
             return episodes > 0 ? "共 \(episodes) 集" : "全集"
         }

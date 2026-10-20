@@ -1210,7 +1210,7 @@ class _DetailScreenState extends State<DetailScreen> {
                         padding: const EdgeInsets.only(right: 8),
                         child: InkWell(
                           key: ValueKey('series-${entry.drama.id}'),
-                          onTap: isCurrent
+                          onTap: isCurrent || !entry.playable
                               ? null
                               : () => _openSeriesDrama(entry.drama),
                           borderRadius: BorderRadius.circular(14),

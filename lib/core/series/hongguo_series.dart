@@ -27,13 +27,19 @@ class HongguoSeriesEntry {
     required this.drama,
     required this.season,
     required this.unit,
+    this.playable = true,
+    this.status = '',
+    this.official = false,
   });
 
   final Drama drama;
   final int season;
   final String unit;
+  final bool playable;
+  final String status;
+  final bool official;
 
-  String get label => '第 $season $unit';
+  String get label => '第 $season $unit${status.isEmpty ? '' : ' · $status'}';
 }
 
 bool hasRoundedHongguoSeriesId(Drama drama) {
@@ -394,8 +400,16 @@ List<HongguoSeriesEntry> hongguoSeriesEntries(
       drama: current(entry.drama),
       season: entry.season,
       unit: entry.unit,
+      playable: entry.playable,
+      status: entry.status,
+      official: entry.official,
     ),
   );
+  if (lockedEntries != null &&
+      lockedEntries.any((entry) => entry.official) &&
+      lockedEntries.any((entry) => entry.drama.id == anchor.id)) {
+    return lockedEntries.toList();
+  }
   var anchorInfo = hongguoSeriesInfo(anchor);
   String key, unit;
   int anchorSeason;
@@ -533,6 +547,32 @@ Future<List<HongguoSeriesEntry>> discoverSeriesSeasons({
   LocalStore? store,
   List<HongguoSeriesEntry>? existingEntries,
 }) async {
+  if (anchor.source == SourceSite.hongguo.id) {
+    try {
+      final seasons = await repository.seriesSeasons(anchor);
+      if (seasons.isNotEmpty) {
+        final fresh = seasons.map((entry) => entry.drama).toList();
+        if (store != null) await store.refreshDramas(fresh);
+        return seasons
+            .map(
+              (entry) => HongguoSeriesEntry(
+                drama: entry.drama.id == anchor.id
+                    ? anchor.merge(entry.drama)
+                    : entry.drama,
+                season: entry.season,
+                unit: '季',
+                playable: entry.playable,
+                status: entry.status,
+                official: true,
+              ),
+            )
+            .toList();
+      }
+    } catch (_) {}
+  }
+  if (existingEntries?.any((entry) => entry.official) == true) {
+    return existingEntries!;
+  }
   final localCandidates = store != null
       ? store.seriesDramasFor(anchor)
       : <Drama>[];

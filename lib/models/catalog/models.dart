@@ -202,6 +202,7 @@ class Drama {
   String get releaseLabel => switch (releaseStatus) {
     'finished' || 'completed' => '已完结',
     'ongoing' => '连载中',
+    'upcoming' => '待上线',
     _ => '状态未知',
   };
   String get cleanSourceId {
@@ -351,6 +352,27 @@ class DramaDetail {
       warning: json['warning'] as String? ?? '',
     );
   }
+}
+
+class SeriesSeason {
+  const SeriesSeason({
+    required this.drama,
+    required this.season,
+    required this.playable,
+    this.status = '',
+  });
+
+  final Drama drama;
+  final int season;
+  final bool playable;
+  final String status;
+
+  factory SeriesSeason.fromJson(Map<String, dynamic> json) => SeriesSeason(
+    drama: Drama.fromJson(Map<String, dynamic>.from(json['drama'] as Map)),
+    season: (json['season'] as num).toInt(),
+    playable: json['playable'] == true,
+    status: json['status'] as String? ?? '',
+  );
 }
 
 class CatalogPage {

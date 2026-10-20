@@ -409,6 +409,11 @@ class _PlayerScreenState extends State<PlayerScreen>
   Future<void> _switchSeason(Drama seasonDrama) async {
     if (_closed || !mounted) return;
     if (seasonDrama.id == widget.detail.drama.id) return;
+    if (_currentSeriesEntries.any(
+      (entry) => entry.drama.id == seasonDrama.id && !entry.playable,
+    )) {
+      return;
+    }
 
     final ticket = ++_seasonSwitchTicket;
 

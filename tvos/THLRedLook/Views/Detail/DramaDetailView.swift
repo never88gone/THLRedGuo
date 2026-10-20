@@ -224,7 +224,7 @@ public struct DramaDetailView: View {
                                                     }
                                                 }
                                             ) {
-                                                if !item.isCurrent {
+                                                if !item.isCurrent && item.playable {
                                                     Task {
                                                         focus(.season(index), with: scrollProxy)
                                                         await viewModel.switchToDrama(item.drama)

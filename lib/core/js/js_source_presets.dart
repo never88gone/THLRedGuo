@@ -42,7 +42,7 @@ const meta = {
   author: "社区开发者",
   type: "video",
   icon: "",
-  features: ["search", "suggestions", "rankingBoards", "rankings", "recommendations", "categories", "danmaku"]
+  features: ["search", "suggestions", "rankingBoards", "rankings", "recommendations", "categories", "danmaku", "seriesSeasons"]
 };
 
 const BASE_URL = "https://hongguoduanju.com";
@@ -2139,6 +2139,58 @@ spider.danmaku = function (id, startMs, durationMs) {
       const cell = container(tab.cell_data);
       return { cell, params: { tab_type: tabType } };
     });
+  };
+})();
+
+(function () {
+  const text = value => value == null ? '' : String(value).trim();
+  const integer = value => Math.max(0, Number.parseInt(value, 10) || 0);
+  const failure = code => Object.assign(new Error('官方系列剧列表暂不可用'), { code });
+  spider.seriesSeasons = async function (rawId) {
+    const id = text(rawId).replace(/^hongguo:/, '');
+    if (!/^[1-9]\d{9,29}$/.test(id)) throw failure('INVALID_SERIES_ID');
+    const api = HongguoApp.fetchAppDiscoveryRaw;
+    const response = await api('/reading/bookapi/plan/v', {
+      scene: 10, from: 'single_col_same_ip_series', book_id: id, filter_ids: id
+    });
+    if (Number(response.code) !== 0) throw failure('SERIES_REJECTED');
+    let cell = (response.data || []).find(value => Array.isArray(value.video_data) &&
+      value.video_data.some(video => integer(video.season_index) > 0));
+    if (!cell) return { list: [] };
+    const rows = new Map();
+    const cursors = new Set();
+    for (let page = 0; page < 10; page++) {
+      for (const video of cell.video_data || []) {
+        const raw = video.series_id_str || video.series_id;
+        const vid = typeof raw === 'string' ? raw : Number.isSafeInteger(raw) ? String(raw) : '';
+        const season = integer(video.season_index);
+        if (!/^[1-9]\d{9,29}$/.test(vid) || !season || season > 200 || !text(video.title)) continue;
+        const episodes = integer(video.episode_cnt);
+        const upcoming = !episodes && !!video.subscribe_item;
+        const playable = episodes > 0 && video.disable_play !== true;
+        const status = upcoming ? '待上线' : playable ? '' : '暂不可播放';
+        rows.set(vid, {
+          vod_id: vid, vod_name: text(video.title), vod_pic: text(video.cover),
+          vod_content: text(video.video_desc), vod_episodes: episodes,
+          vod_remarks: episodes ? episodes + '集' : status,
+          vod_release_status: upcoming ? 'upcoming' : '',
+          season, playable, status
+        });
+      }
+      if (cell.has_more !== true) return { list: [...rows.values()].sort((a, b) => a.season - b.season) };
+      const cursor = {
+        cell_id: text(cell.cell_id_str), offset: integer(cell.next_offset),
+        session_id: text(cell.session_id), filter_ids: id
+      };
+      const key = cursor.cell_id + ':' + cursor.offset;
+      if (!cursor.cell_id || !cursor.offset || cursors.has(key) || page === 9) throw failure('INVALID_SERIES_CURSOR');
+      cursors.add(key);
+      const next = await api('/reading/bookapi/bookmall/cell/change/v', cursor);
+      if (Number(next.code) !== 0 || !next.data?.cell_view) throw failure('INVALID_RESPONSE');
+      cell = next.data.cell_view;
+      if (globalThis.__hongguoCancelled) throw failure('cancelled');
+    }
+    return { list: [] };
   };
 })();
 ''',

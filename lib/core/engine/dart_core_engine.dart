@@ -234,6 +234,8 @@ class DartCoreEngine {
       case 'suggestions':
         final query = input['query'] as String? ?? '';
         return {'items': await _getSuggestions(query)};
+      case 'seriesSeasons':
+        return _getSeriesSeasons(input);
       case 'recommendations':
         return await _getRecommendations(input);
       case 'rankingBoards':
@@ -551,6 +553,7 @@ class DartCoreEngine {
         vod['vod_category']?.toString() ?? category,
       ),
       'tags': tags,
+      'releaseStatus': vod['vod_release_status']?.toString() ?? '',
     };
   }
 
@@ -629,6 +632,29 @@ class DartCoreEngine {
       _catalogCache[key] = result;
     }
     return result;
+  }
+
+  Future<Map<String, dynamic>> _getSeriesSeasons(
+    Map<String, dynamic> input,
+  ) async {
+    final drama = Drama.fromJson(
+      Map<String, dynamic>.from(input['drama'] as Map),
+    );
+    if (drama.source != 'hongguo') return {'items': <Map<String, dynamic>>[]};
+    final runtime = await _getSpiderRuntime(drama.source);
+    if (runtime == null) throw StateError('系列剧数据源不可用');
+    final rows = await runtime.seriesSeasons(drama.cleanSourceId);
+    return {
+      'items': [
+        for (final row in rows)
+          {
+            'drama': _mapVodToDrama(drama.source, row, ''),
+            'season': row['season'],
+            'playable': row['playable'],
+            'status': row['status'],
+          },
+      ],
+    };
   }
 
   Future<List<String>> _getSuggestions(String query) async {

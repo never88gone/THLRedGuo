@@ -7,12 +7,14 @@ public struct SeasonItem: Identifiable, Hashable {
     public let seasonNumber: Int
     public let title: String
     public let isCurrent: Bool
+    public let playable: Bool
 
-    public init(drama: Drama, seasonNumber: Int, title: String, isCurrent: Bool) {
+    public init(drama: Drama, seasonNumber: Int, title: String, isCurrent: Bool, playable: Bool = true) {
         self.drama = drama
         self.seasonNumber = seasonNumber
         self.title = title
         self.isCurrent = isCurrent
+        self.playable = playable
     }
 }
 
@@ -31,6 +33,7 @@ public final class DetailViewModel: ObservableObject {
     private let repository: NativeRepository
     private let store: LocalStore
     private var loadGeneration = 0
+    private var officialSeasonIds = Set<String>()
     private let downloadService: DownloadService
 
     public init(
@@ -58,13 +61,14 @@ public final class DetailViewModel: ObservableObject {
 
     public func switchToDrama(_ newDrama: Drama) async {
         guard newDrama.id != drama.id else { return }
+        guard !seasonItems.contains(where: { $0.drama.id == newDrama.id && !$0.playable }) else { return }
         self.drama = newDrama
         self.followState = store.followState(for: newDrama.id)
         self.lastWatchEntry = store.getWatchEntry(dramaId: newDrama.id)
         self.selectedChunkIndex = 0
         if !self.seasonItems.isEmpty {
             self.seasonItems = self.seasonItems.map {
-                SeasonItem(drama: $0.drama, seasonNumber: $0.seasonNumber, title: $0.title, isCurrent: $0.drama.id == newDrama.id)
+                SeasonItem(drama: $0.drama, seasonNumber: $0.seasonNumber, title: $0.title, isCurrent: $0.drama.id == newDrama.id, playable: $0.playable)
             }
         }
         self.detail = nil
@@ -150,6 +154,22 @@ public final class DetailViewModel: ObservableObject {
     }
 
     private func loadSeasons(generation: Int) async {
+        let anchor = drama
+        if let seasons = try? await repository.loadSeriesSeasons(drama: anchor), !seasons.isEmpty {
+            guard generation == loadGeneration, !Task.isCancelled else { return }
+            store.refreshDramas(seasons.map(\.drama))
+            seasonItems = seasons.map { season in
+                SeasonItem(drama: season.drama.id == anchor.id ? anchor.merge(with: season.drama) : season.drama,
+                           seasonNumber: season.season,
+                           title: "第 \(season.season) 季" + (season.status.isEmpty ? "" : " · \(season.status)"),
+                           isCurrent: season.drama.id == anchor.id, playable: season.playable)
+            }
+            relatedSeasons = seasonItems.map(\.drama)
+            officialSeasonIds = Set(seasonItems.map(\.id))
+            return
+        }
+        guard generation == loadGeneration, !Task.isCancelled else { return }
+        if officialSeasonIds.contains(anchor.id) { return }
         let pattern = "(?:第\\s*[0-9零一二两三四五六七八九十百]+\\s*[季部]|\\s*[0-9零一二两三四五六七八九十]+).*$"
         var baseName = drama.title.replacingOccurrences(of: pattern, with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
         if baseName.isEmpty { baseName = drama.title }
