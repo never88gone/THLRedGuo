@@ -119,6 +119,19 @@ class CatalogBrowser {
   }
 
   List<_CatalogChoice> _choices(SourceGroup group) {
+    if (group.id == 'hongguo' &&
+        (_menus['hongguo'] ?? const []).any(
+          (entry) => entry.section.isNotEmpty,
+        )) {
+      return [
+        for (final category in _menus['hongguo']!) ...[
+          _CatalogChoice(category)..requests['hongguo'] = category.id,
+          for (final filters in category.filterGroups)
+            for (final item in filters.items)
+              _CatalogChoice(item)..requests['hongguo'] = item.id,
+        ],
+      ];
+    }
     final choices = <String, _CatalogChoice>{};
     for (final source in group.sources) {
       for (final category in _menus[source.id] ?? const <CatalogCategory>[]) {
@@ -145,10 +158,16 @@ class CatalogBrowser {
     return choices.values.toList();
   }
 
-  List<CatalogCategory> categories(SourceGroup group) => [
-    CatalogCategory.all,
-    for (final choice in _choices(group)) choice.category,
-  ];
+  List<CatalogCategory> categories(SourceGroup group) {
+    final menu = _menus[group.id];
+    if (menu != null && menu.any((entry) => entry.section.isNotEmpty)) {
+      return menu;
+    }
+    return [
+      CatalogCategory.all,
+      for (final choice in _choices(group)) choice.category,
+    ];
+  }
 
   _CatalogChoice? _choice(SourceGroup group, String category) => _choices(
     group,
@@ -199,7 +218,7 @@ class CatalogBrowser {
           if (index < row.length) items[row[index].id] = row[index];
         }
       }
-      if (choice != null) {
+      if (choice != null && group.id != 'hongguo') {
         for (final source in group.sources) {
           for (final item in _library[source.id]?.values ?? const <Drama>[]) {
             if (choice.category.local ||

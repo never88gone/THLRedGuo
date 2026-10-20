@@ -129,16 +129,41 @@ class SourceGroup {
 }
 
 class CatalogCategory {
-  const CatalogCategory(this.id, this.name, {this.local = false});
+  const CatalogCategory(
+    this.id,
+    this.name, {
+    this.local = false,
+    this.section = '',
+    this.filterGroups = const [],
+  });
   static const all = CatalogCategory('', '全部');
   final String id;
   final String name;
   final bool local;
+  final String section;
+  final List<CatalogFilterGroup> filterGroups;
   factory CatalogCategory.fromJson(Map<String, dynamic> json) =>
       CatalogCategory(
         json['id'] as String? ?? '',
         json['name'] as String? ?? '全部',
+        section: json['section'] as String? ?? '',
+        filterGroups: [
+          for (final row in json['filterGroups'] as List? ?? const [])
+            CatalogFilterGroup.fromJson(Map<String, dynamic>.from(row as Map)),
+        ],
       );
+}
+
+class CatalogFilterGroup {
+  const CatalogFilterGroup(this.name, this.items);
+  final String name;
+  final List<CatalogCategory> items;
+
+  factory CatalogFilterGroup.fromJson(Map<String, dynamic> json) =>
+      CatalogFilterGroup(json['name'] as String? ?? '', [
+        for (final row in json['items'] as List? ?? const [])
+          CatalogCategory.fromJson(Map<String, dynamic>.from(row as Map)),
+      ]);
 }
 
 int intValue(Object? value) =>

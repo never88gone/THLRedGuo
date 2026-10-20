@@ -13,6 +13,7 @@ import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/views/navigation/app_bottom_navigation.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/views/catalog/catalog_filters.dart';
+import 'package:THLRedLook/views/catalog/app_catalog_filters.dart';
 import 'package:THLRedLook/views/browser/catalog_browser.dart';
 import 'package:THLRedLook/core/catalog/catalog_sort.dart';
 import 'package:THLRedLook/views/catalog/catalog_sort_sheet.dart';
@@ -93,9 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   SourceGroup get _group =>
-      _sourceGroups
-          .where((group) => group.id == _source.groupId)
-          .firstOrNull ??
+      _sourceGroups.where((group) => group.id == _source.groupId).firstOrNull ??
       SourceGroup(_source.groupId, _source.groupName, [_source]);
   bool get _onlineSearch => _group.sources.any((source) => source.onlineSearch);
   bool get _searchSuggestions =>
@@ -117,12 +116,15 @@ class _HomeScreenState extends State<HomeScreen> {
   List<CatalogCategory> get _categories => _browser.categories(_group);
   String get _displayCategory =>
       _showRecommendations ? _recommendationCategory : _category;
-  List<CatalogCategory> get _displayCategories => [
-    CatalogCategory.all,
-    if (_group.id == 'hongguo')
-      const CatalogCategory(_recommendationCategory, '推荐'),
-    ..._categories.where((entry) => entry.id.isNotEmpty),
-  ];
+  bool get _appCatalog => _categories.any((entry) => entry.section.isNotEmpty);
+  List<CatalogCategory> get _displayCategories => _appCatalog
+      ? _categories
+      : [
+          CatalogCategory.all,
+          if (_group.id == 'hongguo')
+            const CatalogCategory(_recommendationCategory, '推荐'),
+          ..._categories.where((entry) => entry.id.isNotEmpty),
+        ];
 
   Future<void> _loadCategories({
     bool force = false,
@@ -150,13 +152,19 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     if (!_showRecommendations &&
         _category.isNotEmpty &&
-        !_categories.any((entry) => entry.id == _category)) {
-      _changeCategory('');
+        !_categories.any(
+          (entry) =>
+              entry.id == _category ||
+              entry.filterGroups.any(
+                (group) => group.items.any((item) => item.id == _category),
+              ),
+        )) {
+      _changeCategory(_appCatalog ? _categories.first.id : '');
     }
   }
 
   Future<void> _refreshCatalog() async {
-    if (widget.repository.supportsSourceManagement) {
+    if (widget.repository.supportsSourceManagement && _group.id != 'hongguo') {
       if (_group.sources.any((source) => _updater.busy(source.id))) return;
       _pauseCatalog();
       await _updater.update(_group.sources);
@@ -190,8 +198,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final targetSourceId = visible.any((s) => s.id == widget.store.source)
         ? widget.store.source
         : ((activeJsId.isNotEmpty && visible.any((s) => s.id == activeJsId))
-            ? activeJsId
-            : (visible.isNotEmpty ? visible.first.id : ''));
+              ? activeJsId
+              : (visible.isNotEmpty ? visible.first.id : ''));
 
     // 当前已处于目标数据源，若可用源列表签名发生变化则刷新并重载
     if (_source.id == targetSourceId) {
@@ -207,7 +215,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final allowed = visible.map((site) => site.id).toSet();
 
     // 外部发生数据源切换时才平滑过渡
-    if (targetSourceId.isNotEmpty && allowed.contains(targetSourceId) && _source.id != targetSourceId) {
+    if (targetSourceId.isNotEmpty &&
+        allowed.contains(targetSourceId) &&
+        _source.id != targetSourceId) {
       _sourceSignature = signature;
       _changeSource(SourceSite.byId(targetSourceId));
       return;
@@ -328,9 +338,24 @@ class _HomeScreenState extends State<HomeScreen> {
   void _swipeCategory(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
     if (velocity.abs() < 240) return;
-    final categories = _displayCategories;
+    final currentTab = _categories
+        .where(
+          (entry) =>
+              entry.id == _category || _category.startsWith('${entry.id}:'),
+        )
+        .firstOrNull;
+    final categories = _appCatalog
+        ? _categories
+              .where(
+                (entry) =>
+                    entry.section == (currentTab ?? _categories.first).section,
+              )
+              .toList()
+        : _displayCategories;
     final index = categories.indexWhere(
-      (entry) => entry.id == _displayCategory,
+      (entry) =>
+          entry.id == _displayCategory ||
+          (_appCatalog && _category.startsWith('${entry.id}:')),
     );
     final next = index + (velocity < 0 ? 1 : -1);
     if (next >= 0 && next < categories.length) {
@@ -522,6 +547,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted ||
         _showRecommendations ||
         !_hasMore ||
+        _error != null ||
+        _tab != 0 ||
+        ModalRoute.of(context)?.isCurrent == false ||
         _loading ||
         _loadingMore ||
         !_scroll.hasClients) {
@@ -536,6 +564,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted ||
           _showRecommendations ||
           !_hasMore ||
+          _error != null ||
+          _tab != 0 ||
+          ModalRoute.of(context)?.isCurrent == false ||
           _loading ||
           _loadingMore ||
           !_scroll.hasClients) {
@@ -590,10 +621,21 @@ class _HomeScreenState extends State<HomeScreen> {
         _submittedQuery = query;
         _loading = cached && !result.fresh;
         _loadingMore = false;
-        _error =
-            (force || result.items.isEmpty) && result.warning.isNotEmpty
-                ? result.warning
-                : null;
+        _error = result.warning.isEmpty ? null : result.warning;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || generation != _generation) return;
+        if (_visible.isEmpty &&
+            _hasMore &&
+            _error == null &&
+            !_loading &&
+            !_loadingMore &&
+            _tab == 0 &&
+            ModalRoute.of(context)?.isCurrent != false) {
+          unawaited(_load(more: true));
+        } else {
+          _onCatalogScroll();
+        }
       });
       unawaited(
         saveUserChange(context, () => widget.store.refreshDramas(result.items)),
@@ -617,12 +659,15 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _loading = false;
         _loadingMore = false;
-        _error = (force || _items.isEmpty) ? error.toString() : null;
+        _error = error.toString();
       });
     }
   }
 
-  Future<void> _changeSource(SourceSite source, {bool allSources = false}) async {
+  Future<void> _changeSource(
+    SourceSite source, {
+    bool allSources = false,
+  }) async {
     if (_source.id == source.id && _allSources == allSources) {
       return;
     }
@@ -647,7 +692,8 @@ class _HomeScreenState extends State<HomeScreen> {
           widget.store.catalogView.allSources != allSources) {
         await saveUserChange(
           context,
-          () => widget.store.setCatalogSource(source.id, allSources: allSources),
+          () =>
+              widget.store.setCatalogSource(source.id, allSources: allSources),
         );
       }
       try {
@@ -856,9 +902,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (value == 'about') {
       Navigator.push(
         context,
-        MaterialPageRoute<void>(
-          builder: (_) => AboutPage(store: widget.store),
-        ),
+        MaterialPageRoute<void>(builder: (_) => AboutPage(store: widget.store)),
       );
     }
   }
@@ -867,10 +911,8 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (_) => JsSourcesPage(
-          repository: widget.repository,
-          store: widget.store,
-        ),
+        builder: (_) =>
+            JsSourcesPage(repository: widget.repository, store: widget.store),
       ),
     );
     if (!mounted) return;
@@ -892,7 +934,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final script = utf8.decode(bytes);
       if (script.trim().isEmpty) return;
 
-      final fileName = file.name.endsWith('.js') ? file.name : '${file.name}.js';
+      final fileName = file.name.endsWith('.js')
+          ? file.name
+          : '${file.name}.js';
       final ok = await service.importScript(script, fileName);
       if (!mounted) return;
       if (ok) {
@@ -962,7 +1006,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Text('取消'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.hongguoRed,
+            ),
             onPressed: () {
               final url = controller.text.trim();
               if (url.isNotEmpty) Navigator.pop(ctx, url);
@@ -1141,7 +1187,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         onPressed: () => _openJsSourceManagement(context),
-                        icon: const Icon(Icons.settings_suggest_rounded, size: 18),
+                        icon: const Icon(
+                          Icons.settings_suggest_rounded,
+                          size: 18,
+                        ),
                         label: const Text('插件管理'),
                       ),
                     ],
@@ -1233,40 +1282,71 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SafeArea(
               top: false,
               child: Row(
-              children: [
-                if (television) ...[
-                  SizedBox(
-                    width: 164,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 24, 8, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final entry in [
-                            (Icons.explore_rounded, '发现'),
-                            (Icons.bookmark_rounded, '追剧'),
-                            (Icons.history_rounded, '最近观看'),
-                            if (widget.store.canDownload)
-                              (Icons.download_rounded, '下载'),
-                          ].indexed)
+                children: [
+                  if (television) ...[
+                    SizedBox(
+                      width: 164,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 24, 8, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final entry in [
+                              (Icons.explore_rounded, '发现'),
+                              (Icons.bookmark_rounded, '追剧'),
+                              (Icons.history_rounded, '最近观看'),
+                              if (widget.store.canDownload)
+                                (Icons.download_rounded, '下载'),
+                            ].indexed)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: RemoteButton(
+                                  key: ValueKey('tv-nav-${entry.$1}'),
+                                  label: entry.$2.$2,
+                                  icon: entry.$2.$1,
+                                  selected: _tab == entry.$1,
+                                  autofocus: entry.$1 == 0,
+                                  onPressed: () => _onNavSelected(entry.$1),
+                                ),
+                              ),
+                            const Spacer(),
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
+                              padding: const EdgeInsets.only(bottom: 8),
                               child: RemoteButton(
-                                key: ValueKey('tv-nav-${entry.$1}'),
-                                label: entry.$2.$2,
-                                icon: entry.$2.$1,
-                                selected: _tab == entry.$1,
-                                autofocus: entry.$1 == 0,
-                                onPressed: () => _onNavSelected(entry.$1),
+                                key: const ValueKey('tv-nav-settings'),
+                                label: '设置',
+                                icon: Icons.settings_rounded,
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => SettingsScreen(
+                                      repository: widget.repository,
+                                      store: widget.store,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                          const Spacer(),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: RemoteButton(
-                              key: const ValueKey('tv-nav-settings'),
-                              label: '设置',
-                              icon: Icons.settings_rounded,
+                          ],
+                        ),
+                      ),
+                    ),
+                    const VerticalDivider(width: 1),
+                  ] else if (desktop) ...[
+                    NavigationRail(
+                      selectedIndex: _tab,
+                      onDestinationSelected: _onNavSelected,
+                      labelType: NavigationRailLabelType.all,
+                      groupAlignment: -.8,
+                      trailing: Expanded(
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: IconButton(
+                              key: const ValueKey('desktop-nav-settings'),
+                              icon: const Icon(Icons.settings_rounded),
+                              tooltip: '设置',
                               onPressed: () => Navigator.push(
                                 context,
                                 MaterialPageRoute<void>(
@@ -1278,94 +1358,63 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const VerticalDivider(width: 1),
-                ] else if (desktop) ...[
-                  NavigationRail(
-                    selectedIndex: _tab,
-                    onDestinationSelected: _onNavSelected,
-                    labelType: NavigationRailLabelType.all,
-                    groupAlignment: -.8,
-                    trailing: Expanded(
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: IconButton(
-                            key: const ValueKey('desktop-nav-settings'),
-                            icon: const Icon(Icons.settings_rounded),
-                            tooltip: '设置',
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute<void>(
-                                builder: (_) => SettingsScreen(
-                                  repository: widget.repository,
-                                  store: widget.store,
-                                ),
-                              ),
-                            ),
-                          ),
                         ),
                       ),
-                    ),
-                    destinations: [
-                      NavigationRailDestination(
-                        icon: Icon(Icons.explore_outlined),
-                        selectedIcon: Icon(Icons.explore),
-                        label: Text('发现'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.bookmark_border_rounded),
-                        selectedIcon: Icon(Icons.bookmark_rounded),
-                        label: Text('追剧'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.history_rounded),
-                        label: Text('最近观看'),
-                      ),
-                      if (widget.store.canDownload)
+                      destinations: [
                         NavigationRailDestination(
-                          icon: Icon(Icons.download_outlined),
-                          selectedIcon: Icon(Icons.download_rounded),
-                          label: Text('下载'),
+                          icon: Icon(Icons.explore_outlined),
+                          selectedIcon: Icon(Icons.explore),
+                          label: Text('发现'),
                         ),
-                    ],
+                        NavigationRailDestination(
+                          icon: Icon(Icons.bookmark_border_rounded),
+                          selectedIcon: Icon(Icons.bookmark_rounded),
+                          label: Text('追剧'),
+                        ),
+                        NavigationRailDestination(
+                          icon: Icon(Icons.history_rounded),
+                          label: Text('最近观看'),
+                        ),
+                        if (widget.store.canDownload)
+                          NavigationRailDestination(
+                            icon: Icon(Icons.download_outlined),
+                            selectedIcon: Icon(Icons.download_rounded),
+                            label: Text('下载'),
+                          ),
+                      ],
+                    ),
+                    const VerticalDivider(width: 1, thickness: 1),
+                  ],
+                  Expanded(
+                    child: _tab == 0
+                        ? _hasNoSourcePlugins
+                              ? _buildEmptySourcePluginGuide(context)
+                              : _catalog(selectionInBody: desktop || television)
+                        : _tab == 3
+                        ? DownloadsScreen(
+                            repository: widget.repository,
+                            store: widget.store,
+                            embedded: true,
+                          )
+                        : SavedLibrary(
+                            key: ValueKey('saved-tab-$_tab'),
+                            repository: widget.repository,
+                            store: widget.store,
+                            history: _tab == 2,
+                            onOpen: _openDrama,
+                            onContinue: (drama) =>
+                                _openDrama(drama, resume: true),
+                            onDownload:
+                                widget.repository.supportsDownloads &&
+                                    widget.store.canDownload
+                                ? (drama) => _openDrama(drama, download: true)
+                                : null,
+                          ),
                   ),
-                  const VerticalDivider(width: 1, thickness: 1),
                 ],
-                Expanded(
-                  child: _tab == 0
-                      ? _hasNoSourcePlugins
-                            ? _buildEmptySourcePluginGuide(context)
-                            : _catalog(selectionInBody: desktop || television)
-                      : _tab == 3
-                      ? DownloadsScreen(
-                          repository: widget.repository,
-                          store: widget.store,
-                          embedded: true,
-                        )
-                      : SavedLibrary(
-                          key: ValueKey('saved-tab-$_tab'),
-                          repository: widget.repository,
-                          store: widget.store,
-                          history: _tab == 2,
-                          onOpen: _openDrama,
-                          onContinue: (drama) =>
-                              _openDrama(drama, resume: true),
-                          onDownload:
-                              widget.repository.supportsDownloads &&
-                                  widget.store.canDownload
-                              ? (drama) => _openDrama(drama, download: true)
-                              : null,
-                        ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
           bottomNavigationBar: desktop || television
               ? null
               : _selectionMode
@@ -1422,6 +1471,30 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _catalog({required bool selectionInBody}) {
     final items = _visible;
     final television = AppLayout.isTelevision(context);
+    final sourceChip =
+        (widget.store.isZhenguojianActivated || widget.store.sources.length > 1)
+        ? Padding(
+            key: const ValueKey('catalog-source-chip'),
+            padding: const EdgeInsets.only(right: 8),
+            child: ActionChip(
+              avatar: const Icon(Icons.swap_horiz_rounded, size: 16),
+              label: Text(_group.name),
+              tooltip: '切换数据源（当前：${_group.name}）',
+              shape: const StadiumBorder(),
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              labelStyle: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+              side: BorderSide(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.3),
+              ),
+              onPressed: _openSourceSwitcher,
+            ),
+          )
+        : null;
     return Column(
       children: [
         if (_searchVisible && !television)
@@ -1429,8 +1502,9 @@ class _HomeScreenState extends State<HomeScreen> {
             groupId: _group.id,
             controller: _search,
             hint: _searchHint,
-            suggestions:
-                _searchSuggestions ? widget.repository.suggestions : null,
+            suggestions: _searchSuggestions
+                ? widget.repository.suggestions
+                : null,
             recentSearches: widget.store.recentSearches,
             onChanged: _searchChanged,
             onCancelSuggestions: () =>
@@ -1439,50 +1513,39 @@ class _HomeScreenState extends State<HomeScreen> {
             onClearRecentSearches: () =>
                 saveUserChange(context, widget.store.clearRecentSearches),
           ),
-        CatalogFilters(
-          key: ValueKey('filters-${_group.id}'),
-          leading: (widget.store.isZhenguojianActivated ||
-                  widget.store.sources.length > 1)
-              ? Padding(
-                  key: const ValueKey('catalog-source-chip'),
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ActionChip(
-                    avatar: const Icon(Icons.swap_horiz_rounded, size: 16),
-                    label: Text(_group.name),
-                    tooltip: '切换数据源（当前：${_group.name}）',
-                    shape: const StadiumBorder(),
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    labelStyle: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+        if (_appCatalog)
+          AppCatalogFilters(
+            categories: _categories,
+            category: _category,
+            onCategory: _changeCategory,
+            onRetry: () => _loadCategories(force: true),
+            error: _categoriesError,
+            leading: sourceChip,
+          )
+        else
+          CatalogFilters(
+            key: ValueKey('filters-${_group.id}'),
+            leading: sourceChip,
+            categories: _displayCategories,
+            category: _displayCategory,
+            error: _categoriesError,
+            onCategory: _changeCategory,
+            onRetry: () => _loadCategories(force: true),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_supportsVipFilter)
+                  IconButton(
+                    tooltip: widget.store.hideVip ? 'VIP：隐藏' : 'VIP：显示',
+                    onPressed: () => saveUserChange(
+                      context,
+                      () => widget.store.setHideVip(!widget.store.hideVip),
                     ),
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                    ),
-                    onPressed: _openSourceSwitcher,
+                    icon: VipIcon(hidden: widget.store.hideVip),
                   ),
-                )
-              : null,
-          categories: _displayCategories,
-          category: _displayCategory,
-          error: _categoriesError,
-          onCategory: _changeCategory,
-          onRetry: () => _loadCategories(force: true),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_supportsVipFilter)
-                IconButton(
-                  tooltip: widget.store.hideVip ? 'VIP：隐藏' : 'VIP：显示',
-                  onPressed: () => saveUserChange(
-                    context,
-                    () => widget.store.setHideVip(!widget.store.hideVip),
-                  ),
-                  icon: VipIcon(hidden: widget.store.hideVip),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
         if (_showRecommendations)
           Expanded(
             child: GestureDetector(
@@ -1501,7 +1564,10 @@ class _HomeScreenState extends State<HomeScreen> {
             Material(
               color: Theme.of(context).colorScheme.errorContainer,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     Icon(
@@ -1541,7 +1607,8 @@ class _HomeScreenState extends State<HomeScreen> {
               supportsSourceManagement:
                   widget.repository.supportsSourceManagement,
               sourcesCount: widget.store.sources.length,
-              canLoadMore: _hasMore &&
+              canLoadMore:
+                  _hasMore &&
                   !_loadingMore &&
                   (!_onlineSearch ||
                       _search.text.isEmpty ||
@@ -1549,6 +1616,7 @@ class _HomeScreenState extends State<HomeScreen> {
               gridKey: 'catalog-${_group.id}-$_category-$_submittedQuery',
               onRetryLoad: () => _load(force: true),
               onLoadMore: () => _load(more: true),
+              onPrefetch: _onCatalogScroll,
               onRefresh: _refreshCatalog,
               onManageSources: _manageSources,
               onSwipeCategory: _swipeCategory,

@@ -468,18 +468,22 @@ class DartCoreEngine {
     final rt = await _getSpiderRuntime(source);
     if (rt != null) {
       try {
-        final homeRes = await rt.home();
+        final homeRes = await rt.home(filter: source == 'hongguo');
         if (homeRes.classes.isNotEmpty) {
           return homeRes.classes
               .map(
                 (c) => {
                   'id': c['type_id']?.toString() ?? '',
                   'name': c['type_name']?.toString() ?? '分类',
+                  'section': c['section']?.toString() ?? '',
+                  'filterGroups': c['filterGroups'] ?? const [],
                 },
               )
               .toList();
         }
-      } catch (_) {}
+      } catch (_) {
+        if (source == 'hongguo') rethrow;
+      }
     }
     return _getCategoriesForSource(source);
   }
@@ -606,15 +610,13 @@ class DartCoreEngine {
     bool hasMore = false;
     final rt = await _getSpiderRuntime(source);
     if (rt != null) {
-      try {
-        final res = await rt.category(category, page);
-        if (res.list.isNotEmpty) {
-          dramas = res.list
-              .map((vod) => _mapVodToDrama(source, vod, category))
-              .toList();
-          hasMore = res.hasMore;
-        }
-      } catch (_) {}
+      final res = await rt.category(category, page);
+      dramas = res.list
+          .map((vod) => _mapVodToDrama(source, vod, category))
+          .toList();
+      hasMore = res.hasMore;
+    } else {
+      throw StateError('目录数据源不可用');
     }
     final result = {
       'items': dramas,
