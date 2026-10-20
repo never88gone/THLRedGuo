@@ -1020,7 +1020,7 @@ class _DetailScreenState extends State<DetailScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            drama.category,
+                            drama.displayCategory,
                             style: TextStyle(
                               color: colors.onSurfaceVariant,
                               fontSize: 11,

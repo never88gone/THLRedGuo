@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 import 'package:THLRedLook/core/js/js_source_models.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 
 /// 纯 Dart 核心调度引擎：
 /// 承担数据源解析、分类目录、短剧详情、分集列表、播放直链、
@@ -475,8 +476,6 @@ class DartCoreEngine {
                 (c) => {
                   'id': c['type_id']?.toString() ?? '',
                   'name': c['type_name']?.toString() ?? '分类',
-                  'section': c['section']?.toString() ?? '',
-                  'filterGroups': c['filterGroups'] ?? const [],
                 },
               )
               .toList();
@@ -548,7 +547,9 @@ class DartCoreEngine {
       'episodes': (vod['vod_episodes'] as num?)?.toInt() ?? episodes,
       'heat': vod['vod_heat']?.toString() ?? '',
       'views': vod['vod_views']?.toString() ?? '',
-      'category': category.isNotEmpty ? category : '短剧',
+      'category': dramaCategoryLabel(
+        vod['vod_category']?.toString() ?? category,
+      ),
       'tags': tags,
     };
   }

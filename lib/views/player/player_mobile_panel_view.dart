@@ -89,7 +89,7 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
       if (drama.episodes > 0) '共 ${drama.episodes} 集',
       if (drama.releaseStatus.isNotEmpty && drama.releaseStatus != 'unknown')
         drama.releaseLabel,
-      if (drama.category.isNotEmpty) drama.category,
+      if (drama.category.isNotEmpty) drama.displayCategory,
     ];
     final body = drama.description.trim().isEmpty ? '暂无简介' : drama.description;
 

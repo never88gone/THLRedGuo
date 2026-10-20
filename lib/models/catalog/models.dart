@@ -129,41 +129,38 @@ class SourceGroup {
 }
 
 class CatalogCategory {
-  const CatalogCategory(
-    this.id,
-    this.name, {
-    this.local = false,
-    this.section = '',
-    this.filterGroups = const [],
-  });
+  const CatalogCategory(this.id, this.name, {this.local = false});
   static const all = CatalogCategory('', '全部');
   final String id;
   final String name;
   final bool local;
-  final String section;
-  final List<CatalogFilterGroup> filterGroups;
   factory CatalogCategory.fromJson(Map<String, dynamic> json) =>
       CatalogCategory(
         json['id'] as String? ?? '',
         json['name'] as String? ?? '全部',
-        section: json['section'] as String? ?? '',
-        filterGroups: [
-          for (final row in json['filterGroups'] as List? ?? const [])
-            CatalogFilterGroup.fromJson(Map<String, dynamic>.from(row as Map)),
-        ],
       );
 }
 
-class CatalogFilterGroup {
-  const CatalogFilterGroup(this.name, this.items);
-  final String name;
-  final List<CatalogCategory> items;
-
-  factory CatalogFilterGroup.fromJson(Map<String, dynamic> json) =>
-      CatalogFilterGroup(json['name'] as String? ?? '', [
-        for (final row in json['items'] as List? ?? const [])
-          CatalogCategory.fromJson(Map<String, dynamic>.from(row as Map)),
-      ]);
+String dramaCategoryLabel(String value) {
+  final category = value.trim();
+  if (category.startsWith('app:discover:')) {
+    return switch (category.split(':').last) {
+      'playlet' => '真人剧',
+      'motion_comic' => '漫剧',
+      'ai_playlet' => 'AI剧',
+      _ => '短剧',
+    };
+  }
+  if (category.startsWith('app:') || category.startsWith('hongguo-app:')) {
+    return '短剧';
+  }
+  return switch (category) {
+    'real-drama' || 'real_series' => '真人剧',
+    'comic-drama' || 'comic_series' || 'comic' => '漫剧',
+    'ai-drama' || 'ai_series' => 'AI剧',
+    '' => '短剧',
+    _ => category,
+  };
 }
 
 int intValue(Object? value) =>
@@ -194,6 +191,7 @@ class Drama {
   final String cover;
   final int episodes;
   final String category;
+  String get displayCategory => dramaCategoryLabel(category);
   final bool? vipStatus;
   bool get vip => vipStatus == true;
   final String heat;
@@ -218,6 +216,7 @@ class Drama {
   }
 
   factory Drama.fromJson(Map<String, dynamic> json) {
+    final category = json['category'] as String? ?? '';
     var id = json['id'] as String? ?? '';
     var source = json['source'] as String? ?? '';
     final hasSourceId = json.containsKey('sourceId');
@@ -253,7 +252,7 @@ class Drama {
       description: json['description'] as String? ?? '',
       cover: json['cover'] as String? ?? '',
       episodes: intValue(json['episodes']),
-      category: json['category'] as String? ?? '',
+      category: category.isEmpty ? '' : dramaCategoryLabel(category),
       vip: json['vip'] == true ? true : (json['vip'] == false ? false : null),
       heat: json['heat']?.toString() ?? '',
       views: json['views']?.toString() ?? '',

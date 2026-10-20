@@ -13,7 +13,6 @@ import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/views/navigation/app_bottom_navigation.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/views/catalog/catalog_filters.dart';
-import 'package:THLRedLook/views/catalog/app_catalog_filters.dart';
 import 'package:THLRedLook/views/browser/catalog_browser.dart';
 import 'package:THLRedLook/core/catalog/catalog_sort.dart';
 import 'package:THLRedLook/views/catalog/catalog_sort_sheet.dart';
@@ -114,15 +113,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String get _category => _categorySelections[_group.id] ?? '';
   List<CatalogCategory> get _categories => _browser.categories(_group);
-  String get _displayCategory =>
-      _showRecommendations ? _recommendationCategory : _category;
-  bool get _appCatalog => _categories.any((entry) => entry.section.isNotEmpty);
-  List<CatalogCategory> get _displayCategories => _appCatalog
+  String get _displayCategory => _showRecommendations
+      ? _recommendationCategory
+      : _group.id == 'hongguo' && _category.isEmpty
+      ? _categories.first.id
+      : _category;
+  List<CatalogCategory> get _displayCategories => _group.id == 'hongguo'
       ? _categories
       : [
           CatalogCategory.all,
-          if (_group.id == 'hongguo')
-            const CatalogCategory(_recommendationCategory, '推荐'),
           ..._categories.where((entry) => entry.id.isNotEmpty),
         ];
 
@@ -152,14 +151,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     if (!_showRecommendations &&
         _category.isNotEmpty &&
-        !_categories.any(
-          (entry) =>
-              entry.id == _category ||
-              entry.filterGroups.any(
-                (group) => group.items.any((item) => item.id == _category),
-              ),
-        )) {
-      _changeCategory(_appCatalog ? _categories.first.id : '');
+        !_categories.any((entry) => entry.id == _category)) {
+      _changeCategory(_categories.first.id);
     }
   }
 
@@ -338,24 +331,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _swipeCategory(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
     if (velocity.abs() < 240) return;
-    final currentTab = _categories
-        .where(
-          (entry) =>
-              entry.id == _category || _category.startsWith('${entry.id}:'),
-        )
-        .firstOrNull;
-    final categories = _appCatalog
-        ? _categories
-              .where(
-                (entry) =>
-                    entry.section == (currentTab ?? _categories.first).section,
-              )
-              .toList()
-        : _displayCategories;
+    final categories = _displayCategories;
     final index = categories.indexWhere(
-      (entry) =>
-          entry.id == _displayCategory ||
-          (_appCatalog && _category.startsWith('${entry.id}:')),
+      (entry) => entry.id == _displayCategory,
     );
     final next = index + (velocity < 0 ? 1 : -1);
     if (next >= 0 && next < categories.length) {
@@ -1513,39 +1491,29 @@ class _HomeScreenState extends State<HomeScreen> {
             onClearRecentSearches: () =>
                 saveUserChange(context, widget.store.clearRecentSearches),
           ),
-        if (_appCatalog)
-          AppCatalogFilters(
-            categories: _categories,
-            category: _category,
-            onCategory: _changeCategory,
-            onRetry: () => _loadCategories(force: true),
-            error: _categoriesError,
-            leading: sourceChip,
-          )
-        else
-          CatalogFilters(
-            key: ValueKey('filters-${_group.id}'),
-            leading: sourceChip,
-            categories: _displayCategories,
-            category: _displayCategory,
-            error: _categoriesError,
-            onCategory: _changeCategory,
-            onRetry: () => _loadCategories(force: true),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_supportsVipFilter)
-                  IconButton(
-                    tooltip: widget.store.hideVip ? 'VIP：隐藏' : 'VIP：显示',
-                    onPressed: () => saveUserChange(
-                      context,
-                      () => widget.store.setHideVip(!widget.store.hideVip),
-                    ),
-                    icon: VipIcon(hidden: widget.store.hideVip),
+        CatalogFilters(
+          key: ValueKey('filters-${_group.id}'),
+          leading: sourceChip,
+          categories: _displayCategories,
+          category: _displayCategory,
+          error: _categoriesError,
+          onCategory: _changeCategory,
+          onRetry: () => _loadCategories(force: true),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_supportsVipFilter)
+                IconButton(
+                  tooltip: widget.store.hideVip ? 'VIP：隐藏' : 'VIP：显示',
+                  onPressed: () => saveUserChange(
+                    context,
+                    () => widget.store.setHideVip(!widget.store.hideVip),
                   ),
-              ],
-            ),
+                  icon: VipIcon(hidden: widget.store.hideVip),
+                ),
+            ],
           ),
+        ),
         if (_showRecommendations)
           Expanded(
             child: GestureDetector(

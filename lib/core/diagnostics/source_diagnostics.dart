@@ -147,8 +147,7 @@ class SourceDiagnostics extends ChangeNotifier {
         '/reading/bookapi/search/cue/v' => '猜你想搜',
         '/reading/bookapi/search/suggest/v' => '搜索联想',
         '/reading/bookapi/plan/v' => '榜单',
-        '/reading/bookapi/bookmall/tab/v' => '剧场与推荐',
-        '/reading/bookapi/new_category/landing/v' => '找剧分类',
+        '/reading/bookapi/bookmall/tab/v' => '找剧与推荐',
         '/reading/bookapi/bookmall/cell/change/v' => '列表分页',
         _ => null,
       };

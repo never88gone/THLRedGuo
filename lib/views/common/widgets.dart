@@ -225,7 +225,7 @@ class DramaTile extends StatelessWidget {
           child: SizedBox(
             height: subtitleHeight(context),
             child: Text(
-              subtitle ?? drama.category,
+              subtitle ?? drama.displayCategory,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

@@ -119,17 +119,10 @@ class CatalogBrowser {
   }
 
   List<_CatalogChoice> _choices(SourceGroup group) {
-    if (group.id == 'hongguo' &&
-        (_menus['hongguo'] ?? const []).any(
-          (entry) => entry.section.isNotEmpty,
-        )) {
+    if (group.id == 'hongguo' && _menus.containsKey('hongguo')) {
       return [
-        for (final category in _menus['hongguo']!) ...[
+        for (final category in _menus['hongguo']!)
           _CatalogChoice(category)..requests['hongguo'] = category.id,
-          for (final filters in category.filterGroups)
-            for (final item in filters.items)
-              _CatalogChoice(item)..requests['hongguo'] = item.id,
-        ],
       ];
     }
     final choices = <String, _CatalogChoice>{};
@@ -160,9 +153,7 @@ class CatalogBrowser {
 
   List<CatalogCategory> categories(SourceGroup group) {
     final menu = _menus[group.id];
-    if (menu != null && menu.any((entry) => entry.section.isNotEmpty)) {
-      return menu;
-    }
+    if (group.id == 'hongguo') return menu ?? const [CatalogCategory.all];
     return [
       CatalogCategory.all,
       for (final choice in _choices(group)) choice.category,
