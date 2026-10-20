@@ -23,6 +23,7 @@ import 'package:THLRedLook/core/store/follow_state.dart';
 import 'package:THLRedLook/core/series/hongguo_series.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 import 'package:THLRedLook/core/player/playback_loader.dart';
 import 'package:THLRedLook/core/player/playback_preloader.dart';
@@ -91,6 +92,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   late final DanmakuController _danmaku;
   int _seekSequence = 0;
   bool _danmakuEnabled = true;
+  DanmakuStyle _danmakuStyle = const DanmakuStyle();
   late final PlayerInteractions _interactions;
   final _playerFocus = FocusNode(debugLabel: 'player-surface');
   final _videoPaneKey = GlobalKey();
@@ -164,6 +166,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     quality: _requestedQuality,
     autoAdvance: _autoAdvance,
     danmaku: _danmakuEnabled,
+    danmakuStyle: _danmakuStyle,
     preload: _preloadEnabled,
     enhancement: _enhancement.preferences,
   );
@@ -194,6 +197,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     _requestedQuality = preferences.quality;
     _autoAdvance = preferences.autoAdvance;
     _danmakuEnabled = preferences.danmaku;
+    _danmakuStyle = preferences.danmakuStyle;
     _preloadEnabled = preferences.preload;
     _loader = PlaybackLoader(widget.repository);
     _preloader = PlaybackPreloader(widget.repository);
@@ -1511,6 +1515,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       _requestedQuality = nextPreferences.quality;
       _autoAdvance = nextPreferences.autoAdvance;
       _danmakuEnabled = nextPreferences.danmaku;
+      _danmakuStyle = nextPreferences.danmakuStyle;
       _preloadEnabled = nextPreferences.preload;
     });
     _danmaku.setEnabled(_danmakuEnabled);

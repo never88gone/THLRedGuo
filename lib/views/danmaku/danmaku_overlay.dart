@@ -294,6 +294,9 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
         oldWidget.flight.durationMs != widget.flight.durationMs) {
       _sync();
     }
+    if (oldWidget.style != widget.style || oldWidget.scaler != widget.scaler) {
+      setState(() {});
+    }
   }
 
   void _sync() {
