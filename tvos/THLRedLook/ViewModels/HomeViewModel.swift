@@ -4,42 +4,35 @@ import Combine
 @MainActor
 public final class HomeViewModel: ObservableObject {
     @Published public var items: [Drama] = []
-    @Published public var categories: [CatalogCategory] = [CatalogCategory.all]
-    @Published public var selectedCategory: CatalogCategory = CatalogCategory.all
+    @Published public var categories: [CatalogCategory] = []
+    @Published public var selectedCategory: CatalogCategory = .all
     @Published public var selectedSort: CatalogSort = .source
     @Published public var selectedRelease: CatalogReleaseFilter = .all
     @Published public var isLoading = false
     @Published public var isLoadingMore = false
-    @Published public var hasMore = true
+    @Published public var hasMore = false
     @Published public var errorMessage: String?
 
-    private let repository: NativeRepository
+    private let repository: any DramaSourceProviderProtocol
     private let store: LocalStore
-    private var currentPage = 1
+    private var currentPage = 0
+    private var generation = 0
     private var cancellables = Set<AnyCancellable>()
     private var selectCategoryTask: Task<Void, Never>?
-    private var loadFirstPageTask: Task<Void, Never>?
-    private var cachedByCategory: [String: [Drama]] = [:]
 
-    public init(repository: NativeRepository = .shared, store: LocalStore = .shared) {
+    public init(repository: any DramaSourceProviderProtocol = NativeRepository.shared, store: LocalStore = .shared) {
         self.repository = repository
         self.store = store
-
-        // 监听站源切换
         store.$currentSourceId
             .dropFirst()
             .sink { [weak self] _ in
-                self?.cachedByCategory.removeAll()
-                Task { [weak self] in
-                    await self?.reloadAll()
-                }
+                Task { [weak self] in await self?.reloadAll() }
             }
             .store(in: &cancellables)
     }
 
     public var activeSourceId: String {
-        let src = !JSSourceService.shared.activeSourceId.isEmpty ? JSSourceService.shared.activeSourceId : store.currentSourceId
-        return src
+        !JSSourceService.shared.activeSourceId.isEmpty ? JSSourceService.shared.activeSourceId : store.currentSourceId
     }
 
     public var availableSources: [SourceSite] {
@@ -50,50 +43,45 @@ public final class HomeViewModel: ObservableObject {
         SourceSite.byId(activeSourceId)
     }
 
-    public func reloadAll() async {
-        NSLog("🎬 [HomeVM] reloadAll 调用, activeSourceId='%@'", activeSourceId)
-        cachedByCategory.removeAll()
-        items.removeAll()
-        guard !activeSourceId.isEmpty else {
-            categories = [CatalogCategory.all]
+    private func resetRequest() {
+        generation += 1
+        selectCategoryTask?.cancel()
+        items = []
+        currentPage = 0
+        hasMore = false
+        isLoading = false
+        isLoadingMore = false
+        errorMessage = nil
+    }
+
+    public func reloadAll(initialCategory: String? = nil) async {
+        resetRequest()
+        let ticket = generation
+        let source = activeSourceId
+        guard !source.isEmpty else { categories = []; return }
+        isLoading = true
+        do {
+            let list = try await repository.loadCategories(source: source)
+            guard !Task.isCancelled, generation == ticket, activeSourceId == source else { return }
+            categories = list
+            selectedCategory = list.first(where: { $0.id == initialCategory || $0.name == initialCategory })
+                ?? list.first(where: { $0.id == selectedCategory.id }) ?? list.first ?? .all
+        } catch {
+            guard !Task.isCancelled, generation == ticket, activeSourceId == source else { return }
+            errorMessage = error.localizedDescription
             isLoading = false
             return
         }
-        await loadCategories()
         await loadFirstPage()
     }
 
-    public func loadCategories() async {
-        guard !activeSourceId.isEmpty else {
-            categories = [CatalogCategory.all]
-            return
-        }
-        do {
-            NSLog("🎬 [HomeVM] 正在请求分类...")
-            let list = try await repository.loadCategories(source: activeSourceId)
-            NSLog("🎬 [HomeVM] 分类请求成功: %ld 个", list.count)
-            categories = list
-            if !categories.contains(where: { $0.id == selectedCategory.id }) {
-                selectedCategory = CatalogCategory.all
-            }
-        } catch {
-            NSLog("🎬 [HomeVM] 分类请求失败: %@", error.localizedDescription)
-            categories = [CatalogCategory.all]
-        }
-    }
-
-    public func selectCategory(_ cat: CatalogCategory, immediate: Bool = false) {
-        guard selectedCategory.id != cat.id else { return }
-        selectedCategory = cat
-        if let cached = cachedByCategory[cat.id], !cached.isEmpty {
-            items = cached
-            return
-        }
-        selectCategoryTask?.cancel()
+    public func selectCategory(_ category: CatalogCategory, immediate: Bool = false) {
+        guard selectedCategory.id != category.id else { return }
+        resetRequest()
+        selectedCategory = category
+        isLoading = true
         selectCategoryTask = Task {
-            if !immediate {
-                try? await Task.sleep(nanoseconds: 180_000_000)
-            }
+            if !immediate { try? await Task.sleep(nanoseconds: 180_000_000) }
             guard !Task.isCancelled else { return }
             await loadFirstPage()
         }
@@ -102,106 +90,87 @@ public final class HomeViewModel: ObservableObject {
     public func selectSort(_ sort: CatalogSort) async {
         guard selectedSort != sort else { return }
         selectedSort = sort
-        cachedByCategory.removeAll()
         await loadFirstPage()
     }
 
     public func selectReleaseFilter(_ filter: CatalogReleaseFilter) async {
         guard selectedRelease != filter else { return }
         selectedRelease = filter
-        cachedByCategory.removeAll()
         await loadFirstPage()
     }
 
     public func loadFirstPage() async {
-        guard !activeSourceId.isEmpty else {
-            items = []
-            isLoading = false
-            return
-        }
-        loadFirstPageTask?.cancel()
-        isLoading = true
+        generation += 1
+        let ticket = generation
+        let source = activeSourceId
+        let category = selectedCategory.id
+        items = []
+        currentPage = 0
+        hasMore = false
+        isLoadingMore = false
         errorMessage = nil
-        currentPage = 1
-        NSLog("🎬 [HomeVM] loadFirstPage 发起 loadCatalog: source='%@', category='%@'", activeSourceId, selectedCategory.id)
-        let targetSource = activeSourceId
-        let targetCategory = selectedCategory.id
-        loadFirstPageTask = Task {
-            do {
-                let res = try await repository.loadCatalog(
-                    source: targetSource,
-                    category: targetCategory,
-                    page: 1,
-                    query: "",
-                    force: true
-                )
-                guard !Task.isCancelled else { return }
-                store.refreshDramas(res.items)
-                NSLog("🎬 [HomeVM] loadCatalog 成功返回 %ld 部短剧", res.items.count)
-                let filtered = filterAndSort(dramas: res.items)
-                items = filtered
-                cachedByCategory[targetCategory] = filtered
-                hasMore = res.hasMore
-                currentPage = 1
-            } catch {
-                if !Task.isCancelled {
-                    NSLog("🎬 [HomeVM] loadCatalog 失败: %@", error.localizedDescription)
-                    errorMessage = error.localizedDescription
-                    items = []
-                }
-            }
-            isLoading = false
+        guard !source.isEmpty else { isLoading = false; return }
+        isLoading = true
+        defer { if generation == ticket { isLoading = false } }
+        do {
+            let result = try await repository.loadCatalog(source: source, category: category, page: 1, query: "", force: true)
+            guard !Task.isCancelled, generation == ticket, activeSourceId == source,
+                  selectedCategory.id == category else { return }
+            store.refreshDramas(result.items)
+            items = filterAndSort(dramas: result.items)
+            currentPage = result.page
+            hasMore = result.hasMore
+        } catch {
+            guard !Task.isCancelled, generation == ticket, activeSourceId == source,
+                  selectedCategory.id == category else { return }
+            errorMessage = error.localizedDescription
         }
-        await loadFirstPageTask?.value
+    }
+
+    public func retry() async {
+        if items.isEmpty { await reloadAll() }
+        else {
+            errorMessage = nil
+            await loadNextPage()
+        }
     }
 
     public func loadNextPage() async {
-        guard !isLoadingMore && hasMore else { return }
+        guard !isLoading, !isLoadingMore, hasMore, errorMessage == nil else { return }
+        let ticket = generation
+        let source = activeSourceId
+        let category = selectedCategory.id
+        let page = currentPage + 1
         isLoadingMore = true
-        let nextPage = currentPage + 1
+        defer { if generation == ticket { isLoadingMore = false } }
         do {
-            let res = try await repository.loadCatalog(
-                source: activeSourceId,
-                category: selectedCategory.id,
-                page: nextPage,
-                query: "",
-                force: false
-            )
-            guard !Task.isCancelled else { return }
-            store.refreshDramas(res.items)
-            let newItems = filterAndSort(dramas: res.items)
-            let existing = Set(items.map(\.id))
-            items.append(contentsOf: newItems.filter { !existing.contains($0.id) })
-            hasMore = res.hasMore
-            currentPage = nextPage
+            let result = try await repository.loadCatalog(source: source, category: category, page: page, query: "", force: false)
+            guard !Task.isCancelled, generation == ticket, activeSourceId == source,
+                  selectedCategory.id == category else { return }
+            store.refreshDramas(result.items)
+            var seen = Set(items.map(\.id))
+            items.append(contentsOf: filterAndSort(dramas: result.items).filter { seen.insert($0.id).inserted })
+            hasMore = result.hasMore
+            currentPage = result.page
         } catch {
-            // 静默失败，保持已有数据
+            guard !Task.isCancelled, generation == ticket, activeSourceId == source,
+                  selectedCategory.id == category else { return }
+            errorMessage = error.localizedDescription
         }
-        isLoadingMore = false
     }
 
     private func filterAndSort(dramas: [Drama]) -> [Drama] {
         let target = activeSourceId.lowercased()
-        var result = dramas.filter { drama in
-            let s = drama.source.lowercased()
-            return s.isEmpty || s == target
-        }
-        // 连载状态筛选
+        var result = dramas.filter { $0.source.isEmpty || $0.source.lowercased() == target }
         if selectedRelease != .all {
             result = result.filter { $0.releaseStatus.lowercased() == selectedRelease.rawValue }
         }
-        // 排序
         switch selectedSort {
-        case .source:
-            break
-        case .latest:
-            result.sort { $0.onlineDate > $1.onlineDate }
-        case .heat:
-            result.sort { (Int($0.heat) ?? 0) > (Int($1.heat) ?? 0) }
-        case .views:
-            result.sort { $0.views > $1.views }
-        case .title:
-            result.sort { $0.title < $1.title }
+        case .source: break
+        case .latest: result.sort { $0.onlineDate > $1.onlineDate }
+        case .heat: result.sort { (Int($0.heat) ?? 0) > (Int($1.heat) ?? 0) }
+        case .views: result.sort { $0.views > $1.views }
+        case .title: result.sort { $0.title < $1.title }
         }
         return result
     }

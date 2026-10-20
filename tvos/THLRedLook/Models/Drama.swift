@@ -219,7 +219,6 @@ public struct CatalogCategory: Identifiable, Hashable, Codable {
     }
 
     public static let all = CatalogCategory(id: "", name: "全部")
-    public static let recommendations = CatalogCategory(id: "app:recommendations", name: "推荐")
 }
 
 public enum CatalogSort: String, CaseIterable, Identifiable {

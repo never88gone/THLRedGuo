@@ -430,7 +430,7 @@ public actor NativeBridge {
             "description": desc,
             "cover": cover,
             "episodes": vod["vod_episodes"] as? Int ?? epCount,
-            "category": "short_play",
+            "category": vod["vod_category"] as? String ?? "短剧",
             "heat": vod["vod_heat"] as? String ?? "",
             "views": vod["vod_views"] as? String ?? "",
             "onlineDate": year,
@@ -576,8 +576,11 @@ public actor NativeBridge {
                 return ["items": [["id": "", "name": "全部"]]]
             }
 
-            let res = evalAsync(context: ctx, scriptExpr: "spider.home()")
-            var items: [[String: Any]] = [["id": "", "name": "全部"]]
+            let res = evalAsync(context: ctx, scriptExpr: targetSrc == "hongguo" ? "spider.home(true)" : "spider.home()")
+            guard res?["ok"] as? Bool == true else {
+                throw SourceAPIError.sourceUnavailable(res?["error"] as? String ?? "分类请求失败，请重试")
+            }
+            var items: [[String: Any]] = targetSrc == "hongguo" ? [] : [["id": "", "name": "全部"]]
 
             if let data = res?["data"] as? [String: Any],
                let classes = (data["class"] as? [[String: Any]]) ?? (data["classes"] as? [[String: Any]]) {
@@ -589,6 +592,7 @@ public actor NativeBridge {
                     }
                 }
             }
+            guard !items.isEmpty else { throw SourceAPIError.parseError("未返回找剧分类") }
             return ["items": items]
 
         case "catalog":
@@ -641,6 +645,9 @@ public actor NativeBridge {
 
             let scriptExpr = try spiderExpression("category", [cat, pg, false, [:]])
             let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
+            guard res?["ok"] as? Bool == true else {
+                throw SourceAPIError.sourceUnavailable(res?["error"] as? String ?? "发现数据请求失败，请重试")
+            }
 
             var dramas: [[String: Any]] = []
             var hasMore = false
@@ -651,7 +658,7 @@ public actor NativeBridge {
                     dramas.append(mapVodToDrama(vod: vod, sourceId: targetSrc))
                 }
                 let pageCount = (data["pagecount"] as? Int) ?? (data["pageCount"] as? Int) ?? 1
-                hasMore = pg < pageCount
+                hasMore = data["hasMore"] as? Bool ?? (pg < pageCount)
             }
             return [
                 "items": dramas,

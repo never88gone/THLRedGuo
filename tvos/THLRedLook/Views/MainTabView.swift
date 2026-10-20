@@ -2,7 +2,6 @@ import SwiftUI
 
 public enum TVAppTab: String, CaseIterable, Identifiable {
     case catalog = "catalog"
-    case recommendations = "recommendations"
     case rankings = "rankings"
     case search = "search"
     case library = "library"
@@ -14,7 +13,6 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
     public var title: String {
         switch self {
         case .catalog: return "发现"
-        case .recommendations: return "推荐"
         case .rankings: return "榜单"
         case .search: return "搜索"
         case .library: return "追剧与历史"
@@ -26,7 +24,6 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
     public var icon: String {
         switch self {
         case .catalog: return "sparkles.tv"
-        case .recommendations: return "hand.thumbsup"
         case .rankings: return "chart.bar.fill"
         case .search: return "magnifyingglass"
         case .library: return "bookmark.fill"
@@ -43,7 +40,6 @@ public struct MainTabView: View {
     @State private var selectedTab: TVAppTab = .catalog
     @FocusState private var focusedNavTab: TVAppTab?
     @State private var catalogCategoryFocusTrigger: Int = 0
-    @State private var recommendationsCategoryFocusTrigger: Int = 0
     @State private var rankingsBoardFocusTrigger: Int = 0
     @State private var searchFocusTrigger: Int = 0
     @State private var libraryTabFocusTrigger: Int = 0
@@ -62,7 +58,6 @@ public struct MainTabView: View {
     @State private var isCardFocusedDemo: Bool = false
     @State private var isSettingsActiveDemo: Bool = false
     @State private var catalogInitialCategory: String? = nil
-    @State private var recommendationsCategory: String? = nil
     @State private var deepLinkQuery: String? = nil
     @State private var deepLinkEpisode: Int? = nil
     @State private var testInitialEpisodeIndex: Int = 1
@@ -85,7 +80,6 @@ public struct MainTabView: View {
         var initCardFocused: Bool = false
         var initSettingsActive: Bool = false
         var initCategory: String? = nil
-        var initRecomCategory: String? = nil
 
         var customDramaId: String? = nil
         var customDramaTitle: String? = nil
@@ -130,18 +124,18 @@ public struct MainTabView: View {
                 initTab = .catalog
             case "catalog_real":
                 initTab = .catalog
-                initCategory = "real-drama"
+                initCategory = "app:discover:playlet"
             case "catalog_comic":
                 initTab = .catalog
-                initCategory = "comic-drama"
+                initCategory = "app:discover:motion_comic"
             case "cardFocused":
                 initTab = .catalog
                 initCardFocused = true
             case "recommendations":
-                initTab = .recommendations
+                initTab = .catalog
             case "recommendations_comic":
-                initTab = .recommendations
-                initRecomCategory = "漫剧"
+                initTab = .catalog
+                initCategory = "app:discover:motion_comic"
             case "rankings":
                 initTab = .rankings
             case "search":
@@ -176,7 +170,6 @@ public struct MainTabView: View {
         _isCardFocusedDemo = State(initialValue: initCardFocused)
         _isSettingsActiveDemo = State(initialValue: initSettingsActive)
         _catalogInitialCategory = State(initialValue: initCategory)
-        _recommendationsCategory = State(initialValue: initRecomCategory)
         _deepLinkQuery = State(initialValue: customQuery)
         _testInitialEpisodeIndex = State(initialValue: customEpisodeIndex)
     }
@@ -209,12 +202,9 @@ public struct MainTabView: View {
                         selectedTab: $selectedTab,
                         focusedNavTab: $focusedNavTab,
                         onDownCommandForTab: { tab in
-                            focusedNavTab = nil
                             switch tab {
                             case .catalog:
                                 catalogCategoryFocusTrigger += 1
-                            case .recommendations:
-                                recommendationsCategoryFocusTrigger += 1
                             case .rankings:
                                 rankingsBoardFocusTrigger += 1
                             case .search:
@@ -246,15 +236,6 @@ public struct MainTabView: View {
                                 }
                             )
                             .id("catalog_\(isCardFocusedDemo)_\(catalogInitialCategory ?? "")")
-                        case .recommendations:
-                            RecommendationsView(
-                                initialCategory: recommendationsCategory,
-                                focusCategoryTrigger: recommendationsCategoryFocusTrigger,
-                                onRequestFocusTopNav: {
-                                    focusedNavTab = .recommendations
-                                }
-                            )
-                            .id("recom_\(recommendationsCategory ?? "")")
                         case .rankings:
                             RankingsView(
                                 focusCategoryTrigger: rankingsBoardFocusTrigger,
@@ -317,22 +298,6 @@ public struct MainTabView: View {
                     } else {
                         // 焦点离开导航栏进入了内容页面
                         wasInContentArea = true
-                        switch selectedTab {
-                        case .catalog:
-                            catalogCategoryFocusTrigger += 1
-                        case .recommendations:
-                            recommendationsCategoryFocusTrigger += 1
-                        case .rankings:
-                            rankingsBoardFocusTrigger += 1
-                        case .search:
-                            searchFocusTrigger += 1
-                        case .library:
-                            libraryTabFocusTrigger += 1
-                        case .settings:
-                            settingsSidebarTrigger += 1
-                        default:
-                            break
-                        }
                     }
                 }
             }
@@ -403,19 +368,19 @@ public struct MainTabView: View {
             focusedNavTab = (page == "cardFocused") ? nil : .catalog
         case "catalog_real":
             selectedTab = .catalog
-            catalogInitialCategory = "real-drama"
+            catalogInitialCategory = "app:discover:playlet"
             focusedNavTab = .catalog
         case "catalog_comic":
             selectedTab = .catalog
-            catalogInitialCategory = "comic-drama"
+            catalogInitialCategory = "app:discover:motion_comic"
             focusedNavTab = .catalog
         case "recommendations":
-            selectedTab = .recommendations
-            focusedNavTab = .recommendations
+            selectedTab = .catalog
+            focusedNavTab = .catalog
         case "recommendations_comic":
-            selectedTab = .recommendations
-            recommendationsCategory = "漫剧"
-            focusedNavTab = .recommendations
+            selectedTab = .catalog
+            catalogInitialCategory = "app:discover:motion_comic"
+            focusedNavTab = .catalog
         case "rankings":
             selectedTab = .rankings
             focusedNavTab = .rankings

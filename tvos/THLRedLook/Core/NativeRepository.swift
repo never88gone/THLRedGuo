@@ -10,15 +10,16 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
     public func loadCategories(source: String) async throws -> [CatalogCategory] {
         let resp = try await bridge.request(action: "categories", payload: ["source": source])
         guard let items = resp["items"] as? [[String: Any]] else { return [CatalogCategory.all] }
-        var list = [CatalogCategory.all]
+        var list: [CatalogCategory] = []
+        var seen = Set<String>()
         for item in items {
             let id = item["id"] as? String ?? ""
             let name = item["name"] as? String ?? "全部"
-            if !id.isEmpty {
+            if seen.insert(id).inserted {
                 list.append(CatalogCategory(id: id, name: name))
             }
         }
-        return list
+        return list.isEmpty ? [CatalogCategory.all] : list
     }
 
     public func loadCatalog(
