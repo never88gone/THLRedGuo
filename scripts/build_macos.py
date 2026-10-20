@@ -103,6 +103,8 @@ def main():
     artifacts = []
 
     beijing_build = get_beijing_build_number()
+    os.environ["TZ"] = "Asia/Shanghai"
+    os.environ["BUILD_NUMBER"] = beijing_build
 
     if options.export_options:
         archive_path = root / "build" / "macos" / "Runner.xcarchive"
@@ -120,6 +122,7 @@ def main():
             "-archivePath", str(archive_path),
             "MARKETING_VERSION=1.0.0",
             f"CURRENT_PROJECT_VERSION={beijing_build}",
+            f"BUILD_NUMBER={beijing_build}",
         ]
         if options.clean:
             archive_cmd.insert(archive_cmd.index("archive") + 1, "clean")
@@ -137,7 +140,7 @@ def main():
         create_dmg(target_app, dmg_target)
         artifacts.append(dmg_target)
     else:
-        run([flutter, "build", "macos", "--release", "--no-pub", *variant.flutter_arguments])
+        run([flutter, "build", "macos", "--release", "--no-pub", "--build-name=1.0.0", f"--build-number={beijing_build}", *variant.flutter_arguments])
         app_path = root / "build" / "macos" / "Build" / "Products" / "Release" / "THLRedLook.app"
         if not app_path.exists():
             candidates = list((root / "build" / "macos" / "Build" / "Products" / "Release").glob("*.app"))

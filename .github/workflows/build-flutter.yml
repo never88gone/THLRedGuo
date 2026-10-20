@@ -50,6 +50,9 @@ concurrency:
   group: flutter-build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  TZ: 'Asia/Shanghai'
+
 jobs:
   android:
     name: Android 平台自动化打包

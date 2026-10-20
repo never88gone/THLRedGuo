@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from app_build import sync_project_version, get_beijing_build_number
+from app_build import sync_project_version, get_beijing_timestamp_build_number
 
 root = Path(__file__).resolve().parents[1]
 sync_project_version(root, "1.0.0")
@@ -44,8 +44,10 @@ def main():
     configuration = "Release" if (args.release or args.package) else "Debug"
     destination = "generic/platform=tvOS"
 
-    beijing_build = get_beijing_build_number()
+    beijing_build = get_beijing_timestamp_build_number()
     print(f"[INFO] 动态注入北京时间编译号 (Build Number): {beijing_build}")
+    os.environ["TZ"] = "Asia/Shanghai"
+    os.environ["BUILD_NUMBER"] = beijing_build
 
     info_plist = root / "tvos" / "THLRedLook" / "App" / "Info.plist"
     if info_plist.exists():
@@ -70,6 +72,7 @@ def main():
             "-archivePath", str(archive_path),
             "MARKETING_VERSION=1.0.0",
             f"CURRENT_PROJECT_VERSION={beijing_build}",
+            f"BUILD_NUMBER={beijing_build}",
         ]
         if not args.export_options:
             cmd.extend([
@@ -156,6 +159,7 @@ def main():
             "-destination", destination,
             "MARKETING_VERSION=1.0.0",
             f"CURRENT_PROJECT_VERSION={beijing_build}",
+            f"BUILD_NUMBER={beijing_build}",
             "CODE_SIGNING_ALLOWED=NO",
         ]
         if args.clean:

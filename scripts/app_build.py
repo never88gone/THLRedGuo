@@ -62,6 +62,13 @@ def get_beijing_build_number() -> str:
     return f"{year_part}{day_of_year}{time_part}"
 
 
+def get_beijing_timestamp_build_number() -> str:
+    """生成14位北京时间时间戳构建号 (YYYYMMDDHHmmss)，专供 tvOS / macOS / iOS 原生应用使用"""
+    tz_bj = timezone(timedelta(hours=8))
+    now = datetime.now(tz_bj)
+    return now.strftime('%Y%m%d%H%M%S')
+
+
 def sync_project_version(root: Path, base_version: str = "1.0.0") -> str:
     build_num = get_beijing_build_number()
     full_version = f"{base_version}+{build_num}"

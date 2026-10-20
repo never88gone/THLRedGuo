@@ -8,10 +8,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-from app_build import BuildVariant, add_variant_argument, sync_project_version
+from app_build import BuildVariant, add_variant_argument, sync_project_version, get_beijing_build_number
 
 root = Path(__file__).resolve().parents[1]
 sync_project_version(root, "1.0.0")
+beijing_build = get_beijing_build_number()
+os.environ["TZ"] = "Asia/Shanghai"
+os.environ["BUILD_NUMBER"] = beijing_build
 
 
 def run(arguments, **kwargs):
@@ -39,13 +42,13 @@ def main():
         config = options.export_options.expanduser().resolve()
         if not config.is_file():
             raise SystemExit('ExportOptions.plist 不存在。')
-        run([flutter, 'build', 'ipa', '--release', '--no-pub', '--export-options-plist', str(config), *variant.flutter_arguments])
+        run([flutter, 'build', 'ipa', '--release', '--no-pub', '--build-name=1.0.0', f'--build-number={beijing_build}', '--export-options-plist', str(config), *variant.flutter_arguments])
         for package in (root / 'build' / 'ios' / 'ipa').glob('*.ipa'):
             destination = output / f'{variant.slug}-{version}-ios.ipa'
             shutil.copy2(package, destination)
             artifacts.append(destination)
     else:
-        run([flutter, 'build', 'ios', '--release', '--no-codesign', '--no-pub', *variant.flutter_arguments])
+        run([flutter, 'build', 'ios', '--release', '--no-codesign', '--no-pub', '--build-name=1.0.0', f'--build-number={beijing_build}', *variant.flutter_arguments])
         application = root / 'build' / 'ios' / 'iphoneos' / 'Runner.app'
         destination = output / f'{variant.slug}-{version}-ios-unsigned-app.zip'
         run(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(application), str(destination)])
