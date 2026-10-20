@@ -76,6 +76,7 @@ public struct CatalogView: View {
                                 viewModel.selectCategory(category, immediate: true)
                             }
                             .focused($focusedTarget, equals: .category(catId))
+                            .accessibilityIdentifier("catalog.category.\(catId)")
                         }
                     }
                     .padding(.top, 16)
@@ -106,6 +107,7 @@ public struct CatalogView: View {
                         showingFilterSheet = true
                     }
                     .focused($focusedTarget, equals: .filter)
+                    .accessibilityIdentifier("catalog.filter")
 
                     // 刷新按钮
                     TVButton(
@@ -125,6 +127,7 @@ public struct CatalogView: View {
                         Task { await viewModel.reloadAll() }
                     }
                     .focused($focusedTarget, equals: .refresh)
+                    .accessibilityIdentifier("catalog.refresh")
                 }
                 .padding(.top, 8)
                 .padding(.trailing, 8)
@@ -178,6 +181,7 @@ public struct CatalogView: View {
                                 selectedDrama = drama
                             }
                             .focused($focusedTarget, equals: .card(drama.id))
+                            .accessibilityIdentifier("catalog.result.\(index)")
                             .onAppear {
                                 // 瀑布流智能触底：滑动至倒数 10 部短剧时提前自动请求下一页
                                 if index >= viewModel.items.count - 10 && viewModel.hasMore && !viewModel.isLoadingMore {

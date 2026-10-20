@@ -65,9 +65,15 @@ public actor NativeBridge {
 
     /// 扫描沙盒 sources 目录中的所有 JS Spider 脚本
     private func scanSourcesDirectory() {
+        let previousScripts = sourceScripts
+        defer {
+            jsContexts = jsContexts.filter { entry in
+                guard let script = sourceScripts[entry.key] else { return false }
+                return previousScripts[entry.key] == script
+            }
+        }
         installedSources.removeAll()
         sourceScripts.removeAll()
-        jsContexts.removeAll()
 
         guard let files = try? FileManager.default.contentsOfDirectory(at: sourcesDirURL, includingPropertiesForKeys: nil) else {
             return

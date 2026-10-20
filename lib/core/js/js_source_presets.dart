@@ -1960,7 +1960,7 @@ spider.danmaku = function (id, startMs, durationMs) {
           vod_id: id, vod_name: text(video.title), vod_pic: text(video.cover),
           vod_content: text(video.video_desc), vod_remarks: number(video.episode_cnt) ? number(video.episode_cnt) + '集' : '',
           vod_episodes: number(video.episode_cnt), vod_metric: metric, vod_heat: metric,
-          vod_views: text(video.show_play_cnt) || (number(video.play_cnt) ? text(video.play_cnt) : ''),
+          vod_views: (typeof video.show_play_cnt === 'boolean' ? '' : text(video.show_play_cnt)) || (number(video.play_cnt) ? text(video.play_cnt) : ''),
           vod_score: text(video.score), vod_rank: rank,
           vod_tag: text(video.sub_title)
         });
@@ -2125,7 +2125,10 @@ PresetJsSource? findPresetSource(String idOrFileName) {
 }
 
 /// 单独导入指定的预设数据源
-Future<bool> importSinglePresetSource(JsSourceService service, String sourceId) async {
+Future<bool> importSinglePresetSource(
+  JsSourceService service,
+  String sourceId,
+) async {
   final preset = findPresetSource(sourceId);
   if (preset == null) return false;
   return await service.importScript(preset.script, preset.fileName);
@@ -2147,10 +2150,15 @@ Future<void> showPresetSourceSelectionDialog({
           final activeId = service.activeSourceId;
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             backgroundColor: isDark ? AppColors.darkSurface : AppColors.white,
             titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 8,
+            ),
             actionsPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             title: Row(
               children: [
@@ -2160,7 +2168,11 @@ Future<void> showPresetSourceSelectionDialog({
                     color: AppColors.accentSubtle12,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.flash_on_rounded, color: AppColors.hongguoRed, size: 20),
+                  child: const Icon(
+                    Icons.flash_on_rounded,
+                    color: AppColors.hongguoRed,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 const Expanded(
@@ -2180,7 +2192,11 @@ Future<void> showPresetSourceSelectionDialog({
                   children: [
                     const Text(
                       '可分别单独导入任意预置 JS 插件，验证多源独立沙箱与数据隔离；亦可一键全量装载：',
-                      style: TextStyle(fontSize: 12, color: AppColors.grey, height: 1.4),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.grey,
+                        height: 1.4,
+                      ),
                     ),
                     const SizedBox(height: 14),
                     ...kPresetJsSources.map((preset) {
@@ -2191,12 +2207,16 @@ Future<void> showPresetSourceSelectionDialog({
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDark ? AppColors.darkSurfaceHighest : AppColors.lightSurfaceHigh,
+                          color: isDark
+                              ? AppColors.darkSurfaceHighest
+                              : AppColors.lightSurfaceHigh,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: isActive
                                 ? AppColors.hongguoRed
-                                : (isDark ? AppColors.darkBorder : AppColors.greyLight),
+                                : (isDark
+                                      ? AppColors.darkBorder
+                                      : AppColors.greyLight),
                             width: isActive ? 1.5 : 0.8,
                           ),
                         ),
@@ -2209,11 +2229,15 @@ Future<void> showPresetSourceSelectionDialog({
                                 shape: BoxShape.circle,
                                 color: isActive
                                     ? AppColors.hongguoRed
-                                    : (isDark ? AppColors.darkSurface : AppColors.white),
+                                    : (isDark
+                                          ? AppColors.darkSurface
+                                          : AppColors.white),
                               ),
                               child: Icon(
                                 Icons.javascript_rounded,
-                                color: isActive ? AppColors.white : AppColors.hongguoRed,
+                                color: isActive
+                                    ? AppColors.white
+                                    : AppColors.hongguoRed,
                                 size: 20,
                               ),
                             ),
@@ -2229,7 +2253,9 @@ Future<void> showPresetSourceSelectionDialog({
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
-                                      color: isActive ? AppColors.hongguoRed : null,
+                                      color: isActive
+                                          ? AppColors.hongguoRed
+                                          : null,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
@@ -2237,7 +2263,10 @@ Future<void> showPresetSourceSelectionDialog({
                                     '${preset.fileName} · ${preset.description}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 11, color: AppColors.grey),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.grey,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -2245,14 +2274,21 @@ Future<void> showPresetSourceSelectionDialog({
                             const SizedBox(width: 8),
                             if (isActive)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.hongguoRed,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Text(
                                   '已激活',
-                                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               )
                             else if (isImported)
@@ -2260,14 +2296,19 @@ Future<void> showPresetSourceSelectionDialog({
                                 key: ValueKey('activate-preset-${preset.id}'),
                                 style: FilledButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
                                 ),
                                 onPressed: () async {
                                   await service.switchSource(preset.id);
                                   setDialogState(() {});
                                   onSourceChanged?.call();
                                 },
-                                child: const Text('激活', style: TextStyle(fontSize: 12)),
+                                child: const Text(
+                                  '激活',
+                                  style: TextStyle(fontSize: 12),
+                                ),
                               )
                             else
                               FilledButton(
@@ -2275,10 +2316,15 @@ Future<void> showPresetSourceSelectionDialog({
                                 style: FilledButton.styleFrom(
                                   backgroundColor: AppColors.hongguoRed,
                                   visualDensity: VisualDensity.compact,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
                                 ),
                                 onPressed: () async {
-                                  final ok = await importSinglePresetSource(service, preset.id);
+                                  final ok = await importSinglePresetSource(
+                                    service,
+                                    preset.id,
+                                  );
                                   if (ok) {
                                     if (service.activeSourceId.isEmpty) {
                                       await service.switchSource(preset.id);
@@ -2286,16 +2332,23 @@ Future<void> showPresetSourceSelectionDialog({
                                     setDialogState(() {});
                                     onSourceChanged?.call();
                                     if (dialogCtx.mounted) {
-                                      ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        dialogCtx,
+                                      ).showSnackBar(
                                         SnackBar(
-                                          content: Text('已单独导入数据源：${preset.name}'),
+                                          content: Text(
+                                            '已单独导入数据源：${preset.name}',
+                                          ),
                                           behavior: SnackBarBehavior.floating,
                                         ),
                                       );
                                     }
                                   }
                                 },
-                                child: const Text('导入', style: TextStyle(fontSize: 12)),
+                                child: const Text(
+                                  '导入',
+                                  style: TextStyle(fontSize: 12),
+                                ),
                               ),
                           ],
                         ),
@@ -2338,4 +2391,3 @@ Future<void> showPresetSourceSelectionDialog({
     },
   );
 }
-

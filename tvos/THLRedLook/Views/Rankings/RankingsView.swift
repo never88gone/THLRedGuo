@@ -5,6 +5,7 @@ public struct RankingsView: View {
     @EnvironmentObject private var jsService: JSSourceService
     @EnvironmentObject private var store: LocalStore
     @State private var selectedDrama: Drama?
+    @State private var pendingNextRow: String?
 
     public enum FocusTarget: Hashable {
         case board(String)
@@ -12,9 +13,7 @@ public struct RankingsView: View {
     }
     @FocusState private var focusedTarget: FocusTarget?
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
-    ]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 32), count: 6)
 
     public var focusCategoryTrigger: Int = 0
     public var onRequestFocusTopNav: (() -> Void)? = nil
@@ -51,9 +50,6 @@ public struct RankingsView: View {
                                     board: board,
                                     isSelected: viewModel.selectedBoard?.id == board.id,
                                     isFocused: focusedTarget == .board(board.id),
-                                    onFocused: {
-                                        viewModel.selectBoard(board)
-                                    },
                                     onUpCommand: {
                                         focusedTarget = nil
                                         onRequestFocusTopNav?()
@@ -65,11 +61,14 @@ public struct RankingsView: View {
                                         } else {
                                             NSLog("🎯 [FOCUS_TRACE] Rankings onDownCommand -> items 为空，等待加载完成")
                                         }
-                                    }
+                                    },
+                                    onLeftCommand: { moveBoard(from: board, offset: -1) },
+                                    onRightCommand: { moveBoard(from: board, offset: 1) }
                                 ) {
                                     viewModel.selectBoard(board)
                                 }
                                 .focused($focusedTarget, equals: .board(board.id))
+                                .accessibilityIdentifier("ranking.board.\(board.id)")
                             }
                         }
                         .padding(.horizontal, 48)
@@ -78,7 +77,7 @@ public struct RankingsView: View {
                     }
                     .clipShape(Rectangle().inset(by: -30))
                     .focusSection()
-                    .defaultFocus($focusedTarget, viewModel.boards.first(where: \.isAllowedOnTV).map { FocusTarget.board($0.id) } ?? .board("hot"))
+                    .defaultFocus($focusedTarget, .board(viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id ?? ""))
 
                     if viewModel.isLoading && viewModel.items.isEmpty {
                         Spacer()
@@ -109,15 +108,19 @@ public struct RankingsView: View {
                                         DramaCardView(
                                             drama: drama,
                                             isFocused: focusedTarget == .card(drama.id),
-                                            onUpCommand: (index < 6) ? {
+                                            onUpCommand: (index < columns.count) ? {
                                                 let targetBoard = viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id ?? ""
                                                 focusedTarget = .board(targetBoard)
                                                 NSLog("🎯 [FOCUS_TRACE] Rankings 卡片第 1 行按向上 -> 精确回到当前榜单: %@", targetBoard)
+                                            } : nil,
+                                            onDownCommand: index + columns.count >= viewModel.items.count && viewModel.hasMore ? {
+                                                focusNextRow(after: drama.id)
                                             } : nil
                                         ) {
                                             selectedDrama = drama
                                         }
                                         .focused($focusedTarget, equals: .card(drama.id))
+                                        .accessibilityIdentifier("ranking.result.\(index)")
 
                                         // 前三名金银铜徽章
                                         Text("\(viewModel.ranks[drama.id] ?? index + 1)")
@@ -161,15 +164,54 @@ public struct RankingsView: View {
             DramaDetailView(drama: drama)
         }
         .onChange(of: viewModel.items) { items in
+            finishPendingRowFocus()
             NSLog("🎯 [FOCUS_TRACE] Rankings viewModel.items updated: count = %ld, firstId = %@", items.count, items.first?.id ?? "nil")
         }
         .onChange(of: focusedTarget) { target in
+            if let pendingNextRow, target != .card(pendingNextRow) { self.pendingNextRow = nil }
+            if case .card(let id) = target,
+               let index = viewModel.items.firstIndex(where: { $0.id == id }),
+               index >= viewModel.items.count - columns.count {
+                Task { await viewModel.loadMore() }
+            }
             NSLog("🎯 [FOCUS_TRACE] Rankings focusedTarget = %@", String(describing: target))
         }
         .onChange(of: focusCategoryTrigger) { _ in
             let target = viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id ?? ""
             focusedTarget = .board(target)
             NSLog("🎯 [FOCUS_TRACE] Rankings 收到导航栏向下指令 -> 精确聚焦榜单: %@", target)
+        }
+    }
+
+    private func moveBoard(from board: RankingBoard, offset: Int) {
+        let boards = viewModel.boards.filter(\.isAllowedOnTV)
+        guard let index = boards.firstIndex(where: { $0.id == board.id }) else { return }
+        let target = boards[min(max(index + offset, 0), boards.count - 1)]
+        pendingNextRow = nil
+        viewModel.selectBoard(target)
+        focusedTarget = .board(target.id)
+    }
+
+    private func focusNextRow(after id: String) {
+        pendingNextRow = id
+        Task {
+            await viewModel.loadMore()
+            finishPendingRowFocus()
+        }
+    }
+
+    private func finishPendingRowFocus() {
+        guard let id = pendingNextRow, focusedTarget == .card(id),
+              let index = viewModel.items.firstIndex(where: { $0.id == id }) else { return }
+        guard index + columns.count < viewModel.items.count else {
+            if !viewModel.hasMore || viewModel.errorMessage != nil { pendingNextRow = nil }
+            return
+        }
+        let nextID = viewModel.items[index + columns.count].id
+        pendingNextRow = nil
+        DispatchQueue.main.async {
+            guard focusedTarget == .card(id), selectedDrama == nil else { return }
+            focusedTarget = .card(nextID)
         }
     }
 }
@@ -179,6 +221,7 @@ public struct RecommendationsView: View {
     @EnvironmentObject private var jsService: JSSourceService
     @EnvironmentObject private var store: LocalStore
     @State private var selectedDrama: Drama?
+    @State private var pendingNextRow: String?
 
     public enum FocusTarget: Hashable {
         case category(String)
@@ -186,9 +229,7 @@ public struct RecommendationsView: View {
     }
     @FocusState private var focusedTarget: FocusTarget?
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 32)
-    ]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 32), count: 6)
 
     public var initialCategory: String? = nil
     public var focusCategoryTrigger: Int = 0
@@ -221,9 +262,6 @@ public struct RecommendationsView: View {
                                 title: cat,
                                 isSelected: viewModel.selectedSubCategory == cat,
                                 isFocused: focusedTarget == .category(cat),
-                                onFocused: {
-                                    viewModel.selectSubCategory(cat)
-                                },
                                 onUpCommand: {
                                     focusedTarget = nil
                                     onRequestFocusTopNav?()
@@ -235,11 +273,14 @@ public struct RecommendationsView: View {
                                     } else {
                                         NSLog("🎯 [FOCUS_TRACE] Recommendations onDownCommand -> items 为空，等待加载完成")
                                     }
-                                }
+                                },
+                                onLeftCommand: { moveCategory(from: cat, offset: -1) },
+                                onRightCommand: { moveCategory(from: cat, offset: 1) }
                             ) {
                                 viewModel.selectSubCategory(cat)
                             }
                             .focused($focusedTarget, equals: .category(cat))
+                            .accessibilityIdentifier("recommendation.category.\(cat)")
                         }
                         Spacer()
                     }
@@ -248,7 +289,7 @@ public struct RecommendationsView: View {
                     .padding(.top, 32)
                     .padding(.bottom, 8)
                     .focusSection()
-                    .defaultFocus($focusedTarget, .category("真人剧"))
+                    .defaultFocus($focusedTarget, .category(viewModel.selectedSubCategory))
 
                     if viewModel.isLoading && viewModel.items.isEmpty {
                         Spacer()
@@ -269,15 +310,19 @@ public struct RecommendationsView: View {
                                     DramaCardView(
                                         drama: drama,
                                         isFocused: focusedTarget == .card(drama.id),
-                                        onUpCommand: (index < 6) ? {
+                                        onUpCommand: (index < columns.count) ? {
                                             let cat = viewModel.selectedSubCategory.isEmpty ? (viewModel.subCategories.first ?? "真人剧") : viewModel.selectedSubCategory
                                             focusedTarget = .category(cat)
                                             NSLog("🎯 [FOCUS_TRACE] Recommendations 卡片第 1 行按向上 -> 精确回到当前分类: %@", cat)
+                                        } : nil,
+                                        onDownCommand: index + columns.count >= viewModel.items.count && viewModel.hasMore ? {
+                                            focusNextRow(after: drama.id)
                                         } : nil
                                     ) {
                                         selectedDrama = drama
                                     }
                                     .focused($focusedTarget, equals: .card(drama.id))
+                                    .accessibilityIdentifier("recommendation.result.\(index)")
                                     .onAppear {
                                         if index >= viewModel.items.count - 4 {
                                             Task { await viewModel.loadMore() }
@@ -311,15 +356,54 @@ public struct RecommendationsView: View {
             DramaDetailView(drama: drama)
         }
         .onChange(of: viewModel.items) { items in
+            finishPendingRowFocus()
             NSLog("🎯 [FOCUS_TRACE] Recommendations viewModel.items updated: count = %ld, firstId = %@", items.count, items.first?.id ?? "nil")
         }
         .onChange(of: focusedTarget) { target in
+            if let pendingNextRow, target != .card(pendingNextRow) { self.pendingNextRow = nil }
+            if case .card(let id) = target,
+               let index = viewModel.items.firstIndex(where: { $0.id == id }),
+               index >= viewModel.items.count - columns.count {
+                Task { await viewModel.loadMore() }
+            }
             NSLog("🎯 [FOCUS_TRACE] Recommendations focusedTarget = %@", String(describing: target))
         }
         .onChange(of: focusCategoryTrigger) { _ in
             let target = viewModel.selectedSubCategory.isEmpty ? (viewModel.subCategories.first ?? "真人剧") : viewModel.selectedSubCategory
             focusedTarget = .category(target)
             NSLog("🎯 [FOCUS_TRACE] Recommendations 收到导航栏向下指令 -> 精确聚焦分类: %@", target)
+        }
+    }
+
+    private func moveCategory(from category: String, offset: Int) {
+        let categories = viewModel.subCategories
+        guard let index = categories.firstIndex(of: category) else { return }
+        let target = categories[min(max(index + offset, 0), categories.count - 1)]
+        pendingNextRow = nil
+        viewModel.selectSubCategory(target)
+        focusedTarget = .category(target)
+    }
+
+    private func focusNextRow(after id: String) {
+        pendingNextRow = id
+        Task {
+            await viewModel.loadMore()
+            finishPendingRowFocus()
+        }
+    }
+
+    private func finishPendingRowFocus() {
+        guard let id = pendingNextRow, focusedTarget == .card(id),
+              let index = viewModel.items.firstIndex(where: { $0.id == id }) else { return }
+        guard index + columns.count < viewModel.items.count else {
+            if !viewModel.hasMore || viewModel.errorMessage != nil { pendingNextRow = nil }
+            return
+        }
+        let nextID = viewModel.items[index + columns.count].id
+        pendingNextRow = nil
+        DispatchQueue.main.async {
+            guard focusedTarget == .card(id), selectedDrama == nil else { return }
+            focusedTarget = .card(nextID)
         }
     }
 }

@@ -95,6 +95,7 @@ public struct SearchRootView: View {
                                     TVCapsuleButton(title: sug, isSelected: false) {
                                         Task { await viewModel.executeSearch(keyword: sug) }
                                     }
+                                    .accessibilityIdentifier("search.suggestion.\(sug)")
                                 }
                             }
                             .padding(.leading, 12)
@@ -116,6 +117,7 @@ public struct SearchRootView: View {
                                 TVButton(title: "清空历史", icon: "trash") {
                                     viewModel.clearHistory()
                                 }
+                                .accessibilityIdentifier("search.clearHistory")
                                 .padding(.top, 4)
                                 .padding(.trailing, 6)
                             }
@@ -126,6 +128,7 @@ public struct SearchRootView: View {
                                         TVCapsuleButton(title: kw, isSelected: false) {
                                             Task { await viewModel.executeSearch(keyword: kw) }
                                         }
+                                        .accessibilityIdentifier("search.history.\(kw)")
                                     }
                                 }
                                 .padding(.leading, 12)

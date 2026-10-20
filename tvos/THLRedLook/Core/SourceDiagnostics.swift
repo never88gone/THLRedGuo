@@ -483,43 +483,6 @@ public final class SourceDiagnosticRunner: ObservableObject {
         let context = "主动检测 " + ISO8601DateFormatter().string(from: Date())
         defer { running = false }
 
-        // 1. 网络与 DNS 基础连通性探测
-        let dnsStage = "DNS与网络探测"
-        let pingStart = ProcessInfo.processInfo.systemUptime
-        let cdnURL = URL(string: "https://lf3-shortplay-tos.snssdk.com")!
-        var pingReq = URLRequest(url: cdnURL)
-        pingReq.httpMethod = "HEAD"
-        pingReq.timeoutInterval = 6.0
-        do {
-            let (_, response) = try await URLSession.shared.data(for: pingReq)
-            let pingElapsed = Int((ProcessInfo.processInfo.systemUptime - pingStart) * 1000)
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 200
-            recorder.add(SourceDiagnosticEntry(
-                context: context,
-                stage: dnsStage,
-                host: cdnURL.host ?? "",
-                status: statusCode,
-                elapsedMs: pingElapsed,
-                category: .unknown
-            ))
-        } catch {
-            let pingElapsed = Int((ProcessInfo.processInfo.systemUptime - pingStart) * 1000)
-            let (cat, reason, advice) = SourceDiagnostics.classify(error: error, httpStatus: nil, body: nil, isJS: false)
-            recorder.add(SourceDiagnosticEntry(
-                context: context,
-                stage: dnsStage,
-                host: cdnURL.host ?? "",
-                errorCode: cat.tag,
-                elapsedMs: pingElapsed,
-                category: cat,
-                errorDetail: reason,
-                suggestion: advice
-            ))
-            result = "检测失败：【\(cat.tag)】\(reason)"
-            return
-        }
-
-        // 2. JS 数据源核心与接口探测
         let bridge = NativeBridge(diagnostics: recorder, diagnosticContext: context)
         var stage = "搜索第一页"
         do {

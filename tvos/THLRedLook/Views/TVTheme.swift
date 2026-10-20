@@ -418,6 +418,8 @@ public struct TVCapsuleButton: View {
     public var onFocused: (() -> Void)? = nil
     public var onUpCommand: (() -> Void)? = nil
     public var onDownCommand: (() -> Void)? = nil
+    public var onLeftCommand: (() -> Void)? = nil
+    public var onRightCommand: (() -> Void)? = nil
     public let action: () -> Void
 
     public init(
@@ -428,6 +430,8 @@ public struct TVCapsuleButton: View {
         onFocused: (() -> Void)? = nil,
         onUpCommand: (() -> Void)? = nil,
         onDownCommand: (() -> Void)? = nil,
+        onLeftCommand: (() -> Void)? = nil,
+        onRightCommand: (() -> Void)? = nil,
         action: @escaping () -> Void
     ) {
         self.title = title
@@ -436,6 +440,8 @@ public struct TVCapsuleButton: View {
         self.onFocused = onFocused
         self.onUpCommand = onUpCommand
         self.onDownCommand = onDownCommand
+        self.onLeftCommand = onLeftCommand
+        self.onRightCommand = onRightCommand
         self.action = action
     }
 
@@ -457,6 +463,10 @@ public struct TVCapsuleButton: View {
                 onUpCommand?()
             } else if direction == .down {
                 onDownCommand?()
+            } else if direction == .left {
+                onLeftCommand?()
+            } else if direction == .right {
+                onRightCommand?()
             }
         }
     }
@@ -818,6 +828,8 @@ public struct TVRankingBoardButton: View {
     public var onFocused: (() -> Void)? = nil
     public var onUpCommand: (() -> Void)? = nil
     public var onDownCommand: (() -> Void)? = nil
+    public var onLeftCommand: (() -> Void)? = nil
+    public var onRightCommand: (() -> Void)? = nil
     public let action: () -> Void
 
     public init(
@@ -828,6 +840,8 @@ public struct TVRankingBoardButton: View {
         onFocused: (() -> Void)? = nil,
         onUpCommand: (() -> Void)? = nil,
         onDownCommand: (() -> Void)? = nil,
+        onLeftCommand: (() -> Void)? = nil,
+        onRightCommand: (() -> Void)? = nil,
         action: @escaping () -> Void
     ) {
         self.board = board
@@ -836,6 +850,8 @@ public struct TVRankingBoardButton: View {
         self.onFocused = onFocused
         self.onUpCommand = onUpCommand
         self.onDownCommand = onDownCommand
+        self.onLeftCommand = onLeftCommand
+        self.onRightCommand = onRightCommand
         self.action = action
     }
 
@@ -848,12 +864,13 @@ public struct TVRankingBoardButton: View {
                 Text(board.name)
                     .font(.system(size: 20, weight: isSelected ? .black : .bold))
                     .foregroundColor(TVTheme.textPrimary)
+                    .lineLimit(1)
                 Text(board.description)
                     .font(.caption)
                     .foregroundColor(activeFocused ? TVTheme.textPrimary.opacity(0.9) : TVTheme.textSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2, reservesSpace: true)
             }
-            .frame(minWidth: 160)
+            .frame(width: 240)
             .padding(.horizontal, 28)
             .padding(.vertical, 16)
             .background(
@@ -871,6 +888,10 @@ public struct TVRankingBoardButton: View {
                 onUpCommand?()
             } else if direction == .down {
                 onDownCommand?()
+            } else if direction == .left {
+                onLeftCommand?()
+            } else if direction == .right {
+                onRightCommand?()
             }
         }
         .onChange(of: activeFocused) { focused in

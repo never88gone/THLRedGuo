@@ -2275,7 +2275,7 @@ spider.danmaku = function (id, startMs, durationMs) {
           vod_id: id, vod_name: text(video.title), vod_pic: text(video.cover),
           vod_content: text(video.video_desc), vod_remarks: number(video.episode_cnt) ? number(video.episode_cnt) + '集' : '',
           vod_episodes: number(video.episode_cnt), vod_metric: metric, vod_heat: metric,
-          vod_views: text(video.show_play_cnt) || (number(video.play_cnt) ? text(video.play_cnt) : ''),
+          vod_views: (typeof video.show_play_cnt === 'boolean' ? '' : text(video.show_play_cnt)) || (number(video.play_cnt) ? text(video.play_cnt) : ''),
           vod_score: text(video.score), vod_rank: rank,
           vod_tag: text(video.sub_title)
         });
