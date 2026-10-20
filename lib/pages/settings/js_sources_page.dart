@@ -30,7 +30,8 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _scriptController = TextEditingController();
 
-  late final JsSourceService _service = widget.service ??
+  late final JsSourceService _service =
+      widget.service ??
       JsSourceService.current ??
       JsSourceService(widget.repository);
 
@@ -111,10 +112,14 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                   TextField(
                     controller: _scriptController,
                     maxLines: 10,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'JavaScript 源码',
-                      hintText: 'const meta = { id: "my_source", name: "我的源", ... };\n\nfunction getCategories() { ... }',
+                      hintText:
+                          'const meta = { id: "my_source", name: "我的源", ... };\n\nfunction getCategories() { ... }',
                       border: OutlineInputBorder(),
                       alignLabelWithHint: true,
                     ),
@@ -129,7 +134,9 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
               child: const Text('取消'),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.hongguoRed,
+              ),
               onPressed: () {
                 if (_nameController.text.trim().isEmpty ||
                     _scriptController.text.trim().isEmpty) {
@@ -189,7 +196,9 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
         return;
       }
 
-      final fileName = file.name.endsWith('.js') ? file.name : '${file.name}.js';
+      final fileName = file.name.endsWith('.js')
+          ? file.name
+          : '${file.name}.js';
       final ok = await _service.importScript(script, fileName);
       if (!mounted) return;
       if (ok) {
@@ -255,7 +264,9 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
               child: const Text('取消'),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.hongguoRed,
+              ),
               onPressed: () {
                 final url = controller.text.trim();
                 if (url.isNotEmpty) {
@@ -333,7 +344,9 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
             child: const Text('取消'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.hongguoRed,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('确认删除'),
           ),
@@ -348,7 +361,9 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
         if (widget.store.source == meta.id) {
           final nextSource = _service.activeSourceId.isNotEmpty
               ? _service.activeSourceId
-              : (widget.store.sources.isNotEmpty ? widget.store.sources.first.id : 'hongguo');
+              : (widget.store.sources.isNotEmpty
+                    ? widget.store.sources.first.id
+                    : 'hongguo');
           try {
             await widget.store.setSource(nextSource);
           } catch (_) {}
@@ -383,16 +398,16 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
             Text('清空所有数据源'),
           ],
         ),
-        content: const Text(
-          '确定要清空所有已导入的 JS 数据源插件吗？\n此操作将删除本地所有插件脚本文件，不可恢复。',
-        ),
+        content: const Text('确定要清空所有已导入的 JS 数据源插件吗？\n此操作将删除本地所有插件脚本文件，不可恢复。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('取消'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.hongguoRed),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.hongguoRed,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('全部清空'),
           ),
@@ -434,8 +449,12 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
             key: const ValueKey('js-sources-more-actions'),
             tooltip: '更多操作',
             icon: const Icon(Icons.more_vert_rounded),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            color: isDark
+                ? AppColors.darkSurfaceElevated
+                : AppColors.lightSurface,
             elevation: 4,
             onSelected: (action) {
               switch (action) {
@@ -464,7 +483,11 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                 value: 'select_presets',
                 child: Row(
                   children: [
-                    Icon(Icons.checklist_rounded, size: 20, color: AppColors.hongguoRed),
+                    Icon(
+                      Icons.checklist_rounded,
+                      size: 20,
+                      color: AppColors.hongguoRed,
+                    ),
                     SizedBox(width: 12),
                     Text('选择预设源分别导入'),
                   ],
@@ -474,7 +497,11 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                 value: 'presets',
                 child: Row(
                   children: [
-                    Icon(Icons.flash_on_rounded, size: 20, color: AppColors.hongguoRed),
+                    Icon(
+                      Icons.flash_on_rounded,
+                      size: 20,
+                      color: AppColors.hongguoRed,
+                    ),
                     SizedBox(width: 12),
                     Text('一键导入测试预设源'),
                   ],
@@ -515,9 +542,16 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                 value: 'clear_all',
                 child: Row(
                   children: [
-                    Icon(Icons.delete_forever_rounded, size: 20, color: AppColors.hongguoRed),
+                    Icon(
+                      Icons.delete_forever_rounded,
+                      size: 20,
+                      color: AppColors.hongguoRed,
+                    ),
                     SizedBox(width: 12),
-                    Text('清空所有数据源', style: TextStyle(color: AppColors.hongguoRed)),
+                    Text(
+                      '清空所有数据源',
+                      style: TextStyle(color: AppColors.hongguoRed),
+                    ),
                   ],
                 ),
               ),
@@ -541,7 +575,9 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                   color: isDark ? null : AppColors.greyLight,
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: isDark ? const Color(0x26FFFFFF) : AppColors.lightBorder,
+                    color: isDark
+                        ? const Color(0x26FFFFFF)
+                        : AppColors.lightBorder,
                     width: 0.8,
                   ),
                 ),
@@ -558,14 +594,20 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                               color: AppColors.accentSubtle12,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.hub_rounded, color: AppColors.hongguoRed, size: 18),
+                            child: const Icon(
+                              Icons.hub_rounded,
+                              color: AppColors.hongguoRed,
+                              size: 18,
+                            ),
                           ),
                           const SizedBox(width: 10),
-                          Text(
-                            '原生独立沙箱引擎 (v1.0.1)',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.hongguoRed,
+                          Expanded(
+                            child: Text(
+                              '原生独立沙箱引擎 (v1.0.1)',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.hongguoRed,
+                              ),
                             ),
                           ),
                         ],
@@ -596,18 +638,25 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                     color: isDark ? AppColors.darkSurface : AppColors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isDark ? AppColors.darkBorder : AppColors.greyLight,
+                      color: isDark
+                          ? AppColors.darkBorder
+                          : AppColors.greyLight,
                     ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 36,
+                      horizontal: 20,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: isDark ? AppColors.darkSurfaceHighest : AppColors.lightSurfaceHigh,
+                            color: isDark
+                                ? AppColors.darkSurfaceHighest
+                                : AppColors.lightSurfaceHigh,
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -627,7 +676,11 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                         const Text(
                           '本应用出厂不内置任何站源，请从外部导入或添加 .js 插件。各插件在沙箱内独立运行、互不干扰。',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: AppColors.grey, height: 1.5),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.grey,
+                            height: 1.5,
+                          ),
                         ),
                         const SizedBox(height: 24),
                         Wrap(
@@ -642,7 +695,10 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                                 shape: const StadiumBorder(),
                               ),
                               onPressed: _showPresetSelection,
-                              icon: const Icon(Icons.checklist_rounded, size: 18),
+                              icon: const Icon(
+                                Icons.checklist_rounded,
+                                size: 18,
+                              ),
                               label: const Text('选择预设源分别导入'),
                             ),
                             FilledButton.tonalIcon(
@@ -650,7 +706,10 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                                 shape: const StadiumBorder(),
                               ),
                               onPressed: _importPresets,
-                              icon: const Icon(Icons.flash_on_rounded, size: 18),
+                              icon: const Icon(
+                                Icons.flash_on_rounded,
+                                size: 18,
+                              ),
                               label: const Text('一键导入全部预设'),
                             ),
                             FilledButton.icon(
@@ -659,17 +718,24 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                                 shape: const StadiumBorder(),
                               ),
                               onPressed: _pickAndImportFile,
-                              icon: const Icon(Icons.file_open_rounded, size: 18),
+                              icon: const Icon(
+                                Icons.file_open_rounded,
+                                size: 18,
+                              ),
                               label: const Text('选择外部 .js 插件'),
                             ),
                             FilledButton.tonalIcon(
-                              style: FilledButton.styleFrom(shape: const StadiumBorder()),
+                              style: FilledButton.styleFrom(
+                                shape: const StadiumBorder(),
+                              ),
                               onPressed: _showUrlImportDialog,
                               icon: const Icon(Icons.link_rounded, size: 18),
                               label: const Text('网络链接订阅'),
                             ),
                             OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
+                              style: OutlinedButton.styleFrom(
+                                shape: const StadiumBorder(),
+                              ),
                               onPressed: _showImportDialog,
                               icon: const Icon(Icons.code_rounded, size: 18),
                               label: const Text('粘贴插件源码'),
@@ -692,7 +758,11 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
                       side: BorderSide(
-                        color: isActive ? AppColors.hongguoRed : (isDark ? AppColors.darkBorder : AppColors.greyLight),
+                        color: isActive
+                            ? AppColors.hongguoRed
+                            : (isDark
+                                  ? AppColors.darkBorder
+                                  : AppColors.greyLight),
                         width: isActive ? 1.5 : 0.8,
                       ),
                     ),
@@ -710,42 +780,69 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    gradient: isActive ? AppGradients.primary : null,
-                                    color: isActive ? null : (isDark ? AppColors.darkSurfaceHighest : AppColors.lightSurfaceHighest),
+                                    gradient: isActive
+                                        ? AppGradients.primary
+                                        : null,
+                                    color: isActive
+                                        ? null
+                                        : (isDark
+                                              ? AppColors.darkSurfaceHighest
+                                              : AppColors.lightSurfaceHighest),
                                     shape: BoxShape.circle,
-                                    boxShadow: isActive ? AppShadows.pillGlow : null,
+                                    boxShadow: isActive
+                                        ? AppShadows.pillGlow
+                                        : null,
                                   ),
                                   child: Icon(
                                     Icons.javascript_rounded,
-                                    color: isActive ? AppColors.white : AppColors.hongguoRed,
+                                    color: isActive
+                                        ? AppColors.white
+                                        : AppColors.hongguoRed,
                                     size: 22,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Row(
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 4,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
                                         children: [
                                           Text(
                                             meta.name,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
-                                              color: isActive ? AppColors.hongguoRed : null,
+                                              color: isActive
+                                                  ? AppColors.hongguoRed
+                                                  : null,
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 7,
+                                              vertical: 2,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: isDark ? AppColors.darkSurfaceHighest : AppColors.greyLight,
-                                              borderRadius: BorderRadius.circular(6),
+                                              color: isDark
+                                                  ? AppColors.darkSurfaceHighest
+                                                  : AppColors.greyLight,
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                             ),
                                             child: Text(
                                               'v${meta.version}',
-                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -753,7 +850,10 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                                       const SizedBox(height: 3),
                                       Text(
                                         '文件: ${meta.id}.js · 作者: ${meta.author.isNotEmpty ? meta.author : "内置"}',
-                                        style: const TextStyle(fontSize: 12, color: AppColors.grey),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.grey,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -763,21 +863,36 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                                   children: [
                                     if (isActive)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 5,
+                                        ),
                                         decoration: BoxDecoration(
                                           gradient: AppGradients.primary,
-                                          borderRadius: BorderRadius.circular(20),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                           boxShadow: AppShadows.pillGlow,
                                         ),
                                         child: const Text(
                                           '当前激活',
-                                          style: TextStyle(color: AppColors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                          style: TextStyle(
+                                            color: AppColors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       )
                                     else
                                       TextButton(
-                                        onPressed: () => _handleSwitchSource(meta),
-                                        child: const Text('激活', style: TextStyle(color: AppColors.hongguoRed)),
+                                        onPressed: () =>
+                                            _handleSwitchSource(meta),
+                                        child: const Text(
+                                          '激活',
+                                          style: TextStyle(
+                                            color: AppColors.hongguoRed,
+                                          ),
+                                        ),
                                       ),
                                     const SizedBox(width: 4),
                                     IconButton(
@@ -788,7 +903,8 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                                         size: 20,
                                         color: AppColors.grey,
                                       ),
-                                      onPressed: () => _confirmDeleteSource(meta),
+                                      onPressed: () =>
+                                          _confirmDeleteSource(meta),
                                     ),
                                   ],
                                 ),
@@ -798,7 +914,10 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                               const SizedBox(height: 10),
                               Text(
                                 meta.description,
-                                style: const TextStyle(fontSize: 13, height: 1.4),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  height: 1.4,
+                                ),
                               ),
                             ],
                             if (meta.features.isNotEmpty) ...[
@@ -808,7 +927,10 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                                 runSpacing: 6,
                                 children: meta.features.map((feat) {
                                   return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: AppColors.accentSubtle12,
                                       borderRadius: BorderRadius.circular(4),

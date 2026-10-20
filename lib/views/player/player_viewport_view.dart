@@ -227,9 +227,11 @@ class PlayerViewportView extends StatelessWidget {
             enhancement.setViewport(pixels, television: television);
           });
           return Stack(
-            key: videoPaneKey,
             fit: StackFit.expand,
             children: [
+              Positioned.fill(
+                child: IgnorePointer(child: SizedBox.expand(key: videoPaneKey)),
+              ),
               // 0. 最底层海报毛玻璃托底背景（环境漫反射底衬，消除纯黑边违和感）
               DramaBackdrop(
                 drama: detail.drama,
