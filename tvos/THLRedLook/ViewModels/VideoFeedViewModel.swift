@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AVFoundation
 
 public struct VideoFeedItem: Decodable, Identifiable {
     public let drama: Drama
@@ -23,6 +24,13 @@ public final class VideoFeedViewModel: ObservableObject {
     @Published public private(set) var isLoading = false
     @Published public private(set) var errorMessage: String?
     @Published public private(set) var needsRefresh = false
+
+    // 预热与预解析缓存
+    @Published public private(set) var feedPlans: [String: PlaybackPlan] = [:]
+    @Published public private(set) var feedEpisodes: [String: [Episode]] = [:]
+    private var resolvingTasks: [String: Task<PlaybackPlan?, Never>] = [:]
+    private var decryptedURLs: [String: URL] = [:]
+
     private var session = UUID().uuidString
     private var generation = 0
     private var pageTask: Task<Void, Never>?
@@ -46,6 +54,7 @@ public final class VideoFeedViewModel: ObservableObject {
             if errorMessage != nil { break }
         }
         if items.isEmpty && errorMessage == nil { errorMessage = "暂时没有可播放的推荐，请重试或换一批" }
+        preloadAround(index: currentIndex)
         prefetch()
     }
 
@@ -53,6 +62,13 @@ public final class VideoFeedViewModel: ObservableObject {
         generation += 1
         pageTask?.cancel()
         pageTask = nil
+        for (_, task) in resolvingTasks { task.cancel() }
+        resolvingTasks.removeAll()
+        cleanupDecryptedFiles()
+        feedPlans.removeAll()
+        feedEpisodes.removeAll()
+        VideoCacheManager.shared.clearNamespace("feed")
+
         isLoading = false
         session = UUID().uuidString
         items = []
@@ -78,14 +94,19 @@ public final class VideoFeedViewModel: ObservableObject {
             emptyPages += 1
         }
         guard requestGeneration == generation, currentIndex == requestedIndex else { return }
-        if currentIndex + 1 < items.count { currentIndex += 1 }
-        else if hasMore && errorMessage == nil { errorMessage = "暂未返回新的推荐，请重试或换一批" }
+        if currentIndex + 1 < items.count {
+            currentIndex += 1
+            preloadAround(index: currentIndex)
+        } else if hasMore && errorMessage == nil {
+            errorMessage = "暂未返回新的推荐，请重试或换一批"
+        }
         prefetch()
     }
 
     public func previous() {
         guard canGoPrevious else { return }
         currentIndex -= 1
+        preloadAround(index: currentIndex)
     }
 
     public func retry() async {
@@ -113,10 +134,14 @@ public final class VideoFeedViewModel: ObservableObject {
                 let result = try await loadPage(requestedPage, scope)
                 guard !Task.isCancelled, generation == requestGeneration else { return }
                 var seen = Set(items.map(\.id))
-                items.append(contentsOf: result.items.filter { !$0.id.isEmpty && seen.insert($0.id).inserted })
+                let newItems = result.items.filter { !$0.id.isEmpty && seen.insert($0.id).inserted }
+                items.append(contentsOf: newItems)
                 page = result.page
                 hasMore = result.hasMore
                 if items.isEmpty && !hasMore { errorMessage = "暂时没有可播放的推荐，请刷新重试" }
+
+                // 新数据追加后自动预热
+                self.preloadAround(index: self.currentIndex)
             } catch {
                 guard !Task.isCancelled, generation == requestGeneration else { return }
                 let code = (error as NSError).userInfo["sourceErrorCode"] as? String ?? ""
@@ -129,5 +154,114 @@ public final class VideoFeedViewModel: ObservableObject {
         guard generation == requestGeneration else { return }
         pageTask = nil
         isLoading = false
+    }
+
+    // MARK: - 全链路异步预解析与预热缓冲 (Preload Pipeline)
+
+    public func preloadAround(index: Int) {
+        guard index >= 0 && index < items.count else { return }
+        // 优先预热当前项、下一部、下两部以及上一部
+        let offsets = [0, 1, 2, -1]
+        for offset in offsets {
+            let targetIdx = index + offset
+            guard targetIdx >= 0 && targetIdx < items.count else { continue }
+            let item = items[targetIdx]
+            if feedPlans[item.id] == nil && resolvingTasks[item.id] == nil {
+                Task {
+                    _ = await resolveAndPreload(item: item)
+                }
+            }
+        }
+    }
+
+    public func resolveAndPreload(item: VideoFeedItem) async -> PlaybackPlan? {
+        if let existing = feedPlans[item.id] {
+            return existing
+        }
+        if let task = resolvingTasks[item.id] {
+            return await task.value
+        }
+
+        let dramaId = item.id
+        let task = Task { [weak self] () -> PlaybackPlan? in
+            guard let self else { return nil }
+            do {
+                let detail = try await NativeRepository.shared.loadDetail(drama: item.drama, store: LocalStore.shared)
+                let episodes = detail.episodes
+                let targetEpisode = episodes.first { $0.number == item.episode } ?? episodes.first
+                let targetIndex = targetEpisode?.number ?? item.episode
+
+                let resolved = try await NativeRepository.shared.resolvePlayback(
+                    drama: detail.drama,
+                    episode: targetEpisode,
+                    episodeIndex: targetIndex,
+                    quality: 360
+                )
+                guard !Task.isCancelled else { return nil }
+
+                let effectivePlan: PlaybackPlan
+                if !resolved.decryptionKey.isEmpty, let remoteURL = URL(string: resolved.url) {
+                    let decryptedURL = try await CENCMP4Decryptor.shared.decrypt(
+                        remoteURL: remoteURL,
+                        headers: resolved.headers,
+                        hexKey: resolved.decryptionKey,
+                        mediaBytes: resolved.mediaBytes
+                    )
+                    guard !Task.isCancelled else {
+                        CENCMP4Decryptor.shared.removePlaybackCache(at: decryptedURL)
+                        return nil
+                    }
+                    if let oldDec = self.decryptedURLs[dramaId], oldDec != decryptedURL {
+                        CENCMP4Decryptor.shared.removePlaybackCache(at: oldDec)
+                    }
+                    self.decryptedURLs[dramaId] = decryptedURL
+                    effectivePlan = PlaybackPlan(
+                        url: decryptedURL.absoluteString,
+                        headers: [:],
+                        decryptionKey: "",
+                        quality: resolved.quality,
+                        qualities: resolved.qualities,
+                        danmakuId: resolved.danmakuId
+                    )
+                } else {
+                    effectivePlan = resolved
+                }
+
+                self.feedEpisodes[dramaId] = episodes
+                self.feedPlans[dramaId] = effectivePlan
+
+                // 立即加入 VideoCacheManager 静音预热前 3 秒分片
+                VideoCacheManager.shared.preload(
+                    items: [(url: effectivePlan.url, headers: effectivePlan.headers)],
+                    namespace: "feed"
+                )
+
+                return effectivePlan
+            } catch {
+                return nil
+            }
+        }
+
+        resolvingTasks[dramaId] = task
+        let result = await task.value
+        resolvingTasks.removeValue(forKey: dramaId)
+        return result
+    }
+
+    private func cleanupDecryptedFiles() {
+        let urls = Array(decryptedURLs.values)
+        decryptedURLs.removeAll()
+        Self.removeDecryptedFiles(urls)
+    }
+
+    nonisolated private static func removeDecryptedFiles(_ urls: [URL]) {
+        for url in urls {
+            CENCMP4Decryptor.shared.removePlaybackCache(at: url)
+        }
+    }
+
+    deinit {
+        let urls = Array(decryptedURLs.values)
+        Self.removeDecryptedFiles(urls)
     }
 }

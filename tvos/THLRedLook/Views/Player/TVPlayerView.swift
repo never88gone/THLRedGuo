@@ -10,6 +10,10 @@ public struct TVPlayerView: View {
     public var onDismiss: (() -> Void)? = nil
     public var onSwitchSeason: ((Drama) -> Void)? = nil
     public var feedActions: TVVideoFeedActions?
+    public let drama: Drama
+    public let initialEpisodeIndex: Int
+    public let initialPosition: Double
+    public let preloadedPlan: PlaybackPlan?
     @State private var isSwitchingFeed = false
     @State private var isPlayerPresented = false
 
@@ -29,8 +33,13 @@ public struct TVPlayerView: View {
         initialShowDrawer: Bool = false,
         onDismiss: (() -> Void)? = nil,
         onSwitchSeason: ((Drama) -> Void)? = nil,
-        feedActions: TVVideoFeedActions? = nil
+        feedActions: TVVideoFeedActions? = nil,
+        preloadedPlan: PlaybackPlan? = nil
     ) {
+        self.drama = drama
+        self.initialEpisodeIndex = initialEpisodeIndex
+        self.initialPosition = initialPosition
+        self.preloadedPlan = preloadedPlan
         _viewModel = StateObject(wrappedValue: PlayerViewModel(
             drama: drama,
             allEpisodes: episodes,
@@ -38,7 +47,8 @@ public struct TVPlayerView: View {
             initialPosition: initialPosition,
             initialShowControls: initialShowControls,
             keepControlsVisible: keepControlsVisible,
-            initialShowDrawer: initialShowDrawer
+            initialShowDrawer: initialShowDrawer,
+            preloadedPlan: preloadedPlan
         ))
         self.onDismiss = onDismiss
         self.onSwitchSeason = onSwitchSeason

@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 public struct TVVideoFeedActions {
     let progressText: String
@@ -103,20 +104,22 @@ public struct TVVideoFeedView: View {
     }
 }
 
-private struct TVVideoFeedPlaybackView: View {
+/// 沉浸式短视频推荐全屏流式播放器（参考 thldytv 的 AVPlayerContainerView 与预加载机制）
+/// 复用统一的高性能播放器视口，彻底消除切换时的重复销毁重建与转圈等待，实现毫秒级快速切片
+public struct TVVideoFeedPlaybackView: View {
     @ObservedObject var viewModel: VideoFeedViewModel
     @ObservedObject private var store = LocalStore.shared
     @State private var detailDrama: Drama?
     let onDismiss: () -> Void
 
-    var body: some View {
+    public var body: some View {
         NavigationStack {
             Group {
                 if let item = viewModel.current {
                     let history = store.history.first { $0.drama.id == item.id }
                     TVPlayerView(
                         drama: item.drama,
-                        episodes: [],
+                        episodes: viewModel.feedEpisodes[item.id] ?? [],
                         initialEpisodeIndex: history?.episode ?? item.episode,
                         initialPosition: history?.position ?? item.position,
                         initialShowControls: false,
@@ -139,21 +142,23 @@ private struct TVVideoFeedPlaybackView: View {
                             },
                             onDetail: { detailDrama = $0 },
                             onRefresh: { Task { await viewModel.refresh() } }
-                        )
+                        ),
+                        preloadedPlan: viewModel.feedPlans[item.id]
                     )
                     .id(item.id)
-                } else {
-                    VStack(spacing: 24) {
-                        if viewModel.isLoading { ProgressView("正在加载推荐…") }
-                        if let error = viewModel.errorMessage { Text(error) }
-                        Button("重试") { Task { await viewModel.retry() } }.accessibilityIdentifier("feed.retry")
-                        Button("返回", action: onDismiss)
-                    }
-                    .onExitCommand(perform: onDismiss)
+                } else if viewModel.isLoading {
+                    ProgressView("正在准备下一条推荐…")
+                } else if let error = viewModel.errorMessage {
+                    Text(error)
                 }
             }
-            .navigationDestination(item: $detailDrama) { drama in DramaDetailView(drama: drama) }
+            .navigationDestination(item: $detailDrama) { drama in
+                DramaDetailView(drama: drama)
+            }
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear {
+                viewModel.preloadAround(index: viewModel.currentIndex)
+            }
         }
     }
 }

@@ -84,6 +84,7 @@ public final class PlayerViewModel: ObservableObject {
     private var lastProgressTime = Date()
     private var lastObservedPosition = 0.0
     private static let audioSessionQueue = DispatchQueue(label: "THLRedLook.AudioSession")
+    private let initialPreloadedPlan: PlaybackPlan?
 
     public init(
         drama: Drama,
@@ -93,6 +94,7 @@ public final class PlayerViewModel: ObservableObject {
         initialShowControls: Bool = true,
         keepControlsVisible: Bool = false,
         initialShowDrawer: Bool = false,
+        preloadedPlan: PlaybackPlan? = nil,
         repository: NativeRepository = .shared,
         store: LocalStore = .shared
     ) {
@@ -103,6 +105,7 @@ public final class PlayerViewModel: ObservableObject {
         self.isControlsVisible = initialShowDrawer ? false : initialShowControls
         self.isEpisodeDrawerVisible = initialShowDrawer
         self.keepControlsVisible = keepControlsVisible
+        self.initialPreloadedPlan = preloadedPlan
         self.repository = repository
         self.store = store
         self.danmakuEnabled = store.danmakuEnabled
@@ -123,6 +126,34 @@ public final class PlayerViewModel: ObservableObject {
         isVisible = true
         closed = false
         if progressSaveTimer == nil { startProgressSaveTimer() }
+
+        // 若外部已提前预加载就绪，0ms 瞬间挂载起播，彻底杜绝转圈等待
+        if let preloaded = self.initialPreloadedPlan, let url = URL(string: preloaded.url) {
+            self.plan = preloaded
+            self.selectedQuality = preloaded.quality
+            var options: [String: Any] = [:]
+            if !preloaded.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = preloaded.headers }
+            let asset = AVURLAsset(url: url, options: options.isEmpty ? nil : options)
+            let item = AVPlayerItem(asset: asset)
+            item.preferredForwardBufferDuration = 10.0
+            VideoCacheManager.shared.focusOnVideo(urlString: preloaded.url, namespace: "feed")
+            self.startPlaybackWithItem(item: item, seekTo: self.currentTime)
+            self.isLoading = false
+            NSLog("🎬 [PlayerVM] onAppear 命中预载方案(%@)，实现秒开起播", self.drama.title)
+
+            lifecycleTask = Task { [weak self] in
+                guard let self, !self.drama.id.starts(with: "test_") else { return }
+                if self.allEpisodes.isEmpty {
+                    if let detail = try? await self.repository.loadDetail(drama: self.drama, store: self.store) {
+                        guard !Task.isCancelled, !self.closed else { return }
+                        self.allEpisodes = detail.episodes
+                    }
+                }
+                await self.loadSeasons()
+            }
+            return
+        }
+
         lifecycleTask = Task { [weak self] in
             guard let self else { return }
             if !self.drama.id.starts(with: "test_") {
@@ -251,6 +282,44 @@ public final class PlayerViewModel: ObservableObject {
 
     public func preparePlayback(episodeIndex: Int, seekTo: Double = 0) async {
         await beginPlayback(episodeIndex: episodeIndex, seekTo: seekTo, recovering: false)
+    }
+
+    public func switchFeedDrama(
+        drama: Drama,
+        initialEpisodeIndex: Int = 1,
+        initialPosition: Double = 0,
+        preloadedPlan: PlaybackPlan? = nil
+    ) async {
+        guard !closed else { return }
+        saveCurrentProgress()
+        playbackGeneration += 1
+        let generation = playbackGeneration
+
+        self.drama = drama
+        self.currentEpisodeIndex = initialEpisodeIndex
+        self.currentTime = max(0, initialPosition)
+        self.duration = 0
+        self.errorMessage = nil
+        self.isSeamlessTransitioning = true // 保持当前画面最后一帧，无黑闪
+
+        if let plan = preloadedPlan, let url = URL(string: plan.url) {
+            self.plan = plan
+            self.selectedQuality = plan.quality
+            var options: [String: Any] = [:]
+            if !plan.headers.isEmpty {
+                options["AVURLAssetHTTPHeaderFieldsKey"] = plan.headers
+            }
+            let asset = AVURLAsset(url: url, options: options.isEmpty ? nil : options)
+            let item = AVPlayerItem(asset: asset)
+            item.preferredForwardBufferDuration = 10.0
+            VideoCacheManager.shared.focusOnVideo(urlString: plan.url, namespace: "feed")
+            startPlaybackWithItem(item: item, seekTo: initialPosition)
+            NSLog("🎬 [PlayerVM] switchFeedDrama 命中全链路预载(%@)，实现秒开起播", drama.title)
+            return
+        }
+
+        await preparePlayback(episodeIndex: initialEpisodeIndex, seekTo: initialPosition)
+        self.isSeamlessTransitioning = false
     }
 
     private func beginPlayback(episodeIndex: Int, seekTo: Double, recovering: Bool, preservePlayIntent: Bool = false) async {
@@ -650,6 +719,12 @@ public final class PlayerViewModel: ObservableObject {
                 }
                 let item = AVPlayerItem(asset: asset)
                 item.preferredForwardBufferDuration = 15.0
+
+                // 联动 VideoCacheManager 启动后台静音预热，提前拉取媒体分片
+                VideoCacheManager.shared.preload(
+                    items: [(url: playbackURL.absoluteString, headers: resolvedPlan.headers)],
+                    namespace: "drama"
+                )
 
                 await MainActor.run {
                     guard let self, !self.closed, currentGen == self.playbackGeneration, !Task.isCancelled else {
