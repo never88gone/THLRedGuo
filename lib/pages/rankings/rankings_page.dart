@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/views/catalog/catalog_filters.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/pages/detail/detail_page.dart';
@@ -36,6 +37,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
   int _generation = 0;
   String? _error;
   String _updated = '';
+  bool? _waterfallMode;
 
   @override
   void initState() {
@@ -218,6 +220,22 @@ class _RankingsScreenState extends State<RankingsScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            key: const ValueKey('toggle-ranking-view-mode'),
+            tooltip: (_waterfallMode ?? (MediaQuery.sizeOf(context).width >= 600))
+                ? '切换为列表视图'
+                : '切换为瀑布流视图',
+            icon: Icon(
+              (_waterfallMode ?? (MediaQuery.sizeOf(context).width >= 600))
+                  ? Icons.view_list_rounded
+                  : Icons.grid_view_rounded,
+            ),
+            onPressed: () {
+              final current =
+                  _waterfallMode ?? (MediaQuery.sizeOf(context).width >= 600);
+              setState(() => _waterfallMode = !current);
+            },
+          ),
           RefreshAction(
             loading: _loading || _more,
             tooltip: '更新榜单',
@@ -301,136 +319,421 @@ class _RankingsScreenState extends State<RankingsScreen> {
                           ? _initialize
                           : () => _load(force: true),
                     )
-                  : RefreshIndicator(
-                      onRefresh: () => _load(force: true),
-                      child: ListView.builder(
-                        key: ValueKey('ranking-${_board!.id}'),
-                        controller: _scroll,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-                        itemCount: items.length + 1,
-                        itemBuilder: (context, index) {
-                          if (index == items.length) {
-                            return Center(
-                              child: _more
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(16),
-                                      child: CircularProgressIndicator(),
-                                    )
-                                  : _hasMore
-                                  ? OutlinedButton(
-                                      onPressed: () => _load(more: true),
-                                      child: const Text('加载更多'),
-                                    )
-                                  : const Padding(
-                                      padding: EdgeInsets.all(16),
-                                      child: Text('已显示全部榜单'),
-                                    ),
-                            );
-                          }
-                          final item = items[index];
-                          return Card(
-                            child: InkWell(
-                              key: ValueKey(
-                                'rank-${item.rank}-${item.drama.id}',
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              onFocusChange: (focused) {
-                                if (focused) {
-                                  Scrollable.ensureVisible(
-                                    context,
-                                    alignment: .4,
-                                  );
-                                }
-                              },
-                              onTap: () => Navigator.push<void>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => DetailScreen(
-                                    drama: item.drama,
-                                    repository: widget.repository,
-                                    store: widget.store,
-                                  ),
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    SizedBox(
-                                      width: 36,
-                                      child: Text(
-                                        '${item.rank}',
-                                        style: TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w800,
-                                          color: item.rank <= 3
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.primary
-                                              : Theme.of(
-                                                  context,
-                                                ).colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: 72,
-                                      height: 108,
-                                      child: DramaCover(
-                                        drama: item.drama,
-                                        repository: widget.repository,
-                                        radius: 8,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            item.drama.title,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.titleMedium,
-                                          ),
-                                          if (item.drama.category.isNotEmpty)
-                                            Text(
-                                              item.drama.category,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          if (item.metric.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 8,
-                                              ),
-                                              child: Text(
-                                                item.metric,
-                                                style: TextStyle(
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(Icons.chevron_right_rounded),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        final isWide = width >= 600;
+                        final isWaterfall = _waterfallMode ?? isWide;
+                        if (isWaterfall) {
+                          return _buildWaterfallView(context, items, width);
+                        } else {
+                          return _buildListView(context, items, width);
+                        }
+                      },
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWaterfallView(
+    BuildContext context,
+    List<RankingItem> items,
+    double width,
+  ) {
+    final padding = width < 600 ? 12.0 : 20.0;
+    final contentWidth = width - 2 * padding;
+    final columns = width < 480
+        ? 3
+        : width < 720
+        ? 4
+        : width < 1000
+        ? 5
+        : width < 1300
+        ? 6
+        : (width / 180).floor().clamp(6, 9);
+    final spacing = width < 600 ? 10.0 : 16.0;
+    final itemWidth = (contentWidth - (columns - 1) * spacing) / columns;
+    final coverHeight = itemWidth * 1.38;
+    final itemHeight = coverHeight + 66.0;
+
+    return RefreshIndicator(
+      onRefresh: () => _load(force: true),
+      child: CustomScrollView(
+        key: ValueKey('ranking-waterfall-${_board!.id}'),
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(padding, 8, padding, 16),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                mainAxisSpacing: 18,
+                crossAxisSpacing: spacing,
+                mainAxisExtent: itemHeight,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final item = items[index];
+                  return _buildRankingWaterfallCard(
+                    context,
+                    item,
+                    itemWidth,
+                    coverHeight,
+                  );
+                },
+                childCount: items.length,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Center(
+                child: _more
+                    ? const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(),
+                      )
+                    : _hasMore
+                    ? OutlinedButton(
+                        onPressed: () => _load(more: true),
+                        child: const Text('加载更多'),
+                      )
+                    : const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('已显示全部榜单'),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRankingWaterfallCard(
+    BuildContext context,
+    RankingItem item,
+    double itemWidth,
+    double coverHeight,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final (badgeBg, badgeTextColor, badgeLabel) = switch (item.rank) {
+      1 => (
+        const LinearGradient(
+          colors: [Color(0xFFFF3366), Color(0xFFFF5E3A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        Colors.white,
+        'TOP 1',
+      ),
+      2 => (
+        const LinearGradient(
+          colors: [Color(0xFFFF8C00), Color(0xFFFFA500)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        Colors.white,
+        'TOP 2',
+      ),
+      3 => (
+        const LinearGradient(
+          colors: [Color(0xFF00B4DB), Color(0xFF0083B0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        Colors.white,
+        'TOP 3',
+      ),
+      _ => (
+        LinearGradient(
+          colors: [
+            Colors.black.withValues(alpha: 0.72),
+            Colors.black.withValues(alpha: 0.85),
+          ],
+        ),
+        Colors.white.withValues(alpha: 0.95),
+        '#${item.rank}',
+      ),
+    };
+
+    return Card(
+      key: ValueKey('rank-${item.rank}-${item.drama.id}'),
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onFocusChange: (focused) {
+          if (focused) {
+            Scrollable.ensureVisible(context, alignment: 0.4);
+          }
+        },
+        onTap: () => Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DetailScreen(
+              drama: item.drama,
+              repository: widget.repository,
+              store: widget.store,
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: itemWidth,
+              height: coverHeight,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: DramaCover(
+                      drama: item.drama,
+                      repository: widget.repository,
+                      radius: 8,
+                    ),
+                  ),
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: badgeBg,
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        badgeLabel,
+                        style: TextStyle(
+                          color: badgeTextColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              item.drama.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                if (item.metric.isNotEmpty) ...[
+                  const Icon(
+                    Icons.local_fire_department_rounded,
+                    size: 13,
+                    color: AppColors.hongguoRed,
+                  ),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: Text(
+                      item.metric,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.hongguoRed,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ] else if (item.drama.category.isNotEmpty) ...[
+                  Expanded(
+                    child: Text(
+                      item.drama.category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppColors.whiteWithAlpha(0.6)
+                            : AppColors.greyDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListView(
+    BuildContext context,
+    List<RankingItem> items,
+    double width,
+  ) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 960),
+        child: RefreshIndicator(
+          onRefresh: () => _load(force: true),
+          child: ListView.builder(
+            key: ValueKey('ranking-list-${_board!.id}'),
+            controller: _scroll,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+            itemCount: items.length + 1,
+            itemBuilder: (context, index) {
+              if (index == items.length) {
+                return Center(
+                  child: _more
+                      ? const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CircularProgressIndicator(),
+                        )
+                      : _hasMore
+                      ? OutlinedButton(
+                          onPressed: () => _load(more: true),
+                          child: const Text('加载更多'),
+                        )
+                      : const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('已显示全部榜单'),
+                        ),
+                );
+              }
+              final item = items[index];
+              return Card(
+                key: ValueKey('rank-${item.rank}-${item.drama.id}'),
+                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                child: InkWell(
+                  key: ValueKey('rank-${item.rank}-${item.drama.id}-tap'),
+                  borderRadius: BorderRadius.circular(12),
+                  onFocusChange: (focused) {
+                    if (focused) {
+                      Scrollable.ensureVisible(context, alignment: .4);
+                    }
+                  },
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DetailScreen(
+                        drama: item.drama,
+                        repository: widget.repository,
+                        store: widget.store,
+                      ),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 40,
+                          child: Text(
+                            '${item.rank}',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: item.rank <= 3
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 72,
+                          height: 108,
+                          child: DramaCover(
+                            drama: item.drama,
+                            repository: widget.repository,
+                            radius: 8,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.drama.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              if (item.drama.category.isNotEmpty)
+                                Text(
+                                  item.drama.category,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              if (item.metric.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.local_fire_department_rounded,
+                                        size: 14,
+                                        color: AppColors.hongguoRed,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        item.metric,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.hongguoRed,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
