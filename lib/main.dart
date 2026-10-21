@@ -223,6 +223,7 @@ class _AppBootstrapState extends State<AppBootstrap>
     bootstrapError: error?.toString(),
     onRetry: _initialize,
     television: device.television,
+    isPad: device.isPad,
     version: device.version,
     navigatorKey: navigator,
   );
@@ -237,6 +238,7 @@ class DuanjuApp extends StatelessWidget {
     this.bootstrapError,
     this.onRetry,
     this.television = false,
+    this.isPad = false,
     this.version = appVersion,
     this.navigatorKey,
   });
@@ -246,6 +248,7 @@ class DuanjuApp extends StatelessWidget {
   final String? bootstrapError;
   final VoidCallback? onRetry;
   final bool television;
+  final bool isPad;
   final String version;
   final GlobalKey<NavigatorState>? navigatorKey;
 
@@ -278,6 +281,7 @@ class DuanjuApp extends StatelessWidget {
             television: tv,
             child: AppLayout(
               television: tv,
+              pad: isPad,
               version: version,
               child: Theme(
                 data: tv ? televisionTheme(theme) : theme,

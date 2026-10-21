@@ -44,26 +44,47 @@ ThemeData televisionTheme(ThemeData theme) {
 }
 
 class AppDevice {
-  const AppDevice({this.television = false, this.version = appVersion});
+  const AppDevice({
+    this.television = false,
+    this.isPad = false,
+    this.version = appVersion,
+  });
   final bool television;
+  final bool isPad;
   final String version;
   static const channel = MethodChannel('duanju/device');
+  static bool isPadDevice = false;
 
   static Future<AppDevice> detect({
     AppDevice fallback = const AppDevice(),
   }) async {
-    if (defaultTargetPlatform != TargetPlatform.android) {
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      isPadDevice = false;
       return const AppDevice();
     }
     try {
       final data = await channel
           .invokeMapMethod<String, dynamic>('deviceInfo')
           .timeout(const Duration(seconds: 2));
-      final television = data?['television'];
-      if (television is! bool) return fallback;
+      final television = data?['television'] == true;
+      final rawIsPad = data?['isPad'];
+      var isPad = rawIsPad is bool ? rawIsPad : false;
+      if (!isPad && defaultTargetPlatform == TargetPlatform.iOS) {
+        final view = PlatformDispatcher.instance.views.firstOrNull;
+        if (view != null && view.devicePixelRatio > 0) {
+          final logicalShortestSide =
+              view.physicalSize.shortestSide / view.devicePixelRatio;
+          if (logicalShortestSide >= 600) {
+            isPad = true;
+          }
+        }
+      }
+      isPadDevice = isPad;
       final version = data?['version'];
       return AppDevice(
         television: television,
+        isPad: isPad,
         version: version is String && version.isNotEmpty
             ? version
             : fallback.version,
@@ -106,20 +127,27 @@ class AppLayout extends InheritedWidget {
   const AppLayout({
     super.key,
     required this.television,
+    this.pad = false,
     this.version = appVersion,
     required super.child,
   });
   final bool television;
+  final bool pad;
   final String version;
 
   static bool isTelevision(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppLayout>()?.television ??
       false;
+  static bool isPad(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppLayout>()?.pad ??
+      AppDevice.isPadDevice;
   static String versionOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppLayout>()?.version ??
       appVersion;
 
   @override
   bool updateShouldNotify(AppLayout oldWidget) =>
-      television != oldWidget.television || version != oldWidget.version;
+      television != oldWidget.television ||
+      pad != oldWidget.pad ||
+      version != oldWidget.version;
 }

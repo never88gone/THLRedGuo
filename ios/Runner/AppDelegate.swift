@@ -15,6 +15,9 @@ import CFNetwork
     _ application: UIApplication,
     supportedInterfaceOrientationsFor window: UIWindow?
   ) -> UIInterfaceOrientationMask {
+    if UIDevice.current.userInterfaceIdiom == .pad {
+      return .all
+    }
     return .allButUpsideDown
   }
 
@@ -23,6 +26,18 @@ import CFNetwork
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "DeviceSettings") {
       let channel = FlutterMethodChannel(name: "duanju/device", binaryMessenger: registrar.messenger())
       channel.setMethodCallHandler { call, result in
+        if call.method == "isPad" {
+          result(UIDevice.current.userInterfaceIdiom == .pad)
+          return
+        }
+        if call.method == "deviceInfo" {
+          result([
+            "television": false,
+            "isPad": UIDevice.current.userInterfaceIdiom == .pad,
+            "version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+          ])
+          return
+        }
         guard call.method == "systemProxy" else {
           result(FlutterMethodNotImplemented)
           return

@@ -21,7 +21,11 @@ class AppOrientationController {
     required bool television,
     bool fullscreen = false,
     double aspectRatio = 1,
+    bool isPad = false,
   }) {
+    if (isPad || AppDevice.isPadDevice) {
+      return DeviceOrientation.values;
+    }
     if (television || fullscreen && aspectRatio >= 1) {
       return const [
         DeviceOrientation.landscapeLeft,
@@ -107,6 +111,13 @@ class AppOrientationController {
         }
       }
       if (_disposed || television != _television) return;
+      if (AppDevice.isPadDevice) {
+        if (force || !listEquals(DeviceOrientation.values, _appliedOrientations)) {
+          await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+          if (!_disposed) _appliedOrientations = DeviceOrientation.values;
+        }
+        return;
+      }
       final preferred = television
           ? orientations(television: true)
           : _playbackOrientations;

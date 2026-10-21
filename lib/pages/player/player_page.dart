@@ -612,7 +612,8 @@ class _PlayerScreenState extends State<PlayerScreen>
       assign();
     }
     if (_pictureInPictureVisible ||
-        _lifecycleState == AppLifecycleState.resumed) {
+        _lifecycleState == AppLifecycleState.resumed ||
+        _lifecycleState == AppLifecycleState.inactive) {
       _pictureInPictureExitTimer?.cancel();
       _applyLifecycleVisibility(pauseWhenHidden: false);
       return;
@@ -623,7 +624,8 @@ class _PlayerScreenState extends State<PlayerScreen>
       _pictureInPictureExitTimer = Timer(const Duration(milliseconds: 700), () {
         if (!_closed &&
             !_pictureInPictureVisible &&
-            _lifecycleState != AppLifecycleState.resumed) {
+            _lifecycleState != AppLifecycleState.resumed &&
+            _lifecycleState != AppLifecycleState.inactive) {
           _applyLifecycleVisibility();
         }
       });
@@ -634,6 +636,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (_closed) return;
     final visible =
         _lifecycleState == AppLifecycleState.resumed ||
+        _lifecycleState == AppLifecycleState.inactive ||
         _pictureInPictureVisible;
     _foreground = visible;
     _enhancement.setForeground(_foreground);
@@ -644,7 +647,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (pauseWhenHidden &&
         !visible &&
         (_lifecycleState == AppLifecycleState.paused ||
-            _lifecycleState == AppLifecycleState.inactive ||
             _lifecycleState == AppLifecycleState.hidden)) {
       if (!_lifecyclePaused) {
         _resumeAfterInterruption = _playIntent;
@@ -933,6 +935,15 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (widget.feed) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _closed || (!_mobile && !_television)) return;
+      if (AppDevice.isPadDevice) {
+        if (_systemFullscreen != false) {
+          _systemFullscreen = false;
+          unawaited(
+            SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge),
+          );
+        }
+        return;
+      }
       final fullscreen = _showFullscreen;
       if (_systemFullscreen == fullscreen) return;
       _systemFullscreen = fullscreen;
@@ -1471,18 +1482,20 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (Platform.isWindows) {
         await windowManager.setFullScreen(fullscreen);
       } else if (_mobile) {
-        await (_orientationController?.setPlayback(
-              this,
-              fullscreen: fullscreen,
-              aspectRatio: _aspectRatio,
-            ) ??
-            SystemChrome.setPreferredOrientations(
-              AppOrientationController.orientations(
-                television: _television,
+        if (!AppDevice.isPadDevice) {
+          await (_orientationController?.setPlayback(
+                this,
                 fullscreen: fullscreen,
                 aspectRatio: _aspectRatio,
-              ),
-            ));
+              ) ??
+              SystemChrome.setPreferredOrientations(
+                AppOrientationController.orientations(
+                  television: _television,
+                  fullscreen: fullscreen,
+                  aspectRatio: _aspectRatio,
+                ),
+              ));
+        }
       }
     } catch (_) {
       if (mounted && !_closed) {
