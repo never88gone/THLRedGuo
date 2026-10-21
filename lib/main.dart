@@ -15,6 +15,7 @@ import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/utils/screen/app_orientation.dart';
 import 'package:THLRedLook/utils/theme/app_theme.dart';
 import 'package:THLRedLook/pages/home/home_page.dart';
+import 'package:THLRedLook/utils/navigation/app_route_observer.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/pages/profiles/profiles_page.dart';
 import 'package:THLRedLook/core/media/media_library.dart';
@@ -30,7 +31,9 @@ import 'package:THLRedLook/core/js/js_source_service.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
-  DiaryService.add('[App] 应用启动，版本: $appVersion, 平台: ${Platform.operatingSystem}');
+  DiaryService.add(
+    '[App] 应用启动，版本: $appVersion, 平台: ${Platform.operatingSystem}',
+  );
   if (Platform.isAndroid) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(AppTheme.systemBars(Brightness.dark));
@@ -253,6 +256,7 @@ class DuanjuApp extends StatelessWidget {
   );
 
   Widget _application() => MaterialApp(
+    navigatorObservers: [appRouteObserver],
     navigatorKey: navigatorKey,
     title: appName,
     debugShowCheckedModeBanner: false,
@@ -304,7 +308,10 @@ class DuanjuApp extends StatelessWidget {
                           child: IgnorePointer(
                             child: ClipRect(
                               child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                                filter: ImageFilter.blur(
+                                  sigmaX: 25,
+                                  sigmaY: 25,
+                                ),
                                 child: Container(
                                   color: AppColors.playerGestureHudBackground,
                                 ),

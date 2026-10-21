@@ -12,7 +12,7 @@ const meta = {
   author: "社区开发者",
   type: "video",
   icon: "",
-  features: ["search", "suggestions", "rankingBoards", "rankings", "recommendations", "categories", "danmaku", "seriesSeasons"]
+  features: ["search", "suggestions", "rankingBoards", "rankings", "recommendations", "categories", "danmaku", "seriesSeasons", "feed"]
 };
 
 const BASE_URL = "https://hongguoduanju.com";
@@ -298,6 +298,8 @@ function signGorgon(rawQuery, bodyStr, nowMs) {
 // 官方 App API 获取短剧详情及分集列表
 async function fetchAppDetail(seriesId) {
   if (!seriesId || !/^\d{10,}$/.test(String(seriesId))) return null;
+  const cached = globalThis.__hongguoFeedDetails?.get(String(seriesId));
+  if (cached && Date.now() - cached.updated < 5 * 60 * 1000) return cached.data;
   try {
     var now = Date.now();
     var qs = "aid=8662&app_name=novelread&version_code=73532&version_name=7.3.5.32&manifest_version_code=73532&update_version_code=73532&channel=update_64&device_platform=android&os=android&ssmix=a&device_type=25053RT47C&device_brand=Redmi&language=zh&os_api=36&os_version=16&resolution=1280*2772&dpi=520&ac=wifi&device_id=7361909012345678901&iid=7361909012345678902&_rticket=" + now;
@@ -2161,5 +2163,96 @@ spider.danmaku = function (id, startMs, durationMs) {
       if (globalThis.__hongguoCancelled) throw failure('cancelled');
     }
     return { list: [] };
+  };
+})();
+
+(function () {
+  const states = new Map();
+  const details = new Map();
+  globalThis.__hongguoFeedDetails = details;
+  const text = value => value == null ? '' : String(value).trim();
+  const number = value => Math.max(0, Number.parseInt(value, 10) || 0);
+  const identity = value => typeof value === 'string' && /^[1-9]\d{9,29}$/.test(value) ? value : '';
+  const failure = (message, code) => Object.assign(new Error(message), { code });
+  function videos(cells) {
+    const rows = [];
+    for (const cell of cells || []) {
+      rows.push(...(cell.video_data || []));
+      rows.push(...videos(cell.cell_data));
+    }
+    return rows;
+  }
+  spider.feed = async function (rawPage, rawScope) {
+    const page = Math.max(1, number(rawPage));
+    const scope = text(rawScope).slice(0, 160);
+    let state = states.get(scope);
+    if (page === 1) {
+      state = { pages: new Map(), seen: new Set(), updated: Date.now(), cursor: null };
+      states.delete(scope);
+      states.set(scope, state);
+      while (states.size > 4) states.delete(states.keys().next().value);
+    }
+    if (!state || Date.now() - state.updated > 15 * 60 * 1000) throw failure('推荐已过期，请刷新换一批', 'CURSOR_EXPIRED');
+    if (state.pages.has(page)) return state.pages.get(page);
+    if (page > 1 && (!state.cursor || page !== state.pages.size + 1)) throw failure('推荐分页已更新，请刷新', 'MISSING_CURSOR');
+    const api = HongguoApp.fetchAppDiscoveryRaw;
+    let cell, tab, data, params;
+    if (page === 1) {
+      const response = await api('/reading/bookapi/bookmall/tab/v', {
+        tab_type: 16, bottom_tab_type: 7, tab_index: 0, offset: 0, client_template: 7
+      });
+      tab = response.data?.tab_item?.find(item => Number(item.tab_type) === 16);
+      cell = tab?.cell_data?.find(item => item.cell_id_str && videos([item]).length);
+      data = tab;
+    } else {
+      params = state.cursor;
+      const response = await api('/reading/bookapi/bookmall/cell/change/v', params);
+      cell = response.data?.cell_view;
+      data = response.data;
+    }
+    if (!cell || !data) throw failure('首页推荐暂不可用，请重试', 'INVALID_RESPONSE');
+    const raw = videos([cell]);
+    const list = [];
+    for (const video of raw) {
+      const detail = video.video_detail || {};
+      const id = identity(detail.series_id_str || detail.series_id || video.series_id);
+      const title = text(detail.series_title || video.title);
+      const episodes = number(detail.episode_cnt || video.episode_cnt);
+      if (!id || !title || !episodes || video.disable_play === true || state.seen.has(id)) continue;
+      const chapters = (detail.video_list || []).filter(item => identity(item.vid || item.video_id))
+        .sort((a, b) => number(a.vid_index) - number(b.vid_index));
+      if (chapters.length === episodes && chapters.every((item, index) => number(item.vid_index) === index + 1) &&
+          new Set(chapters.map(item => identity(item.vid || item.video_id))).size === episodes) {
+        details.delete(id);
+        details.set(id, { updated: Date.now(), data: {
+          series_id: id, series_title: title, series_intro: text(detail.series_intro),
+          series_cover: text(detail.series_cover || video.cover), episode_cnt: episodes,
+          video_list: chapters.map(item => ({ vid: identity(item.vid || item.video_id), vid_index: number(item.vid_index) }))
+        } });
+        while (details.size > 8) details.delete(details.keys().next().value);
+      }
+      const startId = identity(video.vid) || identity(video.highlight?.vid);
+      const start = chapters.find(item => item.vid === startId);
+      list.push({
+        vod_id: id, vod_name: title, vod_content: text(detail.series_intro || video.video_desc),
+        vod_pic: text(detail.series_cover || video.cover), vod_episodes: episodes,
+        vod_remarks: episodes + '集', vod_start_episode: number(start?.vid_index) || 1,
+        vod_start_position: start && identity(video.highlight?.vid) === startId ? number(video.highlight.start_time_in_millisecond) / 1000 : 0
+      });
+      state.seen.add(id);
+    }
+    const previous = number(params?.offset);
+    const offset = page === 1 ? Math.max(number(tab.next_offset), raw.length) : number(data.next_offset);
+    const hasMore = page === 1 ? tab.bottom_unlimited === true && raw.length > 0 :
+      data.has_more === true && offset > previous && raw.length > 0;
+    const result = { list, page, pagecount: hasMore ? page + 1 : page, hasMore };
+    state.pages.set(page, result);
+    state.updated = Date.now();
+    state.cursor = hasMore ? {
+      tab_type: 16, bottom_tab_type: 7, client_template: 7, client_req_type: 2,
+      change_type: 1, cell_id: text(cell.cell_id_str || params?.cell_id),
+      offset, session_id: text(data.session_id || tab?.session_id)
+    } : null;
+    return result;
   };
 })();

@@ -236,6 +236,8 @@ class DartCoreEngine {
         return {'items': await _getSuggestions(query)};
       case 'seriesSeasons':
         return _getSeriesSeasons(input);
+      case 'feed':
+        return _getVideoFeed(input);
       case 'recommendations':
         return await _getRecommendations(input);
       case 'rankingBoards':
@@ -654,6 +656,27 @@ class DartCoreEngine {
             'status': row['status'],
           },
       ],
+    };
+  }
+
+  Future<Map<String, dynamic>> _getVideoFeed(Map<String, dynamic> input) async {
+    final runtime = await _getSpiderRuntime('hongguo');
+    if (runtime == null) throw StateError('推荐数据源不可用');
+    final result = await runtime.feed(
+      (input['page'] as num?)?.toInt() ?? 1,
+      input['feedSession'] as String? ?? '',
+    );
+    return {
+      'items': [
+        for (final row in result.list)
+          {
+            'drama': _mapVodToDrama('hongguo', row, ''),
+            'episode': (row['vod_start_episode'] as num?)?.toInt() ?? 1,
+            'position': (row['vod_start_position'] as num?)?.toDouble() ?? 0,
+          },
+      ],
+      'page': result.page,
+      'hasMore': result.hasMore,
     };
   }
 

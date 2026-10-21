@@ -60,6 +60,7 @@ class PlayerViewportView extends StatelessWidget {
     required this.repository,
     required this.store,
     this.videoBuilder,
+    this.controlsOverlay,
     required this.onTogglePlayback,
     required this.onSeek,
     required this.onSeekTo,
@@ -114,6 +115,7 @@ class PlayerViewportView extends StatelessWidget {
   final AppRepository repository;
   final LocalStore store;
   final Widget Function(Widget child)? videoBuilder;
+  final Widget? controlsOverlay;
 
   final VoidCallback onTogglePlayback;
   final void Function(int) onSeek;
@@ -210,7 +212,7 @@ class PlayerViewportView extends StatelessWidget {
             aspectRatio: aspectRatio,
             style: danmakuStyle ?? const DanmakuStyle(),
           ),
-        controls,
+        controlsOverlay ?? controls,
       ],
     );
 

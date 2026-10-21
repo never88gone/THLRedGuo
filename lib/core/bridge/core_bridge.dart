@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:THLRedLook/core/engine/dart_core_engine.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
+import 'package:THLRedLook/models/feed/feed_models.dart';
 import 'package:THLRedLook/core/download/background_downloads.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/utils/build/app_build.dart';
@@ -77,6 +78,8 @@ abstract class AppRepository {
   Future<void> cancelCatalog() async {}
   Future<void> cancelSuggestions() async {}
   Future<void> cancelRecommendations() async {}
+  Future<FeedPage> videoFeed({int page = 1, required String session}) async =>
+      throw AppFailure('当前数据源暂不支持视频流推荐');
   Future<Drama?> supplementMetadata(Drama drama) async => null;
   Future<CatalogPage> recommendations(
     String genre, {
@@ -336,6 +339,19 @@ class NativeRepository extends AppRepository {
   Future<void> cancelRecommendations() => _cancelReads('recommendations-');
 
   @override
+  Future<FeedPage> videoFeed({int page = 1, required String session}) async {
+    _authorize('hongguo');
+    return FeedPage.fromJson(
+      await _read('feed', {
+        'action': 'feed',
+        'source': 'hongguo',
+        'page': page,
+        'feedSession': '$_readOwner:$session',
+      }),
+    );
+  }
+
+  @override
   Future<CatalogPage> recommendations(
     String genre, {
     String? source,
@@ -585,6 +601,7 @@ class NativeRepository extends AppRepository {
       if (action == 'recommendations' ||
           action == 'cachedRecommendations' ||
           action == 'suggestions' ||
+          action == 'feed' ||
           action == 'danmaku') {
         final recSource = input['source'] as String? ?? 'hongguo';
         final target = SourceSite.isAvailable(recSource)
@@ -676,6 +693,7 @@ class NativeRepository extends AppRepository {
             'catalog',
             'categories',
             'suggestions',
+            'feed',
             'recommendations',
             'metadata',
             'seriesSeasons',

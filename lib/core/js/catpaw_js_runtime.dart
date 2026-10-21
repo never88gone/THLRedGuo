@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter_js/flutter_js.dart';
 import 'package:http/http.dart' as http;
@@ -266,6 +267,17 @@ globalThis.console = {
       final body = params['body']?.toString();
 
       final uri = Uri.parse(url);
+      final responseLimit =
+          uri.scheme == 'https' &&
+              uri.host == 'reading.snssdk.com' &&
+              {
+                '/reading/bookapi/bookmall/tab/v',
+                '/reading/bookapi/bookmall/cell/change/v',
+              }.contains(uri.path) &&
+              uri.queryParameters['bottom_tab_type'] == '7' &&
+              uri.queryParameters['tab_type'] == '16'
+          ? 12 * 1024 * 1024
+          : 2 * 1024 * 1024;
       final abort = Completer<void>();
       _requestAborts.add(abort);
       final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 12000).clamp(
@@ -288,17 +300,17 @@ globalThis.console = {
         final response = await _httpClient
             .send(request)
             .timeout(Duration(milliseconds: timeoutMs));
-        final bytes = <int>[];
+        final bytes = BytesBuilder(copy: false);
         await for (final chunk in response.stream.timeout(
           Duration(milliseconds: timeoutMs),
         )) {
-          if (bytes.length + chunk.length > 2 * 1024 * 1024) {
+          if (bytes.length + chunk.length > responseLimit) {
             throw const FormatException('接口响应超过限制');
           }
-          bytes.addAll(chunk);
+          bytes.add(chunk);
         }
         resp = http.Response.bytes(
-          bytes,
+          bytes.takeBytes(),
           response.statusCode,
           headers: response.headers,
         );
@@ -441,6 +453,15 @@ globalThis.console = {
   Future<List<Map<String, dynamic>>> seriesSeasons(String id) async {
     final result = await _discovery('seriesSeasons', [id]);
     return _toListOfMaps(result['list']);
+  }
+
+  Future<CatPawCategoryResult> feed(int page, String session) async {
+    final result = await _discovery('feed', [page, session]);
+    return CatPawCategoryResult(
+      list: _toListOfMaps(result['list']),
+      page: page,
+      hasMore: result['hasMore'] == true,
+    );
   }
 
   Future<List<String>> suggestions(String query) async {

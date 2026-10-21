@@ -44,6 +44,8 @@ import 'package:THLRedLook/views/player/player_quality_sheet_view.dart';
 import 'package:THLRedLook/views/player/player_speed_sheet_view.dart';
 import 'package:THLRedLook/views/player/player_danmaku_sheet_view.dart';
 import 'package:THLRedLook/utils/player/player_dialog_helper.dart';
+import 'package:THLRedLook/core/player/playback_lease.dart';
+import 'package:THLRedLook/views/feed/feed_player_overlay.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
@@ -61,6 +63,9 @@ class PlayerScreen extends StatefulWidget {
     this.handoff,
     this.initialSeriesEntries,
     this.onSeasonChanged,
+    this.feed = false,
+    this.playbackQueue,
+    this.onOpenDetail,
   });
   final DramaDetail detail;
   final int initialIndex;
@@ -73,6 +78,9 @@ class PlayerScreen extends StatefulWidget {
   final LanIncomingPlayback? handoff;
   final List<HongguoSeriesEntry>? initialSeriesEntries;
   final ValueChanged<DramaDetail>? onSeasonChanged;
+  final bool feed;
+  final PlaybackLeaseQueue? playbackQueue;
+  final VoidCallback? onOpenDetail;
   @visibleForTesting
   final Player Function()? playerFactory;
   @visibleForTesting
@@ -84,6 +92,7 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen>
     with WidgetsBindingObserver {
   late final Player _player;
+  PlaybackLease? _playbackLease;
   late final VideoController? _video;
   late final VideoEnhancementController _enhancement;
   late final PlaybackLoader _loader;
@@ -189,6 +198,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   @override
   void initState() {
     super.initState();
+    _playbackLease = widget.playbackQueue?.acquire();
     WidgetsBinding.instance.addObserver(this);
     _index = widget.initialIndex;
     _profileEpoch = widget.handoff?.profileEpoch ?? widget.store.profileEpoch;
@@ -498,6 +508,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       ScaffoldMessenger.maybeOf(context)?.removeCurrentSnackBar();
 
       widget.onSeasonChanged?.call(nextDetail);
+      if (widget.feed) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => PlayerScreen(
@@ -544,6 +555,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   void _configurePictureInPicture() {
+    if (widget.feed) return;
     if (defaultTargetPlatform != TargetPlatform.android) return;
     _pictureInPictureHandlerInstalled = true;
     AppDevice.channel.setMethodCallHandler((call) async {
@@ -918,6 +930,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   void _scheduleSystemUi() {
+    if (widget.feed) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _closed || (!_mobile && !_television)) return;
       final fullscreen = _showFullscreen;
@@ -1106,6 +1119,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     PlaybackPlan? handoffPlan,
     bool showControlsOnReady = true,
   }) async {
+    await _playbackLease?.ready;
     if (_closed ||
         widget.store.profileEpoch != _profileEpoch ||
         index < 0 ||
@@ -1161,7 +1175,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     _resumePosition = position;
     _showControlsOnPlaybackReady = showControlsOnReady;
-    final isSeamlessAdvance = !showControlsOnReady && recoveryAction == null && (index == _index + 1 || warmed != null);
+    final isSeamlessAdvance =
+        !showControlsOnReady &&
+        recoveryAction == null &&
+        (index == _index + 1 || warmed != null);
     setState(() {
       _index = index;
       _loading = !isSeamlessAdvance && warmed == null;
@@ -1429,12 +1446,13 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   bool get _showFullscreen =>
-      _television ||
-      _fullscreen ||
-      (_mobile &&
-          !_automaticFullscreenSuppressed &&
-          _aspectRatio >= 1 &&
-          MediaQuery.orientationOf(context) == Orientation.landscape);
+      !widget.feed &&
+      (_television ||
+          _fullscreen ||
+          (_mobile &&
+              !_automaticFullscreenSuppressed &&
+              _aspectRatio >= 1 &&
+              MediaQuery.orientationOf(context) == Orientation.landscape));
 
   Future<void> _rotate() async {
     if (_rotating || _television) {
@@ -1810,6 +1828,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   @override
   void dispose() {
     _closed = true;
+    unawaited(_player.pause().catchError((Object _) {}));
     final enhancementClosed = _enhancement.close();
     LanController.current?.detachPlayback(_lanIdentity);
     widget.handoff?.fail('接收端已退出播放');
@@ -1835,17 +1854,20 @@ class _PlayerScreenState extends State<PlayerScreen>
     unawaited(widget.repository.release(_session));
     unawaited(_loader.close().catchError((Object _) {}));
     unawaited(_encryptedPlayback.cancel().catchError((Object _) {}));
+    final closing = _operations.catchError((Object _) {}).then((_) async {
+      await _interactions.pendingRates.catchError((Object _) {});
+      await enhancementClosed.catchError((Object _) {});
+      await _player.dispose();
+      await _encryptedPlayback.close();
+    });
     unawaited(
-      _operations.catchError((Object _) {}).then((_) async {
-        await _interactions.pendingRates.catchError((Object _) {});
-        await enhancementClosed.catchError((Object _) {});
-        await _player.dispose();
-        await _encryptedPlayback.close();
-      }),
+      (_playbackLease?.releaseAfter(closing) ?? closing).catchError(
+        (Object _) {},
+      ),
     );
-    if (Platform.isWindows) {
+    if (!widget.feed && Platform.isWindows) {
       unawaited(windowManager.setFullScreen(false));
-    } else if (_mobile || _television && Platform.isAndroid) {
+    } else if (!widget.feed && (_mobile || _television && Platform.isAndroid)) {
       unawaited(
         (_orientationController?.releasePlayback(this) ??
                 SystemChrome.setPreferredOrientations(
@@ -1882,6 +1904,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   Widget _buildPlayer(BuildContext context) {
+    if (widget.feed) return _videoPane(context);
     final theme = Theme.of(context);
     final title = widget.detail.drama.title;
     final fullscreen = _showFullscreen;
@@ -2024,6 +2047,47 @@ class _PlayerScreenState extends State<PlayerScreen>
     );
   }
 
+  Widget _feedControls() => AnimatedBuilder(
+    animation: widget.store,
+    builder: (context, _) => StreamBuilder<bool>(
+      stream: _player.stream.playing,
+      builder: (context, snapshot) => StreamBuilder<Duration>(
+        stream: _player.stream.position,
+        builder: (context, _) => FeedPlayerOverlay(
+          title: widget.detail.drama.title,
+          episodeText:
+              '第 ${widget.detail.episodes[_index].number} 集 · 共 ${widget.detail.episodes.length} 集',
+          description: widget.detail.drama.description,
+          playing: _player.state.playing,
+          enabled: !_loading && _error == null,
+          following: widget.store.following(widget.detail.drama.id) != null,
+          danmakuEnabled: _danmakuEnabled,
+          position: _player.state.position,
+          duration: _player.state.duration,
+          onTogglePlayback: _togglePlayback,
+          onSeek: (value) => unawaited(
+            _seekTo(
+              Duration(
+                milliseconds: (_player.state.duration.inMilliseconds * value)
+                    .round(),
+              ),
+            ),
+          ),
+          onFavorite: () => unawaited(
+            saveUserChange(
+              context,
+              () => widget.store.toggleFavorite(widget.detail.drama),
+            ),
+          ),
+          onEpisodes: () => unawaited(_openPanel(PlayerMenuSection.episodes)),
+          onDetail: widget.onOpenDetail ?? () {},
+          onDanmaku: () => unawaited(_toggleDanmaku()),
+          onSettings: () => unawaited(_openPanel(PlayerMenuSection.settings)),
+        ),
+      ),
+    ),
+  );
+
   Widget _videoPane(BuildContext context) {
     return PlayerViewportView(
       television: _television,
@@ -2061,6 +2125,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       repository: widget.repository,
       store: widget.store,
       videoBuilder: widget.videoBuilder,
+      controlsOverlay: widget.feed ? _feedControls() : null,
       onTogglePlayback: _togglePlayback,
       onSeek: _seek,
       onSeekTo: _seekTo,

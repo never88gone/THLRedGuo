@@ -39,6 +39,8 @@ import 'package:THLRedLook/views/home/home_search_bar_view.dart';
 import 'package:THLRedLook/views/home/home_catalog_view.dart';
 import 'package:THLRedLook/views/home/home_app_bar_view.dart';
 import 'package:THLRedLook/core/js/js_source_service.dart';
+import 'package:THLRedLook/core/feed/video_feed_controller.dart';
+import 'package:THLRedLook/pages/feed/video_feed_page.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -47,16 +49,19 @@ class HomeScreen extends StatefulWidget {
     required this.store,
     this.initialSearchVisible = false,
     this.initialSearchQuery = '',
+    this.initialTab = 0,
   });
   final AppRepository repository;
   final LocalStore store;
   final bool initialSearchVisible;
   final String initialSearchQuery;
+  final int initialTab;
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late final _feed = VideoFeedController(widget.repository, widget.store);
   static const _recommendationCategory = 'app:recommendations';
   final _search = TextEditingController();
   final _scroll = ScrollController();
@@ -473,6 +478,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialTab != 0) {
+      _tab = widget.initialTab;
+    }
     if (widget.initialSearchVisible) {
       _searchVisible = true;
       if (widget.initialSearchQuery.isNotEmpty) {
@@ -504,6 +512,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _feed.dispose();
     _updater.removeListener(_updateChanged);
     _updater.dispose();
     _cacheRefreshTimer?.cancel();
@@ -1212,45 +1221,56 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, constraints) {
         final television = AppLayout.isTelevision(context);
         final desktop = constraints.maxWidth >= 840;
+        final destinations = [
+          (0, Icons.explore_outlined, Icons.explore, '发现'),
+          (4, Icons.play_circle_outline, Icons.play_circle, '推荐'),
+          (1, Icons.bookmark_border_rounded, Icons.bookmark_rounded, '追剧'),
+          (2, Icons.history_rounded, Icons.history_rounded, '最近观看'),
+          if (widget.store.canDownload)
+            (3, Icons.download_outlined, Icons.download_rounded, '下载'),
+        ];
+        final navIndex = destinations.indexWhere((item) => item.$1 == _tab);
         final scaffold = Scaffold(
-          appBar: HomeAppBarView(
-            selectionMode: _selectionMode,
-            selectedEmpty: _selectedDramas.isEmpty,
-            tab: _tab,
-            sourceGroups: _sourceGroups,
-            group: _group,
-            showRecommendations: _showRecommendations,
-            searchVisible: _searchVisible,
-            television: television,
-            canDownload: widget.store.canDownload,
-            supportsDownloads: widget.repository.supportsDownloads,
-            supportsSourceManagement:
-                widget.repository.supportsSourceManagement,
-            sourcesEmpty: _hasNoSourcePlugins,
-            loading:
-                _loading ||
-                _loadingMore ||
-                _categoriesLoading ||
-                _group.sources.any((source) => _updater.busy(source.id)),
-            isUpdaterBusy: _group.sources.any(
-              (source) => _updater.busy(source.id),
-            ),
-            catalogSortLabel: widget.store.catalogView.sort.label,
-            isSortedOrFiltered:
-                widget.store.catalogView.sort != CatalogSort.source ||
-                widget.store.catalogView.release.isNotEmpty,
-            screenWidth: constraints.maxWidth,
-            onClearSelection: () => setState(_selectedDramas.clear),
-            onCancelSelection: _cancelSelection,
-            onChangeGroup: _changeGroup,
-            onChooseCatalogView: _chooseCatalogView,
-            onOpenRankings: _openRankings,
-            onStartSelection: () => setState(() => _selectionMode = true),
-            onToggleSearch: _toggleSearch,
-            onRefreshCatalog: _refreshCatalog,
-            onMoreAction: _handleHomeMoreAction,
-            onOpenSourceSwitcher: _openSourceSwitcher,
-          ),
+          appBar: _tab == 4
+              ? null
+              : HomeAppBarView(
+                  selectionMode: _selectionMode,
+                  selectedEmpty: _selectedDramas.isEmpty,
+                  tab: _tab,
+                  sourceGroups: _sourceGroups,
+                  group: _group,
+                  showRecommendations: _showRecommendations,
+                  searchVisible: _searchVisible,
+                  television: television,
+                  canDownload: widget.store.canDownload,
+                  supportsDownloads: widget.repository.supportsDownloads,
+                  supportsSourceManagement:
+                      widget.repository.supportsSourceManagement,
+                  sourcesEmpty: _hasNoSourcePlugins,
+                  loading:
+                      _loading ||
+                      _loadingMore ||
+                      _categoriesLoading ||
+                      _group.sources.any((source) => _updater.busy(source.id)),
+                  isUpdaterBusy: _group.sources.any(
+                    (source) => _updater.busy(source.id),
+                  ),
+                  catalogSortLabel: widget.store.catalogView.sort.label,
+                  isSortedOrFiltered:
+                      widget.store.catalogView.sort != CatalogSort.source ||
+                      widget.store.catalogView.release.isNotEmpty,
+                  screenWidth: constraints.maxWidth,
+                  onClearSelection: () => setState(_selectedDramas.clear),
+                  onCancelSelection: _cancelSelection,
+                  onChangeGroup: _changeGroup,
+                  onChooseCatalogView: _chooseCatalogView,
+                  onOpenRankings: _openRankings,
+                  onStartSelection: () => setState(() => _selectionMode = true),
+                  onToggleSearch: _toggleSearch,
+                  onRefreshCatalog: _refreshCatalog,
+                  onMoreAction: _handleHomeMoreAction,
+                  onOpenSourceSwitcher: _openSourceSwitcher,
+                ),
           body: Container(
             decoration: BoxDecoration(
               gradient: Theme.of(context).brightness == Brightness.dark
@@ -1269,19 +1289,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            for (final entry in [
-                              (Icons.explore_rounded, '发现'),
-                              (Icons.bookmark_rounded, '追剧'),
-                              (Icons.history_rounded, '最近观看'),
-                              if (widget.store.canDownload)
-                                (Icons.download_rounded, '下载'),
-                            ].indexed)
+                            for (final entry in destinations)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 14),
                                 child: RemoteButton(
                                   key: ValueKey('tv-nav-${entry.$1}'),
-                                  label: entry.$2.$2,
-                                  icon: entry.$2.$1,
+                                  label: entry.$4,
+                                  icon: entry.$3,
                                   selected: _tab == entry.$1,
                                   autofocus: entry.$1 == 0,
                                   onPressed: () => _onNavSelected(entry.$1),
@@ -1312,8 +1326,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     const VerticalDivider(width: 1),
                   ] else if (desktop) ...[
                     NavigationRail(
-                      selectedIndex: _tab,
-                      onDestinationSelected: _onNavSelected,
+                      selectedIndex: navIndex,
+                      onDestinationSelected: (index) =>
+                          _onNavSelected(destinations[index].$1),
                       labelType: NavigationRailLabelType.all,
                       groupAlignment: -.8,
                       trailing: Expanded(
@@ -1339,55 +1354,69 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       destinations: [
-                        NavigationRailDestination(
-                          icon: Icon(Icons.explore_outlined),
-                          selectedIcon: Icon(Icons.explore),
-                          label: Text('发现'),
-                        ),
-                        NavigationRailDestination(
-                          icon: Icon(Icons.bookmark_border_rounded),
-                          selectedIcon: Icon(Icons.bookmark_rounded),
-                          label: Text('追剧'),
-                        ),
-                        NavigationRailDestination(
-                          icon: Icon(Icons.history_rounded),
-                          label: Text('最近观看'),
-                        ),
-                        if (widget.store.canDownload)
+                        for (final item in destinations)
                           NavigationRailDestination(
-                            icon: Icon(Icons.download_outlined),
-                            selectedIcon: Icon(Icons.download_rounded),
-                            label: Text('下载'),
+                            icon: Icon(item.$2),
+                            selectedIcon: Icon(item.$3),
+                            label: Text(item.$4),
                           ),
                       ],
                     ),
                     const VerticalDivider(width: 1, thickness: 1),
                   ],
                   Expanded(
-                    child: _tab == 0
-                        ? _hasNoSourcePlugins
-                              ? _buildEmptySourcePluginGuide(context)
-                              : _catalog(selectionInBody: desktop || television)
-                        : _tab == 3
-                        ? DownloadsScreen(
-                            repository: widget.repository,
-                            store: widget.store,
-                            embedded: true,
-                          )
-                        : SavedLibrary(
-                            key: ValueKey('saved-tab-$_tab'),
-                            repository: widget.repository,
-                            store: widget.store,
-                            history: _tab == 2,
-                            onOpen: _openDrama,
-                            onContinue: (drama) =>
-                                _openDrama(drama, resume: true),
-                            onDownload:
-                                widget.repository.supportsDownloads &&
-                                    widget.store.canDownload
-                                ? (drama) => _openDrama(drama, download: true)
-                                : null,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Offstage(
+                            offstage: _tab == 4,
+                            child: _tab == 4
+                                ? const SizedBox.shrink()
+                                : _tab == 0
+                                ? _hasNoSourcePlugins
+                                      ? _buildEmptySourcePluginGuide(context)
+                                      : _catalog(
+                                          selectionInBody:
+                                              desktop || television,
+                                        )
+                                : _tab == 3
+                                ? DownloadsScreen(
+                                    repository: widget.repository,
+                                    store: widget.store,
+                                    embedded: true,
+                                  )
+                                : SavedLibrary(
+                                    key: ValueKey('saved-tab-$_tab'),
+                                    repository: widget.repository,
+                                    store: widget.store,
+                                    history: _tab == 2,
+                                    onOpen: _openDrama,
+                                    onContinue: (drama) =>
+                                        _openDrama(drama, resume: true),
+                                    onDownload:
+                                        widget.repository.supportsDownloads &&
+                                            widget.store.canDownload
+                                        ? (drama) =>
+                                              _openDrama(drama, download: true)
+                                        : null,
+                                  ),
                           ),
+                        ),
+                        Positioned.fill(
+                          child: Offstage(
+                            offstage: _tab != 4,
+                            child: TickerMode(
+                              enabled: _tab == 4,
+                              child: VideoFeedScreen(
+                                key: const ValueKey('home-video-feed'),
+                                controller: _feed,
+                                active: _tab == 4,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1398,28 +1427,15 @@ class _HomeScreenState extends State<HomeScreen> {
               : _selectionMode
               ? _selectionBar()
               : AppBottomNavigation(
-                  selectedIndex: _tab,
-                  onDestinationSelected: _onNavSelected,
+                  selectedIndex: navIndex,
+                  onDestinationSelected: (index) =>
+                      _onNavSelected(destinations[index].$1),
                   destinations: [
-                    NavigationDestination(
-                      icon: Icon(Icons.explore_outlined),
-                      selectedIcon: Icon(Icons.explore),
-                      label: '发现',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.bookmark_border_rounded),
-                      selectedIcon: Icon(Icons.bookmark_rounded),
-                      label: '追剧',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.history_rounded),
-                      label: '最近观看',
-                    ),
-                    if (widget.store.canDownload)
+                    for (final item in destinations)
                       NavigationDestination(
-                        icon: Icon(Icons.download_outlined),
-                        selectedIcon: Icon(Icons.download_rounded),
-                        label: '下载',
+                        icon: Icon(item.$2),
+                        selectedIcon: Icon(item.$3),
+                        label: item.$4,
                       ),
                   ],
                 ),
