@@ -111,6 +111,13 @@ public final class PlayerViewModel: ObservableObject {
         startProgressSaveTimer()
     }
 
+    public func restoreSavedProgress() {
+        guard !isVisible, let entry = store.getWatchEntry(dramaId: drama.id) else { return }
+        currentEpisodeIndex = entry.episode
+        currentTime = entry.position
+        duration = entry.duration
+    }
+
     public func onAppear() {
         guard !isVisible else { return }
         isVisible = true

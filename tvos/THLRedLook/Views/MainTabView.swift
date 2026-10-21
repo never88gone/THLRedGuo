@@ -39,6 +39,7 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
 public struct MainTabView: View {
     @StateObject private var lanService = LanSyncService.shared
     @StateObject private var store = LocalStore.shared
+    @StateObject private var videoFeedViewModel = VideoFeedViewModel()
 
     @State private var selectedTab: TVAppTab = .catalog
     @FocusState private var focusedNavTab: TVAppTab?
@@ -245,7 +246,9 @@ public struct MainTabView: View {
                             )
                             .id("catalog_\(isCardFocusedDemo)_\(catalogInitialCategory ?? "")")
                         case .feed:
-                            TVVideoFeedView(focusTrigger: feedFocusTrigger, onRequestFocusTopNav: { focusedNavTab = .feed })
+                            TVVideoFeedView(viewModel: videoFeedViewModel, focusTrigger: feedFocusTrigger, onRequestFocusTopNav: {
+                                if selectedTab == .feed { focusedNavTab = .feed }
+                            })
                         case .rankings:
                             RankingsView(
                                 focusCategoryTrigger: rankingsBoardFocusTrigger,
@@ -317,6 +320,9 @@ public struct MainTabView: View {
             if focusedNavTab == nil {
                 focusedNavTab = selectedTab
             }
+        }
+        .onChange(of: selectedTab) { _, tab in
+            if tab == .feed { feedFocusTrigger += 1 }
         }
         .onReceive(lanService.$incomingPlayback) { incoming in
             guard let inc = incoming else { return }
@@ -555,7 +561,11 @@ public struct TVTopNavigationBar: View {
                         selectedTab = .downloads
                     } : nil
                 ) {
-                    selectedTab = tab
+                    if tab == .feed && selectedTab == .feed {
+                        onDownCommandForTab?(tab)
+                    } else {
+                        selectedTab = tab
+                    }
                 }
                 .focused(focusedNavTab, equals: tab)
                 .accessibilityIdentifier("nav.\(tab.rawValue)")

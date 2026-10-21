@@ -215,6 +215,7 @@ public struct TVPlayerView: View {
                 .focused($isWakeupFocused)
                 .accessibilityIdentifier("player.wake")
                 .accessibilityLabel("显示播放控制")
+                .accessibilityValue(playbackAccessibilityValue)
                 .ignoresSafeArea()
                 .onMoveCommand { direction in
                     if feedActions != nil && direction == .down {
@@ -260,6 +261,7 @@ public struct TVPlayerView: View {
         }
         .onAppear {
             isPlayerPresented = true
+            if feedActions != nil { viewModel.restoreSavedProgress() }
             viewModel.onAppear()
             viewModel.setSceneActive(scenePhase == .active)
             if !viewModel.isControlsVisible {
@@ -351,6 +353,13 @@ public struct TVPlayerView: View {
                 }
             }
         }
+    }
+
+    private var playbackAccessibilityValue: String {
+        let position = viewModel.currentTime.isFinite
+            ? String(format: "%.0f", max(0, viewModel.currentTime.rounded(.down))) : "0"
+        let state = viewModel.isPlaying ? "播放中" : viewModel.isLoading || viewModel.isBuffering ? "加载中" : "已暂停"
+        return "\(viewModel.drama.title) · 第 \(viewModel.currentEpisodeIndex) 集 · 已播放 \(position) 秒 · \(state)"
     }
 
     private var playerFeedActions: TVVideoFeedActions? {

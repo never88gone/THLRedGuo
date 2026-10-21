@@ -15,10 +15,12 @@ public struct TVVideoFeedActions {
 }
 
 public struct TVVideoFeedView: View {
-    @StateObject private var viewModel = VideoFeedViewModel()
+    @ObservedObject var viewModel: VideoFeedViewModel
     @State private var isWatching = false
-    @State private var pendingContentFocus = false
-    @FocusState private var focusedAction: String?
+    @State private var isVisible = false
+    @State private var didRequestAutomaticPlayback = false
+    @State private var pendingPlayback = false
+    @FocusState private var isRetryFocused: Bool
     let focusTrigger: Int
     let onRequestFocusTopNav: () -> Void
 
@@ -31,59 +33,73 @@ public struct TVVideoFeedView: View {
                     .font(.system(size: 46, weight: .bold))
                     .lineLimit(2)
                     .accessibilityIdentifier("feed.title")
-                Text(item.drama.description)
+                Text("播放进度已保留，按下或点按“推荐”继续播放")
                     .font(.system(size: 25))
                     .foregroundStyle(TVTheme.textSecondary)
-                    .lineLimit(3)
-                Text("全屏观看 · 上下键切换短剧 · 点按显示选集和弹幕控制")
-                    .font(.system(size: 24))
-                    .foregroundStyle(TVTheme.textSecondary)
-                HStack(spacing: 24) {
-                    action("开始观看", icon: "play.fill", id: "watch") { isWatching = true }
-                    action("换一批", icon: "arrow.clockwise", id: "refresh") { pendingContentFocus = true; Task { await viewModel.refresh() } }
-                        .disabled(viewModel.isLoading)
-                }
             } else if viewModel.isLoading {
                 ProgressView("正在加载首页推荐…")
             }
             if let error = viewModel.errorMessage {
                 Text(error).foregroundStyle(.yellow).font(.system(size: 25))
-                action("重试", icon: "arrow.clockwise", id: "retry") { pendingContentFocus = true; Task { await viewModel.retry() } }
+                TVButton(title: "重试", icon: "arrow.clockwise", isProminent: true, isExternalFocused: isRetryFocused) {
+                    pendingPlayback = true
+                    Task {
+                        await viewModel.retry()
+                        presentPlaybackIfReady()
+                    }
+                }
+                .focused($isRetryFocused)
+                .accessibilityIdentifier("feed.retry")
+                .disabled(viewModel.isLoading)
+                .onMoveCommand { direction in
+                    if direction == .up { returnToNavigation() }
+                }
             }
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 64)
         .padding(.top, 40)
-        .task { await viewModel.start() }
-        .onChange(of: focusTrigger) { _, _ in pendingContentFocus = true; focusContent() }
-        .onChange(of: viewModel.isLoading) { _, loading in
-            if !loading && pendingContentFocus { focusContent() }
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false; pendingPlayback = false }
+        .task {
+            guard !didRequestAutomaticPlayback else { return }
+            didRequestAutomaticPlayback = true
+            guard !isWatching, !Task.isCancelled else { return }
+            pendingPlayback = true
+            await viewModel.start()
+            guard !Task.isCancelled else { return }
+            presentPlaybackIfReady()
+        }
+        .onChange(of: focusTrigger) { _, _ in requestPlayback() }
+        .onChange(of: viewModel.current?.id) { _, _ in presentPlaybackIfReady() }
+        .onChange(of: viewModel.errorMessage) { _, error in
+            if isVisible && pendingPlayback && viewModel.current == nil && error != nil { isRetryFocused = true }
         }
         .onExitCommand { returnToNavigation() }
-        .fullScreenCover(isPresented: $isWatching, onDismiss: { focusedAction = "watch" }) {
+        .fullScreenCover(isPresented: $isWatching, onDismiss: returnToNavigation) {
             TVVideoFeedPlaybackView(viewModel: viewModel) { isWatching = false }
         }
     }
 
     private func returnToNavigation() {
-        pendingContentFocus = false
-        focusedAction = nil
+        pendingPlayback = false
+        isRetryFocused = false
         onRequestFocusTopNav()
     }
 
-    private func focusContent() {
-        if viewModel.current != nil { focusedAction = "watch"; pendingContentFocus = false }
-        else if viewModel.errorMessage != nil { focusedAction = "retry"; pendingContentFocus = false }
+    private func requestPlayback() {
+        guard !isWatching else { return }
+        pendingPlayback = true
+        if viewModel.current != nil { presentPlaybackIfReady() }
+        else if viewModel.errorMessage != nil { isRetryFocused = true }
     }
 
-    private func action(_ title: String, icon: String, id: String, perform: @escaping () -> Void) -> some View {
-        TVButton(title: title, icon: icon, isProminent: id == "watch", isExternalFocused: focusedAction == id, action: perform)
-            .focused($focusedAction, equals: id)
-            .accessibilityIdentifier("feed.\(id)")
-            .onMoveCommand { direction in
-                if direction == .up { returnToNavigation() }
-            }
+    private func presentPlaybackIfReady() {
+        guard isVisible, pendingPlayback, viewModel.current != nil else { return }
+        pendingPlayback = false
+        isRetryFocused = false
+        isWatching = true
     }
 }
 
@@ -103,7 +119,7 @@ private struct TVVideoFeedPlaybackView: View {
                         episodes: [],
                         initialEpisodeIndex: history?.episode ?? item.episode,
                         initialPosition: history?.position ?? item.position,
-                        initialShowControls: true,
+                        initialShowControls: false,
                         onDismiss: onDismiss,
                         feedActions: TVVideoFeedActions(
                             progressText: "推荐 · 第 \(viewModel.currentIndex + 1) 部 · 已加载 \(viewModel.items.count) 部",
