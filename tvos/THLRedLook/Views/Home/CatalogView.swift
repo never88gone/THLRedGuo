@@ -42,7 +42,7 @@ public struct CatalogView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            if jsService.activeSourceId.isEmpty {
+            if jsService.activeSourceId.isEmpty && jsService.sources.isEmpty {
                 TVSourceBlankStateView { Task { await viewModel.reloadAll() } }
             } else {
                 categoryHeader

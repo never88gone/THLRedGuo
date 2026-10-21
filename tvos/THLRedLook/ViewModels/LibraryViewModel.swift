@@ -205,19 +205,28 @@ public final class JSSourceService: ObservableObject {
     public static let shared = JSSourceService()
 
     @Published public private(set) var sources: [[String: Any]] = []
-    @Published public private(set) var activeSourceId: String = ""
+    @Published public private(set) var activeSourceId: String = "hongguo"
 
     private let repository = NativeRepository.shared
     private var initializationTask: Task<Void, Never>?
 
-    private init() {}
+    private init() {
+        let saved = LocalStore.shared.currentSourceId
+        let initial = saved.isEmpty ? "hongguo" : saved
+        self.activeSourceId = initial
+        self.sources = [[
+            "id": "hongguo",
+            "name": "官方内置",
+            "version": "1.0.0",
+            "author": "THL"
+        ]]
+    }
 
     public func initialize() async {
         if let task = initializationTask {
             await task.value
             return
         }
-        if !sources.isEmpty && !activeSourceId.isEmpty { return }
         let task = Task { await initializeSources() }
         initializationTask = task
         await task.value
@@ -225,9 +234,23 @@ public final class JSSourceService: ObservableObject {
     }
 
     private func initializeSources() async {
-        _ = try? await repository.jsSourceScan()
-        _ = await importBuiltInHongguoSource(autoSelect: self.activeSourceId.isEmpty || self.activeSourceId == "hongguo")
+        // 1. 优先快速获取已安装源（毫秒级）
+        if let list = try? await repository.jsSourceList(), !list.isEmpty {
+            self.sources = list
+        } else {
+            _ = try? await repository.jsSourceScan()
+            if let list = try? await repository.jsSourceList(), !list.isEmpty {
+                self.sources = list
+            }
+        }
+
+        // 2. 检查是否包含官方内置源，若缺失才补充导入
+        if !self.sources.contains(where: { ($0["id"] as? String) == "hongguo" }) {
+            _ = await importBuiltInHongguoSource(autoSelect: true)
+        }
+
         await refresh()
+
         if self.activeSourceId.isEmpty {
             await setActiveSource("hongguo")
         }

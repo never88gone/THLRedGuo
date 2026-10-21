@@ -18,7 +18,7 @@ public actor NativeBridge {
     // 当前数据源状态
     private var installedSources: [String: [String: Any]] = [:]
     private var sourceScripts: [String: String] = [:]
-    private var activeSourceId: String = ""
+    private var activeSourceId: String = "hongguo"
 
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
@@ -33,6 +33,16 @@ public actor NativeBridge {
         self.sourcesDirURL = self.baseDirURL.appendingPathComponent("sources")
 
         try? FileManager.default.createDirectory(at: self.sourcesDirURL, withIntermediateDirectories: true)
+
+        // 默认预设官方内置 hongguo 脚本，确保冷启动 0 毫秒处于可用状态
+        self.sourceScripts["hongguo"] = BuiltInHongguoJSContent
+        self.installedSources["hongguo"] = [
+            "id": "hongguo",
+            "name": "官方内置",
+            "version": "1.0.0",
+            "author": "THL"
+        ]
+        self.activeSourceId = "hongguo"
     }
 
     /// 保证核心正规初始化严格就绪

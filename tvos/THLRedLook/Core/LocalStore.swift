@@ -32,7 +32,9 @@ public final class LocalStore: ObservableObject {
     }
     @Published public var unlockedSources: Bool = false
     @Published public var resourceSettings: ResourceSettings = ResourceSettings()
-    @Published public var currentSourceId: String = ""
+    @Published public var currentSourceId: String = "hongguo"
+    @Published public var cachedCategories: [CatalogCategory] = []
+    @Published public var cachedHomeDramas: [Drama] = []
 
     private let defaults: UserDefaults
     private let danmakuKey = "thl_tv_danmaku_enabled"
@@ -44,6 +46,8 @@ public final class LocalStore: ObservableObject {
     private let unlockedKey = "zgj_tv_sources_unlocked"
     private let settingsKey = "zgj_tv_resource_settings"
     private let currentSourceKey = "zgj_tv_current_source"
+    private let cachedCategoriesKey = "thl_tv_cached_categories"
+    private let cachedHomeDramasKey = "thl_tv_cached_home_dramas"
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -52,7 +56,21 @@ public final class LocalStore: ObservableObject {
 
     private func loadFromStorage() {
         unlockedSources = defaults.bool(forKey: unlockedKey)
-        currentSourceId = defaults.string(forKey: currentSourceKey) ?? ""
+        let savedSource = defaults.string(forKey: currentSourceKey) ?? ""
+        currentSourceId = savedSource.isEmpty ? "hongguo" : savedSource
+        if savedSource.isEmpty {
+            defaults.set("hongguo", forKey: currentSourceKey)
+        }
+
+        if let data = defaults.data(forKey: cachedCategoriesKey),
+           let cats = try? JSONDecoder().decode([CatalogCategory].self, from: data) {
+            cachedCategories = cats
+        }
+
+        if let data = defaults.data(forKey: cachedHomeDramasKey),
+           let dramas = try? JSONDecoder().decode([Drama].self, from: data) {
+            cachedHomeDramas = dramas
+        }
         searchHistory = defaults.stringArray(forKey: searchHistoryKey) ?? []
         danmakuEnabled = defaults.object(forKey: danmakuKey) as? Bool ?? true
 
@@ -103,6 +121,22 @@ public final class LocalStore: ObservableObject {
     public func setSource(_ id: String) {
         currentSourceId = id
         defaults.set(id, forKey: currentSourceKey)
+    }
+
+    public func saveCachedCatalog(categories: [CatalogCategory], dramas: [Drama]) {
+        if !categories.isEmpty {
+            self.cachedCategories = categories
+            if let data = try? JSONEncoder().encode(categories) {
+                defaults.set(data, forKey: cachedCategoriesKey)
+            }
+        }
+        if !dramas.isEmpty {
+            let prefixDramas = Array(dramas.prefix(36))
+            self.cachedHomeDramas = prefixDramas
+            if let data = try? JSONEncoder().encode(prefixDramas) {
+                defaults.set(data, forKey: cachedHomeDramasKey)
+            }
+        }
     }
 
     // MARK: - Watch History

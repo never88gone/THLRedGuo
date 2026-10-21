@@ -23,6 +23,16 @@ public final class HomeViewModel: ObservableObject {
     public init(repository: any DramaSourceProviderProtocol = NativeRepository.shared, store: LocalStore = .shared) {
         self.repository = repository
         self.store = store
+
+        // 1. 同步恢复本地缓存的分类与首屏短剧，达成 0 毫秒秒开展现
+        if !store.cachedCategories.isEmpty {
+            self.categories = store.cachedCategories
+            self.selectedCategory = store.cachedCategories.first ?? .all
+        }
+        if !store.cachedHomeDramas.isEmpty {
+            self.items = store.cachedHomeDramas
+        }
+
         store.$currentSourceId
             .dropFirst()
             .sink { [weak self] _ in
@@ -43,10 +53,12 @@ public final class HomeViewModel: ObservableObject {
         SourceSite.byId(activeSourceId)
     }
 
-    private func resetRequest() {
+    private func resetRequest(clearItems: Bool = true) {
         generation += 1
         selectCategoryTask?.cancel()
-        items = []
+        if clearItems {
+            items = []
+        }
         currentPage = 0
         hasMore = false
         isLoading = false
@@ -55,24 +67,48 @@ public final class HomeViewModel: ObservableObject {
     }
 
     public func reloadAll(initialCategory: String? = nil) async {
-        resetRequest()
+        // 如果当前已有内容展示，静默平滑刷新，避免突兀白屏闪烁
+        resetRequest(clearItems: items.isEmpty)
         let ticket = generation
         let source = activeSourceId
-        guard !source.isEmpty else { categories = []; return }
-        isLoading = true
+        guard !source.isEmpty else { return }
+
+        if items.isEmpty {
+            isLoading = true
+        }
+
+        let targetCategory = initialCategory ?? selectedCategory.id
+
+        // 并行发起分类与首屏短剧网络请求，消除串行网络等待
+        async let categoriesTask = repository.loadCategories(source: source)
+        async let catalogTask = repository.loadCatalog(source: source, category: targetCategory, page: 1, query: "", force: true)
+
         do {
-            let list = try await repository.loadCategories(source: source)
+            let (loadedCategories, catalogResult) = try await (categoriesTask, catalogTask)
             guard !Task.isCancelled, generation == ticket, activeSourceId == source else { return }
-            categories = list
-            selectedCategory = list.first(where: { $0.id == initialCategory || $0.name == initialCategory })
-                ?? list.first(where: { $0.id == selectedCategory.id }) ?? list.first ?? .all
+
+            if !loadedCategories.isEmpty {
+                self.categories = loadedCategories
+                self.selectedCategory = loadedCategories.first(where: { $0.id == initialCategory || $0.name == initialCategory })
+                    ?? loadedCategories.first(where: { $0.id == selectedCategory.id }) ?? loadedCategories.first ?? .all
+            }
+
+            self.store.refreshDramas(catalogResult.items)
+            self.items = filterAndSort(dramas: catalogResult.items)
+            self.currentPage = catalogResult.page
+            self.hasMore = catalogResult.hasMore
+            self.isLoading = false
+            self.errorMessage = nil
+
+            // 更新持久化缓存供下一次冷启动秒开
+            self.store.saveCachedCatalog(categories: loadedCategories, dramas: catalogResult.items)
         } catch {
             guard !Task.isCancelled, generation == ticket, activeSourceId == source else { return }
-            errorMessage = error.localizedDescription
-            isLoading = false
-            return
+            self.isLoading = false
+            if self.items.isEmpty {
+                self.errorMessage = error.localizedDescription
+            }
         }
-        await loadFirstPage()
     }
 
     public func selectCategory(_ category: CatalogCategory, immediate: Bool = false) {
