@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+
 class FeedPlayerOverlay extends StatelessWidget {
   const FeedPlayerOverlay({
     super.key,
@@ -219,27 +221,141 @@ class _FeedProgress extends StatefulWidget {
   const _FeedProgress({super.key, required this.value, this.onSeek});
   final double value;
   final ValueChanged<double>? onSeek;
+
   @override
   State<_FeedProgress> createState() => _FeedProgressState();
 }
 
 class _FeedProgressState extends State<_FeedProgress> {
   double? _dragging;
+
+  void _updateSeek(double localDx, double totalWidth) {
+    if (widget.onSeek == null || totalWidth <= 0) return;
+    final progress = (localDx / totalWidth).clamp(0.0, 1.0);
+    setState(() => _dragging = progress);
+  }
+
+  void _finishSeek() {
+    final target = _dragging;
+    setState(() => _dragging = null);
+    if (target != null && widget.onSeek != null) {
+      widget.onSeek!(target);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => Slider(
-    value: _dragging ?? widget.value,
-    onChanged: widget.onSeek == null
-        ? null
-        : (value) => setState(() => _dragging = value),
-    onChangeEnd: widget.onSeek == null
-        ? null
-        : (value) {
-            setState(() => _dragging = null);
-            widget.onSeek!(value);
-          },
-    activeColor: Colors.white,
-    inactiveColor: Colors.white30,
-  );
+  Widget build(BuildContext context) {
+    final effectiveValue = (_dragging ?? widget.value).clamp(0.0, 1.0);
+    final isInteractive = widget.onSeek != null;
+    final isDragging = _dragging != null;
+    final trackHeight = isDragging ? 4.0 : 2.5;
+
+    return Semantics(
+      slider: true,
+      enabled: isInteractive,
+      value: '${(effectiveValue * 100).round()}%',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final progressWidth = width * effectiveValue;
+
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: isInteractive
+                ? (d) => _updateSeek(d.localPosition.dx, width)
+                : null,
+            onTapUp: isInteractive ? (_) => _finishSeek() : null,
+            onTapCancel:
+                isInteractive ? () => setState(() => _dragging = null) : null,
+            onHorizontalDragStart: isInteractive
+                ? (d) => _updateSeek(d.localPosition.dx, width)
+                : null,
+            onHorizontalDragUpdate: isInteractive
+                ? (d) => _updateSeek(d.localPosition.dx, width)
+                : null,
+            onHorizontalDragEnd: isInteractive ? (_) => _finishSeek() : null,
+            onHorizontalDragCancel:
+                isInteractive ? () => setState(() => _dragging = null) : null,
+            child: SizedBox(
+              height: 32,
+              width: width,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    height: trackHeight,
+                    width: width,
+                    decoration: BoxDecoration(
+                      color: AppColors.whiteWithAlpha(0.24),
+                      borderRadius: BorderRadius.circular(trackHeight / 2),
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // 播放进度渐变单线
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            width: progressWidth,
+                            height: trackHeight,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [
+                                  AppColors.hongguoOrange,
+                                  AppColors.hongguoRed,
+                                  AppColors.hongguoRedLight,
+                                ],
+                              ),
+                              borderRadius:
+                                  BorderRadius.circular(trackHeight / 2),
+                              boxShadow: isDragging
+                                  ? [
+                                      BoxShadow(
+                                        color:
+                                            AppColors.hongguoRedWithAlpha(0.6),
+                                        blurRadius: 6,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        // 拖拽手势响应指示微点（静止播放时不显示任何滑块，仅在拖拽微调时给用户清晰反馈）
+                        if (isDragging && progressWidth > 0)
+                          Positioned(
+                            left: (progressWidth - 5).clamp(0.0, width - 10),
+                            top: (trackHeight - 10) / 2,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.white,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.hongguoRedWithAlpha(0.8),
+                                    blurRadius: 6,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 void feedPreviewAction() {}
