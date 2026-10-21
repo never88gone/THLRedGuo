@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FEED00022C00000100000001 /* TVVideoFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00122C00000100000001 /* TVVideoFeedView.swift */; };
+		FEED00012C00000100000001 /* VideoFeedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00112C00000100000001 /* VideoFeedViewModel.swift */; };
 		E34571822EE6111100000021 /* SourceDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6111100000022 /* SourceDiagnostics.swift */; };
 		308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */; };
 		3B9F1C5ADE795910FBD0AD03 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6299EBC862612C3A90774337 /* Foundation.framework */; };
@@ -76,6 +78,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		FEED00122C00000100000001 /* TVVideoFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVVideoFeedView.swift; sourceTree = "<group>"; };
+		FEED00112C00000100000001 /* VideoFeedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFeedViewModel.swift; sourceTree = "<group>"; };
 		E34571822EE6111100000022 /* SourceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceDiagnostics.swift; sourceTree = "<group>"; };
 		041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLook.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D9437790F04A5D01FEC2D84 /* Pods-THLRedLookTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLookTests.debug.xcconfig"; path = "Target Support Files/Pods-THLRedLookTests/Pods-THLRedLookTests.debug.xcconfig"; sourceTree = "<group>"; };
@@ -294,6 +298,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000152C00000100000001 /* HomeViewModel.swift */,
+				FEED00112C00000100000001 /* VideoFeedViewModel.swift */,
 				B10000162C00000100000001 /* SearchViewModel.swift */,
 				B10000172C00000100000001 /* DetailViewModel.swift */,
 				B10000182C00000100000001 /* PlayerViewModel.swift */,
@@ -334,6 +339,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000232C00000100000001 /* CatalogView.swift */,
+				FEED00122C00000100000001 /* TVVideoFeedView.swift */,
 				B10000222C00000100000001 /* FilterSortSheet.swift */,
 			);
 			path = Home;
@@ -653,6 +659,8 @@
 				A10000242C00000100000001 /* TVDanmakuView.swift in Sources */,
 				A10000252C00000100000001 /* TVPlayerControlsOverlay.swift in Sources */,
 				A10000262C00000100000001 /* TVPlayerView.swift in Sources */,
+				FEED00022C00000100000001 /* TVVideoFeedView.swift in Sources */,
+				FEED00012C00000100000001 /* VideoFeedViewModel.swift in Sources */,
 				A10000392C00000100000001 /* AVPlayerView.swift in Sources */,
 				A10000272C00000100000001 /* DramaDetailView.swift in Sources */,
 				A10000282C00000100000001 /* SearchRootView.swift in Sources */,

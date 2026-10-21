@@ -859,7 +859,7 @@ public actor NativeBridge {
             }
             return result
 
-        case "rankingBoards", "rankings", "recommendations", "suggestions", "seriesSeasons":
+        case "rankingBoards", "rankings", "recommendations", "suggestions", "seriesSeasons", "feed":
             let source = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
                 ?? (activeSourceId.isEmpty ? "hongguo" : activeSourceId)
             guard let context = getOrCreateContext(sourceId: source) else {
@@ -872,6 +872,7 @@ public actor NativeBridge {
             case "recommendations": arguments = [payload["category"] as? String ?? "real-drama", page]
             case "suggestions": arguments = [payload["query"] as? String ?? ""]
             case "seriesSeasons": arguments = [payload["id"] as? String ?? ""]
+            case "feed": arguments = [page, payload["session"] as? String ?? ""]
             default: arguments = []
             }
             let expression = try spiderExpression(action, arguments)
@@ -879,8 +880,8 @@ public actor NativeBridge {
             guard evaluated?["ok"] as? Bool == true, let result = evaluated?["data"] as? [String: Any] else {
                 let message = evaluated?["error"] as? String ?? "官方列表响应超时，请重试"
                 let code = SourceDiagnostics.safeCode(evaluated?["code"])
-                diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: action == "suggestions" ? "搜索建议执行" : "发现列表执行", errorCode: code.isEmpty ? "JS_EXECUTION" : code))
-                throw NSError(domain: "THLRedLook.Source", code: -2, userInfo: [NSLocalizedDescriptionKey: message])
+                diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: action == "feed" ? "首页推荐执行" : action == "suggestions" ? "搜索建议执行" : "发现列表执行", errorCode: code.isEmpty ? "JS_EXECUTION" : code))
+                throw NSError(domain: "THLRedLook.Source", code: -2, userInfo: [NSLocalizedDescriptionKey: message, "sourceErrorCode": code])
             }
             if action == "rankingBoards" || action == "suggestions" { return result }
             let rows = result["list"] as? [[String: Any]] ?? []
@@ -892,6 +893,10 @@ public actor NativeBridge {
                 if action == "seriesSeasons" {
                     return ["drama": drama, "season": vod["season"] as? Int ?? 0,
                             "playable": vod["playable"] as? Bool ?? false, "status": vod["status"] as? String ?? ""]
+                }
+                if action == "feed" {
+                    return ["drama": drama, "episode": max(1, vod["vod_start_episode"] as? Int ?? 1),
+                            "position": max(0, vod["vod_start_position"] as? Double ?? 0)]
                 }
                 return drama
             }

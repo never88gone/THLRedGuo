@@ -2,6 +2,7 @@ import SwiftUI
 
 public enum TVAppTab: String, CaseIterable, Identifiable {
     case catalog = "catalog"
+    case feed = "feed"
     case rankings = "rankings"
     case search = "search"
     case library = "library"
@@ -13,6 +14,7 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
     public var title: String {
         switch self {
         case .catalog: return "发现"
+        case .feed: return "推荐"
         case .rankings: return "榜单"
         case .search: return "搜索"
         case .library: return "追剧与历史"
@@ -24,6 +26,7 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
     public var icon: String {
         switch self {
         case .catalog: return "sparkles.tv"
+        case .feed: return "play.rectangle.fill"
         case .rankings: return "chart.bar.fill"
         case .search: return "magnifyingglass"
         case .library: return "bookmark.fill"
@@ -40,6 +43,7 @@ public struct MainTabView: View {
     @State private var selectedTab: TVAppTab = .catalog
     @FocusState private var focusedNavTab: TVAppTab?
     @State private var catalogCategoryFocusTrigger: Int = 0
+    @State private var feedFocusTrigger = 0
     @State private var rankingsBoardFocusTrigger: Int = 0
     @State private var searchFocusTrigger: Int = 0
     @State private var libraryTabFocusTrigger: Int = 0
@@ -131,6 +135,8 @@ public struct MainTabView: View {
             case "cardFocused":
                 initTab = .catalog
                 initCardFocused = true
+            case "feed":
+                initTab = .feed
             case "recommendations":
                 initTab = .catalog
             case "recommendations_comic":
@@ -205,6 +211,8 @@ public struct MainTabView: View {
                             switch tab {
                             case .catalog:
                                 catalogCategoryFocusTrigger += 1
+                            case .feed:
+                                feedFocusTrigger += 1
                             case .rankings:
                                 rankingsBoardFocusTrigger += 1
                             case .search:
@@ -236,6 +244,8 @@ public struct MainTabView: View {
                                 }
                             )
                             .id("catalog_\(isCardFocusedDemo)_\(catalogInitialCategory ?? "")")
+                        case .feed:
+                            TVVideoFeedView(focusTrigger: feedFocusTrigger, onRequestFocusTopNav: { focusedNavTab = .feed })
                         case .rankings:
                             RankingsView(
                                 focusCategoryTrigger: rankingsBoardFocusTrigger,
@@ -374,6 +384,9 @@ public struct MainTabView: View {
             selectedTab = .catalog
             catalogInitialCategory = "app:discover:motion_comic"
             focusedNavTab = .catalog
+        case "feed":
+            selectedTab = .feed
+            focusedNavTab = .feed
         case "recommendations":
             selectedTab = .catalog
             focusedNavTab = .catalog

@@ -9,6 +9,9 @@ public struct TVPlayerView: View {
     @State private var lastExitTime: TimeInterval = 0
     public var onDismiss: (() -> Void)? = nil
     public var onSwitchSeason: ((Drama) -> Void)? = nil
+    public var feedActions: TVVideoFeedActions?
+    @State private var isSwitchingFeed = false
+    @State private var isPlayerPresented = false
 
     enum PlayerErrorFocusTarget: Hashable {
         case backToEpisodes
@@ -25,7 +28,8 @@ public struct TVPlayerView: View {
         keepControlsVisible: Bool = false,
         initialShowDrawer: Bool = false,
         onDismiss: (() -> Void)? = nil,
-        onSwitchSeason: ((Drama) -> Void)? = nil
+        onSwitchSeason: ((Drama) -> Void)? = nil,
+        feedActions: TVVideoFeedActions? = nil
     ) {
         _viewModel = StateObject(wrappedValue: PlayerViewModel(
             drama: drama,
@@ -38,6 +42,7 @@ public struct TVPlayerView: View {
         ))
         self.onDismiss = onDismiss
         self.onSwitchSeason = onSwitchSeason
+        self.feedActions = feedActions
     }
 
     public var body: some View {
@@ -73,11 +78,11 @@ public struct TVPlayerView: View {
             }
 
             // 正在缓冲/加载遮罩
-            if (viewModel.isLoading || viewModel.isBuffering) && !viewModel.isSeamlessTransitioning {
+            if (viewModel.isLoading || viewModel.isBuffering || isSwitchingFeed) && !viewModel.isSeamlessTransitioning {
                 VStack(spacing: 16) {
                     ProgressView()
                         .scaleEffect(1.8)
-                    Text(viewModel.isLoading ? "正在准备视频流..." : "正在缓冲...")
+                    Text(isSwitchingFeed ? "正在切换推荐…" : viewModel.isLoading ? "正在准备视频流..." : "正在缓冲...")
                         .font(.headline)
                         .foregroundColor(.white)
                 }
@@ -109,7 +114,7 @@ public struct TVPlayerView: View {
                         }) {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.backward.circle.fill")
-                                Text("返回选集")
+                                Text(feedActions == nil ? "返回选集" : "返回推荐")
                             }
                             .font(.system(size: 18, weight: .bold))
                             .padding(.horizontal, 28)
@@ -145,6 +150,10 @@ public struct TVPlayerView: View {
                         }
                         .buttonStyle(TVZeroHighlightButtonStyle())
                         .focused($errorFocusTarget, equals: .retry)
+                        if let feedActions, feedActions.canGoNext {
+                            Button("下一部") { Task { _ = await nextFeedDrama() } }
+                                .accessibilityIdentifier("player.errorNextDrama")
+                        }
                     }
                 }
                 .padding(40)
@@ -207,15 +216,22 @@ public struct TVPlayerView: View {
                 .accessibilityIdentifier("player.wake")
                 .accessibilityLabel("显示播放控制")
                 .ignoresSafeArea()
-                .onMoveCommand { _ in
-                    viewModel.showControls()
+                .onMoveCommand { direction in
+                    if feedActions != nil && direction == .down {
+                        Task { _ = await nextFeedDrama() }
+                    } else if let feedActions, direction == .up, feedActions.canGoPrevious {
+                        viewModel.onDisappear()
+                        feedActions.onPrevious()
+                    } else {
+                        viewModel.showControls()
+                    }
                 }
 
             }
 
             // 遥控器悬浮控制条（有错误提示或打开抽屉时隐藏控制条，防止焦点冲突与视觉重叠）
             if viewModel.isControlsVisible && (viewModel.errorMessage == nil || viewModel.keepControlsVisible) && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
-                TVPlayerControlsOverlay(viewModel: viewModel, forceFocusPlayButton: viewModel.keepControlsVisible) {
+                TVPlayerControlsOverlay(viewModel: viewModel, forceFocusPlayButton: viewModel.keepControlsVisible, feedActions: playerFeedActions) {
                     handleExit()
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.98)))
@@ -243,6 +259,7 @@ public struct TVPlayerView: View {
             }
         }
         .onAppear {
+            isPlayerPresented = true
             viewModel.onAppear()
             viewModel.setSceneActive(scenePhase == .active)
             if !viewModel.isControlsVisible {
@@ -252,10 +269,11 @@ public struct TVPlayerView: View {
             }
         }
         .onDisappear {
+            isPlayerPresented = false
             viewModel.onDisappear()
         }
         .onChange(of: scenePhase) { _, phase in
-            viewModel.setSceneActive(phase == .active)
+            viewModel.setSceneActive(phase == .active && !isSwitchingFeed)
         }
         // 遥控器硬件 Play/Pause 按键直接映射
         .onPlayPauseCommand {
@@ -293,6 +311,11 @@ public struct TVPlayerView: View {
         .onChange(of: viewModel.switchSeasonDrama) { _, newDrama in
             if let drama = newDrama {
                 viewModel.onDisappear()
+                if let feedActions {
+                    feedActions.onDetail(drama)
+                    viewModel.switchSeasonDrama = nil
+                    return
+                }
                 if let onSwitchSeason = onSwitchSeason {
                     onSwitchSeason(drama)
                 }
@@ -328,6 +351,38 @@ public struct TVPlayerView: View {
                 }
             }
         }
+    }
+
+    private var playerFeedActions: TVVideoFeedActions? {
+        guard let feedActions else { return nil }
+        return TVVideoFeedActions(
+            progressText: feedActions.progressText,
+            canGoPrevious: feedActions.canGoPrevious && !isSwitchingFeed,
+            canGoNext: feedActions.canGoNext && !isSwitchingFeed,
+            isLoading: feedActions.isLoading || isSwitchingFeed,
+            isFavorite: feedActions.isFavorite,
+            errorMessage: feedActions.errorMessage,
+            onPrevious: { viewModel.onDisappear(); feedActions.onPrevious() },
+            onNext: { await nextFeedDrama() },
+            onFavorite: feedActions.onFavorite,
+            onDetail: { drama in viewModel.onDisappear(); feedActions.onDetail(drama) },
+            onRefresh: { viewModel.onDisappear(); feedActions.onRefresh() }
+        )
+    }
+
+    private func nextFeedDrama() async -> Bool {
+        guard let feedActions, feedActions.canGoNext, !isSwitchingFeed else { return false }
+        isSwitchingFeed = true
+        viewModel.setSceneActive(false)
+        let changed = await feedActions.onNext()
+        isSwitchingFeed = false
+        if changed {
+            viewModel.onDisappear()
+        } else if isPlayerPresented {
+            viewModel.setSceneActive(scenePhase == .active)
+            viewModel.showControls()
+        }
+        return changed
     }
 
     private func handleExit() {

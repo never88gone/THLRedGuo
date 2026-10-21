@@ -7,6 +7,12 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
 
     public init() {}
 
+    public func loadVideoFeed(page: Int, session: String) async throws -> VideoFeedPage {
+        let result = try await bridge.request(action: "feed", payload: ["source": "hongguo", "page": page, "session": session])
+        let data = try JSONSerialization.data(withJSONObject: result)
+        return try JSONDecoder().decode(VideoFeedPage.self, from: data)
+    }
+
     public func loadCategories(source: String) async throws -> [CatalogCategory] {
         let resp = try await bridge.request(action: "categories", payload: ["source": source])
         guard let items = resp["items"] as? [[String: Any]] else { return [CatalogCategory.all] }
