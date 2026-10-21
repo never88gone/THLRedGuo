@@ -1882,7 +1882,7 @@ private struct SourceDiagnosticsView: View {
 
             if runner.running { ProgressView() }
 
-            // 诊断明细流式列表（支持精准遥控器焦点上下移动与详细信息交互）
+            // 诊断明细流式列表（支持精准遥控器焦点上下移动与详细信息交互，高亮严格不缩放溢出）
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
@@ -1937,7 +1937,8 @@ private struct SourceDiagnosticsView: View {
                             }
                         }
                     }
-                    .padding(12)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 8)
                 }
                 .focusSection()
                 .onChange(of: focusedTarget) { newTarget in
@@ -1949,7 +1950,8 @@ private struct SourceDiagnosticsView: View {
                 }
             }
         }
-        .padding(60)
+        .padding(.horizontal, 64)
+        .padding(.vertical, 40)
         .defaultFocus($focusedTarget, .action("run"))
         .onExitCommand { dismiss() }
         .sheet(item: $selectedDetailEntry, onDismiss: {
@@ -1989,6 +1991,27 @@ private struct SourceDiagnosticEntryCardView: View {
         isFocused || envIsFocused
     }
 
+    private var cardBackground: Color {
+        if activeFocused {
+            return entry.failed ? Color(red: 0.35, green: 0.12, blue: 0.14) : Color(red: 0.22, green: 0.20, blue: 0.28)
+        } else {
+            return entry.failed ? Color.red.opacity(0.12) : Color.white.opacity(0.06)
+        }
+    }
+
+    private var cardBorderColor: Color {
+        if activeFocused {
+            return Color.white
+        } else {
+            return entry.failed ? Color.red.opacity(0.4) : Color.white.opacity(0.08)
+        }
+    }
+
+    private var cardShadowColor: Color {
+        guard activeFocused else { return Color.clear }
+        return entry.failed ? Color.red.opacity(0.45) : Color.white.opacity(0.3)
+    }
+
     var body: some View {
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: 12) {
@@ -2010,22 +2033,14 @@ private struct SourceDiagnosticEntryCardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 18)
-                    .fill(
-                        activeFocused
-                            ? (entry.failed ? Color(red: 0.35, green: 0.12, blue: 0.14) : Color(red: 0.22, green: 0.20, blue: 0.28))
-                            : (entry.failed ? Color.red.opacity(0.12) : Color.white.opacity(0.06))
-                    )
+                    .fill(cardBackground)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(
-                        activeFocused
-                            ? Color.white
-                            : (entry.failed ? Color.red.opacity(0.4) : Color.white.opacity(0.08)),
-                        lineWidth: activeFocused ? 3 : 1
-                    )
+                    .stroke(cardBorderColor, lineWidth: activeFocused ? 3.5 : 1)
             )
-            .tvFocusBorder(isFocused: activeFocused, cornerRadius: 18)
+            .shadow(color: cardShadowColor, radius: activeFocused ? 12 : 0)
+            .animation(TVTheme.focusSpringAnimation, value: activeFocused)
         }
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focusEffectDisabled()
@@ -2371,9 +2386,9 @@ private struct SourceDiagnosticsFullReportSheet: View {
                         .cornerRadius(16)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
-                                .stroke(focusedField == "content" ? Color.white : Color.white.opacity(0.12), lineWidth: focusedField == "content" ? 3 : 1)
+                                .stroke(focusedField == "content" ? Color.white : Color.white.opacity(0.12), lineWidth: focusedField == "content" ? 3.5 : 1)
                         )
-                        .tvFocusBorder(isFocused: focusedField == "content", cornerRadius: 16)
+                        .shadow(color: focusedField == "content" ? Color.white.opacity(0.3) : Color.clear, radius: 8)
                         .focusable()
                         .focused($focusedField, equals: "content")
                         .accessibilityIdentifier("sourceDiagnostics.reportContent")
