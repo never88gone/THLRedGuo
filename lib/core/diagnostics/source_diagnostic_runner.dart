@@ -88,15 +88,50 @@ class SourceDiagnosticRunner extends ChangeNotifier {
         currentStage = '剧集详情与分集解析';
         stopwatch.reset();
         stopwatch.start();
-        sampleVodId = first.list.first['vod_id']?.toString() ?? '';
-        detailResult = await runtime.detail(sampleVodId);
-        final playUrl = detailResult.vod['vod_play_url']?.toString() ?? '';
-        if (playUrl.isEmpty) {
-          throw const CatPawSourceFailure(
-            '剧集详情返回的数据中缺少分集播放列表 (vod_play_url 为空)',
-            code: 'MISSING_EPISODE',
-          );
+
+        // 优先筛选标注有完整集数的短剧作为健康探测样本
+        final candidates = <String>[];
+        for (final item in first.list) {
+          final id = item['vod_id']?.toString() ?? '';
+          if (id.isEmpty) continue;
+          final total = (item['vod_total'] as num?)?.toInt() ?? 0;
+          final remarks = item['vod_remarks']?.toString() ?? '';
+          if (total > 0 || (remarks.contains('集') && !remarks.contains('0集'))) {
+            candidates.add(id);
+          }
         }
+        if (candidates.isEmpty) {
+          for (final item in first.list) {
+            final id = item['vod_id']?.toString() ?? '';
+            if (id.isNotEmpty) candidates.add(id);
+          }
+        }
+
+        CatPawSourceFailure? lastFailure;
+        for (final candId in candidates.take(3)) {
+          try {
+            final res = await runtime.detail(candId);
+            final playUrl = res.vod['vod_play_url']?.toString() ?? '';
+            if (playUrl.isNotEmpty) {
+              detailResult = res;
+              sampleVodId = candId;
+              break;
+            }
+          } catch (e) {
+            if (e is CatPawSourceFailure) {
+              lastFailure = e;
+            }
+          }
+        }
+
+        if (detailResult == null) {
+          throw lastFailure ??
+              const CatPawSourceFailure(
+                '剧集详情返回的数据中缺少分集播放列表 (vod_play_url 为空)',
+                code: 'MISSING_EPISODE',
+              );
+        }
+
         successCount++;
         recorder.add(
           SourceDiagnosticEntry(

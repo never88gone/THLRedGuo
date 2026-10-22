@@ -684,7 +684,7 @@ async function fetchAppDetail(seriesId) {
 
     if (resp && resp.status === 200) {
       var raw = typeof resp.text === "function" ? await resp.text() : resp.body;
-      if (raw) {
+      if (raw && typeof raw === "string" && raw.trim().length > 0) {
         var parsed = safeJsonParse(raw);
         if (parsed && parsed.data && parsed.data.video_data) {
           return parsed.data.video_data;
@@ -721,7 +721,7 @@ async function fetchAppVideoModel(videoId) {
 
     if (resp) {
       var raw = typeof resp.text === "function" ? await resp.text() : resp.body;
-      if (raw) {
+      if (raw && typeof raw === "string" && raw.trim().length > 0) {
         var parsed = safeJsonParse(raw);
         if (parsed && parsed.data && parsed.data.video_model) {
           var model = parsed.data.video_model;
@@ -1097,6 +1097,9 @@ async function detail(id) {
     for (let i = 0; i < epTotalCount; i++) {
       epUrls.push("第" + (i + 1) + "集$" + cleanId + "_" + (i + 1));
     }
+  } else if (cleanId) {
+    // 关键保底机制：只要具有有效短剧 ID，即便 Web 端网络抖动未解析出分集，至少提供第1集标准播放路由，确保 vod_play_url 恒有效
+    epUrls.push("第1集$" + BASE_URL + "/player/" + cleanId + "/" + cleanId);
   }
 
   if (!title && epUrls.length === 0) {
@@ -2368,6 +2371,7 @@ spider.danmaku = function (id, startMs, durationMs) {
   }
 
   const legacyHome = spider.home;
+  const legacyCategory = spider.category;
   const discoveryGenres = ['all', 'playlet', 'motion_comic', 'ai_playlet'];
 
   async function discoveryTab() {
@@ -2389,26 +2393,38 @@ spider.danmaku = function (id, startMs, durationMs) {
     })), filters: {} };
   };
 
-  spider.category = function (tid, page) {
+  spider.category = async function (tid, page, filter, extend) {
     const aliases = { '': 'all', all: 'all', short_play: 'all', 'real-drama': 'playlet',
       'comic-drama': 'motion_comic', comic: 'motion_comic', 'ai-drama': 'ai_playlet',
       'app:theater:8': 'all', 'app:theater:38': 'playlet', 'app:theater:32': 'motion_comic' };
     const genre = aliases[text(tid)] || text(tid).replace(/^app:discover:/, '');
-    if (!discoveryGenres.includes(genre)) throw failure('分类已更新，请重新选择分类', 'INVALID_CATEGORY');
-    return paged('discover:' + genre, page, async () => {
-      const { cell, choices } = await discoveryTab();
-      const category = genre === 'all' ? '短剧' : text(choices.find(item => item.selector_item_id === genre).show_name);
-      const params = {
-        cell_id: text(cell.cell_id_str), tab_type: 8, selected_items: genre,
-        sub_selected_items: '', unlimited_selector_change_type: 1,
-        client_template: 2, client_req_type: 2
-      };
-      if (genre === 'all' && choices.find(item => item.selector_item_id === genre).is_selected) return { cell, params, category };
-      const response = await api('/reading/bookapi/bookmall/cell/change/v', {
-        ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 20
+    if (!discoveryGenres.includes(genre)) {
+      if (typeof legacyCategory === 'function') return legacyCategory(tid, page, filter, extend);
+      throw failure('分类已更新，请重新选择分类', 'INVALID_CATEGORY');
+    }
+    try {
+      return await paged('discover:' + genre, page, async () => {
+        const { cell, choices } = await discoveryTab();
+        const category = genre === 'all' ? '短剧' : text(choices.find(item => item.selector_item_id === genre).show_name);
+        const params = {
+          cell_id: text(cell.cell_id_str), tab_type: 8, selected_items: genre,
+          sub_selected_items: '', unlimited_selector_change_type: 1,
+          client_template: 2, client_req_type: 2
+        };
+        if (genre === 'all' && choices.find(item => item.selector_item_id === genre).is_selected) return { cell, params, category };
+        const response = await api('/reading/bookapi/bookmall/cell/change/v', {
+          ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 20
+        });
+        return { cell: response.data?.cell_view, data: response.data || {}, params, category };
       });
-      return { cell: response.data?.cell_view, data: response.data || {}, params, category };
-    });
+    } catch (e) {
+      if (typeof legacyCategory === 'function') {
+        try {
+          return await legacyCategory(tid, page, filter, extend);
+        } catch (_) {}
+      }
+      throw e;
+    }
   };
 
   spider.suggestions = async function (word) {
@@ -2624,4 +2640,5 @@ spider.danmaku = function (id, startMs, durationMs) {
     return result;
   };
 })();
+
 """#

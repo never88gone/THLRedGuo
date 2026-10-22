@@ -165,6 +165,16 @@ class SourceDiagnostics extends ChangeNotifier {
         return '弹幕';
       }
     }
+    if (uri.host == 'hongguoduanju.com' ||
+        uri.host.endsWith('.hongguoduanju.com')) {
+      if (uri.path == '/detail' || uri.path.startsWith('/detail/')) {
+        return '详情';
+      }
+      if (uri.path.startsWith('/player/')) {
+        return '播放解析';
+      }
+      return '网页路由';
+    }
     return null;
   }
 
@@ -209,6 +219,69 @@ class SourceDiagnostics extends ChangeNotifier {
 
     final raw = error.toString();
     final lower = raw.toLowerCase();
+
+    // 0. 站源业务/分集提取异常
+    if (error.runtimeType.toString() == 'CatPawSourceFailure') {
+      final dynamic dyn = error;
+      final c = (dyn.code as Object?)?.toString().trim() ?? '';
+      final msg = (dyn.message as Object?)?.toString() ?? '';
+      if (c == 'MISSING_EPISODE') {
+        return DiagnosticAnalysisResult(
+          category: 'DATA_PARSE',
+          title: '缺少分集播放列表',
+          message: msg.isNotEmpty
+              ? msg
+              : '剧集详情返回的数据中缺少分集播放列表 (vod_play_url 为空)',
+          advice: '选取的短剧在官方站源可能属于预告或已下架，请检查站源分集解析规则或更换剧目。',
+          code: 'MISSING_EPISODE',
+        );
+      }
+      if (c == 'NO_STREAM_URL') {
+        return DiagnosticAnalysisResult(
+          category: 'MEDIA_STREAM',
+          title: '媒体流解析失败',
+          message: msg.isNotEmpty ? msg : '未能成功解析出有效媒体流播放地址',
+          advice: '站源未能提供有效的流媒体播放地址，请检查播放解析逻辑或目标分集状态。',
+          code: 'NO_STREAM_URL',
+        );
+      }
+      if (c == 'SEARCH_REJECTED') {
+        return DiagnosticAnalysisResult(
+          category: 'BUSINESS',
+          title: '搜索请求被拒',
+          message: msg.isNotEmpty ? msg : '官方搜索接口未返回有效结果',
+          advice: '搜索请求被服务端拦截或暂无结果，请稍后重试。',
+          code: 'SEARCH_REJECTED',
+        );
+      }
+      if (c == 'DISCOVERY_REJECTED') {
+        return DiagnosticAnalysisResult(
+          category: 'BUSINESS',
+          title: '官方发现接口受限',
+          message: msg.isNotEmpty ? msg : '官方发现接口暂不可用',
+          advice: '发现与推荐服务可能暂时受限，请稍后刷新重试。',
+          code: 'DISCOVERY_REJECTED',
+        );
+      }
+      if (c == 'JS_EXECUTION') {
+        return DiagnosticAnalysisResult(
+          category: 'JS',
+          title: 'JS 脚本报错',
+          message: msg.isNotEmpty ? msg : 'JS 脚本执行抛出异常',
+          advice: '数据源脚本运行报错，请复制报告反馈。',
+          code: 'JS_EXECUTION',
+        );
+      }
+      if (c.isNotEmpty) {
+        return DiagnosticAnalysisResult(
+          category: 'BUSINESS',
+          title: '站源业务异常 ($c)',
+          message: msg.isNotEmpty ? msg : '站源执行失败: $c',
+          advice: adviceForCode(c),
+          code: c,
+        );
+      }
+    }
 
     // 1. DNS 解析错误
     if (lower.contains('failed host lookup') ||
@@ -328,6 +401,34 @@ class SourceDiagnostics extends ChangeNotifier {
         message: '$target 返回: $desc',
         advice: advice,
         code: 'HTTP_$status',
+      );
+    }
+
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) {
+      return DiagnosticAnalysisResult(
+        category: 'DATA_PARSE',
+        title: '接口响应为空',
+        message: '$target 返回 HTTP 200，但响应内容为空 (0 字节)',
+        advice: '目标端点返回了空响应，可能该接口已被服务商下线或需要特定请求签名。',
+        code: 'EMPTY_RESPONSE',
+      );
+    }
+
+    final isHtml = trimmed.startsWith('<!DOCTYPE') ||
+        trimmed.startsWith('<!doctype') ||
+        trimmed.startsWith('<html') ||
+        (host.contains('hongguoduanju.com') &&
+            (trimmed.contains('<html') ||
+                trimmed.contains('<head') ||
+                trimmed.contains('<body')));
+    if (isHtml) {
+      return const DiagnosticAnalysisResult(
+        category: '',
+        title: '正常',
+        message: '',
+        advice: '',
+        code: '',
       );
     }
 
@@ -471,6 +572,9 @@ class SourceDiagnostics extends ChangeNotifier {
       'BUSINESS_REJECTED' => '服务端拒绝了请求；请保留报告，稍后或换网络对照。',
       'INVALID_RESPONSE' ||
       'GUEST_REGISTRATION_FAILED' => '接口返回的数据不符合预期，请复制报告反馈。',
+      'EMPTY_RESPONSE' => '服务端返回了空响应 (0 字节)，可能该端点已下线或受网关限制。',
+      'MISSING_EPISODE' => '该剧暂无可用分集或已在官方站源下线，建议更换剧目播放。',
+      'NO_STREAM_URL' => '官方媒体播放地址提取失败，建议尝试其他分集或稍后重试。',
       'JS_EXECUTION' => 'JS 脚本执行异常，请复制脱敏报告协助排查。',
       _ => '请结合失败阶段、HTTP 状态和错误说明排查。',
     };

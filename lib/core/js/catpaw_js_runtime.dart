@@ -506,10 +506,18 @@ globalThis.console = {
   }) async {
     _assertReady();
     final flagsJson = jsonEncode(flags ?? []);
-    final res = await _evalAsync(
-      'typeof spider !== "undefined" && typeof spider.play === "function" ? spider.play(${jsonEncode(flag)}, ${jsonEncode(id)}, $flagsJson) : { parse: 0, url: "" }',
-      timeout: const Duration(seconds: 60),
-    );
+    final dynamic res;
+    try {
+      res = await _evalAsync(
+        'typeof spider !== "undefined" && typeof spider.play === "function" ? spider.play(${jsonEncode(flag)}, ${jsonEncode(id)}, $flagsJson) : { parse: 0, url: "" }',
+        timeout: const Duration(seconds: 60),
+      );
+    } on CatPawSourceFailure catch (e) {
+      if (e.code == 'cancelled') {
+        return const CatPawPlayResult(url: '', header: {}, parse: 0);
+      }
+      rethrow;
+    }
     final map = (res is Map) ? res : {};
     final url = map['url']?.toString() ?? '';
     final parse = (map['parse'] as num?)?.toInt() ?? 0;

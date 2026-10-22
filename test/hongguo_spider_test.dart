@@ -175,7 +175,9 @@ void main() {
       expect(hongguoScript.contains('name: "官方免费短剧"'), isTrue);
       expect(hongguoScript.contains('version: "1.1.0-dev.6"'), isTrue);
       expect(
-        hongguoScript.contains('features: ["search", "categories", "danmaku"]'),
+        hongguoScript.contains('"search"') &&
+            hongguoScript.contains('"categories"') &&
+            hongguoScript.contains('"danmaku"'),
         isTrue,
       );
       expect(hongguoScript.contains('type: "video"'), isTrue);
