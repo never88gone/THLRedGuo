@@ -135,7 +135,7 @@ public struct RankingsView: View {
                                             .padding(8)
                                     }
                                     .onAppear {
-                                        if index >= viewModel.items.count - 4 {
+                                        if index >= viewModel.items.count - 8 {
                                             Task { await viewModel.loadMore() }
                                         }
                                     }

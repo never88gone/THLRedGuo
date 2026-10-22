@@ -74,7 +74,7 @@ public struct CatalogView: View {
             if let pendingNextRow, target != .card(pendingNextRow) { self.pendingNextRow = nil }
             if case .card(let id) = target,
                let index = viewModel.items.firstIndex(where: { $0.id == id }),
-               index >= viewModel.items.count - columns.count {
+               index >= viewModel.items.count - columns.count * 2 {
                 Task { await viewModel.loadNextPage() }
             }
         }

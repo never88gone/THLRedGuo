@@ -22,6 +22,7 @@ public struct TVCustomSplitView<Sidebar: View, Detail: View>: View {
             // 主内容区域：占满全屏，无边框与顶部栏挤压，极致沉浸
             detail()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .focusSection()
                 .zIndex(0)
 
             // 侧边栏浮层：当 columnVisibility != .detailOnly 时展开

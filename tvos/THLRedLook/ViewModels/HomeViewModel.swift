@@ -156,6 +156,22 @@ public final class HomeViewModel: ObservableObject {
             items = filterAndSort(dramas: result.items)
             currentPage = result.page
             hasMore = result.hasMore
+
+            // 电视大屏优化：在后台静默加载第 2 页扩充分页容量，首屏立即呈现不等待
+            if items.count < 30 && hasMore {
+                let nextPage = currentPage + 1
+                Task {
+                    if let nextResult = try? await repository.loadCatalog(source: source, category: category, page: nextPage, query: "", force: false) {
+                        guard !Task.isCancelled, generation == ticket, activeSourceId == source,
+                              selectedCategory.id == category else { return }
+                        store.refreshDramas(nextResult.items)
+                        var seen = Set(items.map(\.id))
+                        items.append(contentsOf: filterAndSort(dramas: nextResult.items).filter { seen.insert($0.id).inserted })
+                        currentPage = nextResult.page
+                        hasMore = nextResult.hasMore
+                    }
+                }
+            }
         } catch {
             guard !Task.isCancelled, generation == ticket, activeSourceId == source,
                   selectedCategory.id == category else { return }

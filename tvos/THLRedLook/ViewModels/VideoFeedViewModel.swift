@@ -47,15 +47,13 @@ public final class VideoFeedViewModel: ObservableObject {
     public var canGoNext: Bool { currentIndex + 1 < items.count || hasMore }
 
     public func start() async {
-        var attempts = 0
-        while items.isEmpty && hasMore && attempts < 3 {
+        if items.isEmpty && hasMore {
             await loadMore()
-            attempts += 1
-            if errorMessage != nil { break }
         }
-        if items.isEmpty && errorMessage == nil { errorMessage = "暂时没有可播放的推荐，请重试或换一批" }
+        if items.isEmpty && errorMessage == nil {
+            errorMessage = "暂时没有可播放的推荐，请重试或换一批"
+        }
         preloadAround(index: currentIndex)
-        prefetch()
     }
 
     public func refresh() async {
@@ -116,7 +114,7 @@ public final class VideoFeedViewModel: ObservableObject {
     }
 
     private func prefetch() {
-        guard errorMessage == nil, items.count - currentIndex <= 3, hasMore else { return }
+        guard errorMessage == nil, items.count - currentIndex <= 8, hasMore else { return }
         Task { await loadMore() }
     }
 

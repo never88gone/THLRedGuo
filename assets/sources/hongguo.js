@@ -593,7 +593,7 @@ async function category(tid, pg, filter, extend) {
   return {
     page: pg,
     pagecount: items.length > 0 ? 99 : 1,
-    limit: 20,
+    limit: 40,
     total: items.length,
     list: items
   };
@@ -1994,7 +1994,7 @@ spider.danmaku = function (id, startMs, durationMs) {
     if (state.pages.has(page)) return state.pages.get(page);
     const cursor = state.cursors.get(page);
     if (!cursor) throw failure('请按顺序加载列表，或刷新后重试', 'MISSING_CURSOR');
-    const response = await api('/reading/bookapi/bookmall/cell/change/v', { ...cursor, limit: 20, change_type: 1 });
+    const response = await api('/reading/bookapi/bookmall/cell/change/v', { ...cursor, limit: 40, change_type: 1 });
     return savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
   }
 
@@ -2041,7 +2041,7 @@ spider.danmaku = function (id, startMs, durationMs) {
         };
         if (genre === 'all' && choices.find(item => item.selector_item_id === genre).is_selected) return { cell, params, category };
         const response = await api('/reading/bookapi/bookmall/cell/change/v', {
-          ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 20
+          ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 40
         });
         return { cell: response.data?.cell_view, data: response.data || {}, params, category };
       });

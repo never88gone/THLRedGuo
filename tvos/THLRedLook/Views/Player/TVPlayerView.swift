@@ -10,6 +10,8 @@ public struct TVPlayerView: View {
     public var onDismiss: (() -> Void)? = nil
     public var onSwitchSeason: ((Drama) -> Void)? = nil
     public var feedActions: TVVideoFeedActions?
+    public var focusWakeTrigger: Int = 0
+    public var isInteractive: Bool = true
     public let drama: Drama
     public let episodes: [Episode]
     public let initialEpisodeIndex: Int
@@ -36,6 +38,8 @@ public struct TVPlayerView: View {
         onDismiss: (() -> Void)? = nil,
         onSwitchSeason: ((Drama) -> Void)? = nil,
         feedActions: TVVideoFeedActions? = nil,
+        focusWakeTrigger: Int = 0,
+        isInteractive: Bool = true,
         preloadedPlan: PlaybackPlan? = nil
     ) {
         self.drama = drama
@@ -43,6 +47,8 @@ public struct TVPlayerView: View {
         self.initialEpisodeIndex = initialEpisodeIndex
         self.initialPosition = initialPosition
         self.preloadedPlan = preloadedPlan
+        self.focusWakeTrigger = focusWakeTrigger
+        self.isInteractive = isInteractive
         _viewModel = StateObject(wrappedValue: PlayerViewModel(
             drama: drama,
             allEpisodes: episodes,
@@ -227,6 +233,7 @@ public struct TVPlayerView: View {
                 }
                 .buttonStyle(TvTransparentButtonStyle())
                 .focused($isWakeupFocused)
+                .disabled(!isInteractive)
                 .accessibilityIdentifier("player.wake")
                 .accessibilityLabel("显示播放控制")
                 .accessibilityValue(playbackAccessibilityValue)
@@ -275,12 +282,14 @@ public struct TVPlayerView: View {
                     .zIndex(100)
             }
         }
+        .focusSection()
+        .defaultFocus($isWakeupFocused, true)
         .onAppear {
             isPlayerPresented = true
             if feedActions != nil { viewModel.restoreSavedProgress() }
             viewModel.onAppear()
             viewModel.setSceneActive(scenePhase == .active)
-            if !viewModel.isControlsVisible {
+            if isInteractive && !viewModel.isControlsVisible {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isWakeupFocused = true
                 }
@@ -362,6 +371,28 @@ public struct TVPlayerView: View {
                 }
             }
         }
+        .onChange(of: isInteractive) { _, interactive in
+            if !interactive {
+                isWakeupFocused = false
+            } else if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isWakeupFocused = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    isWakeupFocused = true
+                }
+            }
+        }
+        .onChange(of: focusWakeTrigger) { _, _ in
+            if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isWakeupFocused = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    isWakeupFocused = true
+                }
+            }
+        }
         .onChange(of: viewModel.errorMessage) { _, newErr in
             if newErr != nil {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -422,10 +453,10 @@ public struct TVPlayerView: View {
 
     private func handleExit() {
         isWakeupFocused = false
-        viewModel.onDisappear()
         if let onDismiss = onDismiss {
             onDismiss()
         } else {
+            viewModel.onDisappear()
             presentationMode.wrappedValue.dismiss()
         }
     }

@@ -18,123 +18,68 @@ public struct TVVideoFeedActions {
 public struct TVVideoFeedView: View {
     @ObservedObject var viewModel: VideoFeedViewModel
     var isSidebarVisible: Bool = false
-    @State private var isWatching = false
-    @State private var isVisible = false
-    @State private var pendingPlayback = false
-    @State private var playbackSessionId = UUID()
-    @FocusState private var isRetryFocused: Bool
+    @State private var playbackWakeTrigger: Int = 0
     let focusTrigger: Int
     let onRequestFocusTopNav: () -> Void
 
     public var body: some View {
         Group {
-            if isWatching {
-                TVVideoFeedPlaybackView(viewModel: viewModel) {
-                    returnToNavigation()
-                }
-                .id(playbackSessionId)
-            } else {
-                VStack(alignment: .leading, spacing: 26) {
-                    Label("首页视频推荐", systemImage: "play.rectangle.on.rectangle.fill")
-                        .font(.system(size: 34, weight: .bold))
-                    if let item = viewModel.current {
-                        Text(item.drama.title)
-                            .font(.system(size: 46, weight: .bold))
-                            .lineLimit(2)
-                            .accessibilityIdentifier("feed.title")
-                        Text("播放进度已保留，按下或点按“推荐”继续播放")
-                            .font(.system(size: 25))
-                            .foregroundStyle(TVTheme.textSecondary)
-                    } else if viewModel.isLoading {
-                        ProgressView("正在加载首页推荐…")
+            if let _ = viewModel.current {
+                TVVideoFeedPlaybackView(
+                    viewModel: viewModel,
+                    isSidebarVisible: isSidebarVisible,
+                    focusWakeTrigger: playbackWakeTrigger,
+                    onDismiss: {
+                        onRequestFocusTopNav()
                     }
-                    if let error = viewModel.errorMessage {
-                        Text(error).foregroundStyle(.yellow).font(.system(size: 25))
-                        TVButton(title: "重试", icon: "arrow.clockwise", isProminent: true, isExternalFocused: isRetryFocused) {
-                            pendingPlayback = true
-                            Task {
-                                await viewModel.retry()
-                                presentPlaybackIfReady()
-                            }
-                        }
-                        .focused($isRetryFocused)
-                        .accessibilityIdentifier("feed.retry")
-                        .disabled(viewModel.isLoading)
-                        .onMoveCommand { direction in
-                            if direction == .up { returnToNavigation() }
-                        }
-                    }
-                    Spacer()
+                )
+            } else if viewModel.isLoading {
+                VStack(spacing: 24) {
+                    ProgressView("正在准备推荐短视频…")
+                        .font(.system(size: 26, weight: .medium))
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.horizontal, 64)
-                .padding(.top, 40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = viewModel.errorMessage {
+                VStack(spacing: 24) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 56))
+                        .foregroundColor(.yellow)
+                    Text(error)
+                        .font(.system(size: 24))
+                        .foregroundColor(.white)
+                    TVButton(title: "重试", icon: "arrow.clockwise", isProminent: true) {
+                        Task { await viewModel.retry() }
+                    }
+                    .accessibilityIdentifier("feed.retry")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .focusSection()
         .onAppear {
-            isVisible = true
-            if focusTrigger > 0 {
-                requestPlayback()
-            } else {
-                Task { await viewModel.start() }
+            if !isSidebarVisible {
+                playbackWakeTrigger += 1
             }
-        }
-        .onDisappear {
-            isVisible = false
-            pendingPlayback = false
-            isWatching = false
+            Task {
+                await viewModel.start()
+            }
         }
         .onChange(of: isSidebarVisible) { _, visible in
-            if visible {
-                pendingPlayback = false
-                isRetryFocused = false
-                isWatching = false
-            } else {
-                requestPlayback()
+            if !visible {
+                playbackWakeTrigger += 1
             }
         }
         .onChange(of: focusTrigger) { _, _ in
-            requestPlayback()
+            playbackWakeTrigger += 1
         }
-        .onChange(of: viewModel.errorMessage) { _, error in
-            if isVisible && pendingPlayback && viewModel.current == nil && error != nil {
-                isRetryFocused = true
+        .onChange(of: viewModel.current?.id) { _, newId in
+            if newId != nil && !isSidebarVisible {
+                playbackWakeTrigger += 1
             }
         }
-        .onExitCommand { returnToNavigation() }
-    }
-
-    private func returnToNavigation() {
-        guard isWatching || pendingPlayback else { return }
-        pendingPlayback = false
-        isRetryFocused = false
-        isWatching = false
-        onRequestFocusTopNav()
-    }
-
-    private func requestPlayback() {
-        guard !isSidebarVisible, !isWatching else { return }
-        pendingPlayback = true
-        if viewModel.current != nil {
-            presentPlaybackIfReady()
-        } else if viewModel.errorMessage != nil {
-            isRetryFocused = true
-        } else {
-            Task {
-                await viewModel.start()
-                if !isSidebarVisible {
-                    presentPlaybackIfReady()
-                }
-            }
+        .onExitCommand {
+            onRequestFocusTopNav()
         }
-    }
-
-    private func presentPlaybackIfReady() {
-        guard !isSidebarVisible, isVisible, pendingPlayback, viewModel.current != nil else { return }
-        playbackSessionId = UUID()
-        pendingPlayback = false
-        isRetryFocused = false
-        isWatching = true
     }
 }
 
@@ -145,6 +90,8 @@ public struct TVVideoFeedPlaybackView: View {
     @ObservedObject private var store = LocalStore.shared
     @State private var detailDrama: Drama?
     @State private var restoreDetailControlFocus: Bool = false
+    var isSidebarVisible: Bool = false
+    var focusWakeTrigger: Int = 0
     let onDismiss: () -> Void
 
     public var body: some View {
@@ -188,6 +135,8 @@ public struct TVVideoFeedPlaybackView: View {
                         },
                         onRefresh: { Task { await viewModel.refresh() } }
                     ),
+                    focusWakeTrigger: focusWakeTrigger,
+                    isInteractive: !isSidebarVisible,
                     preloadedPlan: effectivePlan
                 )
             } else if viewModel.isLoading {

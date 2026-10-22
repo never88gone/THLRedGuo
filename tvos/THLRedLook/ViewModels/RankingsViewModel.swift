@@ -160,6 +160,22 @@ public final class RankingsViewModel: ObservableObject {
             let loaded = DiscoveryPage(items: combined, page: result.page, hasMore: result.hasMore)
             cachedByBoard[board.id] = loaded
             apply(loaded)
+
+            // 电视大屏榜单优化：首次呈现后在后台静默补充第 2 页，扩充排行榜深度，不阻塞首屏交互
+            if !more && combined.count < 30 && result.hasMore {
+                Task {
+                    if let nextResult = try? await repository.loadRankingPage(board: board.id, page: 2) {
+                        guard !Task.isCancelled, generation == ticket, currentSource == target else { return }
+                        let nextSanitized = nextResult.items.filter {
+                            $0.drama.source.isEmpty || $0.drama.source.lowercased() == target
+                        }
+                        let merged = (combined + nextSanitized).filter { seen.insert($0.drama.id).inserted }
+                        let updated = DiscoveryPage(items: merged, page: nextResult.page, hasMore: nextResult.hasMore)
+                        cachedByBoard[board.id] = updated
+                        apply(updated)
+                    }
+                }
+            }
         } catch {
             guard !Task.isCancelled, generation == ticket else { return }
             errorMessage = error.localizedDescription
