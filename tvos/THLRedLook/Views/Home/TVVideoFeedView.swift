@@ -21,6 +21,7 @@ public struct TVVideoFeedView: View {
     @State private var isWatching = false
     @State private var isVisible = false
     @State private var pendingPlayback = false
+    @State private var playbackSessionId = UUID()
     @FocusState private var isRetryFocused: Bool
     let focusTrigger: Int
     let onRequestFocusTopNav: () -> Void
@@ -31,6 +32,7 @@ public struct TVVideoFeedView: View {
                 TVVideoFeedPlaybackView(viewModel: viewModel) {
                     returnToNavigation()
                 }
+                .id(playbackSessionId)
             } else {
                 VStack(alignment: .leading, spacing: 26) {
                     Label("首页视频推荐", systemImage: "play.rectangle.on.rectangle.fill")
@@ -87,6 +89,8 @@ public struct TVVideoFeedView: View {
                 pendingPlayback = false
                 isRetryFocused = false
                 isWatching = false
+            } else {
+                requestPlayback()
             }
         }
         .onChange(of: focusTrigger) { _, _ in
@@ -127,6 +131,7 @@ public struct TVVideoFeedView: View {
 
     private func presentPlaybackIfReady() {
         guard !isSidebarVisible, isVisible, pendingPlayback, viewModel.current != nil else { return }
+        playbackSessionId = UUID()
         pendingPlayback = false
         isRetryFocused = false
         isWatching = true

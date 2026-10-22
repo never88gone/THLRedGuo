@@ -243,7 +243,9 @@ public final class PlayerViewModel: ObservableObject {
             timeObserverToken = nil
         }
         player?.pause()
-        player?.replaceCurrentItem(with: nil)
+        if initialPreloadedPlan == nil {
+            player?.replaceCurrentItem(with: nil)
+        }
         player = nil
         isPlaying = false
         isBuffering = false

@@ -28,7 +28,7 @@ public final class VideoCacheManager: NSObject {
     public func getPlayer(for urlString: String, headers: [String: String] = [:], namespace: String = "default") -> AVPlayer {
         return queue.sync {
             let key = "\(namespace)_\(urlString)"
-            if let existingPlayer = players[key] {
+            if let existingPlayer = players[key], existingPlayer.currentItem != nil {
                 updateLRU(key, namespace: namespace)
                 return existingPlayer
             }

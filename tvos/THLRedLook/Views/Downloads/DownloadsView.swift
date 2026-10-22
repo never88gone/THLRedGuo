@@ -3,9 +3,12 @@ import SwiftUI
 public struct DownloadsView: View {
     @StateObject private var viewModel = DownloadsViewModel()
     @State private var playingLocalJob: DownloadJob?
+    public var focusTrigger: Int = 0
     public var onRequestFocusTopNav: (() -> Void)? = nil
+    @FocusState private var isExploreFocused: Bool
 
-    public init(onRequestFocusTopNav: (() -> Void)? = nil) {
+    public init(focusTrigger: Int = 0, onRequestFocusTopNav: (() -> Void)? = nil) {
+        self.focusTrigger = focusTrigger
         self.onRequestFocusTopNav = onRequestFocusTopNav
     }
 
@@ -37,13 +40,19 @@ public struct DownloadsView: View {
                     .padding(.top, 24)
 
                     if viewModel.jobs.isEmpty {
-                        VStack(spacing: 16) {
+                        VStack(spacing: 24) {
                             Spacer()
                             Image(systemName: "arrow.down.circle")
                                 .font(.system(size: 64))
                                 .foregroundColor(.secondary)
                             Text("暂无缓存任务，可在剧集详情页选择「缓存全剧」")
+                                .font(.headline)
                                 .foregroundColor(.secondary)
+                            TVButton(title: "去浏览短剧", icon: "sparkles", isProminent: true, isExternalFocused: isExploreFocused) {
+                                onRequestFocusTopNav?()
+                            }
+                            .focused($isExploreFocused)
+                            .accessibilityIdentifier("downloads.explore")
                             Spacer()
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -134,6 +143,11 @@ public struct DownloadsView: View {
         .onExitCommand {
             if playingLocalJob == nil {
                 onRequestFocusTopNav?()
+            }
+        }
+        .onChange(of: focusTrigger) { _, _ in
+            if viewModel.jobs.isEmpty {
+                isExploreFocused = true
             }
         }
     }

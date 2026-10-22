@@ -62,6 +62,7 @@ public struct MainTabView: View {
     @State private var rankingsBoardFocusTrigger: Int = 0
     @State private var searchFocusTrigger: Int = 0
     @State private var libraryTabFocusTrigger: Int = 0
+    @State private var downloadsFocusTrigger: Int = 0
     @State private var settingsSidebarTrigger: Int = 0
 
     @State private var handoffDrama: Drama?
@@ -285,6 +286,7 @@ public struct MainTabView: View {
                             .padding(.top, 32)
                         case .downloads:
                             DownloadsView(
+                                focusTrigger: downloadsFocusTrigger,
                                 onRequestFocusTopNav: {
                                     requestFocusSidebar()
                                 }
@@ -375,6 +377,8 @@ public struct MainTabView: View {
             searchFocusTrigger += 1
         case .library:
             libraryTabFocusTrigger += 1
+        case .downloads:
+            downloadsFocusTrigger += 1
         case .settings:
             settingsSidebarTrigger += 1
         default:
@@ -394,6 +398,8 @@ public struct MainTabView: View {
             searchFocusTrigger += 1
         case .library:
             libraryTabFocusTrigger += 1
+        case .downloads:
+            downloadsFocusTrigger += 1
         case .settings:
             settingsSidebarTrigger += 1
         default:
