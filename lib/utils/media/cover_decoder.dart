@@ -6,6 +6,23 @@ import 'package:path/path.dart' as path;
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/media/media_pipeline.dart';
 
+/// 规范化剧集封面 URL，解决字节跳动/红果官方接口返回 image/heic 导致 Windows 等平台无法解码的问题。
+/// 将 novel-pic 及 HEIC 模板自动映射到官方高兼容度 JPEG/PNG CDN 直链。
+String normalizeCoverUrl(String rawUrl) {
+  if (rawUrl.isEmpty) return '';
+  final trimmed = rawUrl.trim();
+  final novelPicMatch =
+      RegExp(r'novel-pic/([a-zA-Z0-9_-]+)').firstMatch(trimmed);
+  if (novelPicMatch != null) {
+    final picId = novelPicMatch.group(1);
+    return 'https://p3-novel.byteimg.com/novel-pic/$picId~tplv-shrink:640:0.image';
+  }
+  if (trimmed.contains('.heic')) {
+    return trimmed.replaceAll('.heic', '.image');
+  }
+  return trimmed;
+}
+
 class CoverDecoder {
   CoverDecoder({MediaExecutor Function()? createExecutor})
     : _createExecutor = createExecutor ?? FFmpegExecutor.new;

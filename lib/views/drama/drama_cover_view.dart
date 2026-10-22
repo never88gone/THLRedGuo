@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/utils/media/cover_decoder.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 /// 短剧海报毛玻璃托底背景组件，突出剧目图片质感并提供沉浸式环境光晕
@@ -377,7 +378,7 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
   }
 
   Widget _networkFallback() {
-    final coverUrl = widget.drama.cover.trim();
+    final coverUrl = normalizeCoverUrl(widget.drama.cover.trim());
     if (coverUrl.startsWith('http://') || coverUrl.startsWith('https://')) {
       return Image.network(
         coverUrl,
@@ -405,9 +406,10 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
   }
 
   Widget _buildImage(String path) {
-    if (path.startsWith('http://') || path.startsWith('https://')) {
+    final resolved = normalizeCoverUrl(path.trim());
+    if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
       return Image.network(
-        path,
+        resolved,
         fit: BoxFit.cover,
         cacheWidth: 440,
         gaplessPlayback: true,
@@ -429,7 +431,7 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
       );
     }
     return Image.file(
-      File(path),
+      File(resolved),
       fit: BoxFit.cover,
       cacheWidth: 440,
       gaplessPlayback: true,

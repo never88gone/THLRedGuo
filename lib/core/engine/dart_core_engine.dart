@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 import 'package:THLRedLook/core/js/js_source_models.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/utils/media/cover_decoder.dart';
 
 /// 纯 Dart 核心调度引擎：
 /// 承担数据源解析、分类目录、短剧详情、分集列表、播放直链、
@@ -274,7 +275,8 @@ class DartCoreEngine {
       case 'cover':
       case 'prepareCover':
         final drama = input['drama'] as Map? ?? {};
-        final coverUrl = drama['cover'] as String? ?? '';
+        final rawCover = drama['cover'] as String? ?? '';
+        final coverUrl = normalizeCoverUrl(rawCover);
         return {
           'path': coverUrl.isNotEmpty ? coverUrl : 'assets/icons/app_icon.png',
           'heic': false,
@@ -546,7 +548,7 @@ class DartCoreEngine {
       'source': source,
       'sourceId': rawId.contains(':') ? rawId.split(':').last : rawId,
       'title': title,
-      'cover': vod['vod_pic']?.toString() ?? '',
+      'cover': normalizeCoverUrl(vod['vod_pic']?.toString() ?? ''),
       'description': desc,
       'episodes': (vod['vod_episodes'] as num?)?.toInt() ?? episodes,
       'heat': vod['vod_heat']?.toString() ?? '',
@@ -771,7 +773,7 @@ class DartCoreEngine {
         fullDrama['title'] = spiderVod['vod_name'].toString();
       }
       if ((spiderVod['vod_pic']?.toString() ?? '').isNotEmpty) {
-        fullDrama['cover'] = spiderVod['vod_pic'].toString();
+        fullDrama['cover'] = normalizeCoverUrl(spiderVod['vod_pic'].toString());
       }
       if ((spiderVod['vod_content']?.toString() ?? '').isNotEmpty) {
         fullDrama['description'] = spiderVod['vod_content'].toString();

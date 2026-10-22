@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:THLRedLook/utils/build/app_build.dart';
 import 'package:THLRedLook/core/js/js_source_service.dart';
+import 'package:THLRedLook/utils/media/cover_decoder.dart';
 
 class SourceSite {
   const SourceSite(this.id, this.name, this.description);
@@ -251,7 +252,7 @@ class Drama {
       sourceId: sourceId,
       title: json['title'] as String? ?? '短剧',
       description: json['description'] as String? ?? '',
-      cover: json['cover'] as String? ?? '',
+      cover: normalizeCoverUrl(json['cover'] as String? ?? ''),
       episodes: intValue(json['episodes']),
       category: category.isEmpty ? '' : dramaCategoryLabel(category),
       vip: json['vip'] == true ? true : (json['vip'] == false ? false : null),
