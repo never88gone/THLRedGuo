@@ -25,22 +25,18 @@ public struct TVSidebarView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 顶部 Logo 与应用名称区
+            // 顶部 Logo 与应用名称区（采用真实 App 图标，与全局品牌视觉统一）
             HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                colors: [TVTheme.primary, TVTheme.primaryHover],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "film.stack.fill")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
-                }
+                Image("applogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 48, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    )
+                    .shadow(color: TVTheme.primary.opacity(0.35), radius: 8, x: 0, y: 4)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("糖葫芦")
