@@ -50,6 +50,8 @@
 		A10000312C00000100000001 /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000312C00000100000001 /* DownloadsView.swift */; };
 		A10000322C00000100000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000322C00000100000001 /* SettingsView.swift */; };
 		A10000332C00000100000001 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000332C00000100000001 /* MainTabView.swift */; };
+		E34571822EE6222200000031 /* TVCustomSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000032 /* TVCustomSplitView.swift */; };
+		E34571822EE6222200000033 /* TVSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000034 /* TVSidebarView.swift */; };
 		A10000352C00000100000001 /* TVTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000352C00000100000001 /* TVTheme.swift */; };
 		A10000382C00000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000382C00000100000001 /* Assets.xcassets */; };
 		A10000392C00000100000001 /* AVPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000392C00000100000001 /* AVPlayerView.swift */; };
@@ -127,6 +129,8 @@
 		B10000312C00000100000001 /* DownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadsView.swift; sourceTree = "<group>"; };
 		B10000322C00000100000001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B10000332C00000100000001 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		E34571822EE6222200000032 /* TVCustomSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVCustomSplitView.swift; sourceTree = "<group>"; };
+		E34571822EE6222200000034 /* TVSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSidebarView.swift; sourceTree = "<group>"; };
 		B10000342C00000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10000352C00000100000001 /* TVTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVTheme.swift; sourceTree = "<group>"; };
 		B10000382C00000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -315,6 +319,8 @@
 			isa = PBXGroup;
 			children = (
 				B10000332C00000100000001 /* MainTabView.swift */,
+				E34571822EE6222200000032 /* TVCustomSplitView.swift */,
+				E34571822EE6222200000034 /* TVSidebarView.swift */,
 				B10000352C00000100000001 /* TVTheme.swift */,
 				G10000072C00000100000001 /* Components */,
 				G10000082C00000100000001 /* Home */,
@@ -673,6 +679,8 @@
 				A10000312C00000100000001 /* DownloadsView.swift in Sources */,
 				A10000322C00000100000001 /* SettingsView.swift in Sources */,
 				A10000332C00000100000001 /* MainTabView.swift in Sources */,
+				E34571822EE6222200000031 /* TVCustomSplitView.swift in Sources */,
+				E34571822EE6222200000033 /* TVSidebarView.swift in Sources */,
 				A10000352C00000100000001 /* TVTheme.swift in Sources */,
 				308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */,
 			);

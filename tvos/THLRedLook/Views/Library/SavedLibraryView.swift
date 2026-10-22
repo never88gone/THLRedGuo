@@ -162,7 +162,7 @@ public struct SavedLibraryView: View {
     private func requestTopNavigation() {
         focusSequence += 1
         focusedTarget = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { onRequestFocusTopNav?() }
+        onRequestFocusTopNav?()
     }
 
     private func focus(_ target: FocusTarget, with proxy: ScrollViewProxy) {

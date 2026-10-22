@@ -3,8 +3,11 @@ import SwiftUI
 public struct DownloadsView: View {
     @StateObject private var viewModel = DownloadsViewModel()
     @State private var playingLocalJob: DownloadJob?
+    public var onRequestFocusTopNav: (() -> Void)? = nil
 
-    public init() {}
+    public init(onRequestFocusTopNav: (() -> Void)? = nil) {
+        self.onRequestFocusTopNav = onRequestFocusTopNav
+    }
 
     public var body: some View {
         ZStack {
@@ -127,6 +130,11 @@ public struct DownloadsView: View {
                 initialEpisodeIndex: job.episode.number,
                 initialPosition: 0
             )
+        }
+        .onExitCommand {
+            if playingLocalJob == nil {
+                onRequestFocusTopNav?()
+            }
         }
     }
 }

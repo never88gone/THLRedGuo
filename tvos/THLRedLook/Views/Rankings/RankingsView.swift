@@ -184,6 +184,12 @@ public struct RankingsView: View {
             pendingBoardFocus = true
             DispatchQueue.main.async { focusSelectedBoard() }
         }
+        .onExitCommand {
+            if selectedDrama == nil {
+                focusedTarget = nil
+                onRequestFocusTopNav?()
+            }
+        }
     }
 
     private func focusSelectedBoard() {
@@ -195,6 +201,11 @@ public struct RankingsView: View {
     private func moveBoard(from board: RankingBoard, offset: Int) {
         let boards = viewModel.boards.filter(\.isAllowedOnTV)
         guard let index = boards.firstIndex(where: { $0.id == board.id }) else { return }
+        if index + offset < 0 {
+            focusedTarget = nil
+            onRequestFocusTopNav?()
+            return
+        }
         let target = boards[min(max(index + offset, 0), boards.count - 1)]
         pendingNextRow = nil
         viewModel.selectBoard(target)

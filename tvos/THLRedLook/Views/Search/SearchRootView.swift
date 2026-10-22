@@ -54,9 +54,11 @@ public struct SearchRootView: View {
                             .focused($focusedTarget, equals: .query)
                             .accessibilityIdentifier("search.query")
                             .onMoveCommand { direction in
-                                if direction == .up { focusedTarget = nil; onRequestFocusTopNav?() }
+                                if direction == .up || direction == .left {
+                                    focusedTarget = nil
+                                    onRequestFocusTopNav?()
+                                }
                                 if direction == .right {
-
                                     focusSearchButton()
                                 }
                             }
@@ -245,12 +247,8 @@ public struct SearchRootView: View {
         }
         .onExitCommand {
             guard selectedDrama == nil else { return }
-
-
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                onRequestFocusTopNav?()
-            }
+            focusedTarget = nil
+            onRequestFocusTopNav?()
         }
         .fullScreenCover(item: $selectedDrama, onDismiss: {
             focusedTarget = returningDramaId.map(SearchFocus.drama)

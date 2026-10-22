@@ -94,6 +94,7 @@ public final class PlayerViewModel: ObservableObject {
         initialShowControls: Bool = true,
         keepControlsVisible: Bool = false,
         initialShowDrawer: Bool = false,
+        initialRestoreFocusTarget: PlayerOverlayFocusTarget? = nil,
         preloadedPlan: PlaybackPlan? = nil,
         repository: NativeRepository = .shared,
         store: LocalStore = .shared
@@ -105,6 +106,7 @@ public final class PlayerViewModel: ObservableObject {
         self.isControlsVisible = initialShowDrawer ? false : initialShowControls
         self.isEpisodeDrawerVisible = initialShowDrawer
         self.keepControlsVisible = keepControlsVisible
+        self.restoreFocusTarget = initialRestoreFocusTarget
         self.initialPreloadedPlan = preloadedPlan
         self.repository = repository
         self.store = store
@@ -128,16 +130,12 @@ public final class PlayerViewModel: ObservableObject {
         if progressSaveTimer == nil { startProgressSaveTimer() }
 
         // 若外部已提前预加载就绪，0ms 瞬间挂载起播，彻底杜绝转圈等待
-        if let preloaded = self.initialPreloadedPlan, let url = URL(string: preloaded.url) {
+        if let preloaded = self.initialPreloadedPlan, URL(string: preloaded.url) != nil {
             self.plan = preloaded
             self.selectedQuality = preloaded.quality
-            var options: [String: Any] = [:]
-            if !preloaded.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = preloaded.headers }
-            let asset = AVURLAsset(url: url, options: options.isEmpty ? nil : options)
-            let item = AVPlayerItem(asset: asset)
-            item.preferredForwardBufferDuration = 10.0
             VideoCacheManager.shared.focusOnVideo(urlString: preloaded.url, namespace: "feed")
-            self.startPlaybackWithItem(item: item, seekTo: self.currentTime)
+            let poolPlayer = VideoCacheManager.shared.getPlayer(for: preloaded.url, headers: preloaded.headers, namespace: "feed")
+            self.startPlaybackWithPlayer(poolPlayer, seekTo: self.currentTime)
             self.isLoading = false
             NSLog("🎬 [PlayerVM] onAppear 命中预载方案(%@)，实现秒开起播", self.drama.title)
 
@@ -286,6 +284,7 @@ public final class PlayerViewModel: ObservableObject {
 
     public func switchFeedDrama(
         drama: Drama,
+        allEpisodes: [Episode]? = nil,
         initialEpisodeIndex: Int = 1,
         initialPosition: Double = 0,
         preloadedPlan: PlaybackPlan? = nil
@@ -293,27 +292,23 @@ public final class PlayerViewModel: ObservableObject {
         guard !closed else { return }
         saveCurrentProgress()
         playbackGeneration += 1
-        let generation = playbackGeneration
 
         self.drama = drama
+        if let allEpisodes, !allEpisodes.isEmpty {
+            self.allEpisodes = allEpisodes
+        }
         self.currentEpisodeIndex = initialEpisodeIndex
         self.currentTime = max(0, initialPosition)
         self.duration = 0
         self.errorMessage = nil
         self.isSeamlessTransitioning = true // 保持当前画面最后一帧，无黑闪
 
-        if let plan = preloadedPlan, let url = URL(string: plan.url) {
+        if let plan = preloadedPlan, URL(string: plan.url) != nil {
             self.plan = plan
             self.selectedQuality = plan.quality
-            var options: [String: Any] = [:]
-            if !plan.headers.isEmpty {
-                options["AVURLAssetHTTPHeaderFieldsKey"] = plan.headers
-            }
-            let asset = AVURLAsset(url: url, options: options.isEmpty ? nil : options)
-            let item = AVPlayerItem(asset: asset)
-            item.preferredForwardBufferDuration = 10.0
             VideoCacheManager.shared.focusOnVideo(urlString: plan.url, namespace: "feed")
-            startPlaybackWithItem(item: item, seekTo: initialPosition)
+            let poolPlayer = VideoCacheManager.shared.getPlayer(for: plan.url, headers: plan.headers, namespace: "feed")
+            startPlaybackWithPlayer(poolPlayer, seekTo: initialPosition)
             NSLog("🎬 [PlayerVM] switchFeedDrama 命中全链路预载(%@)，实现秒开起播", drama.title)
             return
         }
@@ -518,6 +513,20 @@ public final class PlayerViewModel: ObservableObject {
             player = newPlayer
             av = newPlayer
         }
+        attachObservers(to: av, item: item, seekTo: seekTo)
+    }
+
+    func startPlaybackWithPlayer(_ cachedPlayer: AVPlayer, seekTo: Double) {
+        releasePlayerObservers()
+        cachedPlayer.isMuted = false
+        cachedPlayer.automaticallyWaitsToMinimizeStalling = true
+        self.player = cachedPlayer
+        if let item = cachedPlayer.currentItem {
+            attachObservers(to: cachedPlayer, item: item, seekTo: seekTo)
+        }
+    }
+
+    private func attachObservers(to av: AVPlayer, item: AVPlayerItem, seekTo: Double) {
         isSeeking = seekTo > 0
         let generation = playbackGeneration
         timeControlObserver = av.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self, weak av] _, _ in
@@ -565,6 +574,7 @@ public final class PlayerViewModel: ObservableObject {
                         let position = min(seekTo, max(0, self.duration - 1))
                         await av.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                         guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
+                        self.currentTime = position
                     }
                     self.isSeeking = false
                     self.initializationTimer?.invalidate()
@@ -586,11 +596,27 @@ public final class PlayerViewModel: ObservableObject {
             self.errorMessage = nil
             let seconds = item.duration.seconds
             if seconds.isFinite && seconds > 0 { self.duration = seconds }
+            let size = item.presentationSize
+            if min(size.width, size.height) > 0 { self.selectedQuality = Int(min(size.width, size.height)) }
+            if seekTo > 0, self.duration > 0 {
+                let position = min(seekTo, max(0, self.duration - 1))
+                Task {
+                    await av.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                    guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
+                    self.currentTime = position
+                    self.isSeeking = false
+                    self.samplePlaybackClock()
+                    self.lastProgressTime = Date()
+                    if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
+                }
+            } else {
+                self.isSeeking = false
+                self.samplePlaybackClock()
+                self.lastProgressTime = Date()
+                if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
+            }
             self.isLoading = false
             self.isSeamlessTransitioning = false
-            self.samplePlaybackClock()
-            self.lastProgressTime = Date()
-            if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
         }
         timeObserverToken = av.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self, weak av] time in
             Task { @MainActor in

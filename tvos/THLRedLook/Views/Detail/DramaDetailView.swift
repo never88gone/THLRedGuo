@@ -32,8 +32,11 @@ public struct DramaDetailView: View {
     }
     @FocusState private var focusedTarget: DetailFocus?
 
-    public init(drama: Drama) {
+    public var onDismiss: (() -> Void)? = nil
+
+    public init(drama: Drama, onDismiss: (() -> Void)? = nil) {
         _viewModel = StateObject(wrappedValue: DetailViewModel(drama: drama))
+        self.onDismiss = onDismiss
     }
 
     private var normalizedCoverURL: URL? {
@@ -457,7 +460,11 @@ public struct DramaDetailView: View {
         }
         .onExitCommand {
             guard playingEpisodeIndex == nil, Date().timeIntervalSince(playerDismissedAt) > 0.5 else { return }
-            presentationMode.wrappedValue.dismiss()
+            if let onDismiss = onDismiss {
+                onDismiss()
+            } else {
+                presentationMode.wrappedValue.dismiss()
+            }
         }
     }
     private func focus(_ target: DetailFocus, with proxy: ScrollViewProxy) {

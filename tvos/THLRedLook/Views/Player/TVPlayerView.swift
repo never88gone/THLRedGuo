@@ -11,6 +11,7 @@ public struct TVPlayerView: View {
     public var onSwitchSeason: ((Drama) -> Void)? = nil
     public var feedActions: TVVideoFeedActions?
     public let drama: Drama
+    public let episodes: [Episode]
     public let initialEpisodeIndex: Int
     public let initialPosition: Double
     public let preloadedPlan: PlaybackPlan?
@@ -31,12 +32,14 @@ public struct TVPlayerView: View {
         initialShowControls: Bool = true,
         keepControlsVisible: Bool = false,
         initialShowDrawer: Bool = false,
+        initialRestoreFocusTarget: PlayerOverlayFocusTarget? = nil,
         onDismiss: (() -> Void)? = nil,
         onSwitchSeason: ((Drama) -> Void)? = nil,
         feedActions: TVVideoFeedActions? = nil,
         preloadedPlan: PlaybackPlan? = nil
     ) {
         self.drama = drama
+        self.episodes = episodes
         self.initialEpisodeIndex = initialEpisodeIndex
         self.initialPosition = initialPosition
         self.preloadedPlan = preloadedPlan
@@ -48,6 +51,7 @@ public struct TVPlayerView: View {
             initialShowControls: initialShowControls,
             keepControlsVisible: keepControlsVisible,
             initialShowDrawer: initialShowDrawer,
+            initialRestoreFocusTarget: initialRestoreFocusTarget,
             preloadedPlan: preloadedPlan
         ))
         self.onDismiss = onDismiss
@@ -231,11 +235,13 @@ public struct TVPlayerView: View {
                     if feedActions != nil && direction == .down {
                         Task { _ = await nextFeedDrama() }
                     } else if let feedActions, direction == .up, feedActions.canGoPrevious {
-                        viewModel.onDisappear()
                         feedActions.onPrevious()
                     } else {
                         viewModel.showControls()
                     }
+                }
+                .onExitCommand {
+                    handleExit()
                 }
 
             }
@@ -363,13 +369,26 @@ public struct TVPlayerView: View {
                 }
             }
         }
+        .onChange(of: drama.id) { _, newId in
+            Task {
+                await viewModel.switchFeedDrama(
+                    drama: drama,
+                    allEpisodes: episodes,
+                    initialEpisodeIndex: initialEpisodeIndex,
+                    initialPosition: initialPosition,
+                    preloadedPlan: preloadedPlan
+                )
+            }
+        }
     }
 
     private var playbackAccessibilityValue: String {
         let position = viewModel.currentTime.isFinite
             ? String(format: "%.0f", max(0, viewModel.currentTime.rounded(.down))) : "0"
         let state = viewModel.isPlaying ? "播放中" : viewModel.isLoading || viewModel.isBuffering ? "加载中" : "已暂停"
-        return "\(viewModel.drama.title) · 第 \(viewModel.currentEpisodeIndex) 集 · 已播放 \(position) 秒 · \(state)"
+        let val = "\(viewModel.drama.title) · 第 \(viewModel.currentEpisodeIndex) 集 · 已播放 \(position) 秒 · \(state)"
+        NSLog("📺 [WAKE_VALUE] %@", val)
+        return val
     }
 
     private var playerFeedActions: TVVideoFeedActions? {
@@ -381,7 +400,7 @@ public struct TVPlayerView: View {
             isLoading: feedActions.isLoading || isSwitchingFeed,
             isFavorite: feedActions.isFavorite,
             errorMessage: feedActions.errorMessage,
-            onPrevious: { viewModel.onDisappear(); feedActions.onPrevious() },
+            onPrevious: { feedActions.onPrevious() },
             onNext: { await nextFeedDrama() },
             onFavorite: feedActions.onFavorite,
             onDetail: { drama in viewModel.onDisappear(); feedActions.onDetail(drama) },
@@ -392,12 +411,9 @@ public struct TVPlayerView: View {
     private func nextFeedDrama() async -> Bool {
         guard let feedActions, feedActions.canGoNext, !isSwitchingFeed else { return false }
         isSwitchingFeed = true
-        viewModel.setSceneActive(false)
         let changed = await feedActions.onNext()
         isSwitchingFeed = false
-        if changed {
-            viewModel.onDisappear()
-        } else if isPlayerPresented {
+        if !changed && isPlayerPresented {
             viewModel.setSceneActive(scenePhase == .active)
             viewModel.showControls()
         }
@@ -405,6 +421,7 @@ public struct TVPlayerView: View {
     }
 
     private func handleExit() {
+        isWakeupFocused = false
         viewModel.onDisappear()
         if let onDismiss = onDismiss {
             onDismiss()

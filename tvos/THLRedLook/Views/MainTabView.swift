@@ -34,6 +34,18 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
         case .settings: return "gearshape.fill"
         }
     }
+
+    public var nextTab: TVAppTab? {
+        let all = TVAppTab.allCases
+        guard let idx = all.firstIndex(of: self), idx + 1 < all.count else { return nil }
+        return all[idx + 1]
+    }
+
+    public var prevTab: TVAppTab? {
+        let all = TVAppTab.allCases
+        guard let idx = all.firstIndex(of: self), idx > 0 else { return nil }
+        return all[idx - 1]
+    }
 }
 
 public struct MainTabView: View {
@@ -43,13 +55,14 @@ public struct MainTabView: View {
 
     @State private var selectedTab: TVAppTab = .catalog
     @FocusState private var focusedNavTab: TVAppTab?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
+
     @State private var catalogCategoryFocusTrigger: Int = 0
     @State private var feedFocusTrigger = 0
     @State private var rankingsBoardFocusTrigger: Int = 0
     @State private var searchFocusTrigger: Int = 0
     @State private var libraryTabFocusTrigger: Int = 0
     @State private var settingsSidebarTrigger: Int = 0
-    @State private var wasInContentArea: Bool = false
 
     @State private var handoffDrama: Drama?
     @State private var handoffEpIndex: Int = 1
@@ -203,35 +216,24 @@ public struct MainTabView: View {
                 DramaDetailView(drama: drama)
                     .id("detail_\(drama.id)")
             } else {
-                VStack(spacing: 0) {
-                    // 自定义顶级无白底导航栏（带焦点精准控制）
-                    TVTopNavigationBar(
+                // 参考 thldytv MainView.swift 实现的 TVCustomSplitView 导航系统
+                TVCustomSplitView(columnVisibility: $columnVisibility) {
+                    TVSidebarView(
                         selectedTab: $selectedTab,
                         focusedNavTab: $focusedNavTab,
-                        onDownCommandForTab: { tab in
-                            switch tab {
-                            case .catalog:
-                                catalogCategoryFocusTrigger += 1
-                            case .feed:
-                                feedFocusTrigger += 1
-                            case .rankings:
-                                rankingsBoardFocusTrigger += 1
-                            case .search:
-                                searchFocusTrigger += 1
-                            case .library:
-                                libraryTabFocusTrigger += 1
-                            case .settings:
-                                settingsSidebarTrigger += 1
-                            default:
-                                break
-                            }
+                        onSelectTab: { tab in
+                            selectedTab = tab
+                            enterContentArea(for: tab)
+                        },
+                        onMoveRight: { tab in
+                            selectedTab = tab
+                            enterContentArea(for: tab)
+                        },
+                        onRefreshCurrentTab: {
+                            refreshCurrentTab()
                         }
                     )
-                    .padding(.top, 28)
-                    .padding(.bottom, 12)
-                    .zIndex(100)
-
-                    // 页面切换容器
+                } detail: {
                     ZStack {
                         switch selectedTab {
                         case .catalog:
@@ -241,85 +243,87 @@ public struct MainTabView: View {
                                 initialCategory: catalogInitialCategory,
                                 focusCategoryTrigger: catalogCategoryFocusTrigger,
                                 onRequestFocusTopNav: {
-                                    focusedNavTab = .catalog
+                                    requestFocusSidebar()
                                 }
                             )
+                            .padding(.top, 32)
                             .id("catalog_\(isCardFocusedDemo)_\(catalogInitialCategory ?? "")")
                         case .feed:
-                            TVVideoFeedView(viewModel: videoFeedViewModel, focusTrigger: feedFocusTrigger, onRequestFocusTopNav: {
-                                if selectedTab == .feed { focusedNavTab = .feed }
-                            })
+                            TVVideoFeedView(
+                                viewModel: videoFeedViewModel,
+                                isSidebarVisible: columnVisibility != .detailOnly,
+                                focusTrigger: feedFocusTrigger,
+                                onRequestFocusTopNav: {
+                                    requestFocusSidebar()
+                                }
+                            )
                         case .rankings:
                             RankingsView(
                                 focusCategoryTrigger: rankingsBoardFocusTrigger,
                                 onRequestFocusTopNav: {
-                                    focusedNavTab = .rankings
+                                    requestFocusSidebar()
                                 }
                             )
+                            .padding(.top, 32)
                         case .search:
                             SearchRootView(
                                 initialQuery: deepLinkQuery,
                                 targetEpisode: deepLinkEpisode,
                                 focusTrigger: searchFocusTrigger,
                                 onRequestFocusTopNav: {
-                                    focusedNavTab = .search
+                                    requestFocusSidebar()
                                 }
                             )
+                            .padding(.top, 32)
                         case .library:
                             SavedLibraryView(
                                 focusCategoryTrigger: libraryTabFocusTrigger,
                                 onRequestFocusTopNav: {
-                                    focusedNavTab = .library
+                                    requestFocusSidebar()
                                 }
                             )
+                            .padding(.top, 32)
                         case .downloads:
-                            DownloadsView()
+                            DownloadsView(
+                                onRequestFocusTopNav: {
+                                    requestFocusSidebar()
+                                }
+                            )
+                            .padding(.top, 32)
                         case .settings:
                             SettingsView(
                                 forceFocusActiveSource: isSettingsActiveDemo,
                                 focusSidebarTrigger: settingsSidebarTrigger,
                                 onRequestFocusTopNav: {
-                                    focusedNavTab = .settings
+                                    requestFocusSidebar()
                                 }
                             )
+                            .padding(.top, 32)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(TVTheme.backgroundGradient.ignoresSafeArea())
                 }
-                .background(TVTheme.backgroundGradient.ignoresSafeArea())
-                // 需求 1：焦点在内容页面，点击返回页面应该回到导航栏，而不是退出 app
                 .onExitCommand {
-                    if focusedNavTab == nil {
-                        if selectedTab != .settings {
-                            focusedNavTab = selectedTab
-                            wasInContentArea = false
-                        }
+                    if selectedTab != .settings {
+                        requestFocusSidebar()
                     }
                 }
-                // 需求 2：从内容页面按上键时，焦点精确重定向到当前激活的 selectedTab
                 .onChange(of: focusedNavTab) { _, newTab in
-                    NSLog("🎯 [FOCUS_TRACE] TopNav focusedNavTab = %@", newTab?.rawValue ?? "nil")
+                    NSLog("🎯 [FOCUS_TRACE] Sidebar focusedNavTab = %@", newTab?.rawValue ?? "nil")
                     if let tab = newTab {
-                        if wasInContentArea && tab != selectedTab {
-                            // 修正跳往正上方错误 Tab 的系统默认行为，精确落回当前选中的 Tab
-                            focusedNavTab = selectedTab
-                        } else {
-                            // 需求 4：在导航栏左右切换 Tab 时，内容页面立即自动同步切换
-                            selectedTab = tab
+                        if columnVisibility != .all {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                columnVisibility = .all
+                            }
                         }
-                        wasInContentArea = false
-                    } else {
-                        // 焦点离开导航栏进入了内容页面
-                        wasInContentArea = true
+                        selectedTab = tab
                     }
                 }
             }
         }
         .onAppear {
             parseLaunchMode()
-            if focusedNavTab == nil {
-                focusedNavTab = selectedTab
-            }
         }
         .onChange(of: selectedTab) { _, tab in
             if tab == .feed { feedFocusTrigger += 1 }
@@ -344,6 +348,59 @@ public struct MainTabView: View {
         }
     }
 
+    private func requestFocusSidebar() {
+        let current = selectedTab
+        focusedNavTab = current
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            columnVisibility = .all
+        }
+        DispatchQueue.main.async {
+            focusedNavTab = current
+        }
+    }
+
+    private func enterContentArea(for tab: TVAppTab) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            columnVisibility = .detailOnly
+        }
+        focusedNavTab = nil
+        switch tab {
+        case .catalog:
+            catalogCategoryFocusTrigger += 1
+        case .feed:
+            feedFocusTrigger += 1
+        case .rankings:
+            rankingsBoardFocusTrigger += 1
+        case .search:
+            searchFocusTrigger += 1
+        case .library:
+            libraryTabFocusTrigger += 1
+        case .settings:
+            settingsSidebarTrigger += 1
+        default:
+            break
+        }
+    }
+
+    private func refreshCurrentTab() {
+        switch selectedTab {
+        case .catalog:
+            catalogCategoryFocusTrigger += 1
+        case .feed:
+            Task { await videoFeedViewModel.refresh() }
+        case .rankings:
+            rankingsBoardFocusTrigger += 1
+        case .search:
+            searchFocusTrigger += 1
+        case .library:
+            libraryTabFocusTrigger += 1
+        case .settings:
+            settingsSidebarTrigger += 1
+        default:
+            break
+        }
+    }
+
     private func handleDeepLink(_ url: URL) {
         guard let scheme = url.scheme?.lowercased(), scheme == "thlredlook" else { return }
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
@@ -352,9 +409,9 @@ public struct MainTabView: View {
             let kw = components.queryItems?.first(where: { $0.name == "keyword" })?.value ?? ""
             let epStr = components.queryItems?.first(where: { $0.name == "episode" })?.value
             let ep = epStr.flatMap { Int($0) }
-            
+
             self.selectedTab = .search
-            self.focusedNavTab = .search
+            self.enterContentArea(for: .search)
             self.deepLinkQuery = kw
             self.deepLinkEpisode = ep
             NSLog("🎬 [THLRedLook] 响应 DeepLink 搜索: keyword=%@, episode=%ld", kw, ep ?? 0)
@@ -366,46 +423,82 @@ public struct MainTabView: View {
         let testPage = ProcessInfo.processInfo.environment["TEST_PAGE"]
             ?? getArgument(named: "-testPage")
 
-        guard let page = testPage?.trimmingCharacters(in: .whitespacesAndNewlines), !page.isEmpty else { return }
+        guard let page = testPage?.trimmingCharacters(in: .whitespacesAndNewlines), !page.isEmpty else {
+            // 默认启动模式：展开侧边栏并聚焦当前 Tab
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = selectedTab
+            }
+            return
+        }
 
         switch page {
-        case "cleanBlank":
+        case "cleanBlank", "catalog":
             selectedTab = .catalog
-            focusedNavTab = .catalog
-        case "importFlow", "settings", "settingsActive", "settings_cache", "settings_about", "settings_sources", "settings_community", "settings_network":
-            selectedTab = .settings
-            focusedNavTab = .settings
-            if page == "settingsActive" {
-                isSettingsActiveDemo = true
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .catalog
             }
-        case "catalog", "cardFocused":
+        case "importFlow", "settings", "settings_cache", "settings_about", "settings_sources", "settings_community", "settings_network":
+            selectedTab = .settings
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .settings
+            }
+        case "settingsActive":
+            selectedTab = .settings
+            isSettingsActiveDemo = true
+            columnVisibility = .detailOnly
+            focusedNavTab = nil
+        case "cardFocused":
             selectedTab = .catalog
-            isCardFocusedDemo = (page == "cardFocused")
-            focusedNavTab = (page == "cardFocused") ? nil : .catalog
+            isCardFocusedDemo = true
+            columnVisibility = .detailOnly
+            focusedNavTab = nil
         case "catalog_real":
             selectedTab = .catalog
             catalogInitialCategory = "app:discover:playlet"
-            focusedNavTab = .catalog
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .catalog
+            }
         case "catalog_comic":
             selectedTab = .catalog
             catalogInitialCategory = "app:discover:motion_comic"
-            focusedNavTab = .catalog
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .catalog
+            }
         case "feed":
             selectedTab = .feed
-            focusedNavTab = .feed
+            columnVisibility = .detailOnly
+            focusedNavTab = nil
+            feedFocusTrigger += 1
         case "recommendations":
             selectedTab = .catalog
-            focusedNavTab = .catalog
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .catalog
+            }
         case "recommendations_comic":
             selectedTab = .catalog
             catalogInitialCategory = "app:discover:motion_comic"
-            focusedNavTab = .catalog
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .catalog
+            }
         case "rankings":
             selectedTab = .rankings
-            focusedNavTab = .rankings
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .rankings
+            }
         case "search":
             selectedTab = .search
-            focusedNavTab = .search
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .search
+            }
             Task {
                 await JSSourceService.shared.initialize()
                 await MainActor.run {
@@ -419,7 +512,10 @@ public struct MainTabView: View {
             }
         case "library":
             selectedTab = .library
-            focusedNavTab = .library
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .library
+            }
             Task {
                 await JSSourceService.shared.initialize()
                 let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
@@ -444,10 +540,9 @@ public struct MainTabView: View {
             }
         case "downloads", "testDownload":
             selectedTab = .downloads
-            focusedNavTab = .downloads
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                self.selectedTab = .downloads
-                self.focusedNavTab = .downloads
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .downloads
             }
             Task {
                 await JSSourceService.shared.initialize()
@@ -473,7 +568,10 @@ public struct MainTabView: View {
 
         case "playDownloaded":
             selectedTab = .downloads
-            focusedNavTab = .downloads
+            columnVisibility = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab = .downloads
+            }
             Task {
                 await JSSourceService.shared.initialize()
                 let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
@@ -528,99 +626,3 @@ public struct MainTabView: View {
         return nil
     }
 }
-
-// MARK: - 自定义高奢顶部导航栏（无白底纯净焦点）
-public struct TVTopNavigationBar: View {
-    @Binding public var selectedTab: TVAppTab
-    public var focusedNavTab: FocusState<TVAppTab?>.Binding
-    public var onDownCommandForTab: ((TVAppTab) -> Void)? = nil
-
-    public init(
-        selectedTab: Binding<TVAppTab>,
-        focusedNavTab: FocusState<TVAppTab?>.Binding,
-        onDownCommandForTab: ((TVAppTab) -> Void)? = nil
-    ) {
-        self._selectedTab = selectedTab
-        self.focusedNavTab = focusedNavTab
-        self.onDownCommandForTab = onDownCommandForTab
-    }
-
-    public var body: some View {
-        HStack(spacing: 12) {
-            ForEach(TVAppTab.allCases) { tab in
-                let isFocused = focusedNavTab.wrappedValue == tab
-                TVTopNavTabButton(
-                    tab: tab,
-                    isSelected: selectedTab == tab,
-                    isFocused: isFocused,
-                    onDownCommand: {
-                        onDownCommandForTab?(tab)
-                    },
-                    onLeftCommand: (tab == .settings) ? {
-                        focusedNavTab.wrappedValue = .downloads
-                        selectedTab = .downloads
-                    } : nil
-                ) {
-                    if tab == .feed && selectedTab == .feed {
-                        onDownCommandForTab?(tab)
-                    } else {
-                        selectedTab = tab
-                    }
-                }
-                .focused(focusedNavTab, equals: tab)
-                .accessibilityIdentifier("nav.\(tab.rawValue)")
-            }
-        }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 12)
-        .background(
-            Capsule()
-                .fill(Color(red: 0.12, green: 0.12, blue: 0.15).opacity(0.95))
-                .shadow(color: Color.black.opacity(0.7), radius: 18, y: 6)
-        )
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-        )
-    }
-}
-
-public struct TVTopNavTabButton: View {
-    public let tab: TVAppTab
-    public let isSelected: Bool
-    public let isFocused: Bool
-    public var onDownCommand: (() -> Void)? = nil
-    public var onLeftCommand: (() -> Void)? = nil
-    public let action: () -> Void
-
-    public var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 16, weight: .bold))
-                Text(tab.title)
-                    .font(.system(size: 16, weight: isSelected ? .bold : .medium))
-            }
-            .foregroundColor(isSelected ? .white : (isFocused ? .white : Color.white.opacity(0.75)))
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(
-                Capsule()
-                    .fill(isSelected ? (isFocused ? TVTheme.primaryHover : TVTheme.primary) : (isFocused ? Color(red: 0.22, green: 0.22, blue: 0.26) : Color.clear))
-            )
-            .tvCapsuleFocus(isFocused: isFocused, lineWidth: 3.5, scale: 1.06)
-        }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 4)
-        .buttonStyle(TVZeroHighlightButtonStyle())
-        .focusEffectDisabled()
-        .onMoveCommand { direction in
-            if direction == .down {
-                onDownCommand?()
-            } else if direction == .left {
-                onLeftCommand?()
-            }
-        }
-    }
-}
-

@@ -85,6 +85,12 @@ public struct CatalogView: View {
         .task(id: jsService.activeSourceId) {
             await viewModel.reloadAll(initialCategory: initialCategory)
         }
+        .onExitCommand {
+            if !showingFilterSheet && selectedDrama == nil {
+                focusedTarget = nil
+                onRequestFocusTopNav?()
+            }
+        }
     }
 
     private var categoryHeader: some View {
@@ -225,7 +231,11 @@ public struct CatalogView: View {
         guard let index = viewModel.categories.firstIndex(of: category) else { return }
         let next = index + offset
         if next >= viewModel.categories.count { focusedTarget = .filter; return }
-        guard next >= 0 else { return }
+        if next < 0 {
+            focusedTarget = nil
+            onRequestFocusTopNav?()
+            return
+        }
         let target = viewModel.categories[next]
         pendingNextRow = nil
         viewModel.selectCategory(target, immediate: true)
