@@ -66,350 +66,362 @@ public struct TVPlayerView: View {
     }
 
     public var body: some View {
-        ZStack {
-            TVTheme.backgroundGradient.ignoresSafeArea()
-
-            // 视频画面渲染：采用纯净解耦的底层 AVPlayerView，不拦截系统焦点与遥控器事件
-            if let player = viewModel.player {
-                AVPlayerView(player: player)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .ignoresSafeArea()
-            } else if !viewModel.isLoading && viewModel.errorMessage == nil {
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    LinearGradient(
-                        colors: [Color(red: 0.12, green: 0.04, blue: 0.08), Color.black],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ).ignoresSafeArea()
-                }
-            }
-
-            // 弹幕层
-            if viewModel.danmakuEnabled {
-                TVDanmakuView(
-                    danmakus: viewModel.activeDanmakus,
-                    position: viewModel.currentTime,
-                    anchor: viewModel.playbackClockDate,
-                    rate: Double(viewModel.playbackRate),
-                    moving: viewModel.isPlaying && viewModel.player?.timeControlStatus == .playing,
-                    style: viewModel.danmakuStyle
-                )
-            }
-
-            // 正在缓冲/加载遮罩
-            if (viewModel.isLoading || viewModel.isBuffering || isSwitchingFeed) && !viewModel.isSeamlessTransitioning {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.8)
-                    Text(isSwitchingFeed ? "正在切换推荐…" : viewModel.isLoading ? "正在准备视频流..." : "正在缓冲...")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                }
-                .padding(32)
-                .background(Color.black.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
-
-            // 播放错误提示
-            if let err = viewModel.errorMessage {
-                let friendlyMsg: String = {
-                    return "播放失败：\(err)"
-                }()
-
-                VStack(spacing: 24) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 48))
-                        .foregroundColor(.yellow)
-                    Text(friendlyMsg)
-                        .font(.headline)
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.white)
-                        .lineSpacing(6)
-                        .padding(.horizontal, 24)
-
-                    HStack(spacing: 24) {
-                        Button(action: {
-                            handleExit()
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "arrow.backward.circle.fill")
-                                Text(feedActions == nil ? "返回选集" : "返回推荐")
-                            }
-                            .font(.system(size: 18, weight: .bold))
-                            .padding(.horizontal, 28)
-                            .padding(.vertical, 14)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(errorFocusTarget == .backToEpisodes ? TVTheme.primaryHover : TVTheme.primary)
-                            )
-                            .foregroundColor(.white)
-                            .tvFocusBorder(isFocused: errorFocusTarget == .backToEpisodes, cornerRadius: 14)
-                        }
-                        .buttonStyle(TVZeroHighlightButtonStyle())
-                        .focused($errorFocusTarget, equals: .backToEpisodes)
-
-                        Button(action: {
-                            Task {
-                                await viewModel.preparePlayback(episodeIndex: viewModel.currentEpisodeIndex, seekTo: viewModel.currentTime)
-                            }
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "arrow.clockwise")
-                                Text("重试")
-                            }
-                            .font(.system(size: 18, weight: .bold))
-                            .padding(.horizontal, 28)
-                            .padding(.vertical, 14)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(errorFocusTarget == .retry ? TVTheme.surfaceFocused : TVTheme.surfaceCard)
-                            )
-                            .foregroundColor(.white)
-                            .tvFocusBorder(isFocused: errorFocusTarget == .retry, cornerRadius: 14)
-                        }
-                        .buttonStyle(TVZeroHighlightButtonStyle())
-                        .focused($errorFocusTarget, equals: .retry)
-                        if let feedActions, feedActions.canGoNext {
-                            Button("下一部") { Task { _ = await nextFeedDrama() } }
-                                .accessibilityIdentifier("player.errorNextDrama")
-                        }
-                    }
-                }
-                .padding(40)
-                .background(Color.black.opacity(0.92))
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.8), radius: 30)
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        errorFocusTarget = .backToEpisodes
-                    }
-                }
-            }
-
-
-
-            // 轻量状态提示 Toast 浮层（救流/切换模式提示，不阻断观看）
-            if let toast = viewModel.toastMessage {
-                VStack {
-                    HStack(spacing: 12) {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.yellow)
-                            .font(.system(size: 20))
-                        Text(toast)
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 14)
-                    .background(
-                        Capsule()
-                            .fill(Color.black.opacity(0.88))
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.6), radius: 12, y: 6)
-                    .padding(.top, 48)
-
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .zIndex(150)
-            }
-
-            // 纯画面播放模式下的遥控器唤醒交互层（点击 Select 或任何方向键呼出浮层，按 Menu 直接退出播放）
-            if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && viewModel.errorMessage == nil {
-                Button(action: {
-                    viewModel.showControls()
-                }) {
-                    Color.black.opacity(0.001)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .buttonStyle(TvTransparentButtonStyle())
-                .focused($isWakeupFocused)
-                .disabled(!isInteractive)
-                .accessibilityIdentifier("player.wake")
-                .accessibilityLabel("显示播放控制")
-                .accessibilityValue(playbackAccessibilityValue)
-                .ignoresSafeArea()
-                .onMoveCommand { direction in
-                    if feedActions != nil && direction == .down {
-                        Task { _ = await nextFeedDrama() }
-                    } else if let feedActions, direction == .up, feedActions.canGoPrevious {
-                        feedActions.onPrevious()
-                    } else {
-                        viewModel.showControls()
-                    }
-                }
-                .onExitCommand {
-                    handleExit()
-                }
-
-            }
-
-            // 遥控器悬浮控制条（有错误提示或打开抽屉时隐藏控制条，防止焦点冲突与视觉重叠）
-            if viewModel.isControlsVisible && (viewModel.errorMessage == nil || viewModel.keepControlsVisible) && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
-                TVPlayerControlsOverlay(viewModel: viewModel, forceFocusPlayButton: viewModel.keepControlsVisible, feedActions: playerFeedActions) {
-                    handleExit()
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.98)))
-            }
-
-            // 选集抽屉
-            if viewModel.isEpisodeDrawerVisible {
-                TVEpisodeDrawer(viewModel: viewModel, isPresented: $viewModel.isEpisodeDrawerVisible)
-                    .ignoresSafeArea()
-                    .zIndex(100)
-            }
-
-            // 弹幕设置抽屉
-            if viewModel.isDanmakuSettingsVisible {
-                TVDanmakuSettingsDrawer(viewModel: viewModel, isPresented: $viewModel.isDanmakuSettingsVisible)
-                    .ignoresSafeArea()
-                    .zIndex(100)
-            }
-
-            // 倍速选择抽屉
-            if viewModel.isSpeedSheetVisible {
-                TVSpeedSelectionDrawer(viewModel: viewModel, isPresented: $viewModel.isSpeedSheetVisible)
-                    .ignoresSafeArea()
-                    .zIndex(100)
-            }
+        let content = ZStack {
+            videoSurfaceView
+            danmakuOverlayView
+            loadingOverlayView
+            errorOverlayView
+            toastOverlayView
+            wakeButtonView
+            controlsOverlayView
+            drawersOverlayView
         }
         .focusSection()
         .defaultFocus($isWakeupFocused, true)
-        .onAppear {
-            isPlayerPresented = true
-            if feedActions != nil { viewModel.restoreSavedProgress() }
-            viewModel.onAppear()
-            viewModel.setSceneActive(scenePhase == .active)
-            if isInteractive && !viewModel.isControlsVisible {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    isWakeupFocused = true
-                }
-            }
-        }
-        .onDisappear {
-            isPlayerPresented = false
-            viewModel.onDisappear()
-        }
-        .onChange(of: scenePhase) { _, phase in
-            viewModel.setSceneActive(phase == .active && !isSwitchingFeed)
-        }
-        // 遥控器硬件 Play/Pause 按键直接映射
-        .onPlayPauseCommand {
-            viewModel.togglePlayPause()
-        }
-        // 遥控器 Menu 退出逻辑（带有时间戳防抖，优先关闭抽屉与控制条，绝不误穿透退出播放）
-        .onExitCommand {
-            let now = Date().timeIntervalSince1970
-            guard now - lastExitTime > 0.35 else { return }
-            lastExitTime = now
 
-            if viewModel.isDanmakuSettingsVisible {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.isDanmakuSettingsVisible = false
-                }
-                viewModel.showControls()
-            } else if viewModel.isSpeedSheetVisible {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.isSpeedSheetVisible = false
-                }
-                viewModel.showControls()
-            } else if viewModel.isEpisodeDrawerVisible {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.isEpisodeDrawerVisible = false
-                }
-                viewModel.showControls()
-            } else if viewModel.isControlsVisible {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.hideControls()
-                }
-            } else {
-                handleExit()
+        let withEvents = applyEventHandlers(to: content)
+        return applyStateListeners(to: withEvents)
+    }
+
+    // MARK: - 子视图组件拆解（消除复杂泛型嵌套，避免 Release 编译类型推断耗时超标）
+
+    @ViewBuilder
+    private var videoSurfaceView: some View {
+        TVTheme.backgroundGradient.ignoresSafeArea()
+
+        if let player = viewModel.player {
+            AVPlayerView(player: player)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
+        } else if !viewModel.isLoading && viewModel.errorMessage == nil {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                LinearGradient(
+                    colors: [Color(red: 0.12, green: 0.04, blue: 0.08), Color.black],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ).ignoresSafeArea()
             }
         }
-        .onChange(of: viewModel.switchSeasonDrama) { _, newDrama in
-            if let drama = newDrama {
-                viewModel.onDisappear()
-                if let feedActions {
-                    feedActions.onDetail(drama)
-                    viewModel.switchSeasonDrama = nil
-                    return
-                }
-                if let onSwitchSeason = onSwitchSeason {
-                    onSwitchSeason(drama)
-                }
-                presentationMode.wrappedValue.dismiss()
-            }
+    }
+
+    @ViewBuilder
+    private var danmakuOverlayView: some View {
+        if viewModel.danmakuEnabled {
+            TVDanmakuView(
+                danmakus: viewModel.activeDanmakus,
+                position: viewModel.currentTime,
+                anchor: viewModel.playbackClockDate,
+                rate: Double(viewModel.playbackRate),
+                moving: viewModel.isPlaying && viewModel.player?.timeControlStatus == .playing,
+                style: viewModel.danmakuStyle
+            )
         }
-        .onChange(of: viewModel.isEpisodeDrawerVisible) { _, isVisible in
-            if !isVisible {
-                viewModel.showControls()
+    }
+
+    @ViewBuilder
+    private var loadingOverlayView: some View {
+        if (viewModel.isLoading || viewModel.isBuffering || isSwitchingFeed) && !viewModel.isSeamlessTransitioning {
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.8)
+                Text(isSwitchingFeed ? "正在切换推荐…" : viewModel.isLoading ? "正在准备视频流..." : "正在缓冲...")
+                    .font(.headline)
+                    .foregroundColor(.white)
             }
+            .padding(32)
+            .background(Color.black.opacity(0.6))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
-        .onChange(of: viewModel.isDanmakuSettingsVisible) { _, isVisible in
-            if !isVisible {
-                viewModel.showControls()
-            }
-        }
-        .onChange(of: viewModel.isSpeedSheetVisible) { _, isVisible in
-            if !isVisible {
-                viewModel.showControls()
-            }
-        }
-        .onChange(of: viewModel.isControlsVisible) { _, isVisible in
-            if !isVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    isWakeupFocused = true
+    }
+
+    @ViewBuilder
+    private var errorOverlayView: some View {
+        if let err = viewModel.errorMessage {
+            VStack(spacing: 24) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.yellow)
+                Text("播放失败：\(err)")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.white)
+                    .lineSpacing(6)
+                    .padding(.horizontal, 24)
+
+                HStack(spacing: 24) {
+                    Button(action: {
+                        handleExit()
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.backward.circle.fill")
+                            Text(feedActions == nil ? "返回选集" : "返回推荐")
+                        }
+                        .font(.system(size: 18, weight: .bold))
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(errorFocusTarget == .backToEpisodes ? TVTheme.primaryHover : TVTheme.primary)
+                        )
+                        .foregroundColor(.white)
+                        .tvFocusBorder(isFocused: errorFocusTarget == .backToEpisodes, cornerRadius: 14)
+                    }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focused($errorFocusTarget, equals: .backToEpisodes)
+
+                    Button(action: {
+                        Task {
+                            await viewModel.preparePlayback(episodeIndex: viewModel.currentEpisodeIndex, seekTo: viewModel.currentTime)
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("重试")
+                        }
+                        .font(.system(size: 18, weight: .bold))
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(errorFocusTarget == .retry ? TVTheme.surfaceFocused : TVTheme.surfaceCard)
+                        )
+                        .foregroundColor(.white)
+                        .tvFocusBorder(isFocused: errorFocusTarget == .retry, cornerRadius: 14)
+                    }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focused($errorFocusTarget, equals: .retry)
+
+                    if let feedActions, feedActions.canGoNext {
+                        Button("下一部") { Task { _ = await nextFeedDrama() } }
+                            .accessibilityIdentifier("player.errorNextDrama")
+                    }
                 }
             }
-        }
-        .onChange(of: isInteractive) { _, interactive in
-            if !interactive {
-                isWakeupFocused = false
-            } else if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    isWakeupFocused = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    isWakeupFocused = true
-                }
-            }
-        }
-        .onChange(of: focusWakeTrigger) { _, _ in
-            if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    isWakeupFocused = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    isWakeupFocused = true
-                }
-            }
-        }
-        .onChange(of: viewModel.errorMessage) { _, newErr in
-            if newErr != nil {
+            .padding(40)
+            .background(Color.black.opacity(0.92))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.8), radius: 30)
+            .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     errorFocusTarget = .backToEpisodes
                 }
             }
         }
-        .onChange(of: drama.id) { _, newId in
-            Task {
-                await viewModel.switchFeedDrama(
-                    drama: drama,
-                    allEpisodes: episodes,
-                    initialEpisodeIndex: initialEpisodeIndex,
-                    initialPosition: initialPosition,
-                    preloadedPlan: preloadedPlan
+    }
+
+    @ViewBuilder
+    private var toastOverlayView: some View {
+        if let toast = viewModel.toastMessage {
+            VStack {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .foregroundColor(.yellow)
+                        .font(.system(size: 20))
+                    Text(toast)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.88))
                 )
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.6), radius: 12, y: 6)
+                .padding(.top, 48)
+
+                Spacer()
             }
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .zIndex(150)
+        }
+    }
+
+    @ViewBuilder
+    private var wakeButtonView: some View {
+        if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && viewModel.errorMessage == nil {
+            Button(action: {
+                viewModel.showControls()
+            }) {
+                Color.black.opacity(0.001)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .buttonStyle(TvTransparentButtonStyle())
+            .focused($isWakeupFocused)
+            .disabled(!isInteractive)
+            .accessibilityIdentifier("player.wake")
+            .accessibilityLabel("显示播放控制")
+            .accessibilityValue(playbackAccessibilityValue)
+            .ignoresSafeArea()
+            .onMoveCommand { direction in
+                if feedActions != nil && direction == .down {
+                    Task { _ = await nextFeedDrama() }
+                } else if let feedActions, direction == .up, feedActions.canGoPrevious {
+                    feedActions.onPrevious()
+                } else {
+                    viewModel.showControls()
+                }
+            }
+            .onExitCommand {
+                handleExit()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var controlsOverlayView: some View {
+        if viewModel.isControlsVisible && (viewModel.errorMessage == nil || viewModel.keepControlsVisible) && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
+            TVPlayerControlsOverlay(viewModel: viewModel, forceFocusPlayButton: viewModel.keepControlsVisible, feedActions: playerFeedActions) {
+                handleExit()
+            }
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        }
+    }
+
+    @ViewBuilder
+    private var drawersOverlayView: some View {
+        if viewModel.isEpisodeDrawerVisible {
+            TVEpisodeDrawer(viewModel: viewModel, isPresented: $viewModel.isEpisodeDrawerVisible)
+                .ignoresSafeArea()
+                .zIndex(100)
+        }
+
+        if viewModel.isDanmakuSettingsVisible {
+            TVDanmakuSettingsDrawer(viewModel: viewModel, isPresented: $viewModel.isDanmakuSettingsVisible)
+                .ignoresSafeArea()
+                .zIndex(100)
+        }
+
+        if viewModel.isSpeedSheetVisible {
+            TVSpeedSelectionDrawer(viewModel: viewModel, isPresented: $viewModel.isSpeedSheetVisible)
+                .ignoresSafeArea()
+                .zIndex(100)
+        }
+    }
+
+    // MARK: - 事件监听与遥控器交互解耦
+
+    private func applyEventHandlers<Content: View>(to content: Content) -> some View {
+        content
+            .onAppear {
+                isPlayerPresented = true
+                if feedActions != nil { viewModel.restoreSavedProgress() }
+                viewModel.onAppear()
+                viewModel.setSceneActive(scenePhase == .active)
+                if isInteractive && !viewModel.isControlsVisible {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        isWakeupFocused = true
+                    }
+                }
+            }
+            .onDisappear {
+                isPlayerPresented = false
+                viewModel.onDisappear()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                viewModel.setSceneActive(phase == .active && !isSwitchingFeed)
+            }
+            .onPlayPauseCommand {
+                viewModel.togglePlayPause()
+            }
+            .onExitCommand(perform: onRemoteMenuPressed)
+    }
+
+    private func applyStateListeners<Content: View>(to content: Content) -> some View {
+        content
+            .onChange(of: viewModel.switchSeasonDrama) { _, newDrama in
+                if let drama = newDrama {
+                    viewModel.onDisappear()
+                    if let feedActions {
+                        feedActions.onDetail(drama)
+                        viewModel.switchSeasonDrama = nil
+                        return
+                    }
+                    onSwitchSeason?(drama)
+                    presentationMode.wrappedValue.dismiss()
+                }
+            }
+            .onChange(of: viewModel.isEpisodeDrawerVisible) { _, isVisible in
+                if !isVisible { viewModel.showControls() }
+            }
+            .onChange(of: viewModel.isDanmakuSettingsVisible) { _, isVisible in
+                if !isVisible { viewModel.showControls() }
+            }
+            .onChange(of: viewModel.isSpeedSheetVisible) { _, isVisible in
+                if !isVisible { viewModel.showControls() }
+            }
+            .onChange(of: viewModel.isControlsVisible) { _, isVisible in
+                if !isVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isWakeupFocused = true }
+                }
+            }
+            .onChange(of: isInteractive) { _, interactive in
+                if !interactive {
+                    isWakeupFocused = false
+                } else if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isWakeupFocused = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { isWakeupFocused = true }
+                }
+            }
+            .onChange(of: focusWakeTrigger) { _, _ in
+                if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isWakeupFocused = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { isWakeupFocused = true }
+                }
+            }
+            .onChange(of: viewModel.errorMessage) { _, newErr in
+                if newErr != nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { errorFocusTarget = .backToEpisodes }
+                }
+            }
+            .onChange(of: drama.id) { _, newId in
+                Task {
+                    await viewModel.switchFeedDrama(
+                        drama: drama,
+                        allEpisodes: episodes,
+                        initialEpisodeIndex: initialEpisodeIndex,
+                        initialPosition: initialPosition,
+                        preloadedPlan: preloadedPlan
+                    )
+                }
+            }
+    }
+
+    private func onRemoteMenuPressed() {
+        let now = Date().timeIntervalSince1970
+        guard now - lastExitTime > 0.35 else { return }
+        lastExitTime = now
+
+        if viewModel.isDanmakuSettingsVisible {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.isDanmakuSettingsVisible = false
+            }
+            viewModel.showControls()
+        } else if viewModel.isSpeedSheetVisible {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.isSpeedSheetVisible = false
+            }
+            viewModel.showControls()
+        } else if viewModel.isEpisodeDrawerVisible {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.isEpisodeDrawerVisible = false
+            }
+            viewModel.showControls()
+        } else if viewModel.isControlsVisible {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.hideControls()
+            }
+        } else {
+            handleExit()
         }
     }
 
