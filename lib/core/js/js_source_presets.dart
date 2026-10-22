@@ -770,11 +770,7 @@ async function detail(id) {
 
   let remarks = "";
   if (epUrls.length > 0) {
-    if (accessibleCount > 0 && accessibleCount < epUrls.length) {
-      remarks = "全" + epUrls.length + "集 (试看前" + accessibleCount + "集)";
-    } else {
-      remarks = "全" + epUrls.length + "集";
-    }
+    remarks = "全" + epUrls.length + "集";
   } else if (epTotalCount === 0) {
     remarks = "全0集（暂无可用分集）";
   }
@@ -789,7 +785,7 @@ async function detail(id) {
         vod_remarks: remarks,
         vod_play_from: "官方直链",
         vod_play_url: epUrls.join("#"),
-        accessible_count: accessibleCount
+        accessible_count: 0
       }
     ]
   };

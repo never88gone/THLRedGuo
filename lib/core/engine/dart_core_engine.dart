@@ -802,7 +802,11 @@ class DartCoreEngine {
         (spiderVod?['accessibleCount'] as num?)?.toInt() ??
         0;
 
-    if (accessibleCount > 0 && accessibleCount < chapters.length) {
+    // 红果官方短剧全集均可直接解析直连播放，不设试看门槛与虚假 VIP 标签；
+    // 仅针对非红果且明确受限的源保留 VIP 标注
+    if (source != 'hongguo' &&
+        accessibleCount > 0 &&
+        accessibleCount < chapters.length) {
       for (var i = 0; i < chapters.length; i++) {
         if (i + 1 > accessibleCount) {
           chapters[i]['vip'] = true;
@@ -811,6 +815,11 @@ class DartCoreEngine {
         }
       }
       fullDrama['vip'] = true;
+    } else {
+      for (var i = 0; i < chapters.length; i++) {
+        chapters[i]['vip'] = false;
+      }
+      fullDrama['vip'] = false;
     }
 
     fullDrama['episodes'] = chapters.length;
