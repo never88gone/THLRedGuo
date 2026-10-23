@@ -1,11 +1,17 @@
 import SwiftUI
 import AVKit
 
+private enum PlayerWakeFocusArea: Hashable {
+    case leftSeek
+    case centerWake
+    case rightSeek
+}
+
 public struct TVPlayerView: View {
     @StateObject private var viewModel: PlayerViewModel
     @Environment(\.presentationMode) var presentationMode
     @Environment(\.scenePhase) private var scenePhase
-    @FocusState private var isWakeupFocused: Bool
+    @FocusState private var activeWakeFocus: PlayerWakeFocusArea?
     @State private var lastExitTime: TimeInterval = 0
     public var onDismiss: (() -> Void)? = nil
     public var onSwitchSeason: ((Drama) -> Void)? = nil
@@ -275,54 +281,19 @@ public struct TVPlayerView: View {
     @ViewBuilder
     private var wakeButtonView: some View {
         if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && viewModel.errorMessage == nil {
-            ZStack {
-                TVRemoteTouchSurfaceView(
-                    onPanBegan: handlePanBegan,
-                    onPanChanged: handlePanChanged,
-                    onPanEnded: handlePanEnded
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea()
-
-                Button(action: {
-                    viewModel.showControls()
-                }) {
-                    Color.clear
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(TvTransparentButtonStyle())
-                .focused($isWakeupFocused)
-                .disabled(!isInteractive)
-                .accessibilityIdentifier("player.wake")
-                .accessibilityLabel("显示播放控制")
-                .accessibilityValue(playbackAccessibilityValue)
-                .ignoresSafeArea()
-                .onMoveCommand { direction in
-                    switch direction {
-                    case .left:
-                        handleQuickSeek(by: -10)
-                    case .right:
-                        handleQuickSeek(by: 10)
-                    case .up:
-                        if let feedActions, feedActions.canGoPrevious {
-                            feedActions.onPrevious()
-                        }
-                    case .down:
-                        if feedActions != nil {
-                            Task { _ = await nextFeedDrama() }
-                        }
-                    default:
-                        break
-                    }
-                }
-                .onPlayPauseCommand {
-                    viewModel.showControls()
-                }
-                .onExitCommand {
-                    handleExit()
-                }
-            }
+            TVRemoteTouchSurfaceView(
+                accessibilityValue: playbackAccessibilityValue,
+                onPanBegan: handlePanBegan,
+                onPanChanged: handlePanChanged,
+                onPanEnded: handlePanEnded,
+                onLeftArrow: { handleQuickSeek(by: -10) },
+                onRightArrow: { handleQuickSeek(by: 10) },
+                onSelect: { viewModel.showControls() },
+                onPlayPause: { viewModel.showControls() },
+                onMenu: { onRemoteMenuPressed() }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea()
         }
     }
 
@@ -385,6 +356,27 @@ public struct TVPlayerView: View {
                 viewModel.togglePlayPause()
             }
             .onExitCommand(perform: onRemoteMenuPressed)
+            .onMoveCommand { direction in
+                print("THL_GLOBAL_ON_MOVE_COMMAND: direction=\(direction)")
+                if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
+                    switch direction {
+                    case .left:
+                        handleQuickSeek(by: -10)
+                    case .right:
+                        handleQuickSeek(by: 10)
+                    case .up:
+                        if let feedActions, feedActions.canGoPrevious {
+                            feedActions.onPrevious()
+                        }
+                    case .down:
+                        if feedActions != nil {
+                            Task { _ = await nextFeedDrama() }
+                        }
+                    default:
+                        break
+                    }
+                }
+            }
     }
 
     private func applyStateListeners<Content: View>(to content: Content) -> some View {
@@ -528,8 +520,10 @@ public struct TVPlayerView: View {
 
     private func handleQuickSeek(by delta: Double) {
         let base = showQuickSeekIndicator ? quickSeekTarget : viewModel.currentTime
-        let newTarget = max(0, min(base + delta, viewModel.duration))
+        let maxLimit = viewModel.duration > 0 ? viewModel.duration : 10000.0
+        let newTarget = max(0, min(base + delta, maxLimit))
         let totalDelta = newTarget - viewModel.currentTime
+        print("THL_HANDLE_QUICK_SEEK: delta=\(delta), base=\(base), newTarget=\(newTarget), duration=\(viewModel.duration)")
 
         quickSeekTarget = newTarget
         quickSeekDelta = totalDelta
@@ -652,6 +646,7 @@ public struct TVQuickSeekIndicatorView: View {
                 .stroke(Color.white.opacity(0.18), lineWidth: 1.2)
         )
         .shadow(color: Color.black.opacity(0.85), radius: 28, x: 0, y: 10)
+        .accessibilityIdentifier("player.quickSeek")
     }
 
     private func formatTime(_ sec: Double) -> String {
@@ -663,45 +658,161 @@ public struct TVQuickSeekIndicatorView: View {
     }
 }
 
-// MARK: - 遥控器触控板滑动捕获组件 (tvOS Siri Remote Touch Surface)
+// MARK: - 遥控器触控板滑动与手势捕获组件 (tvOS Siri Remote Touch & Gesture Surface)
 
 public struct TVRemoteTouchSurfaceView: UIViewRepresentable {
+    public var accessibilityValue: String? = nil
     public var onPanBegan: () -> Void
     public var onPanChanged: (CGFloat) -> Void
     public var onPanEnded: () -> Void
+    public var onLeftArrow: (() -> Void)? = nil
+    public var onRightArrow: (() -> Void)? = nil
+    public var onSelect: (() -> Void)? = nil
+    public var onPlayPause: (() -> Void)? = nil
+    public var onMenu: (() -> Void)? = nil
 
     public func makeUIView(context: Context) -> TVTouchCapturingView {
         let view = TVTouchCapturingView()
-        view.onPanBegan = onPanBegan
-        view.onPanChanged = onPanChanged
-        view.onPanEnded = onPanEnded
+        updateProps(view)
         return view
     }
 
     public func updateUIView(_ uiView: TVTouchCapturingView, context: Context) {
-        uiView.onPanBegan = onPanBegan
-        uiView.onPanChanged = onPanChanged
-        uiView.onPanEnded = onPanEnded
+        updateProps(uiView)
+    }
+
+    private func updateProps(_ view: TVTouchCapturingView) {
+        view.accessibilityValue = accessibilityValue
+        view.onPanBegan = onPanBegan
+        view.onPanChanged = onPanChanged
+        view.onPanEnded = onPanEnded
+        view.onLeftArrow = onLeftArrow
+        view.onRightArrow = onRightArrow
+        view.onSelect = onSelect
+        view.onPlayPause = onPlayPause
+        view.onMenu = onMenu
     }
 }
 
-public class TVTouchCapturingView: UIView {
+public class TVTouchCapturingView: UIView, UIGestureRecognizerDelegate {
     var onPanBegan: (() -> Void)?
     var onPanChanged: ((CGFloat) -> Void)?
     var onPanEnded: (() -> Void)?
+    var onLeftArrow: (() -> Void)?
+    var onRightArrow: (() -> Void)?
+    var onSelect: (() -> Void)?
+    var onPlayPause: (() -> Void)?
+    var onMenu: (() -> Void)?
+
+    public override var canBecomeFocused: Bool {
+        return true
+    }
+
+    public override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil {
+            setNeedsFocusUpdate()
+            updateFocusIfNeeded()
+        }
+    }
+
+    public override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
+        super.didUpdateFocus(in: context, with: coordinator)
+        print("THL_DID_UPDATE_FOCUS: nextFocusedView=\(String(describing: context.nextFocusedView)), isSelf=\(context.nextFocusedView === self)")
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         isUserInteractionEnabled = true
         backgroundColor = .clear
 
+        isAccessibilityElement = true
+        accessibilityIdentifier = "player.wake"
+        accessibilityTraits = .button
+        accessibilityLabel = "显示播放控制"
+
+        // 1. Siri Remote 触控表面滑动手势
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
         panGesture.cancelsTouchesInView = false
+        panGesture.delegate = self
         addGestureRecognizer(panGesture)
+
+        // 2. 遥控器 Left 按键专用手势
+        let leftTap = UITapGestureRecognizer(target: self, action: #selector(handleLeftPress))
+        leftTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.leftArrow.rawValue)]
+        leftTap.cancelsTouchesInView = false
+        leftTap.delegate = self
+        addGestureRecognizer(leftTap)
+
+        // 3. 遥控器 Right 按键专用手势
+        let rightTap = UITapGestureRecognizer(target: self, action: #selector(handleRightPress))
+        rightTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.rightArrow.rawValue)]
+        rightTap.cancelsTouchesInView = false
+        rightTap.delegate = self
+        addGestureRecognizer(rightTap)
+
+        // 4. 遥控器 Select 确认按键手势
+        let selectTap = UITapGestureRecognizer(target: self, action: #selector(handleSelectPress))
+        selectTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.select.rawValue)]
+        selectTap.cancelsTouchesInView = false
+        selectTap.delegate = self
+        addGestureRecognizer(selectTap)
+
+        // 5. 遥控器 Play/Pause 按键手势
+        let playPauseTap = UITapGestureRecognizer(target: self, action: #selector(handlePlayPausePress))
+        playPauseTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.playPause.rawValue)]
+        playPauseTap.cancelsTouchesInView = false
+        playPauseTap.delegate = self
+        addGestureRecognizer(playPauseTap)
+
+        // 6. 遥控器 Menu 按键手势
+        let menuTap = UITapGestureRecognizer(target: self, action: #selector(handleMenuPress))
+        menuTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.menu.rawValue)]
+        menuTap.cancelsTouchesInView = false
+        menuTap.delegate = self
+        addGestureRecognizer(menuTap)
+
+        // 7. 遥控器触控板轻扫手势 (Swipe Right: 快进, Swipe Left: 快退)
+        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handleRightPress))
+        swipeRight.direction = .right
+        swipeRight.cancelsTouchesInView = false
+        swipeRight.delegate = self
+        addGestureRecognizer(swipeRight)
+
+        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(handleLeftPress))
+        swipeLeft.direction = .left
+        swipeLeft.cancelsTouchesInView = false
+        swipeLeft.delegate = self
+        addGestureRecognizer(swipeLeft)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func handleMenuPress() {
+        print("THL_GESTURE_MENU_PRESS_CAPTURED")
+        onMenu?()
+    }
+
+    @objc private func handleLeftPress() {
+        print("THL_GESTURE_LEFT_PRESS_CAPTURED")
+        onLeftArrow?()
+    }
+
+    @objc private func handleRightPress() {
+        print("THL_GESTURE_RIGHT_PRESS_CAPTURED")
+        onRightArrow?()
+    }
+
+    @objc private func handleSelectPress() {
+        print("THL_GESTURE_SELECT_PRESS_CAPTURED")
+        onSelect?()
+    }
+
+    @objc private func handlePlayPausePress() {
+        print("THL_GESTURE_PLAYPAUSE_PRESS_CAPTURED")
+        onPlayPause?()
     }
 
     @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {
@@ -715,6 +826,45 @@ public class TVTouchCapturingView: UIView {
             onPanEnded?()
         default:
             break
+        }
+    }
+
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
+    }
+
+    public override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        var handled = false
+        for press in presses {
+            switch press.type {
+            case .leftArrow:
+                print("THL_PRESSES_BEGAN_LEFT_ARROW")
+                onLeftArrow?()
+                handled = true
+            case .rightArrow:
+                print("THL_PRESSES_BEGAN_RIGHT_ARROW")
+                onRightArrow?()
+                handled = true
+            case .select:
+                print("THL_PRESSES_BEGAN_SELECT")
+                onSelect?()
+                handled = true
+            case .playPause:
+                print("THL_PRESSES_BEGAN_PLAY_PAUSE")
+                onPlayPause?()
+                handled = true
+            case .menu:
+                print("THL_PRESSES_BEGAN_MENU")
+                if let onMenu {
+                    onMenu()
+                    handled = true
+                }
+            default:
+                break
+            }
+        }
+        if !handled {
+            super.pressesBegan(presses, with: event)
         }
     }
 }

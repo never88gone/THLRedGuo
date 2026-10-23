@@ -190,7 +190,22 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
             ? const StatusPanel(title: '当前用户未开放精选短剧', message: '可在设置中调整站源权限。')
             : feed.items.isEmpty
             ? feed.loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(color: Colors.white70),
+                          SizedBox(height: 16),
+                          Text(
+                            '正在加载精彩短剧视频...',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
                   : StatusPanel(
                       title: feed.error == null ? '暂无推荐' : '推荐暂时无法加载',
                       message: feed.error ?? '刷新后获取新的推荐',

@@ -176,11 +176,24 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
-  bool get _hasNoSourcePlugins => widget.store.sources.isEmpty;
+  bool get _isSourceInitializing {
+    final service = JsSourceService.current;
+    if (service == null) return false;
+    return !service.initialized || service.loading;
+  }
+
+  bool get _hasNoSourcePlugins =>
+      !_isSourceInitializing && widget.store.sources.isEmpty;
 
   /// 站源或配置变更时，同步当前站源与可见站源列表。
   void _sourcesChanged() {
     if (!mounted || _switchingSource) return;
+    if (_isSourceInitializing) {
+      if (!_loading) {
+        setState(() => _loading = true);
+      }
+      return;
+    }
     if (_hasNoSourcePlugins) {
       setState(() {
         _items = [];
@@ -199,11 +212,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ? activeJsId
               : (visible.isNotEmpty ? visible.first.id : ''));
 
-    // 当前已处于目标数据源，若可用源列表签名发生变化则刷新并重载
+    // 当前已处于目标数据源，若可用源列表签名发生变化或之前未加载数据则刷新并重载
     if (_source.id == targetSourceId) {
-      if (signature != _sourceSignature) {
+      if (signature != _sourceSignature || (_items.isEmpty && !_loadingMore)) {
         _sourceSignature = signature;
-        setState(() {});
+        setState(() {
+          _loading = true;
+        });
         _load(useCache: true);
         _loadCategories();
       }
@@ -502,7 +517,9 @@ class _HomeScreenState extends State<HomeScreen> {
     widget.store.addListener(_sourcesChanged);
     JsSourceService.current?.addListener(_sourcesChanged);
     widget.repository.catalogUpdates.addListener(_metadataChanged);
-    if (!_hasNoSourcePlugins) {
+    if (_isSourceInitializing) {
+      _loading = true;
+    } else if (!_hasNoSourcePlugins) {
       _load(useCache: true);
       _loadCategories();
     } else {
@@ -1060,6 +1077,63 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Widget _buildInitializingSourceView(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Card(
+            elevation: 0,
+            color: isDark ? AppColors.darkSurface : AppColors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: isDark ? AppColors.darkBorder : AppColors.greyLight,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3.5,
+                      color: AppColors.hongguoRed,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    '正在准备短剧数据源...',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    '首次启动正在载入精选源并连接数据服务，请稍候片刻',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.grey,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptySourcePluginGuide(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -1373,7 +1447,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: _tab == 4
                                 ? const SizedBox.shrink()
                                 : _tab == 0
-                                ? _hasNoSourcePlugins
+                                ? _isSourceInitializing
+                                      ? _buildInitializingSourceView(context)
+                                      : _hasNoSourcePlugins
                                       ? _buildEmptySourcePluginGuide(context)
                                       : _catalog(
                                           selectionInBody:
@@ -1581,7 +1657,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: HomeCatalogView(
               items: items,
-              loading: _loading,
+              loading: _loading || _categoriesLoading || _isSourceInitializing,
               loadingMore: _loadingMore,
               hasMore: _hasMore,
               error: _error,
@@ -1598,6 +1674,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       _search.text.isEmpty ||
                       _group.sources.any((source) => source.pagedSearch)),
               gridKey: 'catalog-${_group.id}-$_category-$_submittedQuery',
+              loadingMessage: _search.text.trim().isNotEmpty
+                  ? '正在搜索相关短剧...'
+                  : (_category.isNotEmpty
+                        ? '正在获取分类短剧...'
+                        : '正在加载精选短剧...'),
+              loadingHint: '数据加载中，请稍候片刻',
               onRetryLoad: () => _load(force: true),
               onLoadMore: () => _load(more: true),
               onPrefetch: _onCatalogScroll,

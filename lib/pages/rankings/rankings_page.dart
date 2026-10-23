@@ -303,11 +303,32 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const CircularProgressIndicator(),
-                          if (_board?.source == 'hongguo') ...[
-                            const SizedBox(height: 16),
-                            const Text('正在获取榜单，数据未完整返回时会自动重试'),
-                          ],
+                          const SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: CircularProgressIndicator(strokeWidth: 3),
+                          ),
+                          const SizedBox(height: 18),
+                          Text(
+                            '正在获取热播短剧榜单...',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _board?.source == 'hongguo'
+                                ? '正在连接榜单服务，数据未完整返回时会自动重试'
+                                : '正在同步最新榜单排行，请稍候片刻',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
                         ],
                       ),
                     )

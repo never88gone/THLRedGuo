@@ -27,6 +27,8 @@ class HomeCatalogView extends StatelessWidget {
     required this.onManageSources,
     required this.onSwipeCategory,
     required this.tileBuilder,
+    this.loadingMessage,
+    this.loadingHint,
   });
 
   final List<Drama> items;
@@ -53,6 +55,8 @@ class HomeCatalogView extends StatelessWidget {
     VoidCallback? onFocus,
   })
   tileBuilder;
+  final String? loadingMessage;
+  final String? loadingHint;
 
   Widget _paginationFooter(BuildContext context) {
     if (loadingMore) return const CircularProgressIndicator();
@@ -88,14 +92,36 @@ class HomeCatalogView extends StatelessWidget {
       child: GestureDetector(
         onHorizontalDragEnd: television ? null : onSwipeCategory,
         child: loading && items.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 18),
-                    Text('正在加载剧集'),
-                  ],
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(strokeWidth: 3),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        loadingMessage ?? '正在加载精选短剧...',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        loadingHint ?? '正在连接短剧数据源，请稍候片刻',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
             : items.isEmpty && error != null

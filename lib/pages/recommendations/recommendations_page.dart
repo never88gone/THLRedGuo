@@ -166,7 +166,38 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
           child: !widget.store.allowsSource('hongguo')
               ? const StatusPanel(title: '当前用户未开放精选短剧', message: '可在用户管理中调整站源权限。')
               : _loading && _items.isEmpty
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: CircularProgressIndicator(strokeWidth: 3),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          '正在准备推荐短剧...',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '正在同步最新短剧推荐，请稍候片刻',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : _items.isEmpty
               ? StatusPanel(
                   title: _error == null ? '暂无推荐' : '推荐暂时无法加载',
