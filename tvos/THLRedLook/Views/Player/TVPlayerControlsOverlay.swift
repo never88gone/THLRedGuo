@@ -108,8 +108,18 @@ public struct TVPlayerControlsOverlay: View {
                     .lineLimit(2)
             }
 
-            // 中间纯净视频画面，无大图标遮挡
-            Spacer()
+            // 中间纯净视频画面，支持点击收起控制栏
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.hideControls()
+                }
+            }) {
+                Color.black.opacity(0.001)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .buttonStyle(TvTransparentButtonStyle())
+            .accessibilityLabel("收起控制栏")
+            .accessibilityIdentifier("player.dismissControls")
 
             // MARK: - 底部进度条与一体化操作栏
             VStack(spacing: 24) {
@@ -408,7 +418,19 @@ public struct TVPlayerControlsOverlay: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.hideControls()
+                }
+            }
         )
+        .onExitCommand {
+            NSLog("🎬 [Overlay] 遥控器按下 Menu 键，拦截模态退出，仅收起控制栏")
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.hideControls()
+            }
+        }
         .onChange(of: focusedControl) { _, _ in viewModel.showControls() }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {

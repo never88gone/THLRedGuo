@@ -91,7 +91,7 @@ public final class PlayerViewModel: ObservableObject {
         allEpisodes: [Episode],
         initialEpisodeIndex: Int = 1,
         initialPosition: Double = 0,
-        initialShowControls: Bool = true,
+        initialShowControls: Bool = false,
         keepControlsVisible: Bool = false,
         initialShowDrawer: Bool = false,
         initialRestoreFocusTarget: PlayerOverlayFocusTarget? = nil,
