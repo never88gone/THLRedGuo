@@ -23,8 +23,19 @@ public actor NativeBridge {
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
 
-    init(baseDirectory: URL? = nil, httpSession: URLSession = .shared, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用") {
-        self.httpSession = httpSession
+    init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用") {
+        if let httpSession {
+            self.httpSession = httpSession
+        } else {
+            let config = URLSessionConfiguration.default
+            config.httpMaximumConnectionsPerHost = 10
+            config.timeoutIntervalForRequest = 10.0
+            config.timeoutIntervalForResource = 15.0
+            config.requestCachePolicy = .useProtocolCachePolicy
+            config.httpShouldUsePipelining = true
+            config.urlCache = URLCache(memoryCapacity: 20 * 1024 * 1024, diskCapacity: 100 * 1024 * 1024)
+            self.httpSession = URLSession(configuration: config)
+        }
         self.diagnostics = diagnostics
         self.diagnosticContext = diagnosticContext
         let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
@@ -166,6 +177,17 @@ public actor NativeBridge {
             NSLog("🎬 [CatPawOpen JS:%@] %@", sourceId, msg)
         }
         context.setObject(logBlock, forKeyedSubscript: "__console_log" as NSString)
+
+        // 1.5 注入官方设备认证持久化桥接，避免每次冷启动/重新初始化产生额外的设备注册网络延迟
+        let saveDeviceBlock: @convention(block) (String) -> Void = { json in
+            guard !json.isEmpty else { return }
+            UserDefaults.standard.set(json, forKey: "thl_tv_hongguo_device_session")
+        }
+        context.setObject(saveDeviceBlock, forKeyedSubscript: "__native_save_device" as NSString)
+
+        if let cachedDevice = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session"), !cachedDevice.isEmpty {
+            context.evaluateScript("try { globalThis.__hongguoCachedDevice = JSON.parse(\(cachedDevice.debugDescription)); } catch(_) {}")
+        }
 
         // 2. 注入原生高性能 HTTP 请求桥接
         let session = httpSession
