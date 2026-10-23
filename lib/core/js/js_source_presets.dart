@@ -1996,17 +1996,60 @@ spider.danmaku = function (id, startMs, durationMs) {
     return text(sub.find(item => item.is_selected)?.sub_title);
   }
 
-  function savePage(state, page, cell, data, params) {
+  async function savePage(state, page, cell, data, params) {
     if (!cell) throw failure('官方接口未返回剧集列表，请重试', 'INVALID_RESPONSE');
     const seen = new Set();
     for (const [previous, value] of state.pages) if (previous < page) for (const row of value.list) seen.add(row.vod_id);
     const previous = state.cursors.get(page);
-    const list = videos([cell]).filter(row => !seen.has(row.vod_id)).map((row, index) => ({
-      ...row, ...(state.category ? { vod_category: state.category } : {}),
-      vod_rank: row.vod_rank || number(previous?.offset) + index + 1
-    }));
-    const offset = number(data.next_offset ?? cell.next_offset);
-    const hasMore = data.has_more !== false && cell.has_more !== false && offset > number(previous?.offset) && list.length > 0;
+    const list = [];
+    let offset = number(data.next_offset ?? cell.next_offset);
+    let hasMore = data.has_more !== false && cell.has_more !== false && offset > number(previous?.offset);
+    let currentCell = cell;
+    let currentData = data;
+
+    function appendCell(c) {
+      for (const row of videos([c])) {
+        if (!seen.has(row.vod_id)) {
+          seen.add(row.vod_id);
+          list.push({
+            ...row, ...(state.category ? { vod_category: state.category } : {}),
+            vod_rank: row.vod_rank || number(previous?.offset) + list.length + 1
+          });
+        }
+      }
+    }
+    appendCell(cell);
+
+    const TARGET_SIZE = 10;
+    let rounds = 0;
+    while (list.length < TARGET_SIZE && hasMore && rounds < 3) {
+      rounds++;
+      try {
+        const nextParams = {
+          ...params,
+          cell_id: text(currentCell.cell_id_str || previous?.cell_id),
+          offset: offset,
+          session_id: text(currentData.session_id || currentCell.session_id),
+          rank_version: text(currentData.rank_version || currentCell.rank_version),
+          limit: 40,
+          change_type: 1
+        };
+        const nextRes = await api('/reading/bookapi/bookmall/cell/change/v', nextParams);
+        const nextCell = nextRes.data?.cell_view;
+        const nextData = nextRes.data;
+        if (!nextCell || !nextData) break;
+        const prevOff = offset;
+        offset = number(nextData.next_offset ?? nextCell.next_offset);
+        hasMore = nextData.has_more !== false && nextCell.has_more !== false && offset > prevOff;
+        currentCell = nextCell;
+        currentData = nextData;
+        appendCell(nextCell);
+      } catch (_) {
+        break;
+      }
+    }
+
+    hasMore = hasMore && list.length > 0;
     const result = {
       page, pagecount: hasMore ? page + 1 : page, hasMore, list,
       updatedText: selectedSubtitle(cell) || state.updatedText || ''
@@ -2015,8 +2058,8 @@ spider.danmaku = function (id, startMs, durationMs) {
     state.updatedText = result.updatedText;
     state.updated = Date.now();
     if (hasMore) state.cursors.set(page + 1, {
-      ...params, cell_id: text(cell.cell_id_str || previous?.cell_id), offset,
-      session_id: text(data.session_id || cell.session_id), rank_version: text(data.rank_version || cell.rank_version)
+      ...params, cell_id: text(currentCell.cell_id_str || previous?.cell_id), offset,
+      session_id: text(currentData.session_id || currentCell.session_id), rank_version: text(currentData.rank_version || currentCell.rank_version)
     });
     return result;
   }
@@ -2031,14 +2074,14 @@ spider.danmaku = function (id, startMs, durationMs) {
       while (states.size > 24) states.delete(states.keys().next().value);
       const initial = await first();
       state.category = initial.category;
-      return savePage(state, page, initial.cell, initial.data || {}, initial.params);
+      return await savePage(state, page, initial.cell, initial.data || {}, initial.params);
     }
     if (!state || Date.now() - state.updated > ttl) throw failure('列表游标已过期，请刷新后重试', 'CURSOR_EXPIRED');
     if (state.pages.has(page)) return state.pages.get(page);
     const cursor = state.cursors.get(page);
     if (!cursor) throw failure('请按顺序加载列表，或刷新后重试', 'MISSING_CURSOR');
     const response = await api('/reading/bookapi/bookmall/cell/change/v', { ...cursor, limit: 40, change_type: 1 });
-    return savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
+    return await savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
   }
 
   const legacyHome = spider.home;
@@ -2286,47 +2329,83 @@ spider.danmaku = function (id, startMs, durationMs) {
       data = response.data;
     }
     if (!cell || !data) throw failure('首页推荐暂不可用，请重试', 'INVALID_RESPONSE');
-    const raw = videos([cell]);
+
+    const cellId = text(cell.cell_id_str || state.cellId || params?.cell_id);
+    const sessionId = text(data.session_id || tab?.session_id || state.sessionId);
+    state.cellId = cellId;
+    state.sessionId = sessionId;
+
+    let previous = number(params?.offset);
+    let offset = (page === 1 && !params) ? Math.max(number(tab.next_offset), videos([cell]).length) : number(data.next_offset);
+    let hasMore = (page === 1 && !params) ? tab.bottom_unlimited === true && videos([cell]).length > 0 :
+      data.has_more === true && offset > previous && videos([cell]).length > 0;
+
     const list = [];
-    for (const video of raw) {
-      const detail = video.video_detail || {};
-      const id = identity(detail.series_id_str || detail.series_id || video.series_id);
-      const title = text(detail.series_title || video.title);
-      const episodes = number(detail.episode_cnt || video.episode_cnt);
-      if (!id || !title || !episodes || video.disable_play === true || state.seen.has(id)) continue;
-      const chapters = (detail.video_list || []).filter(item => identity(item.vid || item.video_id))
-        .sort((a, b) => number(a.vid_index) - number(b.vid_index));
-      if (chapters.length === episodes && chapters.every((item, index) => number(item.vid_index) === index + 1) &&
-          new Set(chapters.map(item => identity(item.vid || item.video_id))).size === episodes) {
-        details.delete(id);
-        details.set(id, { updated: Date.now(), data: {
-          series_id: id, series_title: title, series_intro: text(detail.series_intro),
-          series_cover: text(detail.series_cover || video.cover), episode_cnt: episodes,
-          video_list: chapters.map(item => ({ vid: identity(item.vid || item.video_id), vid_index: number(item.vid_index) }))
-        } });
-        while (details.size > 8) details.delete(details.keys().next().value);
+    function appendVideos(targetCell) {
+      const raw = videos([targetCell]);
+      for (const video of raw) {
+        const detail = video.video_detail || {};
+        const id = identity(detail.series_id_str || detail.series_id || video.series_id);
+        const title = text(detail.series_title || video.title);
+        const episodes = number(detail.episode_cnt || video.episode_cnt);
+        if (!id || !title || !episodes || video.disable_play === true || state.seen.has(id)) continue;
+        const chapters = (detail.video_list || []).filter(item => identity(item.vid || item.video_id))
+          .sort((a, b) => number(a.vid_index) - number(b.vid_index));
+        if (chapters.length === episodes && chapters.every((item, index) => number(item.vid_index) === index + 1) &&
+            new Set(chapters.map(item => identity(item.vid || item.video_id))).size === episodes) {
+          details.delete(id);
+          details.set(id, { updated: Date.now(), data: {
+            series_id: id, series_title: title, series_intro: text(detail.series_intro),
+            series_cover: text(detail.series_cover || video.cover), episode_cnt: episodes,
+            video_list: chapters.map(item => ({ vid: identity(item.vid || item.video_id), vid_index: number(item.vid_index) }))
+          } });
+          while (details.size > 16) details.delete(details.keys().next().value);
+        }
+        const startId = identity(video.vid) || identity(video.highlight?.vid);
+        const start = chapters.find(item => item.vid === startId);
+        list.push({
+          vod_id: id, vod_name: title, vod_content: text(detail.series_intro || video.video_desc),
+          vod_pic: cleanCoverUrl(text(detail.series_cover || video.cover)), vod_episodes: episodes,
+          vod_remarks: episodes + '集', vod_start_episode: number(start?.vid_index) || 1,
+          vod_start_position: start && identity(video.highlight?.vid) === startId ? number(video.highlight.start_time_in_millisecond) / 1000 : 0
+        });
+        state.seen.add(id);
       }
-      const startId = identity(video.vid) || identity(video.highlight?.vid);
-      const start = chapters.find(item => item.vid === startId);
-      list.push({
-        vod_id: id, vod_name: title, vod_content: text(detail.series_intro || video.video_desc),
-        vod_pic: cleanCoverUrl(text(detail.series_cover || video.cover)), vod_episodes: episodes,
-        vod_remarks: episodes + '集', vod_start_episode: number(start?.vid_index) || 1,
-        vod_start_position: start && identity(video.highlight?.vid) === startId ? number(video.highlight.start_time_in_millisecond) / 1000 : 0
-      });
-      state.seen.add(id);
     }
-    const previous = number(params?.offset);
-    const offset = (page === 1 && !params) ? Math.max(number(tab.next_offset), raw.length) : number(data.next_offset);
-    const hasMore = (page === 1 && !params) ? tab.bottom_unlimited === true && raw.length > 0 :
-      data.has_more === true && offset > previous && raw.length > 0;
+
+    appendVideos(cell);
+
+    // 分页数量目标设置为 10：若单次下发不足 10 条且接口有更多数据，自动换一批补足 10 条
+    const TARGET_SIZE = 10;
+    let rounds = 0;
+    while (list.length < TARGET_SIZE && hasMore && rounds < 3) {
+      rounds++;
+      try {
+        const nextRes = await api('/reading/bookapi/bookmall/cell/change/v', {
+          tab_type: 16, bottom_tab_type: 7, client_template: 7, client_req_type: 2,
+          change_type: 1, cell_id: cellId,
+          offset: offset, session_id: sessionId
+        });
+        const nextCell = nextRes.data?.cell_view;
+        const nextData = nextRes.data;
+        if (!nextCell || !nextData) break;
+        const prevOff = offset;
+        offset = number(nextData.next_offset);
+        hasMore = nextData.has_more === true && offset > prevOff;
+        appendVideos(nextCell);
+      } catch (_) {
+        break;
+      }
+    }
+
+    hasMore = hasMore && list.length > 0;
     const result = { list, page, pagecount: hasMore ? page + 1 : page, hasMore };
     state.pages.set(page, result);
     state.updated = Date.now();
     state.cursor = hasMore ? {
       tab_type: 16, bottom_tab_type: 7, client_template: 7, client_req_type: 2,
-      change_type: 1, cell_id: text(cell.cell_id_str || params?.cell_id),
-      offset, session_id: text(data.session_id || tab?.session_id)
+      change_type: 1, cell_id: cellId,
+      offset, session_id: sessionId
     } : null;
     return result;
   };
