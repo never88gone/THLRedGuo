@@ -133,12 +133,15 @@ class DartCoreEngine {
         final fileName = input['fileName'] as String? ?? 'custom.js';
         final meta = _parseScriptMeta(script, fileName);
         if (meta != null) {
-          _spiderPool.remove(meta.id);
-          await _ensureDirectories();
-          final targetFile = File(p.join(_sourcesDir, fileName));
-          await targetFile.writeAsString(script);
-          _installedSources[meta.id] = meta;
-          _sourceScripts[meta.id] = script;
+          final isSameScript = _sourceScripts[meta.id] == script;
+          if (!isSameScript) {
+            _spiderPool.remove(meta.id);
+            await _ensureDirectories();
+            final targetFile = File(p.join(_sourcesDir, fileName));
+            await targetFile.writeAsString(script);
+            _installedSources[meta.id] = meta;
+            _sourceScripts[meta.id] = script;
+          }
           if (_activeSourceId.isEmpty) _activeSourceId = meta.id;
           return {'ok': true, 'meta': meta.toJson()};
         }

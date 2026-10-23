@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -5,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 import 'package:THLRedLook/core/js/js_source_models.dart';
 import 'package:THLRedLook/core/js/js_source_presets.dart';
 
@@ -44,6 +46,7 @@ class JsSourceService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      unawaited(CatPawJsRuntime.preloadDeviceSession());
       // 扫描本地已导入的 sources 目录
       await _repository.jsSourceScan();
 

@@ -28,9 +28,11 @@ import 'package:THLRedLook/utils/privacy/privacy_lock_controller.dart';
 import 'package:THLRedLook/utils/screen/screen_wake_controller.dart';
 import 'package:THLRedLook/pages/privacy/privacy_lock_page.dart';
 import 'package:THLRedLook/core/js/js_source_service.dart';
+import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  unawaited(CatPawJsRuntime.preloadDeviceSession());
   DiaryService.add(
     '[App] 应用启动，版本: $appVersion, 平台: ${Platform.operatingSystem}',
   );

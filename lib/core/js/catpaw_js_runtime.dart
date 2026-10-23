@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_js/flutter_js.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
 
@@ -105,6 +106,26 @@ class CatPawSearchResult {
 }
 
 class CatPawJsRuntime {
+  static String? _cachedDeviceSession;
+  static const String _deviceSessionKey = 'thl_hongguo_device_session';
+
+  /// 预先加载持久化的官方设备认证 Session
+  static Future<void> preloadDeviceSession() async {
+    if (_cachedDeviceSession != null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _cachedDeviceSession = prefs.getString(_deviceSessionKey);
+    } catch (_) {}
+  }
+
+  /// 获取当前内存中的设备会话（可用于调试或诊断）
+  static String? get cachedDeviceSession => _cachedDeviceSession;
+
+  /// 测试辅助方法：重置设备会话
+  static void resetDeviceSessionForTesting([String? session]) {
+    _cachedDeviceSession = session;
+  }
+
   late final JavascriptRuntime _rt;
   final http.Client _httpClient;
   final bool _isOwnedClient;
@@ -132,6 +153,9 @@ class CatPawJsRuntime {
 
   Future<void> init(String script) async {
     if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
+    if (_cachedDeviceSession == null) {
+      await preloadDeviceSession();
+    }
     _rt = getJavascriptRuntime(xhr: false);
     _injectGlobals();
     final result = _rt.evaluate(script);
@@ -242,6 +266,23 @@ globalThis.console = {
     _rt.evaluate(_evalAsyncShim);
     _rt.evaluate(_htmlShim);
     _rt.evaluate(_fetchShim);
+
+    // 注入设备认证持久化桥接，避免每次冷启动/重新初始化产生额外的设备注册网络延迟
+    if (_cachedDeviceSession != null && _cachedDeviceSession!.isNotEmpty) {
+      _rt.evaluate('''
+try {
+  globalThis.__hongguoCachedDevice = $_cachedDeviceSession;
+} catch (_) {}
+''');
+    }
+    _rt.evaluate(r'''
+globalThis.__pendingSavedDevice = null;
+globalThis.__native_save_device = function(json) {
+  if (json && typeof json === 'string') {
+    globalThis.__pendingSavedDevice = json;
+  }
+};
+''');
   }
 
   Future<Map<String, dynamic>> _executeFetch(
@@ -705,9 +746,12 @@ globalThis.console = {
           } catch (_) {}
         }
 
+        _syncSavedDevice();
         _rt.executePendingJob();
         await Future.delayed(const Duration(milliseconds: 10));
       }
+
+      _syncSavedDevice();
 
       final raw = rawResult?.toString() ?? '';
       if (raw.isEmpty || raw == 'null' || raw == 'undefined') {
@@ -745,6 +789,23 @@ globalThis.console = {
         _evalDrainCompleter!.complete();
       }
     }
+  }
+
+  void _syncSavedDevice() {
+    try {
+      final check = _rt.evaluate('globalThis.__pendingSavedDevice');
+      final val = check.stringResult;
+      if (val.isNotEmpty && val != 'null' && val != 'undefined') {
+        _rt.evaluate('globalThis.__pendingSavedDevice = null;');
+        _cachedDeviceSession = val;
+        unawaited(() async {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(_deviceSessionKey, val);
+          } catch (_) {}
+        }());
+      }
+    } catch (_) {}
   }
 
   List<Map<String, dynamic>> _toListOfMaps(dynamic raw) {
