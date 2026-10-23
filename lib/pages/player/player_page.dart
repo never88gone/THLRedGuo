@@ -737,10 +737,12 @@ class _PlayerScreenState extends State<PlayerScreen>
     final mediaUrl = _plan?.url.isNotEmpty == true
         ? _plan!.url
         : (_player is LunaExoPlayer ? _player.mediaUri : '');
+    final headers = _plan?.headers ?? const <String, String>{};
     final arguments = <String, dynamic>{
       'width': width,
       'height': height,
       if (mediaUrl.isNotEmpty) 'url': mediaUrl,
+      if (headers.isNotEmpty) 'headers': headers,
       'title': widget.detail.drama.title,
       'position': _player.state.position.inMilliseconds,
       'speed': _speed,
@@ -755,14 +757,18 @@ class _PlayerScreenState extends State<PlayerScreen>
       final supported = status?['supported'] == true;
       final active = status?['active'] == true;
       final requested = status?['requested'] == true;
+      final error = status?['error'] as String?;
       _setPictureInPictureStatus(
         supported: supported,
         active: active,
         requested: requested && !active,
       );
-      if (!supported || (!active && !requested)) {
+      if (!supported) {
         _pictureInPictureExitTimer?.cancel();
-        _notice('当前设备不支持画中画');
+        _notice('当前系统或设备不支持画中画');
+      } else if (!active && !requested) {
+        _pictureInPictureExitTimer?.cancel();
+        _notice(error ?? '无法启动画中画，请检查系统画中画设置或稍后重试');
       }
     } on PlatformException catch (e) {
       _pictureInPictureExitTimer?.cancel();

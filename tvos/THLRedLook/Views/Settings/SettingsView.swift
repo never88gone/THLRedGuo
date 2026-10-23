@@ -4,8 +4,9 @@ import CoreImage.CIFilterBuiltins
 public enum SettingsCategory: String, CaseIterable, Identifiable {
     case sources = "sources"
     case sync = "sync"
-    case network = "network"
     case cache = "cache"
+    case help = "help"
+    case contact = "contact"
     case about = "about"
 
     public var id: String { rawValue }
@@ -14,8 +15,9 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .sources: return "站源管理"
         case .sync: return "iCloud 同步"
-        case .network: return "网络与策略"
         case .cache: return "存储与缓存"
+        case .help: return "帮助说明"
+        case .contact: return "联系方式"
         case .about: return "系统与关于"
         }
     }
@@ -24,9 +26,10 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .sources: return "当前活跃影视源"
         case .sync: return "多端观看记录与配置同步"
-        case .network: return "代理模式与解析并发度"
         case .cache: return "沙盒空间占用与清理"
-        case .about: return "版本信息与核心技术栈"
+        case .help: return "遥控器操作与核心指南"
+        case .contact: return "官方群组与反馈渠道"
+        case .about: return "版本号与免责声明"
         }
     }
 
@@ -34,8 +37,9 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .sources: return "antenna.radiowaves.left.and.right"
         case .sync: return "icloud.fill"
-        case .network: return "network"
         case .cache: return "internaldrive.fill"
+        case .help: return "questionmark.circle.fill"
+        case .contact: return "paperplane.fill"
         case .about: return "info.circle.fill"
         }
     }
@@ -52,11 +56,6 @@ public struct SettingsView: View {
     @FocusState private var icloudFocus: ICloudFocusTarget?
     @Namespace private var settingsScope
     @State private var saveNotice: String?
-    @State private var pingLatency: Int? = 28
-    @State private var isTestingPing: Bool = false
-    @State private var pingStatus: String = "良好 (28ms)"
-    @State private var pingErrorDetail: String? = nil
-    @State private var autoSavedTip: String? = nil
 
     public var forceFocusActiveSource: Bool = false
     public var focusSidebarTrigger: Int = 0
@@ -71,11 +70,12 @@ public struct SettingsView: View {
     @State private var importURLString = ""
     @State private var isImporting = false
 
+    private var appVersionNumber: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
 
-    private var appVersionDisplay: String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-        return "\(version)+\(build)"
+    private var appBuildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 
     public init(
@@ -152,10 +152,12 @@ public struct SettingsView: View {
                         sourcesPanel
                     case .sync:
                         iCloudSyncPanel
-                    case .network:
-                        networkPanel
                     case .cache:
                         StorageSettingsView()
+                    case .help:
+                        helpPanel
+                    case .contact:
+                        contactPanel
                     case .about:
                         aboutPanel
                     }
@@ -602,352 +604,82 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - 2. 网络与抓取面板（全面优化样式，带实时测速与自适应调优）
-    private var networkPanel: some View {
+    // MARK: - 3. 帮助说明面板
+    private var helpPanel: some View {
         VStack(alignment: .leading, spacing: 32) {
-            panelHeader(title: "网络与资源抓取设置", desc: "配置电视网络连接模式与切片解析并发度，优化大屏端视频加载体验。")
+            panelHeader(title: "帮助说明", desc: "了解 Apple TV 遥控器核心手势操作与系统特色功能使用技巧。")
 
-            // 1. 实时网络与 CDN 延迟诊断横幅卡片
-            NetworkStatusHeroCard(
-                pingStatus: pingStatus,
-                latency: pingLatency,
-                isTesting: isTestingPing,
-                errorDetail: pingErrorDetail
-            ) {
-                testNetworkPing()
-            }
-
-            // 2. 代理模式选择卡片组
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text("网络代理连接模式")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white.opacity(0.9))
-
-                    Spacer()
-
-                    if let tip = autoSavedTip {
-                        Text(tip)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.green)
-                            .transition(.opacity)
-                    }
-                }
-                .padding(.horizontal, 4)
-
-                HStack(spacing: 20) {
-                    ProxyModeOptionButton(
-                        title: "直连高速 (推荐)",
-                        subtitle: "绕过代理，直接连接影视源 CDN 节点，低延迟 4K 秒开",
-                        icon: "bolt.fill",
-                        accentColor: .yellow,
-                        isSelected: viewModel.proxyMode == "direct"
-                    ) {
-                        viewModel.proxyMode = "direct"
-                        viewModel.saveSettings()
-                        triggerAutoSaveTip("已切换为直连高速模式")
-                    }
-
-                    ProxyModeOptionButton(
-                        title: "系统全局代理",
-                        subtitle: "同步 Apple TV 系统的全局 VPN 与路由扩展规则",
-                        icon: "network.badge.shield.half.filled",
-                        accentColor: .blue,
-                        isSelected: viewModel.proxyMode == "auto"
-                    ) {
-                        viewModel.proxyMode = "auto"
-                        viewModel.saveSettings()
-                        triggerAutoSaveTip("已切换为系统全局代理模式")
-                    }
-
-                    ProxyModeOptionButton(
-                        title: "自定义节点模式",
-                        subtitle: "端侧智能分配端口，配合局域网透明旁路节点",
-                        icon: "slider.horizontal.3",
-                        accentColor: .purple,
-                        isSelected: viewModel.proxyMode == "manual"
-                    ) {
-                        viewModel.proxyMode = "manual"
-                        viewModel.saveSettings()
-                        triggerAutoSaveTip("已启用自定义节点模式")
-                    }
-                }
-            }
-
-            // 3. 并行解析线程数 (并发度)
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("并行解析线程数 (并发度)")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
-                        Text(concurrencyDescription(viewModel.concurrency))
-                            .font(.system(size: 14))
-                            .foregroundColor(TVTheme.primary)
-                    }
-
-                    Spacer()
-
-                    Text("当前: \(viewModel.concurrency) 线程")
-                        .font(.system(size: 18, weight: .heavy))
-                        .foregroundColor(TVTheme.primary)
-                }
-
-                HStack(spacing: 14) {
-                    ForEach(1...6, id: \.self) { num in
-                        TVCapsuleButton(
-                            title: "\(num) 线程",
-                            isSelected: viewModel.concurrency == num
-                        ) {
-                            viewModel.concurrency = num
-                            viewModel.saveSettings()
-                            triggerAutoSaveTip("并发线程数已设置为 \(num)")
-                        }
-                    }
-                }
-            }
-            .padding(24)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(red: 0.13, green: 0.13, blue: 0.17))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            // 1. 遥控器与手势操作指引
+            HelpItemCard(
+                title: "Apple TV 遥控器操作指南",
+                subtitle: "全屏播放与导航专属按键映射",
+                icon: "appletvremote.gen4.fill",
+                accentColor: .purple,
+                identifier: "settings.help.remote",
+                tips: [
+                    "左右方向键：单按独立快退/快进 10 秒，弹出轻量胶囊进度条，不遮挡画面",
+                    "触控表面滑动：手指在 Siri Remote 触控板横向平滑滑动，可快速大跨度拖拽视频进度",
+                    "Select 确认键：播放时点击唤出完整控制菜单（选集、倍速、画质、弹幕设置）",
+                    "Menu 返回键：短按收起播放控制浮层，再次短按退出播放返回上级剧集详情页",
+                    "播放/暂停键：遥控器实体播放键随时暂停或恢复当前短剧流"
+                ]
             )
 
-            // 4. 请求防封安全间隔
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("请求防封安全间隔")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
-                        Text(intervalDescription(viewModel.intervalMs))
-                            .font(.system(size: 14))
-                            .foregroundColor(TVTheme.primary)
-                    }
-
-                    Spacer()
-
-                    Text("当前: \(viewModel.intervalMs) 毫秒")
-                        .font(.system(size: 18, weight: .heavy))
-                        .foregroundColor(TVTheme.primary)
-                }
-
-                HStack(spacing: 12) {
-                    ForEach([0, 100, 250, 500, 1000, 2000], id: \.self) { ms in
-                        TVCapsuleButton(
-                            title: ms == 0 ? "0ms 无延时" : "\(ms)ms",
-                            isSelected: viewModel.intervalMs == ms
-                        ) {
-                            viewModel.intervalMs = ms
-                            viewModel.saveSettings()
-                            triggerAutoSaveTip("安全间隔已设为 \(ms)ms")
-                        }
-                    }
-                }
-            }
-            .padding(24)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(red: 0.13, green: 0.13, blue: 0.17))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            // 2. iCloud 多端云端漫游指南
+            HelpItemCard(
+                title: "iCloud 多端观看记录同步",
+                subtitle: "iOS、macOS 与 Apple TV 全生态漫游",
+                icon: "icloud.fill",
+                accentColor: .blue,
+                identifier: "settings.help.icloud",
+                tips: [
+                    "同一账号：在所有苹果设备登录同一个 Apple ID 即可自动开启",
+                    "设置开启：在设置「iCloud 同步」中点击「启用 iCloud 云端同步」开关",
+                    "即时漫游：在手机上看到的剧集进度，回到电视大屏无缝自动续播"
+                ]
             )
 
-            // 5. 休眠与锁屏设置 (Wakelock)
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text("休眠与常亮策略")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white.opacity(0.9))
-                    Spacer()
-                }
-                .padding(.horizontal, 4)
-
-                HStack(spacing: 20) {
-                    ProxyModeOptionButton(
-                        title: "禁止系统自动休眠锁屏",
-                        subtitle: "开启后避免长时间大批量短剧下载时电视熄屏导致后台任务中断",
-                        icon: "lightbulb.fill",
-                        accentColor: .orange,
-                        isSelected: viewModel.keepScreenOn
-                    ) {
-                        viewModel.keepScreenOn.toggle()
-                        viewModel.saveSettings()
-                        triggerAutoSaveTip(viewModel.keepScreenOn ? "已开启屏幕常亮" : "已关闭屏幕常亮")
-                    }
-                }
-            }
-
-            // 5. 底部快捷操作行
-            HStack(spacing: 20) {
-                TVButton(title: "恢复推荐网络默认值", icon: "arrow.counterclockwise") {
-                    viewModel.proxyMode = "direct"
-                    viewModel.concurrency = 3
-                    viewModel.intervalMs = 250
-                    viewModel.saveSettings()
-                    triggerAutoSaveTip("已重置为最佳默认配置")
-                    saveNotice = "网络与抓取配置已重置为推荐默认参数 (直连 · 3并发 · 250ms)"
-                }
-
-                Spacer()
-
-                TVButton(title: "测试网络连通性", icon: "antenna.radiowaves.left.and.right") {
-                    testNetworkPing()
-                }
-
-                TVButton(title: "保存并应用配置", icon: "checkmark.circle.fill", isProminent: true) {
-                    viewModel.saveSettings()
-                    saveNotice = "网络与抓取配置已保存，当前设置均在本端实时生效"
-                }
-            }
-            .padding(.top, 4)
+            // 3. 常见播放问题与站源诊断
+            HelpItemCard(
+                title: "播放故障重试与站源诊断",
+                subtitle: "如何自测网络并排查播放异常",
+                icon: "wrench.and.screwdriver.fill",
+                accentColor: .orange,
+                identifier: "settings.help.troubleshooting",
+                tips: [
+                    "原地重试：播放失败时画面将弹出「重试」与「返回剧集」按钮",
+                    "站源诊断：在设置「站源管理」中点击「影视源健康诊断」进行链路体检",
+                    "缓存清理：若遇到画面卡顿，可在「存储与缓存」中清理临时播放切片"
+                ]
+            )
         }
     }
 
-    private func concurrencyDescription(_ num: Int) -> String {
-        switch num {
-        case 1...2: return "适中策略：适合轻量网络或移动热点，平稳低功耗"
-        case 3...4: return "推荐策略：智能多切片并发缓冲，大屏播放最流畅"
-        default: return "极速策略：适合千兆宽带环境，多线程全速吞吐"
+    // MARK: - 4. 联系方式面板
+    private var contactPanel: some View {
+        VStack(alignment: .leading, spacing: 32) {
+            panelHeader(title: "联系方式", desc: "如有任何功能建议、体验反馈或技术问题，欢迎加入官方群组或通过邮件联系我们。")
+
+            // 1. Telegram 官方交流与反馈卡片（大屏扫码）
+            ContactTelegramCard()
+
+            // 2. 电子邮箱与反馈渠道卡片
+            ContactEmailCard()
         }
     }
 
-    private func intervalDescription(_ ms: Int) -> String {
-        switch ms {
-        case 0: return "狂暴无延时：切片解析无等待，加载极快"
-        case 1...150: return "高速模式：兼顾流畅切片与请求防抖"
-        case 151...350: return "智能均衡推荐：官方防封频控最佳平衡点"
-        default: return "保守稳定：最大程度避免频繁请求触发短时限制"
-        }
-    }
-
-    private func triggerAutoSaveTip(_ message: String) {
-        autoSavedTip = "✓ \(message)"
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            if autoSavedTip == "✓ \(message)" {
-                autoSavedTip = nil
-            }
-        }
-    }
-
-    private func testNetworkPing() {
-        isTestingPing = true
-        pingErrorDetail = nil
-        let start = Date()
-        Task {
-            do {
-                guard let url = URL(string: "https://lf3-shortplay-tos.snssdk.com") else {
-                    throw NSError(domain: "Network", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效探测目标地址"])
-                }
-                var req = URLRequest(url: url)
-                req.httpMethod = "HEAD"
-                req.timeoutInterval = 8
-                let (_, response) = try await URLSession.shared.data(for: req)
-                let elapsed = max(16, Int(Date().timeIntervalSince(start) * 1000))
-                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 200
-
-                await MainActor.run {
-                    self.pingLatency = elapsed
-                    if statusCode >= 400 {
-                        let (cat, reason, _) = SourceDiagnostics.classify(error: nil, httpStatus: statusCode, body: nil, isJS: false)
-                        self.pingStatus = "异常 (\(statusCode))"
-                        self.pingErrorDetail = "【\(cat.tag)】\(reason)"
-                    } else if elapsed < 50 {
-                        self.pingStatus = "极佳 (\(elapsed)ms)"
-                        self.pingErrorDetail = nil
-                    } else if elapsed < 120 {
-                        self.pingStatus = "良好 (\(elapsed)ms)"
-                        self.pingErrorDetail = nil
-                    } else {
-                        self.pingStatus = "稍慢 (\(elapsed)ms)"
-                        self.pingErrorDetail = nil
-                    }
-                    self.isTestingPing = false
-                }
-            } catch {
-                let (cat, reason, advice) = SourceDiagnostics.classify(error: error, httpStatus: nil, body: nil, isJS: false)
-                await MainActor.run {
-                    self.pingLatency = nil
-                    self.pingStatus = "【\(cat.tag)】"
-                    self.pingErrorDetail = "\(reason)。建议：\(advice)"
-                    self.isTestingPing = false
-                }
-            }
-        }
-    }
-
-    // MARK: - 4. 系统与关于面板（全面优化样式，高质感电视端大屏视觉）
+    // MARK: - 5. 系统与关于面板（极简纯粹：仅图标、版本号、编译号与免责说明）
     private var aboutPanel: some View {
         VStack(alignment: .leading, spacing: 32) {
-            panelHeader(title: "系统与关于", desc: "Apple tvOS 纯原生独立大屏端短剧体验系统与核心架构信息。")
+            panelHeader(title: "系统与关于", desc: "Apple tvOS 纯原生独立大屏端短剧体验系统。")
 
-            // 品牌横幅交互卡片
-            AboutHeroCard(appVersion: appVersionDisplay) {
-                saveNotice = "当前系统已是最新版本 v\(appVersionDisplay)，核心引擎状态运行良好。"
-            }
+            // 1. 核心版本信息卡片（图标 + 版本号 + 编译号）
+            AboutCompactInfoCard(
+                appVersion: appVersionNumber,
+                appBuild: appBuildNumber
+            )
 
-            // Telegram 交流与反馈卡片（大屏扫码）
-            AboutTelegramCard()
-
-            // 核心架构与技术规格六宫格矩阵
-            VStack(alignment: .leading, spacing: 16) {
-                Text("系统架构与核心引擎规格")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white.opacity(0.9))
-                    .padding(.horizontal, 4)
-
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 20),
-                        GridItem(.flexible(), spacing: 20)
-                    ],
-                    spacing: 20
-                ) {
-                    AboutFocusCard(
-                        title: "原生开发架构",
-                        value: "Swift 6.0 · SwiftUI · AVKit",
-                        icon: "swift",
-                        badgeColor: .orange
-                    )
-                    AboutFocusCard(
-                        title: "视频解码链路",
-                        value: "AVPlayerLayer 硬件直出 (透底渐变)",
-                        icon: "play.rectangle.on.rectangle.fill",
-                        badgeColor: .red
-                    )
-                    AboutFocusCard(
-                        title: "遥控焦点引擎",
-                        value: "Apple TV Siri Remote 原生驱动",
-                        icon: "appletv.fill",
-                        badgeColor: .purple
-                    )
-                    AboutFocusCard(
-                        title: "局域网互联服务",
-                        value: "Bonjour Discovery (_zgj-link._tcp)",
-                        icon: "network",
-                        badgeColor: .blue
-                    )
-                    AboutFocusCard(
-                        title: "沙盒存储机制",
-                        value: "CachesDirectory 空间自适配管理",
-                        icon: "internaldrive.fill",
-                        badgeColor: .green
-                    )
-                    AboutFocusCard(
-                        title: "隐私安全合规",
-                        value: "纯本地闭环解析 · 零数据上报",
-                        icon: "checkmark.shield.fill",
-                        badgeColor: .cyan
-                    )
-                }
-            }
-
-            // 合规与隐私声明卡片
+            // 2. 免责声明与合规承诺卡片
             AboutDisclaimerCard()
         }
     }
@@ -1017,6 +749,7 @@ struct SettingsNavButton: View {
         .padding(.vertical, 6)
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focusEffectDisabled()
+        .accessibilityIdentifier("settings.nav.\(category.rawValue)")
     }
 }
 
@@ -1132,120 +865,71 @@ struct SourceCardButton: View {
     }
 }
 
-// MARK: - 实时网络与 CDN 延迟诊断横幅卡片
-struct NetworkStatusHeroCard: View {
-    let pingStatus: String
-    let latency: Int?
-    let isTesting: Bool
-    var errorDetail: String? = nil
-    let onTest: () -> Void
+// MARK: - 帮助说明卡片（可聚焦，支持遥控器导航与无裁切高亮）
+struct HelpItemCard: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    var accentColor: Color = .purple
+    let identifier: String
+    let tips: [String]
 
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        Button(action: onTest) {
-            HStack(spacing: 24) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(
-                            LinearGradient(
-                                colors: errorDetail != nil
-                                    ? [Color.red.opacity(0.35), Color.orange.opacity(0.2)]
-                                    : [Color.blue.opacity(0.35), Color.purple.opacity(0.2)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 80, height: 80)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(errorDetail != nil ? Color.red.opacity(0.4) : Color.blue.opacity(0.3), lineWidth: 1.5)
-                        )
+        Button(action: {}) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 20) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(accentColor.opacity(isFocused ? 0.35 : 0.18))
+                            .frame(width: 56, height: 56)
 
-                    Image(systemName: errorDetail != nil ? "exclamationmark.triangle.fill" : "wifi")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundColor(errorDetail != nil ? .orange : .cyan)
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 12) {
-                        Text("端侧引擎与 CDN 链路")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-
-                        Text(errorDetail != nil ? "链路异常" : "端侧直连就绪")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 3)
-                            .background(errorDetail != nil ? Color.red.opacity(0.8) : Color.blue.opacity(0.8))
-                            .clipShape(Capsule())
+                        Image(systemName: icon)
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundColor(isFocused ? .white : accentColor)
                     }
 
-                    if let err = errorDetail {
-                        Text(err)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.orange)
-                            .lineLimit(2)
-                    } else {
-                        Text("设备端独立网络栈 · 环回调度响应正常 · 短剧专线 CDN")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Text(subtitle)
                             .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(.white.opacity(0.68))
                     }
+
+                    Spacer()
                 }
 
-                Spacer()
+                // 指南条目细则
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(tips.enumerated()), id: \.offset) { _, tip in
+                        HStack(alignment: .top, spacing: 10) {
+                            Circle()
+                                .fill(isFocused ? accentColor : Color.white.opacity(0.4))
+                                .frame(width: 6, height: 6)
+                                .padding(.top, 7)
 
-                HStack(spacing: 16) {
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("CDN 响应状态")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
-
-                        HStack(spacing: 6) {
-                            if isTesting {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                            } else {
-                                Circle()
-                                    .fill(errorDetail != nil ? Color.red : Color.green)
-                                    .frame(width: 8, height: 8)
-                            }
-
-                            Text(isTesting ? "正在测速..." : pingStatus)
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(isTesting ? .yellow : (errorDetail != nil ? .red : .green))
+                            Text(tip)
+                                .font(.system(size: 15))
+                                .foregroundColor(isFocused ? .white.opacity(0.95) : .white.opacity(0.72))
+                                .lineSpacing(4)
                         }
                     }
-
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(isFocused ? TVTheme.primary : .white.opacity(0.6))
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.white.opacity(0.06))
-                )
+                .padding(.leading, 8)
             }
             .padding(22)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                isFocused ? Color(red: 0.16, green: 0.18, blue: 0.26) : Color(red: 0.12, green: 0.13, blue: 0.18),
-                                isFocused ? Color(red: 0.12, green: 0.13, blue: 0.20) : Color(red: 0.10, green: 0.10, blue: 0.13)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(isFocused ? Color(red: 0.18, green: 0.18, blue: 0.24) : Color(red: 0.11, green: 0.11, blue: 0.15))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(isFocused ? TVTheme.primary : (errorDetail != nil ? Color.red.opacity(0.3) : Color.white.opacity(0.08)), lineWidth: isFocused ? 2.5 : 1)
+                    .stroke(isFocused ? TVTheme.primary : Color.white.opacity(0.06), lineWidth: isFocused ? 2 : 1)
             )
             .tvFocusBorder(isFocused: isFocused, cornerRadius: 20)
         }
@@ -1254,250 +938,12 @@ struct NetworkStatusHeroCard: View {
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focused($isFocused)
         .focusEffectDisabled()
+        .accessibilityIdentifier(identifier)
     }
 }
 
-// MARK: - 代理模式选项卡片（预留防裁切间距，支持高质感主题徽标）
-struct ProxyModeOptionButton: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    var accentColor: Color = TVTheme.primary
-    let isSelected: Bool
-    let action: () -> Void
-
-    @FocusState private var isFocused: Bool
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    ZStack {
-                        Circle()
-                            .fill(accentColor.opacity(isSelected || isFocused ? 0.35 : 0.15))
-                            .frame(width: 44, height: 44)
-
-                        Image(systemName: icon)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(isSelected || isFocused ? .white : accentColor)
-                    }
-
-                    Spacer()
-
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(TVTheme.primary)
-                    }
-                }
-
-                Text(title)
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundColor(.white)
-
-                Text(subtitle)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.68))
-                    .lineLimit(2)
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, minHeight: 128)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(isSelected ? Color(red: 0.22, green: 0.14, blue: 0.18) : (isFocused ? Color(red: 0.22, green: 0.22, blue: 0.26) : Color(red: 0.13, green: 0.13, blue: 0.17)))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(isSelected ? TVTheme.primary : (isFocused ? Color.white.opacity(0.2) : Color.white.opacity(0.06)), lineWidth: isSelected ? 2 : 1)
-            )
-            .tvFocusBorder(isFocused: isFocused, cornerRadius: 18)
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 8)
-        .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isFocused)
-        .focusEffectDisabled()
-    }
-}
-
-// MARK: - 关于品牌横幅可聚焦卡片（预留防裁切间距，电影感微暗渐变）
-struct AboutHeroCard: View {
-    let appVersion: String
-    let action: () -> Void
-
-    @FocusState private var isFocused: Bool
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 32) {
-                // 应用图标 / 品牌徽标
-                ZStack {
-                    RoundedRectangle(cornerRadius: 28)
-                        .fill(Color.black.opacity(0.3))
-                        .frame(width: 140, height: 140)
-
-                    Image("applogo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 140, height: 140)
-                        .clipShape(RoundedRectangle(cornerRadius: 28))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 28)
-                                .stroke(Color.white.opacity(0.25), lineWidth: 2)
-                        )
-                        .shadow(color: TVTheme.primary.opacity(0.6), radius: 20, x: 0, y: 10)
-                }
-
-                // 核心品牌信息
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 16) {
-                        Text("糖葫芦Haw · 电视版")
-                            .font(.system(size: 44, weight: .heavy))
-                            .foregroundColor(.white)
-
-                        Text("v\(appVersion)")
-                            .font(.system(size: 16, weight: .black))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(TVTheme.primary)
-                            .clipShape(Capsule())
-                    }
-
-                    HStack(spacing: 12) {
-                        HeroTagPill(title: "Apple TV 原生独占")
-                        HeroTagPill(title: "纯净沉浸体验")
-                        HeroTagPill(title: "端侧自闭环引擎")
-                    }
-
-                    Text("独立端侧协议解析 · 原生硬件硬解渲染 · 零远端服务依赖")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white.opacity(0.72))
-                }
-
-                Spacer()
-
-                // 运行状态指示器
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 10, height: 10)
-                            .shadow(color: .green.opacity(0.8), radius: 6)
-                        Text("运行状态")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-
-                    Text("良好 · 就绪")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.white.opacity(0.06))
-                )
-            }
-            .padding(26)
-            .background(
-                RoundedRectangle(cornerRadius: 22)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                isFocused ? Color(red: 0.24, green: 0.12, blue: 0.16) : Color(red: 0.18, green: 0.10, blue: 0.14),
-                                isFocused ? Color(red: 0.16, green: 0.12, blue: 0.18) : Color(red: 0.11, green: 0.11, blue: 0.14)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 22)
-                    .stroke(isFocused ? TVTheme.primary : Color.white.opacity(0.1), lineWidth: isFocused ? 2.5 : 1)
-            )
-            .tvFocusBorder(isFocused: isFocused, cornerRadius: 22)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-        .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isFocused)
-        .focusEffectDisabled()
-    }
-}
-
-struct HeroTagPill: View {
-    let title: String
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 12, weight: .bold))
-            .foregroundColor(.white.opacity(0.85))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
-            .background(Color.white.opacity(0.12))
-            .clipShape(Capsule())
-    }
-}
-
-// MARK: - 关于信息可聚焦卡片（预留防裁切间距，强化层级与图标高亮）
-struct AboutFocusCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    var badgeColor: Color = .red
-
-    @FocusState private var isFocused: Bool
-
-    var body: some View {
-        Button(action: {}) {
-            HStack(spacing: 18) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(badgeColor.opacity(isFocused ? 0.35 : 0.18))
-                        .frame(width: 52, height: 52)
-
-                    Image(systemName: icon)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(isFocused ? .white : badgeColor)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.6))
-                    Text(value)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-            }
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(isFocused ? Color(red: 0.22, green: 0.22, blue: 0.28) : Color(red: 0.13, green: 0.13, blue: 0.17))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(isFocused ? TVTheme.primary : Color.white.opacity(0.06), lineWidth: isFocused ? 2 : 1)
-            )
-            .tvFocusBorder(isFocused: isFocused, cornerRadius: 18)
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 6)
-        .buttonStyle(TVZeroHighlightButtonStyle())
-        .focused($isFocused)
-        .focusEffectDisabled()
-    }
-}
-
-// MARK: - Telegram 交流反馈与扫码卡片（大屏扫码）
-struct AboutTelegramCard: View {
+// MARK: - Telegram 官方交流与反馈卡片（大屏扫码）
+struct ContactTelegramCard: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -1516,13 +962,13 @@ struct AboutTelegramCard: View {
                     .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 4)
 
                 // 右侧说明
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 12) {
                         Image(systemName: "paperplane.fill")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(TVTheme.primary)
 
-                        Text("Telegram 交流与反馈")
+                        Text("Telegram 官方交流群")
                             .font(.system(size: 26, weight: .bold))
                             .foregroundColor(.white)
 
@@ -1535,12 +981,12 @@ struct AboutTelegramCard: View {
                             .clipShape(Capsule())
                     }
 
-                    Text("手机打开 Telegram 扫描左侧二维码，即可加入官方交流群组；也可直接搜索 @tanghulutvos 关注反馈。")
+                    Text("手机打开 Telegram 扫描左侧二维码，即可加入官方群组；也可直接在客户端搜索 @tanghulutvos 关注反馈。")
                         .font(.system(size: 16))
                         .foregroundColor(.white.opacity(0.75))
                         .lineSpacing(4)
 
-                    Text("联系地址：https://t.me/tanghulutvos")
+                    Text("群组链接：https://t.me/tanghulutvos")
                         .font(.system(size: 14, weight: .medium, design: .monospaced))
                         .foregroundColor(TVTheme.primaryHover)
                 }
@@ -1564,31 +1010,184 @@ struct AboutTelegramCard: View {
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focused($isFocused)
         .focusEffectDisabled()
+        .accessibilityIdentifier("settings.contact.telegram")
     }
 }
 
-// MARK: - 合规与隐私声明卡片
+// MARK: - 电子邮箱反馈卡片
+struct ContactEmailCard: View {
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        Button(action: {}) {
+            HStack(spacing: 24) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(Color.orange.opacity(isFocused ? 0.35 : 0.18))
+                        .frame(width: 68, height: 68)
+
+                    Image(systemName: "envelope.badge.fill")
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundColor(isFocused ? .white : .orange)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 12) {
+                        Text("反馈与技术支持邮箱")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+
+                        Text("邮件渠道")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white.opacity(0.85))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 3)
+                            .background(Color.orange.opacity(0.6))
+                            .clipShape(Capsule())
+                    }
+
+                    Text("如遇站源失效、多端同步异常或电视端崩溃等问题，可随时向开发者发送邮件附带截图。")
+                        .font(.system(size: 15))
+                        .foregroundColor(.white.opacity(0.7))
+
+                    Text("联系邮箱：never88gone@gmail.com")
+                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                        .foregroundColor(TVTheme.primaryHover)
+                        .padding(.top, 2)
+                }
+
+                Spacer()
+            }
+            .padding(22)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(isFocused ? Color(red: 0.18, green: 0.17, blue: 0.22) : Color(red: 0.11, green: 0.11, blue: 0.15))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(isFocused ? TVTheme.primary : Color.white.opacity(0.06), lineWidth: isFocused ? 2 : 1)
+            )
+            .tvFocusBorder(isFocused: isFocused, cornerRadius: 20)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .buttonStyle(TVZeroHighlightButtonStyle())
+        .focused($isFocused)
+        .focusEffectDisabled()
+        .accessibilityIdentifier("settings.contact.email")
+    }
+}
+
+// MARK: - 极简关于信息卡片（只放图标、版本号、编译号）
+struct AboutCompactInfoCard: View {
+    let appVersion: String
+    let appBuild: String
+
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        Button(action: {}) {
+            HStack(spacing: 32) {
+                // 应用图标
+                ZStack {
+                    RoundedRectangle(cornerRadius: 26)
+                        .fill(Color.black.opacity(0.3))
+                        .frame(width: 120, height: 120)
+
+                    Image("applogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 120, height: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 26))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 26)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1.5)
+                        )
+                        .shadow(color: TVTheme.primary.opacity(0.4), radius: 16, x: 0, y: 8)
+                }
+
+                // 版本号与编译号
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("糖葫芦Haw")
+                        .font(.system(size: 38, weight: .heavy))
+                        .foregroundColor(.white)
+
+                    HStack(spacing: 20) {
+                        HStack(spacing: 8) {
+                            Text("版本号:")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.6))
+                            Text("v\(appVersion)")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+
+                        HStack(spacing: 8) {
+                            Text("编译号:")
+                                .font(.system(size: 16))
+                                .foregroundColor(.white.opacity(0.6))
+                            Text(appBuild)
+                                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                                .foregroundColor(TVTheme.primaryHover)
+                        }
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(26)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                isFocused ? Color(red: 0.22, green: 0.14, blue: 0.18) : Color(red: 0.15, green: 0.11, blue: 0.14),
+                                isFocused ? Color(red: 0.15, green: 0.12, blue: 0.18) : Color(red: 0.11, green: 0.10, blue: 0.13)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22)
+                    .stroke(isFocused ? TVTheme.primary : Color.white.opacity(0.08), lineWidth: isFocused ? 2 : 1)
+            )
+            .tvFocusBorder(isFocused: isFocused, cornerRadius: 22)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .buttonStyle(TVZeroHighlightButtonStyle())
+        .focused($isFocused)
+        .focusEffectDisabled()
+        .accessibilityIdentifier("settings.about.compact_info")
+    }
+}
+
+// MARK: - 免责说明与合规声明卡片
 struct AboutDisclaimerCard: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
         Button(action: {}) {
-            HStack(alignment: .top, spacing: 18) {
+            HStack(alignment: .top, spacing: 20) {
                 Image(systemName: "hand.raised.fill")
                     .font(.system(size: 26))
                     .foregroundColor(isFocused ? TVTheme.primary : .white.opacity(0.65))
                     .frame(width: 32)
                     .padding(.top, 2)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("免责声明与合规承诺")
-                        .font(.system(size: 18, weight: .bold))
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("免责声明")
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.white)
 
                     Text("1. 本项目为独立 Apple tvOS 客户端系统，仅供大屏原生开发技术学习与非商业研究使用；\n2. 短剧及流媒体数据均来源于网络公开接口，开发者不搭建中转服务、不存储任何音视频内容；版权归原版权方所有；\n3. 视频解析与播放均在 Apple TV 设备本地沙箱闭环执行，零隐私数据上报，使用者需对自配内容自行承担法律责任。")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.65))
-                        .lineSpacing(4)
+                        .lineSpacing(5)
                 }
                 Spacer()
             }
@@ -1609,6 +1208,7 @@ struct AboutDisclaimerCard: View {
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focused($isFocused)
         .focusEffectDisabled()
+        .accessibilityIdentifier("settings.about.disclaimer")
     }
 }
 import SwiftUI

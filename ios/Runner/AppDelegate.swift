@@ -56,6 +56,7 @@ import CoreMedia
           return
         }
         if call.method == "pictureInPictureStatus" {
+          self.ensureAudioSessionConfigured()
           let supported = AVPictureInPictureController.isPictureInPictureSupported()
           let active = self.pipController?.isPictureInPictureActive ?? false
           result([
@@ -65,31 +66,32 @@ import CoreMedia
           return
         }
         if call.method == "enterPictureInPicture" {
-          guard AVPictureInPictureController.isPictureInPictureSupported() else {
-            result(["supported": false, "active": false, "requested": false])
+          self.ensureAudioSessionConfigured()
+          let supported = AVPictureInPictureController.isPictureInPictureSupported()
+          guard supported else {
+            result(["supported": false, "active": false, "requested": false, "error": "当前设备或系统未支持画中画功能"])
             return
           }
           let args = call.arguments as? [String: Any]
           let urlStr = args?["url"] as? String ?? ""
+          let headers = args?["headers"] as? [String: String] ?? [:]
           let positionMs = args?["position"] as? Int ?? 0
           let speed = (args?["speed"] as? NSNumber)?.floatValue ?? 1.0
 
-          let targetUrl: URL?
-          if urlStr.hasPrefix("/") {
-            targetUrl = URL(fileURLWithPath: urlStr)
-          } else if !urlStr.isEmpty {
-            targetUrl = URL(string: urlStr)
-          } else {
-            targetUrl = nil
-          }
+          let targetUrl = self.parseMediaUrl(urlStr)
 
           if let url = targetUrl {
-            self.startPip(with: url, positionMs: positionMs, speed: speed, result: result)
+            self.startPip(with: url, headers: headers, positionMs: positionMs, speed: speed, result: result)
           } else if let controller = self.pipController, controller.isPictureInPicturePossible {
             controller.startPictureInPicture()
             result(["supported": true, "active": false, "requested": true])
           } else {
-            result(["supported": true, "active": false, "requested": false])
+            result([
+              "supported": true,
+              "active": false,
+              "requested": false,
+              "error": urlStr.isEmpty ? "未找到当前播放的视频地址" : "视频地址解析失败，请检查播放状态"
+            ])
           }
           return
         }
@@ -156,26 +158,85 @@ import CoreMedia
     }
   }
 
-  private func startPip(with url: URL, positionMs: Int, speed: Float, result: @escaping FlutterResult) {
+  private func ensureAudioSessionConfigured() {
     do {
-      try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-      try AVAudioSession.sharedInstance().setActive(true)
+      let audioSession = AVAudioSession.sharedInstance()
+      try audioSession.setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
+      try audioSession.setActive(true)
     } catch {}
+  }
+
+  private func parseMediaUrl(_ urlStr: String) -> URL? {
+    let clean = urlStr.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !clean.isEmpty else { return nil }
+    if clean.hasPrefix("/") {
+      return URL(fileURLWithPath: clean)
+    }
+    if let direct = URL(string: clean) {
+      return direct
+    }
+    if let encoded = clean.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+       let parsed = URL(string: encoded) {
+      return parsed
+    }
+    let fixed = clean
+      .replacingOccurrences(of: "|", with: "%7C")
+      .replacingOccurrences(of: " ", with: "%20")
+      .replacingOccurrences(of: "^", with: "%5E")
+      .replacingOccurrences(of: "`", with: "%60")
+      .replacingOccurrences(of: "{", with: "%7B")
+      .replacingOccurrences(of: "}", with: "%7D")
+    return URL(string: fixed)
+  }
+
+  private var activeRootViewController: UIViewController? {
+    if let root = self.window?.rootViewController {
+      return root
+    }
+    if #available(iOS 13.0, *) {
+      for scene in UIApplication.shared.connectedScenes {
+        if let windowScene = scene as? UIWindowScene {
+          for window in windowScene.windows where window.isKeyWindow || window.rootViewController != nil {
+            if let root = window.rootViewController {
+              return root
+            }
+          }
+        }
+      }
+    }
+    return UIApplication.shared.keyWindow?.rootViewController
+  }
+
+  private func startPip(with url: URL, headers: [String: String], positionMs: Int, speed: Float, result: @escaping FlutterResult) {
+    ensureAudioSessionConfigured()
 
     self.pipObservation?.invalidate()
     self.pipObservation = nil
     self.pipPlayer?.pause()
 
-    let playerItem = AVPlayerItem(url: url)
+    var assetOptions: [String: Any] = [:]
+    if !headers.isEmpty {
+      assetOptions["AVURLAssetHTTPHeaderFieldsKey"] = headers
+    }
+    let asset = AVURLAsset(url: url, options: assetOptions)
+    let playerItem = AVPlayerItem(asset: asset)
     let player = AVPlayer(playerItem: playerItem)
     self.pipPlayer = player
 
-    guard let rootVC = self.window?.rootViewController else {
-      result(["supported": true, "active": false, "requested": false])
+    guard let rootVC = self.activeRootViewController else {
+      result([
+        "supported": true,
+        "active": false,
+        "requested": false,
+        "error": "无法获取应用窗口视图，请在界面显示后重试"
+      ])
       return
     }
 
-    let targetBounds = rootVC.view.bounds
+    var targetBounds = rootVC.view.bounds
+    if targetBounds.width <= 0 || targetBounds.height <= 0 {
+      targetBounds = UIScreen.main.bounds
+    }
     if pipContainerView == nil {
       let view = UIView(frame: targetBounds)
       view.backgroundColor = .black
