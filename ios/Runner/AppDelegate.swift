@@ -12,6 +12,7 @@ import CoreMedia
   private var pipPlayerLayer: AVPlayerLayer?
   private var pipContainerView: UIView?
   private var deviceChannel: FlutterMethodChannel?
+  private var icloudChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -105,6 +106,47 @@ import CoreMedia
         result(["http": http, "https": https.isEmpty ? http : https,
                 "bypass": settings["ExceptionsList"] as? [String] ?? [],
                 "pac": (settings["ProxyAutoConfigEnable"] as? NSNumber)?.boolValue == true])
+      }
+    }
+
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ICloudSync") {
+      let icloudChannel = FlutterMethodChannel(name: "duanju/icloud", binaryMessenger: registrar.messenger())
+      self.icloudChannel = icloudChannel
+      icloudChannel.setMethodCallHandler { call, result in
+        let kv = NSUbiquitousKeyValueStore.default
+        switch call.method {
+        case "isAvailable":
+          result(true)
+        case "getString":
+          let args = call.arguments as? [String: Any]
+          let key = args?["key"] as? String ?? ""
+          result(kv.string(forKey: key))
+        case "setString":
+          let args = call.arguments as? [String: Any]
+          let key = args?["key"] as? String ?? ""
+          let val = args?["value"] as? String ?? ""
+          kv.set(val, forKey: key)
+          kv.synchronize()
+          result(true)
+        case "remove":
+          let args = call.arguments as? [String: Any]
+          let key = args?["key"] as? String ?? ""
+          kv.removeObject(forKey: key)
+          kv.synchronize()
+          result(true)
+        case "synchronize":
+          result(kv.synchronize())
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      NotificationCenter.default.addObserver(
+        forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+        object: NSUbiquitousKeyValueStore.default,
+        queue: .main
+      ) { [weak self] _ in
+        self?.icloudChannel?.invokeMethod("onICloudChanged", arguments: nil)
       }
     }
   }

@@ -3,6 +3,52 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  private var icloudChannel: FlutterMethodChannel?
+
+  override func applicationDidFinishLaunching(_ notification: Notification) {
+    super.applicationDidFinishLaunching(notification)
+    if let controller = mainFlutterWindow?.contentViewController as? FlutterViewController {
+      let channel = FlutterMethodChannel(name: "duanju/icloud", binaryMessenger: controller.engine.binaryMessenger)
+      self.icloudChannel = channel
+      channel.setMethodCallHandler { call, result in
+        let kv = NSUbiquitousKeyValueStore.default
+        switch call.method {
+        case "isAvailable":
+          result(true)
+        case "getString":
+          let args = call.arguments as? [String: Any]
+          let key = args?["key"] as? String ?? ""
+          result(kv.string(forKey: key))
+        case "setString":
+          let args = call.arguments as? [String: Any]
+          let key = args?["key"] as? String ?? ""
+          let val = args?["value"] as? String ?? ""
+          kv.set(val, forKey: key)
+          kv.synchronize()
+          result(true)
+        case "remove":
+          let args = call.arguments as? [String: Any]
+          let key = args?["key"] as? String ?? ""
+          kv.removeObject(forKey: key)
+          kv.synchronize()
+          result(true)
+        case "synchronize":
+          result(kv.synchronize())
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      NotificationCenter.default.addObserver(
+        forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+        object: NSUbiquitousKeyValueStore.default,
+        queue: .main
+      ) { [weak self] _ in
+        self?.icloudChannel?.invokeMethod("onICloudChanged", arguments: nil)
+      }
+    }
+  }
+
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     return true
   }
@@ -11,3 +57,4 @@ class AppDelegate: FlutterAppDelegate {
     return true
   }
 }
+

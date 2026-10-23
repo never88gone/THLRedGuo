@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/core/sync/icloud_sync_service.dart';
+import 'package:THLRedLook/pages/settings/icloud_sync_page.dart';
 import 'package:THLRedLook/pages/settings/resource_settings_page.dart';
 import 'package:THLRedLook/utils/settings/settings_backup_helper.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
@@ -109,6 +111,45 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
+
+          if (ICloudSyncService.instance.isSupported) ...[
+            Text(
+              '云端同步',
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.hongguoRed,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              elevation: 0,
+              color: isDark ? AppColors.darkCard : AppColors.greyLight,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                key: const ValueKey('backup-icloud-sync-entry'),
+                leading: const Icon(Icons.cloud_sync_rounded, color: AppColors.hongguoRed),
+                title: const Text('iCloud 云端多端同步'),
+                subtitle: Text(
+                  ICloudSyncService.instance.isSyncEnabled(widget.store.preferences)
+                      ? '已开启 · 自动在 iOS、macOS 与 Apple TV 间同步'
+                      : '已停用 · 轻触进入设置开启云端同步',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => ICloudSyncPage(store: widget.store),
+                    ),
+                  );
+                  if (mounted) setState(() {});
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           Text(
             '备份操作',

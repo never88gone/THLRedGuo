@@ -21,7 +21,10 @@ public final class LocalStore: ObservableObject {
     @Published public private(set) var followedDramas: [Drama] = []
     @Published public private(set) var searchHistory: [String] = []
     @Published public var danmakuEnabled: Bool = true {
-        didSet { defaults.set(danmakuEnabled, forKey: danmakuKey) }
+        didSet {
+            defaults.set(danmakuEnabled, forKey: danmakuKey)
+            ICloudSyncService.shared.scheduleUpload(store: self)
+        }
     }
     @Published public var danmakuStyle: TVDanmakuStyle = TVDanmakuStyle() {
         didSet {
@@ -121,6 +124,7 @@ public final class LocalStore: ObservableObject {
     public func setSource(_ id: String) {
         currentSourceId = id
         defaults.set(id, forKey: currentSourceKey)
+        ICloudSyncService.shared.scheduleUpload(store: self)
     }
 
     public func saveCachedCatalog(categories: [CatalogCategory], dramas: [Drama]) {
@@ -182,6 +186,7 @@ public final class LocalStore: ObservableObject {
         if let data = try? JSONEncoder().encode(history) {
             defaults.set(data, forKey: historyKey)
         }
+        ICloudSyncService.shared.scheduleUpload(store: self)
     }
 
     // MARK: - Follow State
@@ -213,6 +218,22 @@ public final class LocalStore: ObservableObject {
         }
         if let dramaData = try? JSONEncoder().encode(followedDramas) {
             defaults.set(dramaData, forKey: followedDramasKey)
+        }
+        ICloudSyncService.shared.scheduleUpload(store: self)
+    }
+
+    public func applySyncedData(history: [WatchEntry], follows: [String: FollowState], followedDramas: [Drama]) {
+        self.history = history
+        self.follows = follows
+        self.followedDramas = followedDramas
+        if let data = try? JSONEncoder().encode(history) {
+            defaults.set(data, forKey: historyKey)
+        }
+        if let data = try? JSONEncoder().encode(follows) {
+            defaults.set(data, forKey: followsKey)
+        }
+        if let data = try? JSONEncoder().encode(followedDramas) {
+            defaults.set(data, forKey: followedDramasKey)
         }
     }
 

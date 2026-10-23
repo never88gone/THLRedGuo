@@ -7,10 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		FEED00022C00000100000001 /* TVVideoFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00122C00000100000001 /* TVVideoFeedView.swift */; };
-		FEED00012C00000100000001 /* VideoFeedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00112C00000100000001 /* VideoFeedViewModel.swift */; };
-		E34571822EE6111100000021 /* SourceDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6111100000022 /* SourceDiagnostics.swift */; };
-		E34571822EE6222200000021 /* VideoCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000022 /* VideoCacheManager.swift */; };
 		308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */; };
 		3B9F1C5ADE795910FBD0AD03 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6299EBC862612C3A90774337 /* Foundation.framework */; };
 		3EB52B87EAB6FA6FA6506647 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6299EBC862612C3A90774337 /* Foundation.framework */; };
@@ -27,6 +23,7 @@
 		A10000082C00000100000001 /* RankingBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000082C00000100000001 /* RankingBoard.swift */; };
 		A10000092C00000100000001 /* LanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000092C00000100000001 /* LanModels.swift */; };
 		A10000102C00000100000001 /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000102C00000100000001 /* LocalStore.swift */; };
+		ICLOUD002C00000100000001 /* ICloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ICLOUD001C00000100000001 /* ICloudSyncService.swift */; };
 		A10000112C00000100000001 /* NativeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000112C00000100000001 /* NativeBridge.swift */; };
 		A10000122C00000100000001 /* NativeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000122C00000100000001 /* NativeRepository.swift */; };
 		A10000132C00000100000001 /* LanSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000132C00000100000001 /* LanSyncService.swift */; };
@@ -50,8 +47,6 @@
 		A10000312C00000100000001 /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000312C00000100000001 /* DownloadsView.swift */; };
 		A10000322C00000100000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000322C00000100000001 /* SettingsView.swift */; };
 		A10000332C00000100000001 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000332C00000100000001 /* MainTabView.swift */; };
-		E34571822EE6222200000031 /* TVCustomSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000032 /* TVCustomSplitView.swift */; };
-		E34571822EE6222200000033 /* TVSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000034 /* TVSidebarView.swift */; };
 		A10000352C00000100000001 /* TVTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000352C00000100000001 /* TVTheme.swift */; };
 		A10000382C00000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000382C00000100000001 /* Assets.xcassets */; };
 		A10000392C00000100000001 /* AVPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000392C00000100000001 /* AVPlayerView.swift */; };
@@ -61,6 +56,12 @@
 		BC5B31CB27136862380FB32F /* PlaybackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF46F916F921E87B28F33AB /* PlaybackTests.swift */; };
 		CABD071B5C68D672495450B9 /* LocalLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */; };
 		DFB5B536F10F369514C3C5B4 /* RemoteNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */; };
+		E34571822EE6111100000021 /* SourceDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6111100000022 /* SourceDiagnostics.swift */; };
+		E34571822EE6222200000021 /* VideoCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000022 /* VideoCacheManager.swift */; };
+		E34571822EE6222200000031 /* TVCustomSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000032 /* TVCustomSplitView.swift */; };
+		E34571822EE6222200000033 /* TVSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000034 /* TVSidebarView.swift */; };
+		FEED00012C00000100000001 /* VideoFeedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00112C00000100000001 /* VideoFeedViewModel.swift */; };
+		FEED00022C00000100000001 /* TVVideoFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00122C00000100000001 /* TVVideoFeedView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,14 +82,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		FEED00122C00000100000001 /* TVVideoFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVVideoFeedView.swift; sourceTree = "<group>"; };
-		FEED00112C00000100000001 /* VideoFeedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFeedViewModel.swift; sourceTree = "<group>"; };
-		E34571822EE6111100000022 /* SourceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceDiagnostics.swift; sourceTree = "<group>"; };
-		E34571822EE6222200000022 /* VideoCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCacheManager.swift; sourceTree = "<group>"; };
 		041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLook.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D9437790F04A5D01FEC2D84 /* Pods-THLRedLookTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLookTests.debug.xcconfig"; path = "Target Support Files/Pods-THLRedLookTests/Pods-THLRedLookTests.debug.xcconfig"; sourceTree = "<group>"; };
 		221C9DFACA76E6DED5DC2B01 /* Pods_THLRedLookTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLookTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3311D255B0226B0543DC9491 /* Pods-THLRedLook.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLook.debug.xcconfig"; path = "Target Support Files/Pods-THLRedLook/Pods-THLRedLook.debug.xcconfig"; sourceTree = "<group>"; };
+		38651745308B80FD001D48EB /* THLRedLook.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = THLRedLook.entitlements; sourceTree = "<group>"; };
 		3A2AC2E0C811128FF9CE4D20 /* Pods-THLRedLookTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLookTests.release.xcconfig"; path = "Target Support Files/Pods-THLRedLookTests/Pods-THLRedLookTests.release.xcconfig"; sourceTree = "<group>"; };
 		5DEF076423A4DDD1829FFF47 /* THLRedLookUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = THLRedLookUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6299EBC862612C3A90774337 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
@@ -106,6 +104,7 @@
 		B10000082C00000100000001 /* RankingBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingBoard.swift; sourceTree = "<group>"; };
 		B10000092C00000100000001 /* LanModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanModels.swift; sourceTree = "<group>"; };
 		B10000102C00000100000001 /* LocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStore.swift; sourceTree = "<group>"; };
+		ICLOUD001C00000100000001 /* ICloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSyncService.swift; sourceTree = "<group>"; };
 		B10000112C00000100000001 /* NativeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBridge.swift; sourceTree = "<group>"; };
 		B10000122C00000100000001 /* NativeRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRepository.swift; sourceTree = "<group>"; };
 		B10000132C00000100000001 /* LanSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanSyncService.swift; sourceTree = "<group>"; };
@@ -129,8 +128,6 @@
 		B10000312C00000100000001 /* DownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadsView.swift; sourceTree = "<group>"; };
 		B10000322C00000100000001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B10000332C00000100000001 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
-		E34571822EE6222200000032 /* TVCustomSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVCustomSplitView.swift; sourceTree = "<group>"; };
-		E34571822EE6222200000034 /* TVSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSidebarView.swift; sourceTree = "<group>"; };
 		B10000342C00000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10000352C00000100000001 /* TVTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVTheme.swift; sourceTree = "<group>"; };
 		B10000382C00000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -141,8 +138,14 @@
 		B10000992C00000100000001 /* PlatformProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformProtocols.swift; sourceTree = "<group>"; };
 		B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CENCMediaDownloader.swift; sourceTree = "<group>"; };
 		DDF46F916F921E87B28F33AB /* PlaybackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackTests.swift; sourceTree = "<group>"; };
+		E34571822EE6111100000022 /* SourceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceDiagnostics.swift; sourceTree = "<group>"; };
+		E34571822EE6222200000022 /* VideoCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCacheManager.swift; sourceTree = "<group>"; };
+		E34571822EE6222200000032 /* TVCustomSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVCustomSplitView.swift; sourceTree = "<group>"; };
+		E34571822EE6222200000034 /* TVSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSidebarView.swift; sourceTree = "<group>"; };
 		EA0AC74BAC1238FE7FC98B9C /* Pods-THLRedLook.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLook.release.xcconfig"; path = "Target Support Files/Pods-THLRedLook/Pods-THLRedLook.release.xcconfig"; sourceTree = "<group>"; };
 		FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteNavigationTests.swift; sourceTree = "<group>"; };
+		FEED00112C00000100000001 /* VideoFeedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFeedViewModel.swift; sourceTree = "<group>"; };
+		FEED00122C00000100000001 /* TVVideoFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVVideoFeedView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -179,7 +182,6 @@
 			children = (
 				FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */,
 			);
-			name = THLRedLookUITests;
 			path = THLRedLookUITests;
 			sourceTree = "<group>";
 		};
@@ -209,7 +211,6 @@
 				3A2AC2E0C811128FF9CE4D20 /* Pods-THLRedLookTests.release.xcconfig */,
 				1D9437790F04A5D01FEC2D84 /* Pods-THLRedLookTests.debug.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -220,7 +221,6 @@
 				83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */,
 				9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */,
 			);
-			name = THLRedLookTests;
 			path = THLRedLookTests;
 			sourceTree = "<group>";
 		};
@@ -239,6 +239,7 @@
 		D10000022C00000100000001 /* THLRedLook */ = {
 			isa = PBXGroup;
 			children = (
+				38651745308B80FD001D48EB /* THLRedLook.entitlements */,
 				G10000012C00000100000001 /* App */,
 				G10000022C00000100000001 /* Models */,
 				G10000032C00000100000001 /* Core */,
@@ -290,6 +291,7 @@
 				E34571822EE6111100000022 /* SourceDiagnostics.swift */,
 				E34571822EE6222200000022 /* VideoCacheManager.swift */,
 				B10000102C00000100000001 /* LocalStore.swift */,
+				ICLOUD001C00000100000001 /* ICloudSyncService.swift */,
 				B10000112C00000100000001 /* NativeBridge.swift */,
 				B10000122C00000100000001 /* NativeRepository.swift */,
 				B10000982C00000100000001 /* CENCMP4Decryptor.swift */,
@@ -541,9 +543,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-THLRedLook/Pods-THLRedLook-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-THLRedLook/Pods-THLRedLook-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -650,6 +656,7 @@
 				E34571822EE6111100000021 /* SourceDiagnostics.swift in Sources */,
 				E34571822EE6222200000021 /* VideoCacheManager.swift in Sources */,
 				A10000102C00000100000001 /* LocalStore.swift in Sources */,
+				ICLOUD002C00000100000001 /* ICloudSyncService.swift in Sources */,
 				A10000112C00000100000001 /* NativeBridge.swift in Sources */,
 				A10000122C00000100000001 /* NativeRepository.swift in Sources */,
 				A10000982C00000100000001 /* CENCMP4Decryptor.swift in Sources */,
@@ -848,9 +855,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = THLRedLook/THLRedLook.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=appletvos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 20261005205413;
-				DEVELOPMENT_TEAM = 876385K952;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=appletvos*]" = 876385K952;
 				ENABLE_TESTABILITY = YES;
 				"EXCLUDED_ARCHS[sdk=appletvsimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -863,6 +873,8 @@
 				OTHER_LDFLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=appletvos*]" = thlredlook_tvOS_dev;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
 			};
@@ -874,10 +886,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = THLRedLook/THLRedLook.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
+				"CODE_SIGN_IDENTITY[sdk=appletvos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 20261005205413;
 				DEVELOPMENT_TEAM = 876385K952;
+				"DEVELOPMENT_TEAM[sdk=appletvos*]" = 876385K952;
 				"EXCLUDED_ARCHS[sdk=appletvsimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = THLRedLook/App/Info.plist;
@@ -890,6 +905,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = thlredlook_tvOS_dis;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=appletvos*]" = thlredlook_tvOS_dis;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
 			};

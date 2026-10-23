@@ -3,6 +3,7 @@ import CoreImage.CIFilterBuiltins
 
 public enum SettingsCategory: String, CaseIterable, Identifiable {
     case sources = "sources"
+    case sync = "sync"
     case network = "network"
     case cache = "cache"
     case about = "about"
@@ -12,6 +13,7 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
     public var title: String {
         switch self {
         case .sources: return "站源管理"
+        case .sync: return "iCloud 同步"
         case .network: return "网络与策略"
         case .cache: return "存储与缓存"
         case .about: return "系统与关于"
@@ -21,6 +23,7 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
     public var subtitle: String {
         switch self {
         case .sources: return "当前活跃影视源"
+        case .sync: return "多端观看记录与配置同步"
         case .network: return "代理模式与解析并发度"
         case .cache: return "沙盒空间占用与清理"
         case .about: return "版本信息与核心技术栈"
@@ -30,6 +33,7 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
     public var icon: String {
         switch self {
         case .sources: return "antenna.radiowaves.left.and.right"
+        case .sync: return "icloud.fill"
         case .network: return "network"
         case .cache: return "internaldrive.fill"
         case .about: return "info.circle.fill"
@@ -135,6 +139,8 @@ public struct SettingsView: View {
                     switch selectedCategory {
                     case .sources:
                         sourcesPanel
+                    case .sync:
+                        iCloudSyncPanel
                     case .network:
                         networkPanel
                     case .cache:
@@ -451,6 +457,88 @@ public struct SettingsView: View {
         }
     }
 
+
+    // MARK: - iCloud 云端同步面板
+    @ObservedObject private var icloudSync = ICloudSyncService.shared
+
+    private var iCloudSyncPanel: some View {
+        VStack(alignment: .leading, spacing: 32) {
+            panelHeader(title: "iCloud 多端同步", desc: "通过 Apple 官方 iCloud 键值存储，在登录同一 Apple ID 的 iOS、macOS 和 Apple TV 设备间实时同步配置、观看进度与追剧收藏。")
+
+            // 开关卡片
+            HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "icloud.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(TVTheme.primary)
+                        Text("启用 iCloud 云端同步")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    Text(icloudSync.isSyncEnabled ? "已开启 · 自动在苹果全生态设备间实时同步观看历史、追剧收藏与偏好设置" : "已停用 · 所有记录仅保存在当前设备，不进行云端同步")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                Spacer()
+                Button(action: {
+                    icloudSync.isSyncEnabled.toggle()
+                }) {
+                    Text(icloudSync.isSyncEnabled ? "已开启" : "已关闭")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(icloudSync.isSyncEnabled ? .white : .white.opacity(0.8))
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 14)
+                        .background(icloudSync.isSyncEnabled ? TVTheme.primary : Color.white.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.card)
+            }
+            .padding(24)
+            .background(Color.white.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            if icloudSync.isSyncEnabled {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("同步概览与状态")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                            Text(icloudSync.lastStatusMessage)
+                                .font(.system(size: 14))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                        Spacer()
+                        if let date = icloudSync.lastSyncDate {
+                            Text("上次同步时间: " + DateFormatter.localizedString(from: date, dateStyle: .short, timeStyle: .medium))
+                                .font(.system(size: 14))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+
+                    HStack(spacing: 24) {
+                        Button(action: {
+                            icloudSync.syncWithCloud()
+                        }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                Text(icloudSync.isSyncing ? "正在同步..." : "立即同步")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.card)
+                        .disabled(icloudSync.isSyncing)
+                    }
+                }
+                .padding(24)
+                .background(Color.white.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+        }
+    }
 
     // MARK: - 2. 网络与抓取面板（全面优化样式，带实时测速与自适应调优）
     private var networkPanel: some View {

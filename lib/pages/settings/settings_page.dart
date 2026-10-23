@@ -11,6 +11,8 @@ import 'package:THLRedLook/pages/about/contact_page.dart';
 import 'package:THLRedLook/pages/about/third_party_page.dart';
 import 'package:THLRedLook/pages/privacy/privacy_settings_page.dart';
 import 'package:THLRedLook/pages/settings/backup_settings_page.dart';
+import 'package:THLRedLook/pages/settings/icloud_sync_page.dart';
+import 'package:THLRedLook/core/sync/icloud_sync_service.dart';
 import 'package:THLRedLook/pages/settings/display_mode_page.dart';
 import 'package:THLRedLook/pages/settings/js_sources_page.dart';
 import 'package:THLRedLook/pages/settings/playback_settings_page.dart';
@@ -285,6 +287,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: '数据与备份',
                 icon: Icons.settings_backup_restore_rounded,
                 children: [
+                  if (ICloudSyncService.instance.isSupported) ...[
+                    ListTile(
+                      key: const ValueKey('settings-icloud-sync-entry'),
+                      leading: const Icon(Icons.cloud_sync_rounded),
+                      title: const Text('iCloud 云端同步'),
+                      subtitle: Text(
+                        ICloudSyncService.instance.isSyncEnabled(widget.store.preferences)
+                            ? '已开启 · 自动在 iOS、macOS 与 Apple TV 间同步'
+                            : '已停用 · 轻触开启苹果生态多端同步',
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => ICloudSyncPage(store: widget.store),
+                          ),
+                        );
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    const Divider(height: 1, indent: 56),
+                  ],
                   ListTile(
                     key: const ValueKey('settings-backup-entry'),
                     leading: const Icon(Icons.backup_outlined),

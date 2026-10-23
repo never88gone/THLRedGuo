@@ -15,6 +15,7 @@ import 'package:THLRedLook/core/series/hongguo_series.dart';
 import 'package:THLRedLook/models/lan/lan_sync_models.dart';
 import 'package:THLRedLook/utils/screen/screen_wake_controller.dart';
 import 'package:THLRedLook/core/js/js_source_service.dart';
+import 'package:THLRedLook/core/sync/icloud_sync_service.dart';
 
 part 'local_store_sync.dart';
 
@@ -85,6 +86,7 @@ class LocalStore extends ChangeNotifier {
       if (keepScreenOn) {
         ScreenWakeController.instance.sync(true);
       }
+      ICloudSyncService.instance.initialize(this);
     } catch (_) {
       _block('本地用户配置损坏，已锁定访问。原始记录已保留，请重新读取或从备份恢复。');
     }
@@ -711,10 +713,13 @@ class LocalStore extends ChangeNotifier {
             (key) =>
                 key == _key('favorites') ||
                 key == _key('history') ||
-                key == _key('followStates'),
+                key == _key('followStates') ||
+                key == _key('playback') ||
+                key == _key('source'),
           )) {
         _lanRevision++;
         if (syncUrgent) _lanUrgentRevision++;
+        ICloudSyncService.instance.scheduleUpload(this);
       }
     } on SnapshotRecoveryRequired catch (error) {
       _block(error.toString());
@@ -1603,6 +1608,37 @@ class LocalStore extends ChangeNotifier {
   Future<void> _queue(Future<void> Function() action) {
     _writes = _writes.catchError((Object _) {}).then((_) => action());
     return _writes;
+  }
+
+  Future<void> applySyncedICloudData({
+    required List<WatchEntry> history,
+    required Map<String, Drama> favorites,
+    required Map<String, FollowState> followStates,
+    String? source,
+    PlaybackPreferences? playback,
+  }) {
+    final epoch = _epoch;
+    return _queue(() async {
+      if (locked || epoch != _epoch) return;
+      final changes = <String, Object>{
+        _key('history'): jsonEncode(
+          history.take(300).map((entry) => entry.toJson()).toList(),
+        ),
+        _key('favorites'): jsonEncode(
+          favorites.values.map((entry) => entry.toJson()).toList(),
+        ),
+        _key('followStates'): _encodeFollowStates(followStates),
+      };
+      if (source != null && source.isNotEmpty && allowsSource(source)) {
+        changes[_key('source')] = source;
+      }
+      if (playback != null) {
+        changes[_key('playback')] = jsonEncode(playback.toJson());
+      }
+      await _commit(changes, trackSync: false);
+      _loadLibrary();
+      _notify();
+    });
   }
 
   @override
