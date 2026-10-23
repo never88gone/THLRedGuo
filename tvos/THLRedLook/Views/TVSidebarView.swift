@@ -26,34 +26,34 @@ public struct TVSidebarView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // 顶部 Logo 与应用名称区（采用真实 App 图标，与全局品牌视觉统一）
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image("applogo")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 48, height: 48)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(width: 56, height: 56)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.white.opacity(0.18), lineWidth: 1.2)
                     )
-                    .shadow(color: TVTheme.primary.opacity(0.35), radius: 8, x: 0, y: 4)
+                    .shadow(color: TVTheme.primary.opacity(0.4), radius: 10, x: 0, y: 4)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("糖葫芦")
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(.system(size: 28, weight: .black, design: .rounded))
                         .foregroundColor(.white)
-                        .tracking(1)
+                        .tracking(1.2)
                     Text("红果短剧")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(TVTheme.textSecondary)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 36)
-            .padding(.bottom, 28)
+            .padding(.horizontal, 26)
+            .padding(.top, 40)
+            .padding(.bottom, 32)
 
             // Tab 导航列表（垂直排列）
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
                 ForEach(TVAppTab.allCases) { tab in
                     let isFocused = (focusedNavTab.wrappedValue == tab)
                     TVSidebarTabButton(
@@ -73,7 +73,7 @@ public struct TVSidebarView: View {
                     .accessibilityIdentifier("nav.\(tab.rawValue)")
                 }
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 20)
             .focusSection()
             .defaultFocus(focusedNavTab, selectedTab)
 
@@ -88,8 +88,8 @@ public struct TVSidebarView: View {
                     .font(.system(size: 11, weight: .regular))
                     .foregroundColor(Color.white.opacity(0.3))
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 28)
+            .padding(.horizontal, 26)
+            .padding(.bottom, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onPlayPauseCommand {
@@ -172,25 +172,25 @@ public struct TVSidebarTabButton: View {
         Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 26, weight: .bold))
                     .foregroundColor(iconColor)
-                    .frame(width: 32)
+                    .frame(width: 36)
 
                 Text(tab.title)
-                    .font(.system(size: 20, weight: isFocused || isSelected ? .bold : .medium))
+                    .font(.system(size: 22, weight: isFocused || isSelected ? .bold : .semibold))
                     .foregroundColor(contentColor)
                     .lineLimit(1)
 
                 Spacer()
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 22)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 18)
                     .fill(buttonBackgroundStyle)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 18)
                     .stroke(borderColor, lineWidth: borderWidth)
             )
             .scaleEffect(isFocused ? 1.05 : 1.0)

@@ -813,6 +813,18 @@ public final class PlayerViewModel: ObservableObject {
         showControls()
     }
 
+    public func seekDirectly(by seconds: Double) {
+        guard !isLoading, seconds.isFinite, duration.isFinite, duration > 0 else { return }
+        let target = max(0, min(currentTime + seconds, duration))
+        seek(to: target)
+    }
+
+    public func seekTo(target: Double) {
+        guard !isLoading, target.isFinite, duration.isFinite, duration > 0 else { return }
+        let clamped = max(0, min(target, duration))
+        seek(to: clamped)
+    }
+
     private func seek(to target: Double) {
         guard let p = player, p.currentItem?.status == .readyToPlay else { return }
         seekSequence += 1

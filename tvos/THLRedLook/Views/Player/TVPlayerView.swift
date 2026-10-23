@@ -19,6 +19,12 @@ public struct TVPlayerView: View {
     public let preloadedPlan: PlaybackPlan?
     @State private var isSwitchingFeed = false
     @State private var isPlayerPresented = false
+    @State private var quickSeekDelta: Double = 0
+    @State private var quickSeekTarget: Double = 0
+    @State private var showQuickSeekIndicator: Bool = false
+    @State private var quickSeekHideWorkItem: DispatchWorkItem?
+    @State private var initialScrubPosition: Double = 0
+    @State private var isScrubbing: Bool = false
 
     enum PlayerErrorFocusTarget: Hashable {
         case backToEpisodes
@@ -72,6 +78,7 @@ public struct TVPlayerView: View {
             loadingOverlayView
             errorOverlayView
             toastOverlayView
+            quickSeekOverlayView
             wakeButtonView
             controlsOverlayView
             drawersOverlayView
@@ -247,32 +254,74 @@ public struct TVPlayerView: View {
     }
 
     @ViewBuilder
+    private var quickSeekOverlayView: some View {
+        if showQuickSeekIndicator {
+            VStack {
+                Spacer()
+                TVQuickSeekIndicatorView(
+                    targetTime: quickSeekTarget,
+                    duration: viewModel.duration,
+                    delta: quickSeekDelta,
+                    isScrubbing: isScrubbing
+                )
+                .padding(.bottom, 96)
+            }
+            .transition(.scale(scale: 0.92).combined(with: .opacity))
+            .zIndex(140)
+            .ignoresSafeArea()
+        }
+    }
+
+    @ViewBuilder
     private var wakeButtonView: some View {
         if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && viewModel.errorMessage == nil {
-            Button(action: {
-                viewModel.showControls()
-            }) {
-                Color.black.opacity(0.001)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .buttonStyle(TvTransparentButtonStyle())
-            .focused($isWakeupFocused)
-            .disabled(!isInteractive)
-            .accessibilityIdentifier("player.wake")
-            .accessibilityLabel("显示播放控制")
-            .accessibilityValue(playbackAccessibilityValue)
-            .ignoresSafeArea()
-            .onMoveCommand { direction in
-                if feedActions != nil && direction == .down {
-                    Task { _ = await nextFeedDrama() }
-                } else if let feedActions, direction == .up, feedActions.canGoPrevious {
-                    feedActions.onPrevious()
-                } else {
+            ZStack {
+                TVRemoteTouchSurfaceView(
+                    onPanBegan: handlePanBegan,
+                    onPanChanged: handlePanChanged,
+                    onPanEnded: handlePanEnded
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
+
+                Button(action: {
+                    viewModel.showControls()
+                }) {
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(TvTransparentButtonStyle())
+                .focused($isWakeupFocused)
+                .disabled(!isInteractive)
+                .accessibilityIdentifier("player.wake")
+                .accessibilityLabel("显示播放控制")
+                .accessibilityValue(playbackAccessibilityValue)
+                .ignoresSafeArea()
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .left:
+                        handleQuickSeek(by: -10)
+                    case .right:
+                        handleQuickSeek(by: 10)
+                    case .up:
+                        if let feedActions, feedActions.canGoPrevious {
+                            feedActions.onPrevious()
+                        }
+                    case .down:
+                        if feedActions != nil {
+                            Task { _ = await nextFeedDrama() }
+                        }
+                    default:
+                        break
+                    }
+                }
+                .onPlayPauseCommand {
                     viewModel.showControls()
                 }
-            }
-            .onExitCommand {
-                handleExit()
+                .onExitCommand {
+                    handleExit()
+                }
             }
         }
     }
@@ -472,6 +521,200 @@ public struct TVPlayerView: View {
         } else {
             viewModel.onDisappear()
             presentationMode.wrappedValue.dismiss()
+        }
+    }
+
+    // MARK: - 快捷进度与遥控器触控板手势处理
+
+    private func handleQuickSeek(by delta: Double) {
+        let base = showQuickSeekIndicator ? quickSeekTarget : viewModel.currentTime
+        let newTarget = max(0, min(base + delta, viewModel.duration))
+        let totalDelta = newTarget - viewModel.currentTime
+
+        quickSeekTarget = newTarget
+        quickSeekDelta = totalDelta
+        withAnimation(.easeOut(duration: 0.15)) {
+            showQuickSeekIndicator = true
+        }
+
+        viewModel.seekTo(target: newTarget)
+
+        quickSeekHideWorkItem?.cancel()
+        let workItem = DispatchWorkItem {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                showQuickSeekIndicator = false
+            }
+        }
+        quickSeekHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
+    }
+
+    private func handlePanBegan() {
+        guard !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible else { return }
+        initialScrubPosition = viewModel.currentTime
+        quickSeekTarget = viewModel.currentTime
+        quickSeekDelta = 0
+        isScrubbing = true
+        quickSeekHideWorkItem?.cancel()
+        withAnimation(.easeOut(duration: 0.15)) {
+            showQuickSeekIndicator = true
+        }
+    }
+
+    private func handlePanChanged(translationX: CGFloat) {
+        guard isScrubbing, viewModel.duration > 0 else { return }
+        // 触控表面手势映射：灵敏平滑，滑动可快速跨度调整视频进度
+        let deltaSeconds = Double(translationX) * 0.18
+        let target = max(0, min(initialScrubPosition + deltaSeconds, viewModel.duration))
+        quickSeekTarget = target
+        quickSeekDelta = target - initialScrubPosition
+    }
+
+    private func handlePanEnded() {
+        guard isScrubbing else { return }
+        isScrubbing = false
+        viewModel.seekTo(target: quickSeekTarget)
+
+        quickSeekHideWorkItem?.cancel()
+        let workItem = DispatchWorkItem {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                showQuickSeekIndicator = false
+            }
+        }
+        quickSeekHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
+    }
+}
+
+// MARK: - 快捷调进度悬浮提示组件
+
+public struct TVQuickSeekIndicatorView: View {
+    public let targetTime: Double
+    public let duration: Double
+    public let delta: Double
+    public let isScrubbing: Bool
+
+    public var body: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 16) {
+                Image(systemName: delta >= 0 ? "goforward" : "gobackward")
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundColor(TVTheme.primary)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(formatTime(targetTime))
+                            .font(.system(size: 34, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("/ \(formatTime(duration))")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(TVTheme.textSecondary)
+                    }
+
+                    Text(delta >= 0 ? (isScrubbing ? "滑动快进 +\(Int(delta))s" : "快进 +\(Int(delta))s") : (isScrubbing ? "滑动快退 \(Int(delta))s" : "快退 \(Int(delta))s"))
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(TVTheme.primary)
+                }
+            }
+
+            // 微缩高精进度条
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(height: 6)
+
+                    let progress = duration > 0 ? max(0, min(targetTime / duration, 1.0)) : 0
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [TVTheme.primary, TVTheme.primaryHover],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(6, geo.size.width * CGFloat(progress)), height: 6)
+                }
+            }
+            .frame(width: 300, height: 6)
+        }
+        .padding(.horizontal, 36)
+        .padding(.vertical, 22)
+        .background(
+            Material.regular
+        )
+        .background(
+            Color(red: 0.08, green: 0.08, blue: 0.1).opacity(0.92)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1.2)
+        )
+        .shadow(color: Color.black.opacity(0.85), radius: 28, x: 0, y: 10)
+    }
+
+    private func formatTime(_ sec: Double) -> String {
+        guard !sec.isNaN && sec >= 0 else { return "00:00" }
+        let total = Int(sec)
+        let m = total / 60
+        let s = total % 60
+        return String(format: "%02d:%02d", m, s)
+    }
+}
+
+// MARK: - 遥控器触控板滑动捕获组件 (tvOS Siri Remote Touch Surface)
+
+public struct TVRemoteTouchSurfaceView: UIViewRepresentable {
+    public var onPanBegan: () -> Void
+    public var onPanChanged: (CGFloat) -> Void
+    public var onPanEnded: () -> Void
+
+    public func makeUIView(context: Context) -> TVTouchCapturingView {
+        let view = TVTouchCapturingView()
+        view.onPanBegan = onPanBegan
+        view.onPanChanged = onPanChanged
+        view.onPanEnded = onPanEnded
+        return view
+    }
+
+    public func updateUIView(_ uiView: TVTouchCapturingView, context: Context) {
+        uiView.onPanBegan = onPanBegan
+        uiView.onPanChanged = onPanChanged
+        uiView.onPanEnded = onPanEnded
+    }
+}
+
+public class TVTouchCapturingView: UIView {
+    var onPanBegan: (() -> Void)?
+    var onPanChanged: ((CGFloat) -> Void)?
+    var onPanEnded: (() -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = true
+        backgroundColor = .clear
+
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        panGesture.cancelsTouchesInView = false
+        addGestureRecognizer(panGesture)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {
+        switch recognizer.state {
+        case .began:
+            onPanBegan?()
+        case .changed:
+            let translation = recognizer.translation(in: self)
+            onPanChanged?(translation.x)
+        case .ended, .cancelled:
+            onPanEnded?()
+        default:
+            break
         }
     }
 }
