@@ -95,6 +95,13 @@ import CoreMedia
           }
           return
         }
+        if call.method == "stopPictureInPicture" {
+          let positionMs = Int((self.pipPlayer?.currentTime().seconds ?? 0) * 1000)
+          self.pipController?.stopPictureInPicture()
+          self.cleanUpPip()
+          result(["stopped": true, "position": positionMs])
+          return
+        }
         guard call.method == "systemProxy" else {
           result(FlutterMethodNotImplemented)
           return
@@ -207,12 +214,22 @@ import CoreMedia
     return UIApplication.shared.keyWindow?.rootViewController
   }
 
-  private func startPip(with url: URL, headers: [String: String], positionMs: Int, speed: Float, result: @escaping FlutterResult) {
-    ensureAudioSessionConfigured()
-
+  private func cleanUpPip() {
     self.pipObservation?.invalidate()
     self.pipObservation = nil
     self.pipPlayer?.pause()
+    self.pipPlayer = nil
+    self.pipPlayerLayer?.removeFromSuperlayer()
+    self.pipPlayerLayer = nil
+    self.pipContainerView?.removeFromSuperview()
+    self.pipContainerView = nil
+    self.pipController = nil
+  }
+
+  private func startPip(with url: URL, headers: [String: String], positionMs: Int, speed: Float, result: @escaping FlutterResult) {
+    ensureAudioSessionConfigured()
+
+    self.cleanUpPip()
 
     var assetOptions: [String: Any] = [:]
     if !headers.isEmpty {
@@ -221,6 +238,10 @@ import CoreMedia
     let asset = AVURLAsset(url: url, options: assetOptions)
     let playerItem = AVPlayerItem(asset: asset)
     let player = AVPlayer(playerItem: playerItem)
+    player.actionAtItemEnd = .none
+    if #available(iOS 16.0, *) {
+      player.preventsDisplaySleepDuringVideoPlayback = true
+    }
     self.pipPlayer = player
 
     guard let rootVC = self.activeRootViewController else {
@@ -237,21 +258,19 @@ import CoreMedia
     if targetBounds.width <= 0 || targetBounds.height <= 0 {
       targetBounds = UIScreen.main.bounds
     }
-    if pipContainerView == nil {
-      let view = UIView(frame: targetBounds)
-      view.backgroundColor = .black
-      view.isUserInteractionEnabled = false
-      rootVC.view.insertSubview(view, at: 0)
-      self.pipContainerView = view
-    } else {
-      pipContainerView?.frame = targetBounds
-    }
 
-    pipPlayerLayer?.removeFromSuperlayer()
+    // 关键修复：容器完全透明且不拦截触摸，置于最顶层避免被 FlutterView 完全遮盖导致 isPictureInPicturePossible 为 false
+    let view = UIView(frame: targetBounds)
+    view.backgroundColor = .clear
+    view.isUserInteractionEnabled = false
+    rootVC.view.addSubview(view)
+    self.pipContainerView = view
+
     let layer = AVPlayerLayer(player: player)
     layer.frame = targetBounds
     layer.videoGravity = .resizeAspect
-    pipContainerView?.layer.addSublayer(layer)
+    layer.backgroundColor = UIColor.clear.cgColor
+    view.layer.addSublayer(layer)
     self.pipPlayerLayer = layer
 
     let controller = AVPictureInPictureController(playerLayer: layer)
@@ -261,10 +280,12 @@ import CoreMedia
       controller?.canStartPictureInPictureAutomaticallyFromInline = true
     }
 
-    let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
-    player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
-      guard let self = self, let pipCtrl = self.pipController else { return }
-      player.playImmediately(atRate: speed)
+    var triggerFired = false
+    let triggerPip: () -> Void = { [weak self] in
+      guard let self = self, !triggerFired else { return }
+      triggerFired = true
+      guard let pipCtrl = self.pipController else { return }
+      self.pipPlayer?.playImmediately(atRate: speed)
 
       if pipCtrl.isPictureInPicturePossible {
         pipCtrl.startPictureInPicture()
@@ -277,17 +298,28 @@ import CoreMedia
           }
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+        // 3秒启动超时保护
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
           guard let self = self, self.pipObservation != nil else { return }
           if !(self.pipController?.isPictureInPictureActive ?? false) {
-            self.pipObservation?.invalidate()
-            self.pipObservation = nil
-            self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "error": "启动画中画超时"])
-            self.pipPlayer?.pause()
-            self.pipPlayer = nil
+            self.cleanUpPip()
+            self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "error": "启动画中画未就绪，请稍后重试"])
           }
         }
       }
+    }
+
+    if positionMs > 0 {
+      let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
+      // 容错：如果 seek 在 800ms 内未回调，自动触发启动
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+        triggerPip()
+      }
+      player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+        triggerPip()
+      }
+    } else {
+      triggerPip()
     }
 
     result(["supported": true, "active": false, "requested": true])
@@ -300,13 +332,7 @@ import CoreMedia
   func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
     let positionMs = Int((pipPlayer?.currentTime().seconds ?? 0) * 1000)
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "position": positionMs])
-    pipPlayer?.pause()
-    pipPlayer = nil
-    pipPlayerLayer?.removeFromSuperlayer()
-    pipPlayerLayer = nil
-    pipController = nil
-    pipObservation?.invalidate()
-    pipObservation = nil
+    cleanUpPip()
   }
 
   func pictureInPictureController(
@@ -314,12 +340,6 @@ import CoreMedia
     failedToStartPictureInPictureWithError error: Error
   ) {
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "error": error.localizedDescription])
-    pipPlayer?.pause()
-    pipPlayer = nil
-    pipPlayerLayer?.removeFromSuperlayer()
-    pipPlayerLayer = nil
-    pipController = nil
-    pipObservation?.invalidate()
-    pipObservation = nil
+    cleanUpPip()
   }
 }

@@ -781,6 +781,22 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
   }
 
+  Future<void> _restoreFromPictureInPicture() async {
+    try {
+      final status = await AppDevice.channel.invokeMapMethod<String, dynamic>(
+        'stopPictureInPicture',
+      );
+      final position = (status?['position'] as num?)?.toInt();
+      if (position != null && position > 0) {
+        await _seekTo(Duration(milliseconds: position));
+      }
+    } catch (_) {}
+    _setPictureInPictureStatus(active: false, requested: false);
+    if (_playIntent && !_loading && _error == null) {
+      unawaited(_player.play());
+    }
+  }
+
   Map<String, int>? _pictureInPictureSourceRect() {
     final paneContext = _videoPaneKey.currentContext;
     final renderObject = paneContext?.findRenderObject();
@@ -2211,6 +2227,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       onRetryDanmaku: _retryDanmakuFromControls,
       onPushToDevice: _pushToDevice,
       onEnterPictureInPicture: _enterPictureInPicture,
+      onRestorePictureInPicture: _restoreFromPictureInPicture,
       onTelevisionEpisodes: _televisionEpisodes,
       onTelevisionSettings: _televisionSettings,
     );
