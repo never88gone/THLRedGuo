@@ -162,7 +162,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       _pictureInPictureActive || _pictureInPictureRequested;
   bool get _canUsePictureInPicture =>
       !_television &&
-      defaultTargetPlatform == TargetPlatform.android &&
+      widget.store.playbackPreferences.pictureInPicture &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS) &&
       _pictureInPictureSupported;
   bool get _mobile =>
       !_television &&
@@ -552,11 +554,17 @@ class _PlayerScreenState extends State<PlayerScreen>
             !widget.store.allowsSource('hongguo'))) {
       _danmaku.setPlan(null);
     }
+    if (!_closed && mounted) {
+      setState(() {});
+    }
   }
 
   void _configurePictureInPicture() {
     if (widget.feed) return;
-    if (defaultTargetPlatform != TargetPlatform.android) return;
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
     _pictureInPictureHandlerInstalled = true;
     AppDevice.channel.setMethodCallHandler((call) async {
       if (call.method == 'pictureInPictureChanged') {
@@ -569,7 +577,10 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   Future<void> _refreshPictureInPictureStatus() async {
-    if (defaultTargetPlatform != TargetPlatform.android) return;
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
     try {
       final status = await AppDevice.channel.invokeMapMethod<String, dynamic>(
         'pictureInPictureStatus',
@@ -689,7 +700,17 @@ class _PlayerScreenState extends State<PlayerScreen>
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted || _closed) return;
     final sourceRect = _pictureInPictureSourceRect();
-    final arguments = <String, int>{'width': width, 'height': height};
+    final mediaUrl = _plan?.url.isNotEmpty == true
+        ? _plan!.url
+        : (_player is LunaExoPlayer ? _player.mediaUri : '');
+    final arguments = <String, dynamic>{
+      'width': width,
+      'height': height,
+      if (mediaUrl.isNotEmpty) 'url': mediaUrl,
+      'title': widget.detail.drama.title,
+      'position': _player.state.position.inMilliseconds,
+      'speed': _speed,
+    };
     if (sourceRect != null) arguments.addAll(sourceRect);
     try {
       final status = await AppDevice.channel.invokeMapMethod<String, dynamic>(

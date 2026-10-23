@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/core/store/local_store.dart';
@@ -149,6 +150,30 @@ class PlaybackSettingsPage extends StatelessWidget {
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => _chooseSpeed(context),
                     ),
+                    if (defaultTargetPlatform == TargetPlatform.android ||
+                        defaultTargetPlatform == TargetPlatform.iOS) ...[
+                      const Divider(height: 1, indent: 56),
+                      SwitchListTile.adaptive(
+                        key: const ValueKey('settings-pip-switch'),
+                        secondary: const Icon(Icons.picture_in_picture_alt_rounded),
+                        title: const Text('画中画模式'),
+                        subtitle: Text(
+                          prefs.pictureInPicture
+                              ? '已开启画中画，播放时支持悬浮小窗播放'
+                              : '关闭后播放器隐藏画中画入口',
+                        ),
+                        value: prefs.pictureInPicture,
+                        activeThumbColor: AppColors.white,
+                        activeTrackColor: AppColors.hongguoRed,
+                        onChanged: (val) async {
+                          final updated = prefs.copyWith(pictureInPicture: val);
+                          await saveUserChange(
+                            context,
+                            () => store.setPlaybackPreferences(updated),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),

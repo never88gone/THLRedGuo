@@ -1,9 +1,18 @@
 import Flutter
 import UIKit
 import CFNetwork
+import AVKit
+import AVFoundation
+import CoreMedia
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, AVPictureInPictureControllerDelegate {
+  private var pipController: AVPictureInPictureController?
+  private var pipPlayer: AVPlayer?
+  private var pipPlayerLayer: AVPlayerLayer?
+  private var pipContainerView: UIView?
+  private var deviceChannel: FlutterMethodChannel?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -25,7 +34,9 @@ import CFNetwork
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "DeviceSettings") {
       let channel = FlutterMethodChannel(name: "duanju/device", binaryMessenger: registrar.messenger())
-      channel.setMethodCallHandler { call, result in
+      self.deviceChannel = channel
+      channel.setMethodCallHandler { [weak self] call, result in
+        guard let self = self else { return }
         if call.method == "isPad" {
           result(UIDevice.current.userInterfaceIdiom == .pad)
           return
@@ -36,6 +47,44 @@ import CFNetwork
             "isPad": UIDevice.current.userInterfaceIdiom == .pad,
             "version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
           ])
+          return
+        }
+        if call.method == "pictureInPictureStatus" {
+          let supported = AVPictureInPictureController.isPictureInPictureSupported()
+          let active = self.pipController?.isPictureInPictureActive ?? false
+          result([
+            "supported": supported,
+            "active": active
+          ])
+          return
+        }
+        if call.method == "enterPictureInPicture" {
+          guard AVPictureInPictureController.isPictureInPictureSupported() else {
+            result(["supported": false, "active": false, "requested": false])
+            return
+          }
+          let args = call.arguments as? [String: Any]
+          let urlStr = args?["url"] as? String ?? ""
+          let positionMs = args?["position"] as? Int ?? 0
+          let speed = (args?["speed"] as? NSNumber)?.floatValue ?? 1.0
+
+          let targetUrl: URL?
+          if urlStr.hasPrefix("/") {
+            targetUrl = URL(fileURLWithPath: urlStr)
+          } else if !urlStr.isEmpty {
+            targetUrl = URL(string: urlStr)
+          } else {
+            targetUrl = nil
+          }
+
+          if let url = targetUrl {
+            self.startPip(with: url, positionMs: positionMs, speed: speed, result: result)
+          } else if let controller = self.pipController, controller.isPictureInPicturePossible {
+            controller.startPictureInPicture()
+            result(["supported": true, "active": controller.isPictureInPictureActive, "requested": true])
+          } else {
+            result(["supported": true, "active": false, "requested": false])
+          }
           return
         }
         guard call.method == "systemProxy" else {
@@ -58,5 +107,58 @@ import CFNetwork
                 "pac": (settings["ProxyAutoConfigEnable"] as? NSNumber)?.boolValue == true])
       }
     }
+  }
+
+  private func startPip(with url: URL, positionMs: Int, speed: Float, result: @escaping FlutterResult) {
+    do {
+      try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+      try AVAudioSession.sharedInstance().setActive(true)
+    } catch {}
+
+    let playerItem = AVPlayerItem(url: url)
+    let player = AVPlayer(playerItem: playerItem)
+    self.pipPlayer = player
+
+    if pipContainerView == nil {
+      let view = UIView(frame: CGRect(x: 0, y: 0, width: 4, height: 4))
+      view.backgroundColor = .clear
+      view.isUserInteractionEnabled = false
+      view.alpha = 0.01
+      self.window?.addSubview(view)
+      self.pipContainerView = view
+    }
+
+    pipPlayerLayer?.removeFromSuperlayer()
+    let layer = AVPlayerLayer(player: player)
+    layer.frame = CGRect(x: 0, y: 0, width: 4, height: 4)
+    pipContainerView?.layer.addSublayer(layer)
+    self.pipPlayerLayer = layer
+
+    let controller = AVPictureInPictureController(playerLayer: layer)
+    self.pipController = controller
+    controller?.delegate = self
+    if #available(iOS 14.2, *) {
+      controller?.canStartPictureInPictureAutomaticallyFromInline = true
+    }
+
+    let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
+    player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+      player.playImmediately(atRate: speed)
+      controller?.startPictureInPicture()
+      result(["supported": true, "active": true, "requested": true])
+    }
+  }
+
+  func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+    deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": true])
+  }
+
+  func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+    deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false])
+    pipPlayer?.pause()
+    pipPlayer = nil
+    pipPlayerLayer?.removeFromSuperlayer()
+    pipPlayerLayer = nil
+    pipController = nil
   }
 }

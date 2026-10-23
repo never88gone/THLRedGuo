@@ -8,6 +8,7 @@ class PlaybackPreferences {
     this.speed = 1,
     this.quality = 0,
     this.autoAdvance = true,
+    this.pictureInPicture = false,
     this.danmaku = true,
     this.danmakuStyle = const DanmakuStyle(),
     this.preload = true,
@@ -17,6 +18,7 @@ class PlaybackPreferences {
   final double speed;
   final int quality;
   final bool autoAdvance;
+  final bool pictureInPicture;
   final bool danmaku;
   final DanmakuStyle danmakuStyle;
   final bool preload;
@@ -26,6 +28,7 @@ class PlaybackPreferences {
     double? speed,
     int? quality,
     bool? autoAdvance,
+    bool? pictureInPicture,
     bool? danmaku,
     DanmakuStyle? danmakuStyle,
     bool? preload,
@@ -34,6 +37,7 @@ class PlaybackPreferences {
     speed: speed ?? this.speed,
     quality: quality ?? this.quality,
     autoAdvance: autoAdvance ?? this.autoAdvance,
+    pictureInPicture: pictureInPicture ?? this.pictureInPicture,
     danmaku: danmaku ?? this.danmaku,
     danmakuStyle: danmakuStyle ?? this.danmakuStyle,
     preload: preload ?? this.preload,
@@ -44,6 +48,7 @@ class PlaybackPreferences {
     'speed': speed,
     'quality': quality,
     'autoAdvance': autoAdvance,
+    'pictureInPicture': pictureInPicture,
     'danmaku': danmaku,
     'danmakuStyle': danmakuStyle.toJson(),
     'preload': preload,
@@ -54,6 +59,7 @@ class PlaybackPreferences {
     final speed = (value['speed'] as num? ?? 1).toDouble();
     final quality = value['quality'] as int? ?? 0;
     final autoAdvance = value['autoAdvance'] as bool? ?? true;
+    final pictureInPicture = value['pictureInPicture'] as bool? ?? false;
     final danmaku = value['danmaku'] as bool? ?? true;
     final danmakuStyle = value['danmakuStyle'] is Map
         ? DanmakuStyle.fromJson(value['danmakuStyle'] as Map<String, dynamic>)
@@ -66,6 +72,7 @@ class PlaybackPreferences {
       speed: speed,
       quality: quality,
       autoAdvance: autoAdvance,
+      pictureInPicture: pictureInPicture,
       danmaku: danmaku,
       danmakuStyle: danmakuStyle,
       preload: preload,

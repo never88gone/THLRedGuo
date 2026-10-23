@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -21,6 +22,7 @@ import 'package:THLRedLook/pages/sources/sources_page.dart';
 import 'package:THLRedLook/utils/build/app_build.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
 import 'package:THLRedLook/utils/privacy/privacy_lock_controller.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/utils/theme/app_theme.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 import 'package:THLRedLook/views/settings/settings_group_view.dart';
@@ -136,7 +138,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     key: const ValueKey('settings-playback-entry'),
                     leading: const Icon(Icons.tune_rounded),
                     title: const Text('播放设置'),
-                    subtitle: Text('默认 $qualityLabel · ${playPrefs.speed}x · 弹幕${playPrefs.danmaku ? "开启" : "关闭"}'),
+                    subtitle: Text(
+                      '默认 $qualityLabel · ${playPrefs.speed}x · 弹幕${playPrefs.danmaku ? "开启" : "关闭"}${playPrefs.pictureInPicture ? " · 画中画开启" : ""}',
+                    ),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,
@@ -145,6 +149,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
+                  if (defaultTargetPlatform == TargetPlatform.android ||
+                      defaultTargetPlatform == TargetPlatform.iOS) ...[
+                    const Divider(height: 1, indent: 56),
+                    SwitchListTile.adaptive(
+                      key: const ValueKey('settings-main-pip-switch'),
+                      secondary: const Icon(Icons.picture_in_picture_alt_rounded),
+                      title: const Text('画中画模式'),
+                      subtitle: Text(
+                        playPrefs.pictureInPicture
+                            ? '已开启画中画（切出应用或点击按钮悬浮播放）'
+                            : '已关闭（开启后可在播放器使用画中画小窗）',
+                      ),
+                      value: playPrefs.pictureInPicture,
+                      activeThumbColor: AppColors.white,
+                      activeTrackColor: AppColors.hongguoRed,
+                      onChanged: (val) async {
+                        final updated = playPrefs.copyWith(pictureInPicture: val);
+                        await saveUserChange(
+                          context,
+                          () => widget.store.setPlaybackPreferences(updated),
+                        );
+                      },
+                    ),
+                  ],
                 ],
               ),
 
