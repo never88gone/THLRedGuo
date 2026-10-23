@@ -62,6 +62,14 @@
 		E34571822EE6222200000033 /* TVSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000034 /* TVSidebarView.swift */; };
 		FEED00012C00000100000001 /* VideoFeedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00112C00000100000001 /* VideoFeedViewModel.swift */; };
 		FEED00022C00000100000001 /* TVVideoFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00122C00000100000001 /* TVVideoFeedView.swift */; };
+		AFE6F58902DA55C6890424B4 /* SettingsCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE6F58902DA55C6890424B4 /* SettingsCategory.swift */; };
+		AD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift */; };
+		A648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift */; };
+		A7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift */; };
+		AF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift */; };
+		A75AFF05E2765687A3A41090 /* SettingsContactPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */; };
+		AC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */; };
+		A4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -146,6 +154,14 @@
 		FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteNavigationTests.swift; sourceTree = "<group>"; };
 		FEED00112C00000100000001 /* VideoFeedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFeedViewModel.swift; sourceTree = "<group>"; };
 		FEED00122C00000100000001 /* TVVideoFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVVideoFeedView.swift; sourceTree = "<group>"; };
+		BFE6F58902DA55C6890424B4 /* SettingsCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCategory.swift; sourceTree = "<group>"; };
+		BD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSourcesPanel.swift; sourceTree = "<group>"; };
+		B648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSyncPanel.swift; sourceTree = "<group>"; };
+		B7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoragePanel.swift; sourceTree = "<group>"; };
+		BF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHelpPanel.swift; sourceTree = "<group>"; };
+		B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsContactPanel.swift; sourceTree = "<group>"; };
+		BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAboutPanel.swift; sourceTree = "<group>"; };
+		B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceDiagnosticsSheetView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -411,7 +427,16 @@
 			isa = PBXGroup;
 			children = (
 				B10000322C00000100000001 /* SettingsView.swift */,
-			);
+			
+				BFE6F58902DA55C6890424B4 /* SettingsCategory.swift */,
+				BD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift */,
+				B648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift */,
+				B7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift */,
+				BF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift */,
+				B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */,
+				BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */,
+				B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */,
+);
 			path = Settings;
 			sourceTree = "<group>";
 		};
@@ -685,6 +710,14 @@
 				A10000302C00000100000001 /* SavedLibraryView.swift in Sources */,
 				A10000312C00000100000001 /* DownloadsView.swift in Sources */,
 				A10000322C00000100000001 /* SettingsView.swift in Sources */,
+				AFE6F58902DA55C6890424B4 /* SettingsCategory.swift in Sources */,
+				AD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift in Sources */,
+				A648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift in Sources */,
+				A7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift in Sources */,
+				AF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift in Sources */,
+				A75AFF05E2765687A3A41090 /* SettingsContactPanel.swift in Sources */,
+				AC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift in Sources */,
+				A4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift in Sources */,
 				A10000332C00000100000001 /* MainTabView.swift in Sources */,
 				E34571822EE6222200000031 /* TVCustomSplitView.swift in Sources */,
 				E34571822EE6222200000033 /* TVSidebarView.swift in Sources */,

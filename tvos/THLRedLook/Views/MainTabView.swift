@@ -170,8 +170,21 @@ public struct MainTabView: View {
             case "settings_sync":
                 initTab = .settings
                 initSettingsCategory = .sync
-            case "settings", "importFlow", "settings_sources", "settings_about", "settings_cache", "settings_community", "settings_network":
+            case "settings_help":
                 initTab = .settings
+                initSettingsCategory = .help
+            case "settings_contact":
+                initTab = .settings
+                initSettingsCategory = .contact
+            case "settings_about":
+                initTab = .settings
+                initSettingsCategory = .about
+            case "settings_cache":
+                initTab = .settings
+                initSettingsCategory = .cache
+            case "settings", "importFlow", "settings_sources":
+                initTab = .settings
+                initSettingsCategory = .sources
             case "settingsActive":
                 initTab = .settings
                 initSettingsActive = true
@@ -452,12 +465,28 @@ public struct MainTabView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 focusedNavTab = .catalog
             }
-        case "importFlow", "settings", "settings_cache", "settings_about", "settings_sources", "settings_community", "settings_network":
+        case "importFlow", "settings", "settings_sources":
             selectedTab = .settings
+            settingsInitialCategory = .sources
             columnVisibility = .all
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 focusedNavTab = .settings
             }
+        case "settings_cache", "settings_about", "settings_help", "settings_contact", "settings_sync":
+            selectedTab = .settings
+            if page == "settings_help" {
+                settingsInitialCategory = .help
+            } else if page == "settings_contact" {
+                settingsInitialCategory = .contact
+            } else if page == "settings_about" {
+                settingsInitialCategory = .about
+            } else if page == "settings_cache" {
+                settingsInitialCategory = .cache
+            } else if page == "settings_sync" {
+                settingsInitialCategory = .sync
+            }
+            columnVisibility = .detailOnly
+            focusedNavTab = nil
         case "settingsActive":
             selectedTab = .settings
             isSettingsActiveDemo = true
