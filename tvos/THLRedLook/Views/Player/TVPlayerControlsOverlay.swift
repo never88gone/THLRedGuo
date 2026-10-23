@@ -41,81 +41,94 @@ public struct TVPlayerControlsOverlay: View {
     }
 
     public var body: some View {
-        VStack {
-            // MARK: - 顶部信息与返回条
-            HStack(spacing: 20) {
-                overlayBarButton(
-                    title: "返回",
-                    icon: "chevron.left",
-                    target: .back
-                ) {
-                    onDismiss()
-                }
-                .onMoveCommand { dir in
-                    if dir == .down {
-                        focusedControl = feedActions == nil ? .playPause : .nextDrama
+        VStack(spacing: 0) {
+            // MARK: - 顶部信息与返回条（局部顶部渐变，全屏贴顶铺满）
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 20) {
+                    overlayBarButton(
+                        title: "返回",
+                        icon: "chevron.left",
+                        target: .back
+                    ) {
+                        onDismiss()
                     }
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(viewModel.drama.title)
-                        .accessibilityIdentifier("player.title")
-                        .font(.title3)
-                        .bold()
-                        .foregroundColor(TVTheme.textPrimary)
-                    Text("第 \(viewModel.currentEpisodeIndex) 集 · \(PlaybackPlan.qualityLabel(viewModel.selectedQuality))")
-                        .accessibilityIdentifier("player.episode")
-                        .font(.subheadline)
-                        .foregroundColor(TVTheme.textSecondary)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, 56)
-            .padding(.top, 42)
-
-            if let feedActions {
-                Text(feedActions.progressText)
-                    .font(.system(size: 22))
-                    .accessibilityIdentifier("feed.progress")
-                HStack(spacing: 18) {
-                    overlayBarButton(title: "上一部", icon: "arrow.up", target: .previousDrama, action: feedActions.onPrevious)
-                        .disabled(!feedActions.canGoPrevious)
-                        .opacity(feedActions.canGoPrevious ? 1 : 0.45)
-                    overlayBarButton(title: "下一部", icon: "arrow.down", target: .nextDrama) {
-                        Task { _ = await feedActions.onNext() }
+                    .onMoveCommand { dir in
+                        if dir == .down {
+                            focusedControl = feedActions == nil ? .playPause : .nextDrama
+                        }
                     }
-                    .disabled(!feedActions.canGoNext)
-                    .opacity(feedActions.canGoNext ? 1 : 0.45)
-                    overlayBarButton(title: feedActions.isFavorite ? "已收藏" : "收藏", icon: "bookmark", target: .favorite, action: feedActions.onFavorite)
-                    overlayBarButton(title: "剧集详情", icon: "info.circle", target: .detail) {
-                        feedActions.onDetail(viewModel.drama)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(viewModel.drama.title)
+                            .accessibilityIdentifier("player.title")
+                            .font(.title3)
+                            .bold()
+                            .foregroundColor(TVTheme.textPrimary)
+                        Text("第 \(viewModel.currentEpisodeIndex) 集 · \(PlaybackPlan.qualityLabel(viewModel.selectedQuality))")
+                            .accessibilityIdentifier("player.episode")
+                            .font(.subheadline)
+                            .foregroundColor(TVTheme.textSecondary)
                     }
-                    overlayBarButton(title: "换一批", icon: "arrow.clockwise", target: .refreshFeed, action: feedActions.onRefresh)
-                        .disabled(feedActions.isLoading)
+
                     Spacer()
                 }
                 .padding(.horizontal, 56)
-                .padding(.top, 18)
-                .onMoveCommand { direction in
-                    if direction == .down { focusedControl = .playPause }
-                    if direction == .up { focusedControl = .back }
-                }
-                Text(feedActions.errorMessage ?? "画面模式下按上下键切换短剧，点按显示控制")
-                    .font(.system(size: 22))
-                    .foregroundStyle(feedActions.errorMessage == nil ? .white.opacity(0.8) : .yellow)
-                    .padding(.top, 12)
-                    .lineLimit(2)
-            }
+                .padding(.top, 42)
 
-            // 中间纯净视频画面，支持点击收起控制栏
+                if let feedActions {
+                    Text(feedActions.progressText)
+                        .font(.system(size: 22))
+                        .accessibilityIdentifier("feed.progress")
+                    HStack(spacing: 18) {
+                        overlayBarButton(title: "上一部", icon: "arrow.up", target: .previousDrama, action: feedActions.onPrevious)
+                            .disabled(!feedActions.canGoPrevious)
+                            .opacity(feedActions.canGoPrevious ? 1 : 0.45)
+                        overlayBarButton(title: "下一部", icon: "arrow.down", target: .nextDrama) {
+                            Task { _ = await feedActions.onNext() }
+                        }
+                        .disabled(!feedActions.canGoNext)
+                        .opacity(feedActions.canGoNext ? 1 : 0.45)
+                        overlayBarButton(title: feedActions.isFavorite ? "已收藏" : "收藏", icon: "bookmark", target: .favorite, action: feedActions.onFavorite)
+                        overlayBarButton(title: "剧集详情", icon: "info.circle", target: .detail) {
+                            feedActions.onDetail(viewModel.drama)
+                        }
+                        overlayBarButton(title: "换一批", icon: "arrow.clockwise", target: .refreshFeed, action: feedActions.onRefresh)
+                            .disabled(feedActions.isLoading)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 56)
+                    .padding(.top, 18)
+                    .onMoveCommand { direction in
+                        if direction == .down { focusedControl = .playPause }
+                        if direction == .up { focusedControl = .back }
+                    }
+                    Text(feedActions.errorMessage ?? "画面模式下按上下键切换短剧，点按显示控制")
+                        .font(.system(size: 22))
+                        .foregroundStyle(feedActions.errorMessage == nil ? .white.opacity(0.8) : .yellow)
+                        .padding(.top, 12)
+                        .lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.bottom, 24)
+            .background(
+                LinearGradient(
+                    colors: [Color.black.opacity(0.88), Color.black.opacity(0.45), Color.clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea(edges: [.top, .horizontal])
+            )
+
+            // 中间纯净视频画面，支持点击收起控制栏（完全透明，不产生任何可见背景色块）
             Button(action: {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     viewModel.hideControls()
                 }
             }) {
-                Color.black.opacity(0.001)
+                Color.clear
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(TvTransparentButtonStyle())
             .accessibilityLabel("收起控制栏")
@@ -410,21 +423,20 @@ public struct TVPlayerControlsOverlay: View {
                 }
             }
             .padding(.horizontal, 56)
+            .padding(.top, 36)
             .padding(.bottom, 44)
-        }
-        .background(
-            LinearGradient(
-                colors: [Color.black.opacity(0.85), Color.clear, Color.black.opacity(0.85)],
-                startPoint: .top,
-                endPoint: .bottom
+            .frame(maxWidth: .infinity)
+            .background(
+                LinearGradient(
+                    colors: [Color.clear, Color.black.opacity(0.45), Color.black.opacity(0.92)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea(edges: [.bottom, .horizontal])
             )
-            .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.hideControls()
-                }
-            }
-        )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
         .onExitCommand {
             NSLog("🎬 [Overlay] 遥控器按下 Menu 键，拦截模态退出，仅收起控制栏")
             withAnimation(.easeInOut(duration: 0.2)) {

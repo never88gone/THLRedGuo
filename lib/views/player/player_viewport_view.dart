@@ -144,7 +144,28 @@ class PlayerViewportView extends StatelessWidget {
         '${detail.drama.title} · 第 ${detail.episodes[index].number} 集${plan?.offline == true ? ' · 本地' : ''}${detail.episodes[index].vip ? ' · VIP 试看' : ''}${(plan?.routeIndex ?? 0) > 0 ? ' · 线路 ${plan!.routeIndex + 1}' : ''}';
     final hideOverlayForPictureInPicture = pictureInPictureVisible;
     final Widget controls = hideOverlayForPictureInPicture
-        ? const SizedBox.shrink()
+        ? Align(
+            alignment: Alignment.topLeft,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Material(
+                  color: AppColors.blackWithAlpha(0.6),
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    key: const ValueKey('player-pip-viewport-back'),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    tooltip: '退出播放',
+                    onPressed: onBack,
+                  ),
+                ),
+              ),
+            ),
+          )
         : television
         ? TelevisionControls(
             player: player,

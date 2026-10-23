@@ -13,11 +13,16 @@ import CoreMedia
   private var pipContainerView: UIView?
   private var deviceChannel: FlutterMethodChannel?
   private var icloudChannel: FlutterMethodChannel?
+  private var pipObservation: NSKeyValueObservation?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    do {
+      try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+      try AVAudioSession.sharedInstance().setActive(true)
+    } catch {}
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -82,7 +87,7 @@ import CoreMedia
             self.startPip(with: url, positionMs: positionMs, speed: speed, result: result)
           } else if let controller = self.pipController, controller.isPictureInPicturePossible {
             controller.startPictureInPicture()
-            result(["supported": true, "active": controller.isPictureInPictureActive, "requested": true])
+            result(["supported": true, "active": false, "requested": true])
           } else {
             result(["supported": true, "active": false, "requested": false])
           }
@@ -157,22 +162,34 @@ import CoreMedia
       try AVAudioSession.sharedInstance().setActive(true)
     } catch {}
 
+    self.pipObservation?.invalidate()
+    self.pipObservation = nil
+    self.pipPlayer?.pause()
+
     let playerItem = AVPlayerItem(url: url)
     let player = AVPlayer(playerItem: playerItem)
     self.pipPlayer = player
 
+    guard let rootVC = self.window?.rootViewController else {
+      result(["supported": true, "active": false, "requested": false])
+      return
+    }
+
+    let targetBounds = rootVC.view.bounds
     if pipContainerView == nil {
-      let view = UIView(frame: CGRect(x: 0, y: 0, width: 4, height: 4))
-      view.backgroundColor = .clear
+      let view = UIView(frame: targetBounds)
+      view.backgroundColor = .black
       view.isUserInteractionEnabled = false
-      view.alpha = 0.01
-      self.window?.addSubview(view)
+      rootVC.view.insertSubview(view, at: 0)
       self.pipContainerView = view
+    } else {
+      pipContainerView?.frame = targetBounds
     }
 
     pipPlayerLayer?.removeFromSuperlayer()
     let layer = AVPlayerLayer(player: player)
-    layer.frame = CGRect(x: 0, y: 0, width: 4, height: 4)
+    layer.frame = targetBounds
+    layer.videoGravity = .resizeAspect
     pipContainerView?.layer.addSublayer(layer)
     self.pipPlayerLayer = layer
 
@@ -185,10 +202,34 @@ import CoreMedia
 
     let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
     player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+      guard let self = self, let pipCtrl = self.pipController else { return }
       player.playImmediately(atRate: speed)
-      controller?.startPictureInPicture()
-      result(["supported": true, "active": true, "requested": true])
+
+      if pipCtrl.isPictureInPicturePossible {
+        pipCtrl.startPictureInPicture()
+      } else {
+        self.pipObservation = pipCtrl.observe(\.isPictureInPicturePossible, options: [.new]) { [weak self] c, change in
+          if change.newValue == true {
+            c.startPictureInPicture()
+            self?.pipObservation?.invalidate()
+            self?.pipObservation = nil
+          }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+          guard let self = self, self.pipObservation != nil else { return }
+          if !(self.pipController?.isPictureInPictureActive ?? false) {
+            self.pipObservation?.invalidate()
+            self.pipObservation = nil
+            self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "error": "启动画中画超时"])
+            self.pipPlayer?.pause()
+            self.pipPlayer = nil
+          }
+        }
+      }
     }
+
+    result(["supported": true, "active": false, "requested": true])
   }
 
   func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
@@ -196,11 +237,28 @@ import CoreMedia
   }
 
   func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-    deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false])
+    let positionMs = Int((pipPlayer?.currentTime().seconds ?? 0) * 1000)
+    deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "position": positionMs])
     pipPlayer?.pause()
     pipPlayer = nil
     pipPlayerLayer?.removeFromSuperlayer()
     pipPlayerLayer = nil
     pipController = nil
+    pipObservation?.invalidate()
+    pipObservation = nil
+  }
+
+  func pictureInPictureController(
+    _ pictureInPictureController: AVPictureInPictureController,
+    failedToStartPictureInPictureWithError error: Error
+  ) {
+    deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "error": error.localizedDescription])
+    pipPlayer?.pause()
+    pipPlayer = nil
+    pipPlayerLayer?.removeFromSuperlayer()
+    pipPlayerLayer = nil
+    pipController = nil
+    pipObservation?.invalidate()
+    pipObservation = nil
   }
 }

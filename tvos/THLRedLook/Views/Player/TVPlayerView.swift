@@ -283,7 +283,9 @@ public struct TVPlayerView: View {
             TVPlayerControlsOverlay(viewModel: viewModel, forceFocusPlayButton: viewModel.keepControlsVisible, feedActions: playerFeedActions) {
                 handleExit()
             }
-            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea()
+            .transition(.opacity)
         }
     }
 

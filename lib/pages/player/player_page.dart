@@ -158,8 +158,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _rotating = false;
   bool _television = false;
   AppOrientationController? _orientationController;
-  bool get _pictureInPictureVisible =>
-      _pictureInPictureActive || _pictureInPictureRequested;
+  bool get _pictureInPictureVisible => _pictureInPictureActive;
   bool get _canUsePictureInPicture =>
       !_television &&
       widget.store.playbackPreferences.pictureInPicture &&
@@ -570,7 +569,32 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (call.method == 'pictureInPictureChanged') {
         final arguments = call.arguments;
         final active = arguments is Map && arguments['active'] == true;
-        _setPictureInPictureStatus(active: active, delayHiddenPause: !active);
+        final error = arguments is Map ? arguments['error'] as String? : null;
+        final position =
+            arguments is Map ? (arguments['position'] as num?)?.toInt() : null;
+
+        if (error != null && error.isNotEmpty) {
+          _notice('画中画提示: $error');
+        }
+
+        if (active) {
+          if (Platform.isIOS && _player.state.playing) {
+            unawaited(_player.pause());
+          }
+        } else {
+          if (position != null && position > 0) {
+            unawaited(_seekTo(Duration(milliseconds: position)));
+          }
+          if (_playIntent && !_loading && _error == null) {
+            unawaited(_player.play());
+          }
+        }
+
+        _setPictureInPictureStatus(
+          active: active,
+          requested: false,
+          delayHiddenPause: !active,
+        );
       }
     });
     unawaited(_refreshPictureInPictureStatus());
@@ -686,7 +710,8 @@ class _PlayerScreenState extends State<PlayerScreen>
         _closed ||
         _loading ||
         _error != null ||
-        _panelOpen) {
+        _panelOpen ||
+        _pictureInPictureRequested) {
       return;
     }
     _interactions.cancel();
@@ -697,6 +722,15 @@ class _PlayerScreenState extends State<PlayerScreen>
     final width = ratio >= 1 ? (1000 * ratio).round() : 1000;
     final height = ratio >= 1 ? 1000 : (1000 / ratio).round();
     _setPictureInPictureStatus(requested: true);
+
+    _pictureInPictureExitTimer?.cancel();
+    _pictureInPictureExitTimer = Timer(const Duration(seconds: 4), () {
+      if (!_closed && _pictureInPictureRequested && !_pictureInPictureActive) {
+        _setPictureInPictureStatus(requested: false);
+        _notice('无法进入画中画，请检查系统设置');
+      }
+    });
+
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted || _closed) return;
     final sourceRect = _pictureInPictureSourceRect();
@@ -727,21 +761,15 @@ class _PlayerScreenState extends State<PlayerScreen>
         requested: requested && !active,
       );
       if (!supported || (!active && !requested)) {
-        _notice('当前设备不支持画中画');
-      } else if (requested && !active) {
         _pictureInPictureExitTimer?.cancel();
-        _pictureInPictureExitTimer = Timer(const Duration(seconds: 2), () {
-          if (!_closed &&
-              _pictureInPictureRequested &&
-              !_pictureInPictureActive) {
-            _setPictureInPictureStatus(requested: false);
-          }
-        });
+        _notice('当前设备不支持画中画');
       }
-    } on PlatformException {
+    } on PlatformException catch (e) {
+      _pictureInPictureExitTimer?.cancel();
       _setPictureInPictureStatus(requested: false);
-      _notice('无法进入画中画，请检查系统权限');
+      _notice(e.message ?? '无法进入画中画，请检查系统权限');
     } on MissingPluginException {
+      _pictureInPictureExitTimer?.cancel();
       _setPictureInPictureStatus(supported: false, requested: false);
       _notice('当前平台不支持画中画');
     }
@@ -1944,10 +1972,12 @@ class _PlayerScreenState extends State<PlayerScreen>
     final fullscreen = _showFullscreen;
     final pictureInPicture = _pictureInPictureVisible;
     return PopScope(
-      canPop: _television || !fullscreen,
+      canPop: _television || pictureInPicture || !fullscreen,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && fullscreen && !_television) {
+        if (!didPop && fullscreen && !_television && !pictureInPicture) {
           _rotate();
+        } else if (!didPop && pictureInPicture) {
+          _back();
         }
       },
       child: CallbackShortcuts(
