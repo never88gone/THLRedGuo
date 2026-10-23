@@ -90,7 +90,7 @@ public struct TVPlayerView: View {
             drawersOverlayView
         }
         .focusSection()
-        .defaultFocus($isWakeupFocused, true)
+        .defaultFocus($activeWakeFocus, isInteractive ? .centerWake : nil)
 
         let withEvents = applyEventHandlers(to: content)
         return applyStateListeners(to: withEvents)
@@ -280,20 +280,95 @@ public struct TVPlayerView: View {
 
     @ViewBuilder
     private var wakeButtonView: some View {
-        if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && viewModel.errorMessage == nil {
-            TVRemoteTouchSurfaceView(
-                accessibilityValue: playbackAccessibilityValue,
-                onPanBegan: handlePanBegan,
-                onPanChanged: handlePanChanged,
-                onPanEnded: handlePanEnded,
-                onLeftArrow: { handleQuickSeek(by: -10) },
-                onRightArrow: { handleQuickSeek(by: 10) },
-                onSelect: { viewModel.showControls() },
-                onPlayPause: { viewModel.showControls() },
-                onMenu: { onRemoteMenuPressed() }
-            )
+        if isInteractive && !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && viewModel.errorMessage == nil {
+            ZStack {
+                TVRemoteTouchSurfaceView(
+                    accessibilityValue: playbackAccessibilityValue,
+                    onPanBegan: handlePanBegan,
+                    onPanChanged: handlePanChanged,
+                    onPanEnded: handlePanEnded,
+                    onLeftArrow: { handleQuickSeek(by: -10) },
+                    onRightArrow: { handleQuickSeek(by: 10) },
+                    onSelect: { viewModel.showControls() },
+                    onPlayPause: { viewModel.showControls() },
+                    onMenu: { onRemoteMenuPressed() }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                HStack(spacing: 0) {
+                    // 左侧步进快退锚点
+                    Button(action: {
+                        handleQuickSeek(by: -10)
+                    }) {
+                        Color.black.opacity(0.001)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focusEffectDisabled()
+                    .focused($activeWakeFocus, equals: .leftSeek)
+                    .onExitCommand(perform: onRemoteMenuPressed)
+                    .accessibilityIdentifier("player.directRewind")
+                    .frame(width: 120)
+
+                    // 中间主唤醒层（对应 player.wake，按 Select 唤出控制浮层）
+                    Button(action: {
+                        viewModel.showControls()
+                    }) {
+                        Color.black.opacity(0.001)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focusEffectDisabled()
+                    .focused($activeWakeFocus, equals: .centerWake)
+                    .accessibilityIdentifier("player.wake")
+                    .accessibilityLabel("显示播放控制")
+                    .accessibilityValue(playbackAccessibilityValue)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .onPlayPauseCommand {
+                        viewModel.showControls()
+                    }
+                    .onExitCommand(perform: onRemoteMenuPressed)
+                    .onMoveCommand { direction in
+                        if direction == .right {
+                            handleQuickSeek(by: 10)
+                        } else if direction == .left {
+                            handleQuickSeek(by: -10)
+                        }
+                    }
+
+                    // 右侧步进快进锚点
+                    Button(action: {
+                        handleQuickSeek(by: 10)
+                    }) {
+                        Color.black.opacity(0.001)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focusEffectDisabled()
+                    .focused($activeWakeFocus, equals: .rightSeek)
+                    .onExitCommand(perform: onRemoteMenuPressed)
+                    .accessibilityIdentifier("player.directForward")
+                    .frame(width: 120)
+                }
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
+            .onChange(of: activeWakeFocus) { _, newFocus in
+                if newFocus == .leftSeek {
+                    handleQuickSeek(by: -10)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        activeWakeFocus = .centerWake
+                    }
+                } else if newFocus == .rightSeek {
+                    handleQuickSeek(by: 10)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        activeWakeFocus = .centerWake
+                    }
+                }
+            }
         }
     }
 
@@ -341,7 +416,7 @@ public struct TVPlayerView: View {
                 viewModel.setSceneActive(scenePhase == .active)
                 if isInteractive && !viewModel.isControlsVisible {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        isWakeupFocused = true
+                        activeWakeFocus = .centerWake
                     }
                 }
             }
@@ -403,22 +478,24 @@ public struct TVPlayerView: View {
                 if !isVisible { viewModel.showControls() }
             }
             .onChange(of: viewModel.isControlsVisible) { _, isVisible in
+                guard isInteractive else { return }
                 if !isVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isWakeupFocused = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { activeWakeFocus = .centerWake }
                 }
             }
             .onChange(of: isInteractive) { _, interactive in
                 if !interactive {
-                    isWakeupFocused = false
+                    activeWakeFocus = nil
                 } else if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isWakeupFocused = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { isWakeupFocused = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { activeWakeFocus = .centerWake }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { activeWakeFocus = .centerWake }
                 }
             }
             .onChange(of: focusWakeTrigger) { _, _ in
+                guard isInteractive else { return }
                 if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isWakeupFocused = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { isWakeupFocused = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { activeWakeFocus = .centerWake }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { activeWakeFocus = .centerWake }
                 }
             }
             .onChange(of: viewModel.errorMessage) { _, newErr in
@@ -507,7 +584,7 @@ public struct TVPlayerView: View {
     }
 
     private func handleExit() {
-        isWakeupFocused = false
+        activeWakeFocus = nil
         if let onDismiss = onDismiss {
             onDismiss()
         } else {
@@ -540,7 +617,7 @@ public struct TVPlayerView: View {
             }
         }
         quickSeekHideWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8, execute: workItem)
     }
 
     private func handlePanBegan() {
@@ -576,7 +653,7 @@ public struct TVPlayerView: View {
             }
         }
         quickSeekHideWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8, execute: workItem)
     }
 }
 
@@ -705,31 +782,18 @@ public class TVTouchCapturingView: UIView, UIGestureRecognizerDelegate {
     var onMenu: (() -> Void)?
 
     public override var canBecomeFocused: Bool {
-        return true
+        return false
     }
 
     public override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window != nil {
-            setNeedsFocusUpdate()
-            updateFocusIfNeeded()
-        }
-    }
-
-    public override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
-        super.didUpdateFocus(in: context, with: coordinator)
-        print("THL_DID_UPDATE_FOCUS: nextFocusedView=\(String(describing: context.nextFocusedView)), isSelf=\(context.nextFocusedView === self)")
     }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         isUserInteractionEnabled = true
         backgroundColor = .clear
-
-        isAccessibilityElement = true
-        accessibilityIdentifier = "player.wake"
-        accessibilityTraits = .button
-        accessibilityLabel = "显示播放控制"
+        isAccessibilityElement = false
 
         // 1. Siri Remote 触控表面滑动手势
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
