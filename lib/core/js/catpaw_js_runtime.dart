@@ -108,18 +108,23 @@ class CatPawSearchResult {
 class CatPawJsRuntime {
   static String? _cachedDeviceSession;
   static const String _deviceSessionKey = 'thl_hongguo_device_session';
+  static const String _defaultDeviceSession =
+      '{"ac":"wifi","channel":"update_64","aid":"8662","app_name":"novelread","version_code":"73932","version_name":"7.3.9.32","manifest_version_code":"73932","update_version_code":"73932","pv_player":"73932","device_platform":"android","os":"android","ssmix":"a","device_type":"25053RT47C","device_brand":"Redmi","language":"zh","os_api":"36","os_version":"16","resolution":"1280*2772","dpi":"520","host_abi":"arm64-v8a","dragon_device_type":"phone","compliance_status":"0","need_personal_recommend":"1","player_so_load":"1","is_android_pad_screen":"0","iid":"3102193510285178","device_id":"3102193510281082","cdid":"ce682f4d-2693-454f-8d8a-d3bdc2a87037"}';
 
   /// 预先加载持久化的官方设备认证 Session
   static Future<void> preloadDeviceSession() async {
-    if (_cachedDeviceSession != null) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      _cachedDeviceSession = prefs.getString(_deviceSessionKey);
-    } catch (_) {}
+      _cachedDeviceSession =
+          prefs.getString(_deviceSessionKey) ?? _defaultDeviceSession;
+    } catch (_) {
+      _cachedDeviceSession ??= _defaultDeviceSession;
+    }
   }
 
   /// 获取当前内存中的设备会话（可用于调试或诊断）
-  static String? get cachedDeviceSession => _cachedDeviceSession;
+  static String? get cachedDeviceSession =>
+      _cachedDeviceSession ?? _defaultDeviceSession;
 
   /// 测试辅助方法：重置设备会话
   static void resetDeviceSessionForTesting([String? session]) {
@@ -268,10 +273,12 @@ globalThis.console = {
     _rt.evaluate(_fetchShim);
 
     // 注入设备认证持久化桥接，避免每次冷启动/重新初始化产生额外的设备注册网络延迟
-    if (_cachedDeviceSession != null && _cachedDeviceSession!.isNotEmpty) {
+    final sessionToInject = _cachedDeviceSession ?? _defaultDeviceSession;
+    if (sessionToInject.isNotEmpty) {
+      final safeEncoded = jsonEncode(sessionToInject);
       _rt.evaluate('''
 try {
-  globalThis.__hongguoCachedDevice = $_cachedDeviceSession;
+  globalThis.__hongguoCachedDevice = JSON.parse($safeEncoded);
 } catch (_) {}
 ''');
     }
