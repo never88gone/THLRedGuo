@@ -21,24 +21,24 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
   final recorder = SourceDiagnostics.shared;
   final runner = SourceDiagnosticRunner.shared;
   String version = '版本信息读取中';
-  late final sourceHash = sha256
-      .convert(
-        utf8.encode(
-          kPresetJsSources
-              .firstWhere((s) => s.id == 'hongguo')
-              .script
-              .trimRight(),
-        ),
-      )
-      .toString();
+  late String sourceHash = () {
+    try {
+      final script = kPresetJsSources
+          .firstWhere((s) => s.id == 'hongguo')
+          .loadScriptSync();
+      return sha256.convert(utf8.encode(script.trimRight())).toString();
+    } catch (_) {
+      return '--------';
+    }
+  }();
 
   @override
   void initState() {
     super.initState();
-    _loadVersion();
+    _loadMetadata();
   }
 
-  Future<void> _loadVersion() async {
+  Future<void> _loadMetadata() async {
     try {
       final info = await PackageInfo.fromPlatform();
       if (mounted) {
@@ -49,6 +49,17 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
         setState(() => version = '1.0.0（构建号读取失败）');
       }
     }
+
+    try {
+      final script = await kPresetJsSources
+          .firstWhere((s) => s.id == 'hongguo')
+          .loadScript();
+      if (mounted) {
+        setState(() {
+          sourceHash = sha256.convert(utf8.encode(script.trimRight())).toString();
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _copy() async {
@@ -118,7 +129,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                             border: Border.all(color: AppColors.hongguoRed.withValues(alpha: 0.3), width: 0.8),
                           ),
                           child: Text(
-                            'SHA256 ${sourceHash.substring(0, 8)}',
+                            'SHA256 ${sourceHash.length >= 8 ? sourceHash.substring(0, 8) : sourceHash}',
                             style: const TextStyle(fontSize: 11, color: AppColors.hongguoRed, fontWeight: FontWeight.w600),
                           ),
                         ),

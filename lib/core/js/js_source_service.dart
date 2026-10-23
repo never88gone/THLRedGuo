@@ -51,7 +51,8 @@ class JsSourceService extends ChangeNotifier {
       _sources = await _repository.jsSourceList();
 
       for (final preset in kPresetJsSources) {
-        await _repository.jsSourceSaveAndLoad(preset.script, preset.fileName);
+        final script = await preset.loadScript();
+        await _repository.jsSourceSaveAndLoad(script, preset.fileName);
       }
       _sources = await _repository.jsSourceList();
 

@@ -33,9 +33,10 @@ class SourceDiagnosticRunner extends ChangeNotifier {
       currentStage = 'JS 脚本与引擎初始化';
       stopwatch.reset();
       stopwatch.start();
-      await runtime.init(
-        kPresetJsSources.firstWhere((s) => s.id == 'hongguo').script,
-      );
+      final script = await kPresetJsSources
+          .firstWhere((s) => s.id == 'hongguo')
+          .loadScript();
+      await runtime.init(script);
       successCount++;
       recorder.add(
         SourceDiagnosticEntry(
