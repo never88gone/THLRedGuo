@@ -76,6 +76,7 @@ public struct MainTabView: View {
     @State private var directPlayerDrawer: Bool = false
     @State private var isCardFocusedDemo: Bool = false
     @State private var isSettingsActiveDemo: Bool = false
+    @State private var settingsInitialCategory: SettingsCategory = .sources
     @State private var catalogInitialCategory: String? = nil
     @State private var deepLinkQuery: String? = nil
     @State private var deepLinkEpisode: Int? = nil
@@ -98,6 +99,7 @@ public struct MainTabView: View {
         var initPlayerDrawer: Bool = false
         var initCardFocused: Bool = false
         var initSettingsActive: Bool = false
+        var initSettingsCategory: SettingsCategory = .sources
         var initCategory: String? = nil
 
         var customDramaId: String? = nil
@@ -165,6 +167,9 @@ public struct MainTabView: View {
                 initTab = .library
             case "downloads", "testDownload":
                 initTab = .downloads
+            case "settings_sync":
+                initTab = .settings
+                initSettingsCategory = .sync
             case "settings", "importFlow", "settings_sources", "settings_about", "settings_cache", "settings_community", "settings_network":
                 initTab = .settings
             case "settingsActive":
@@ -190,6 +195,7 @@ public struct MainTabView: View {
         _directPlayerDrawer = State(initialValue: initPlayerDrawer)
         _isCardFocusedDemo = State(initialValue: initCardFocused)
         _isSettingsActiveDemo = State(initialValue: initSettingsActive)
+        _settingsInitialCategory = State(initialValue: initSettingsCategory)
         _catalogInitialCategory = State(initialValue: initCategory)
         _deepLinkQuery = State(initialValue: customQuery)
         _testInitialEpisodeIndex = State(initialValue: customEpisodeIndex)
@@ -294,6 +300,7 @@ public struct MainTabView: View {
                             .padding(.top, 32)
                         case .settings:
                             SettingsView(
+                                initialCategory: settingsInitialCategory,
                                 forceFocusActiveSource: isSettingsActiveDemo,
                                 focusSidebarTrigger: settingsSidebarTrigger,
                                 onRequestFocusTopNav: {
