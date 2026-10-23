@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -38,6 +39,9 @@ class LocalStore extends ChangeNotifier {
   final Map<String, Drama> _favorites = {};
   final Map<String, FollowState> _followStates = {};
   final Map<String, Drama> _seriesCandidates = {};
+  final List<String> _feedSeenIds = [];
+  final Set<String> _feedSeenSet = {};
+  int _feedOffset = 0;
   Future<void> _writes = Future<void>.value();
   List<LocalProfile> _profiles = [];
   String _current = 'default';
@@ -116,6 +120,9 @@ class LocalStore extends ChangeNotifier {
     _favorites.clear();
     _followStates.clear();
     _seriesCandidates.clear();
+    _feedSeenIds.clear();
+    _feedSeenSet.clear();
+    _feedOffset = 0;
     _epoch++;
   }
 
@@ -316,6 +323,8 @@ class LocalStore extends ChangeNotifier {
     _favorites.clear();
     _followStates.clear();
     _seriesCandidates.clear();
+    _feedSeenIds.clear();
+    _feedSeenSet.clear();
     if (_configurationError != null) return;
     for (final row in readJsonList(_string(_key('history')))) {
       try {
@@ -355,6 +364,15 @@ class LocalStore extends ChangeNotifier {
         }
       } catch (_) {}
     }
+    try {
+      final raw = _string(_key('feedSeenDramas'));
+      if (raw != null) {
+        final list = (jsonDecode(raw) as List).whereType<String>();
+        _feedSeenIds.addAll(list);
+        _feedSeenSet.addAll(list);
+      }
+    } catch (_) {}
+    _feedOffset = int.tryParse(_string(_key('feedOffset')) ?? '0') ?? 0;
   }
 
   String _dramaSource(Drama drama) {
@@ -615,6 +633,48 @@ class LocalStore extends ChangeNotifier {
   }
 
   Future<void> clearRecentSearches() => _setting(_key('recentSearches'), '[]');
+
+  List<String> get feedSeenIds => List.unmodifiable(_feedSeenIds);
+  bool isFeedSeen(String dramaId) => _feedSeenSet.contains(dramaId);
+  int get feedOffset => _feedOffset;
+
+  Future<void> markFeedSeen(String dramaId) {
+    if (dramaId.isEmpty) return Future.value();
+    final epoch = _epoch;
+    return _queue(() async {
+      if (locked || epoch != _epoch) return;
+      if (_feedSeenSet.contains(dramaId)) return;
+      _feedSeenIds.add(dramaId);
+      _feedSeenSet.add(dramaId);
+      while (_feedSeenIds.length > 300) {
+        final removed = _feedSeenIds.removeAt(0);
+        _feedSeenSet.remove(removed);
+      }
+      await _commit({
+        _key('feedSeenDramas'): jsonEncode(_feedSeenIds),
+      }, trackSync: false);
+    });
+  }
+
+  int stepFeedOffset([int step = 6]) {
+    _feedOffset = (_feedOffset + step) % 60;
+    unawaited(_commit({
+      _key('feedOffset'): _feedOffset.toString(),
+    }, trackSync: false));
+    return _feedOffset;
+  }
+
+  Future<void> clearFeedSeen() {
+    final epoch = _epoch;
+    return _queue(() async {
+      if (locked || epoch != _epoch) return;
+      _feedSeenIds.clear();
+      _feedSeenSet.clear();
+      await _commit({
+        _key('feedSeenDramas'): jsonEncode([]),
+      }, trackSync: false);
+    });
+  }
 
   Future<void> _commit(
     Map<String, Object> changes, {

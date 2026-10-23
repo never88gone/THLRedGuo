@@ -54,11 +54,13 @@ class VideoFeedController extends ChangeNotifier {
     }
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh({bool preserveCurrent = false}) async {
     if (_disposed || !allowed) return;
     final generation = ++_generation;
     _selection++;
-    _session = DateTime.now().microsecondsSinceEpoch.toString();
+    final retainId = preserveCurrent ? current?.drama.id : null;
+    final offset = store.stepFeedOffset();
+    _session = '${DateTime.now().microsecondsSinceEpoch}_$offset';
     _selectionTimer?.cancel();
     items = [];
     detail = null;
@@ -75,9 +77,12 @@ class VideoFeedController extends ChangeNotifier {
       if (_disposed || generation != _generation || !allowed) return;
       final result = await repository.videoFeed(page: 1, session: _session);
       if (_disposed || generation != _generation || !allowed) return;
-      items = _unique(result.items);
+      final filtered = _filterSeen(result.items, retainId: retainId);
+      items = (filtered.isEmpty && !result.hasMore)
+          ? _unique(result.items)
+          : filtered;
       _page = result.page;
-      hasMore = result.hasMore && items.isNotEmpty;
+      hasMore = result.hasMore;
     } catch (failure) {
       if (!_disposed && generation == _generation) error = failure.toString();
     } finally {
@@ -85,9 +90,27 @@ class VideoFeedController extends ChangeNotifier {
         loading = false;
         notifyListeners();
         if (active) unawaited(prepare());
-        if (active && hasMore && items.length < 3) unawaited(loadMore());
+        if (active && hasMore && items.length < 3) {
+          unawaited(loadMore(retainId: retainId));
+        }
       }
     }
+  }
+
+  List<FeedItem> _filterSeen(Iterable<FeedItem> values, {String? retainId}) {
+    final list = <FeedItem>[];
+    final seen = <String>{};
+    for (final value in values) {
+      final id = value.drama.id;
+      if (value.drama.source == 'hongguo' &&
+          id.isNotEmpty &&
+          !seen.contains(id) &&
+          (!store.isFeedSeen(id) || id == retainId)) {
+        seen.add(id);
+        list.add(value);
+      }
+    }
+    return list;
   }
 
   List<FeedItem> _unique(Iterable<FeedItem> values) => <String, FeedItem>{
@@ -96,7 +119,7 @@ class VideoFeedController extends ChangeNotifier {
         value.drama.id: value,
   }.values.toList();
 
-  Future<void> loadMore() async {
+  Future<void> loadMore({String? retainId}) async {
     if (_disposed ||
         !active ||
         !allowed ||
@@ -115,10 +138,13 @@ class VideoFeedController extends ChangeNotifier {
         session: _session,
       );
       if (_disposed || generation != _generation || !allowed) return;
-      final previous = items.length;
-      items = _unique([...items, ...result.items]);
+      final existingIds = items.map((e) => e.drama.id).toSet();
+      final fresh = _filterSeen(result.items, retainId: retainId)
+          .where((e) => !existingIds.contains(e.drama.id))
+          .toList();
+      items = [...items, ...fresh];
       _page = result.page;
-      hasMore = result.hasMore && items.length > previous;
+      hasMore = result.hasMore;
     } catch (failure) {
       if (!_disposed && generation == _generation) {
         moreError = failure.toString();
@@ -134,7 +160,7 @@ class VideoFeedController extends ChangeNotifier {
             hasMore &&
             moreError == null &&
             items.length - index < 3) {
-          unawaited(loadMore());
+          unawaited(loadMore(retainId: retainId));
         }
       }
     }
@@ -142,7 +168,7 @@ class VideoFeedController extends ChangeNotifier {
 
   Future<void> retryMore() async {
     if (restartRequired) {
-      await refresh();
+      await refresh(preserveCurrent: true);
       return;
     }
     moreError = null;
@@ -201,6 +227,7 @@ class VideoFeedController extends ChangeNotifier {
           detail = loaded;
           loadingDetail = false;
           notifyListeners();
+          unawaited(store.markFeedSeen(target.drama.id));
           break;
         } catch (failure) {
           if (_disposed || !active || ticket != _selection) continue;

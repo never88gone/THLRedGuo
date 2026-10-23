@@ -2210,6 +2210,7 @@ spider.danmaku = function (id, startMs, durationMs) {
   spider.feed = async function (rawPage, rawScope) {
     const page = Math.max(1, number(rawPage));
     const scope = text(rawScope).slice(0, 160);
+    const initialOffset = Math.max(0, number((scope.match(/_(\d+)$/) || [])[1]));
     let state = states.get(scope);
     if (page === 1) {
       state = { pages: new Map(), seen: new Set(), updated: Date.now(), cursor: null };
@@ -2229,6 +2230,25 @@ spider.danmaku = function (id, startMs, durationMs) {
       tab = response.data?.tab_item?.find(item => Number(item.tab_type) === 16);
       cell = tab?.cell_data?.find(item => item.cell_id_str && videos([item]).length);
       data = tab;
+      if (initialOffset > 0 && cell?.cell_id_str) {
+        try {
+          const changeRes = await api('/reading/bookapi/bookmall/cell/change/v', {
+            tab_type: 16,
+            bottom_tab_type: 7,
+            client_template: 7,
+            client_req_type: 2,
+            change_type: 1,
+            cell_id: text(cell.cell_id_str),
+            offset: initialOffset,
+            session_id: text(tab.session_id)
+          });
+          if (changeRes.data?.cell_view && videos([changeRes.data.cell_view]).length) {
+            cell = changeRes.data.cell_view;
+            data = changeRes.data;
+            params = { offset: initialOffset };
+          }
+        } catch (_) {}
+      }
     } else {
       params = state.cursor;
       const response = await api('/reading/bookapi/bookmall/cell/change/v', params);
@@ -2267,8 +2287,8 @@ spider.danmaku = function (id, startMs, durationMs) {
       state.seen.add(id);
     }
     const previous = number(params?.offset);
-    const offset = page === 1 ? Math.max(number(tab.next_offset), raw.length) : number(data.next_offset);
-    const hasMore = page === 1 ? tab.bottom_unlimited === true && raw.length > 0 :
+    const offset = (page === 1 && !params) ? Math.max(number(tab.next_offset), raw.length) : number(data.next_offset);
+    const hasMore = (page === 1 && !params) ? tab.bottom_unlimited === true && raw.length > 0 :
       data.has_more === true && offset > previous && raw.length > 0;
     const result = { list, page, pagecount: hasMore ? page + 1 : page, hasMore };
     state.pages.set(page, result);
