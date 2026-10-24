@@ -158,7 +158,7 @@ public final class HomeViewModel: ObservableObject {
             hasMore = result.hasMore
 
             // 电视大屏优化：在后台静默加载第 2 页扩充分页容量，首屏立即呈现不等待
-            if items.count < 30 && hasMore {
+            if items.count < 40 && hasMore {
                 let nextPage = currentPage + 1
                 Task {
                     if let nextResult = try? await repository.loadCatalog(source: source, category: category, page: nextPage, query: "", force: false) {
