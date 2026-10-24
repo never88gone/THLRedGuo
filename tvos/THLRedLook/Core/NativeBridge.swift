@@ -654,18 +654,36 @@ public actor NativeBridge {
                 let evaluated = evalAsync(context: ctx, scriptExpr: scriptExpr)
                 guard let res = evaluated, res["ok"] as? Bool == true else {
                     let errMsg = evaluated?["error"] as? String ?? "JS 执行无响应或超时"
-                    let errCat = DiagnosticCategory(rawValue: evaluated?["category"] as? String ?? "") ?? (errMsg.contains("网络") ? .dnsError : .jsError)
+                    let rawCat = evaluated?["category"] as? String ?? ""
+                    let rawCode = evaluated?["code"] as? String ?? ""
+                    let errCat: DiagnosticCategory
+                    if let parsedCat = DiagnosticCategory(rawValue: rawCat), rawCat != "js_error" {
+                        errCat = parsedCat
+                    } else if errMsg.contains("网络") || errMsg.contains("DNS") {
+                        errCat = .dnsError
+                    } else if rawCode == "SEARCH_REJECTED" || rawCode == "BUSINESS_REJECTED" || rawCode == "GUEST_REGISTRATION_FAILED" || errMsg.contains("官方搜索") || errMsg.contains("官方会话") {
+                        errCat = .businessRejected
+                    } else if rawCode == "INVALID_RESPONSE" {
+                        errCat = .invalidResponse
+                    } else {
+                        errCat = .jsError
+                    }
                     let errDetail = "搜索执行失败: \(errMsg)"
                     let advice = SourceDiagnostics.advice(SourceDiagnosticEntry(context: diagnosticContext, stage: "搜索执行", category: errCat, errorDetail: errDetail))
                     diagnostics.add(SourceDiagnosticEntry(
                         context: diagnosticContext,
                         stage: "搜索执行",
-                        errorCode: errCat.tag,
+                        errorCode: rawCode.isEmpty ? errCat.tag : rawCode,
                         category: errCat,
                         errorDetail: errMsg,
                         suggestion: advice
                     ))
-                    throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "【\(errCat.tag)】\(errMsg)"])
+                    throw NSError(domain: "CatPawOpen", code: -1, userInfo: [
+                        NSLocalizedDescriptionKey: errMsg,
+                        "diagnosticCategory": errCat.rawValue,
+                        "diagnosticCode": rawCode.isEmpty ? errCat.tag : rawCode,
+                        "diagnosticAdvice": advice
+                    ])
                 }
                 var searchItems: [[String: Any]] = []
                 var searchHasMore = false

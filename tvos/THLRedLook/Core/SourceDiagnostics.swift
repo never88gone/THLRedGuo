@@ -522,13 +522,28 @@ public final class SourceDiagnosticRunner: ObservableObject {
 
             result = "检测完成：DNS网络、JS引擎、游客注册、搜索\(more ? "、分页" : "")\(items.isEmpty ? "（空结果）" : "、详情解析")全部通过"
         } catch {
+            let nsErr = error as NSError
             let errorMsg = error.localizedDescription
-            let isJS = errorMsg.contains("JS") || errorMsg.contains("SyntaxError") || errorMsg.contains("ReferenceError")
-            let (cat, reason, advice) = SourceDiagnostics.classify(error: error, httpStatus: nil, body: nil, isJS: isJS)
+            let cat: DiagnosticCategory
+            let reason: String
+            let advice: String
+            if let rawCat = nsErr.userInfo["diagnosticCategory"] as? String,
+               let parsedCat = DiagnosticCategory(rawValue: rawCat) {
+                cat = parsedCat
+                reason = errorMsg
+                advice = (nsErr.userInfo["diagnosticAdvice"] as? String)
+                    ?? SourceDiagnostics.advice(SourceDiagnosticEntry(context: context, stage: stage, category: cat, errorDetail: reason))
+            } else {
+                let isJS = errorMsg.contains("SyntaxError") || errorMsg.contains("ReferenceError") || errorMsg.contains("TypeError")
+                let classified = SourceDiagnostics.classify(error: error, httpStatus: nil, body: nil, isJS: isJS)
+                cat = classified.category
+                reason = classified.reason
+                advice = classified.suggestion
+            }
             recorder.add(SourceDiagnosticEntry(
                 context: context,
                 stage: stage,
-                errorCode: cat.tag,
+                errorCode: (nsErr.userInfo["diagnosticCode"] as? String) ?? cat.tag,
                 category: cat,
                 errorDetail: reason,
                 suggestion: advice
