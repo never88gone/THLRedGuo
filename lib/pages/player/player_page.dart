@@ -706,13 +706,25 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   Future<void> _enterPictureInPicture() async {
-    if (!_canUsePictureInPicture ||
-        _closed ||
-        _loading ||
-        _error != null ||
-        _panelOpen ||
-        _pictureInPictureRequested) {
+    if (_closed) return;
+    if (!_canUsePictureInPicture) {
+      _notice('画中画未开启或当前设备暂不支持');
       return;
+    }
+    if (_loading) {
+      _notice('正在加载视频，请稍候开启画中画');
+      return;
+    }
+    if (_error != null) {
+      _notice('视频播放出错，无法开启画中画');
+      return;
+    }
+    if (_pictureInPictureRequested) {
+      _notice('正在启动画中画，请稍候...');
+      return;
+    }
+    if (_panelOpen) {
+      setState(() => _panelOpen = false);
     }
     _interactions.cancel();
     final rawRatio = _aspectRatio.isFinite && _aspectRatio > 0
@@ -721,10 +733,11 @@ class _PlayerScreenState extends State<PlayerScreen>
     final ratio = rawRatio.clamp(1 / 2.39, 2.39).toDouble();
     final width = ratio >= 1 ? (1000 * ratio).round() : 1000;
     final height = ratio >= 1 ? 1000 : (1000 / ratio).round();
+    _notice('正在启动画中画...');
     _setPictureInPictureStatus(requested: true);
 
     _pictureInPictureExitTimer?.cancel();
-    _pictureInPictureExitTimer = Timer(const Duration(seconds: 4), () {
+    _pictureInPictureExitTimer = Timer(const Duration(seconds: 8), () {
       if (!_closed && _pictureInPictureRequested && !_pictureInPictureActive) {
         _setPictureInPictureStatus(requested: false);
         _notice('无法进入画中画，请检查系统设置');
@@ -778,6 +791,10 @@ class _PlayerScreenState extends State<PlayerScreen>
       _pictureInPictureExitTimer?.cancel();
       _setPictureInPictureStatus(supported: false, requested: false);
       _notice('当前平台不支持画中画');
+    } catch (e) {
+      _pictureInPictureExitTimer?.cancel();
+      _setPictureInPictureStatus(requested: false);
+      _notice('启动画中画异常: $e');
     }
   }
 
@@ -2203,6 +2220,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       showControlsOnPlaybackReady: _showControlsOnPlaybackReady,
       panelOpen: _panelOpen,
       canUsePictureInPicture: _canUsePictureInPicture,
+      pictureInPictureRequested: _pictureInPictureRequested,
       playerFocus: _playerFocus,
       videoPaneKey: _videoPaneKey,
       allowOnlineFallback: widget.allowOnlineFallback,

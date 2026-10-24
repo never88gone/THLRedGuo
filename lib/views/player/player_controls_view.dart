@@ -43,6 +43,7 @@ class PlayerControls extends StatefulWidget {
     this.onRetryDanmaku,
     this.onPush,
     this.onPictureInPicture,
+    this.pictureInPictureRequested = false,
     this.playbackRequested,
     this.enhancement,
   });
@@ -76,6 +77,7 @@ class PlayerControls extends StatefulWidget {
   final Future<void> Function()? onRetryDanmaku;
   final Future<void> Function()? onPush;
   final Future<void> Function()? onPictureInPicture;
+  final bool pictureInPictureRequested;
   final VideoEnhancementController? enhancement;
 
   @override
@@ -355,6 +357,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                         onPictureInPicture: widget.onPictureInPicture != null
                             ? () => _panel(widget.onPictureInPicture!)
                             : null,
+                        pictureInPictureRequested:
+                            widget.pictureInPictureRequested,
                         onSeekStart: (_) {
                           _hideTimer?.cancel();
                         },

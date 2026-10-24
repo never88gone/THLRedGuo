@@ -26,12 +26,14 @@ class PlayerBottomBarView extends StatelessWidget {
     this.onEpisodes,
     this.onPush,
     this.onPictureInPicture,
+    this.pictureInPictureRequested = false,
   });
 
   final BoxConstraints constraints;
   final bool fullscreen;
   final bool swipeEnabled;
   final bool enabled;
+  final bool pictureInPictureRequested;
   final double speed;
   final String qualityLabel;
   final double duration;
@@ -221,9 +223,20 @@ class PlayerBottomBarView extends StatelessWidget {
         _toolButton(
           context: context,
           key: const ValueKey('player-picture-in-picture'),
-          tooltip: '画中画',
-          onPressed: enabled ? onPictureInPicture : null,
-          child: const Icon(Icons.picture_in_picture_alt_rounded),
+          tooltip: pictureInPictureRequested ? '正在启动画中画' : '画中画',
+          onPressed: (enabled && !pictureInPictureRequested)
+              ? onPictureInPicture
+              : null,
+          child: pictureInPictureRequested
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.picture_in_picture_alt_rounded),
         ),
       if (fullscreen && onEpisodes != null)
         _toolButton(

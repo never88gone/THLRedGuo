@@ -28,6 +28,7 @@ class PlayerViewportView extends StatelessWidget {
     required this.television,
     required this.fullscreen,
     required this.pictureInPictureVisible,
+    this.pictureInPictureRequested = false,
     required this.mobile,
     required this.detail,
     required this.index,
@@ -84,6 +85,7 @@ class PlayerViewportView extends StatelessWidget {
   final bool television;
   final bool fullscreen;
   final bool pictureInPictureVisible;
+  final bool pictureInPictureRequested;
   final bool mobile;
   final DramaDetail detail;
   final int index;
@@ -318,6 +320,7 @@ class PlayerViewportView extends StatelessWidget {
             onPictureInPicture: canUsePictureInPicture
                 ? onEnterPictureInPicture
                 : null,
+            pictureInPictureRequested: pictureInPictureRequested,
             onPrevious: index > 0 ? () => onPlay(index - 1) : null,
             onNext: index + 1 < detail.episodes.length
                 ? () => onPlay(index + 1)

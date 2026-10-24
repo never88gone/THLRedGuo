@@ -14,6 +14,8 @@ import CoreMedia
   private var deviceChannel: FlutterMethodChannel?
   private var icloudChannel: FlutterMethodChannel?
   private var pipObservation: NSKeyValueObservation?
+  private var pipItemStatusObservation: NSKeyValueObservation?
+  private var pipTimeoutWorkItem: DispatchWorkItem?
 
   override func application(
     _ application: UIApplication,
@@ -168,9 +170,11 @@ import CoreMedia
   private func ensureAudioSessionConfigured() {
     do {
       let audioSession = AVAudioSession.sharedInstance()
-      try audioSession.setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
+      try audioSession.setCategory(.playback, mode: .moviePlayback)
       try audioSession.setActive(true)
-    } catch {}
+    } catch {
+      NSLog("[PiP] ensureAudioSessionConfigured failed: %@", error.localizedDescription)
+    }
   }
 
   private func parseMediaUrl(_ urlStr: String) -> URL? {
@@ -215,8 +219,12 @@ import CoreMedia
   }
 
   private func cleanUpPip() {
+    self.pipTimeoutWorkItem?.cancel()
+    self.pipTimeoutWorkItem = nil
     self.pipObservation?.invalidate()
     self.pipObservation = nil
+    self.pipItemStatusObservation?.invalidate()
+    self.pipItemStatusObservation = nil
     self.pipPlayer?.pause()
     self.pipPlayer = nil
     self.pipPlayerLayer?.removeFromSuperlayer()
@@ -228,7 +236,6 @@ import CoreMedia
 
   private func startPip(with url: URL, headers: [String: String], positionMs: Int, speed: Float, result: @escaping FlutterResult) {
     ensureAudioSessionConfigured()
-
     self.cleanUpPip()
 
     var assetOptions: [String: Any] = [:]
@@ -259,9 +266,9 @@ import CoreMedia
       targetBounds = UIScreen.main.bounds
     }
 
-    // 关键修复：容器完全透明且不拦截触摸，置于最顶层避免被 FlutterView 完全遮盖导致 isPictureInPicturePossible 为 false
+    // 宿主容器挂载于顶层并保留微透明度以确保参与 CoreAnimation 屏幕合成
     let view = UIView(frame: targetBounds)
-    view.backgroundColor = .clear
+    view.backgroundColor = UIColor.black.withAlphaComponent(0.005)
     view.isUserInteractionEnabled = false
     rootVC.view.addSubview(view)
     self.pipContainerView = view
@@ -269,9 +276,19 @@ import CoreMedia
     let layer = AVPlayerLayer(player: player)
     layer.frame = targetBounds
     layer.videoGravity = .resizeAspect
-    layer.backgroundColor = UIColor.clear.cgColor
     view.layer.addSublayer(layer)
     self.pipPlayerLayer = layer
+
+    guard AVPictureInPictureController.isPictureInPictureSupported() else {
+      self.cleanUpPip()
+      result([
+        "supported": false,
+        "active": false,
+        "requested": false,
+        "error": "当前设备或系统暂不支持画中画功能"
+      ])
+      return
+    }
 
     let controller = AVPictureInPictureController(playerLayer: layer)
     self.pipController = controller
@@ -280,52 +297,88 @@ import CoreMedia
       controller?.canStartPictureInPictureAutomaticallyFromInline = true
     }
 
-    var triggerFired = false
+    var hasStartedPip = false
     let triggerPip: () -> Void = { [weak self] in
-      guard let self = self, !triggerFired else { return }
-      triggerFired = true
+      guard let self = self, !hasStartedPip else { return }
       guard let pipCtrl = self.pipController else { return }
       self.pipPlayer?.playImmediately(atRate: speed)
 
       if pipCtrl.isPictureInPicturePossible {
+        hasStartedPip = true
         pipCtrl.startPictureInPicture()
       } else {
+        self.pipObservation?.invalidate()
         self.pipObservation = pipCtrl.observe(\.isPictureInPicturePossible, options: [.new]) { [weak self] c, change in
-          if change.newValue == true {
+          guard let self = self else { return }
+          if change.newValue == true && !hasStartedPip {
+            hasStartedPip = true
             c.startPictureInPicture()
-            self?.pipObservation?.invalidate()
-            self?.pipObservation = nil
-          }
-        }
-
-        // 3秒启动超时保护
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-          guard let self = self, self.pipObservation != nil else { return }
-          if !(self.pipController?.isPictureInPictureActive ?? false) {
-            self.cleanUpPip()
-            self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "error": "启动画中画未就绪，请稍后重试"])
+            self.pipObservation?.invalidate()
+            self.pipObservation = nil
           }
         }
       }
     }
 
-    if positionMs > 0 {
-      let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
-      // 容错：如果 seek 在 800ms 内未回调，自动触发启动
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-        triggerPip()
+    // 监听 playerItem 状态，在 readyToPlay 时进行 seek 和触发
+    self.pipItemStatusObservation = playerItem.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
+      guard let self = self else { return }
+      switch item.status {
+      case .readyToPlay:
+        self.pipItemStatusObservation?.invalidate()
+        self.pipItemStatusObservation = nil
+        if positionMs > 0 {
+          let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
+          player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+            DispatchQueue.main.async {
+              triggerPip()
+            }
+          }
+        } else {
+          DispatchQueue.main.async {
+            triggerPip()
+          }
+        }
+      case .failed:
+        self.pipItemStatusObservation?.invalidate()
+        self.pipItemStatusObservation = nil
+        let errorMsg = item.error?.localizedDescription ?? "视频加载异常"
+        NSLog("[PiP] AVPlayerItem failed: %@", errorMsg)
+        self.cleanUpPip()
+        self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: [
+          "active": false,
+          "error": "画中画视频加载失败: \(errorMsg)"
+        ])
+      case .unknown:
+        break
+      @unknown default:
+        break
       }
-      player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
-        triggerPip()
-      }
-    } else {
-      triggerPip()
     }
+
+    // 8 秒超时保护
+    let timeoutItem = DispatchWorkItem { [weak self] in
+      guard let self = self else { return }
+      if !(self.pipController?.isPictureInPictureActive ?? false) {
+        NSLog("[PiP] Start PiP timeout (8s)")
+        self.cleanUpPip()
+        self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: [
+          "active": false,
+          "error": "启动画中画未就绪，请检查网络或系统画中画设置"
+        ])
+      }
+    }
+    self.pipTimeoutWorkItem = timeoutItem
+    DispatchQueue.main.asyncAfter(deadline: .now() + 8.0, execute: timeoutItem)
 
     result(["supported": true, "active": false, "requested": true])
   }
 
   func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+    self.pipTimeoutWorkItem?.cancel()
+    self.pipTimeoutWorkItem = nil
+    self.pipObservation?.invalidate()
+    self.pipObservation = nil
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": true])
   }
 
@@ -339,6 +392,8 @@ import CoreMedia
     _ pictureInPictureController: AVPictureInPictureController,
     failedToStartPictureInPictureWithError error: Error
   ) {
+    self.pipTimeoutWorkItem?.cancel()
+    self.pipTimeoutWorkItem = nil
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "error": error.localizedDescription])
     cleanUpPip()
   }
