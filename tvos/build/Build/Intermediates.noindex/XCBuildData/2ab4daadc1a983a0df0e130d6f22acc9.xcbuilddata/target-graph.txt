@@ -1,2 +1,0 @@
-Target dependency graph (1 target)
-Target 'THLRedLook' in project 'THLRedLook' (no dependencies)

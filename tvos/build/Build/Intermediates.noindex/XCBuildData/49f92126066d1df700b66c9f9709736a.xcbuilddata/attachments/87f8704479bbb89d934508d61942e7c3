@@ -1,4 +1,0 @@
-
-module Kingfisher.Swift {
-  header "Kingfisher-Swift.h"
-}
