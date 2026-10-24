@@ -574,7 +574,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             arguments is Map ? (arguments['position'] as num?)?.toInt() : null;
 
         if (error != null && error.isNotEmpty) {
-          _notice('画中画提示: $error');
+          _notice('画中画提示: ${_localizePipError(error)}');
         }
 
         if (active) {
@@ -705,6 +705,19 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
   }
 
+  String _localizePipError(String? error) {
+    if (error == null || error.trim().isEmpty) {
+      return '无法启动画中画，请检查系统画中画设置或稍后重试';
+    }
+    final lower = error.toLowerCase();
+    if (lower.contains('cannot be completed') ||
+        lower.contains('could not be completed') ||
+        lower.contains('couldn’t be completed')) {
+      return '系统画中画启动未就绪，请稍后重试';
+    }
+    return error;
+  }
+
   Future<void> _enterPictureInPicture() async {
     if (_closed) return;
     if (!_canUsePictureInPicture) {
@@ -727,6 +740,10 @@ class _PlayerScreenState extends State<PlayerScreen>
       setState(() => _panelOpen = false);
     }
     _interactions.cancel();
+    final wasPlaying = _player.state.playing;
+    if (Platform.isIOS && wasPlaying) {
+      await _player.pause();
+    }
     final rawRatio = _aspectRatio.isFinite && _aspectRatio > 0
         ? _aspectRatio
         : 16 / 9;
@@ -741,6 +758,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (!_closed && _pictureInPictureRequested && !_pictureInPictureActive) {
         _setPictureInPictureStatus(requested: false);
         _notice('无法进入画中画，请检查系统设置');
+        if (Platform.isIOS && wasPlaying && !_closed) {
+          unawaited(_player.play());
+        }
       }
     });
 
@@ -779,22 +799,37 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (!supported) {
         _pictureInPictureExitTimer?.cancel();
         _notice('当前系统或设备不支持画中画');
+        if (Platform.isIOS && wasPlaying && !_closed) {
+          unawaited(_player.play());
+        }
       } else if (!active && !requested) {
         _pictureInPictureExitTimer?.cancel();
-        _notice(error ?? '无法启动画中画，请检查系统画中画设置或稍后重试');
+        _notice(_localizePipError(error));
+        if (Platform.isIOS && wasPlaying && !_closed) {
+          unawaited(_player.play());
+        }
       }
     } on PlatformException catch (e) {
       _pictureInPictureExitTimer?.cancel();
       _setPictureInPictureStatus(requested: false);
-      _notice(e.message ?? '无法进入画中画，请检查系统权限');
+      _notice(_localizePipError(e.message));
+      if (Platform.isIOS && wasPlaying && !_closed) {
+        unawaited(_player.play());
+      }
     } on MissingPluginException {
       _pictureInPictureExitTimer?.cancel();
       _setPictureInPictureStatus(supported: false, requested: false);
       _notice('当前平台不支持画中画');
+      if (Platform.isIOS && wasPlaying && !_closed) {
+        unawaited(_player.play());
+      }
     } catch (e) {
       _pictureInPictureExitTimer?.cancel();
       _setPictureInPictureStatus(requested: false);
       _notice('启动画中画异常: $e');
+      if (Platform.isIOS && wasPlaying && !_closed) {
+        unawaited(_player.play());
+      }
     }
   }
 

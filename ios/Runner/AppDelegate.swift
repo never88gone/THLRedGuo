@@ -15,6 +15,7 @@ import CoreMedia
   private var icloudChannel: FlutterMethodChannel?
   private var pipObservation: NSKeyValueObservation?
   private var pipItemStatusObservation: NSKeyValueObservation?
+  private var pipReadyForDisplayObservation: NSKeyValueObservation?
   private var pipTimeoutWorkItem: DispatchWorkItem?
 
   override func application(
@@ -223,6 +224,8 @@ import CoreMedia
     self.pipTimeoutWorkItem = nil
     self.pipObservation?.invalidate()
     self.pipObservation = nil
+    self.pipReadyForDisplayObservation?.invalidate()
+    self.pipReadyForDisplayObservation = nil
     self.pipItemStatusObservation?.invalidate()
     self.pipItemStatusObservation = nil
     self.pipPlayer?.pause()
@@ -266,9 +269,9 @@ import CoreMedia
       targetBounds = UIScreen.main.bounds
     }
 
-    // 宿主容器挂载于顶层并保留微透明度以确保参与 CoreAnimation 屏幕合成
+    // 宿主容器挂载于顶层，确保 CoreAnimation 与 Pegasus 能够完整捕捉可见视频画面执行飞出动画
     let view = UIView(frame: targetBounds)
-    view.backgroundColor = UIColor.black.withAlphaComponent(0.005)
+    view.backgroundColor = .black
     view.isUserInteractionEnabled = false
     rootVC.view.addSubview(view)
     self.pipContainerView = view
@@ -298,45 +301,60 @@ import CoreMedia
     }
 
     var hasStartedPip = false
-    let triggerPip: () -> Void = { [weak self] in
+    let attemptStartPip: () -> Void = { [weak self] in
       guard let self = self, !hasStartedPip else { return }
-      guard let pipCtrl = self.pipController else { return }
-      self.pipPlayer?.playImmediately(atRate: speed)
+      guard let pipCtrl = self.pipController, let currentLayer = self.pipPlayerLayer else { return }
 
-      if pipCtrl.isPictureInPicturePossible {
+      // 核心防错保护：必须等到图层首帧视频画面渲染就绪且画中画控制器判定可能，方可调用系统 startPictureInPicture
+      if currentLayer.isReadyForDisplay && pipCtrl.isPictureInPicturePossible {
         hasStartedPip = true
-        pipCtrl.startPictureInPicture()
-      } else {
         self.pipObservation?.invalidate()
-        self.pipObservation = pipCtrl.observe(\.isPictureInPicturePossible, options: [.new]) { [weak self] c, change in
-          guard let self = self else { return }
-          if change.newValue == true && !hasStartedPip {
-            hasStartedPip = true
-            c.startPictureInPicture()
-            self.pipObservation?.invalidate()
-            self.pipObservation = nil
-          }
-        }
+        self.pipObservation = nil
+        self.pipReadyForDisplayObservation?.invalidate()
+        self.pipReadyForDisplayObservation = nil
+
+        self.ensureAudioSessionConfigured()
+        pipCtrl.startPictureInPicture()
       }
     }
 
-    // 监听 playerItem 状态，在 readyToPlay 时进行 seek 和触发
+    // 监听 playerItem 状态，在 readyToPlay 时进行 seek 和播放
     self.pipItemStatusObservation = playerItem.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
       guard let self = self else { return }
       switch item.status {
       case .readyToPlay:
         self.pipItemStatusObservation?.invalidate()
         self.pipItemStatusObservation = nil
+
+        let beginPlayAndObserve = { [weak self] in
+          guard let self = self else { return }
+          self.pipPlayer?.playImmediately(atRate: speed)
+
+          // 监听 isReadyForDisplay：首帧画面真正渲染到屏幕
+          self.pipReadyForDisplayObservation = self.pipPlayerLayer?.observe(\.isReadyForDisplay, options: [.new, .initial]) { _, _ in
+            DispatchQueue.main.async {
+              attemptStartPip()
+            }
+          }
+
+          // 监听 isPictureInPicturePossible：系统画中画通道完全就绪
+          self.pipObservation = self.pipController?.observe(\.isPictureInPicturePossible, options: [.new, .initial]) { _, _ in
+            DispatchQueue.main.async {
+              attemptStartPip()
+            }
+          }
+        }
+
         if positionMs > 0 {
           let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
           player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
             DispatchQueue.main.async {
-              triggerPip()
+              beginPlayAndObserve()
             }
           }
         } else {
           DispatchQueue.main.async {
-            triggerPip()
+            beginPlayAndObserve()
           }
         }
       case .failed:
@@ -379,6 +397,10 @@ import CoreMedia
     self.pipTimeoutWorkItem = nil
     self.pipObservation?.invalidate()
     self.pipObservation = nil
+    self.pipReadyForDisplayObservation?.invalidate()
+    self.pipReadyForDisplayObservation = nil
+    // 小窗已成功从屏幕飞出，隐藏原生全黑容器，完整呈现 Flutter 页面居中的画中画控制卡片
+    self.pipContainerView?.isHidden = true
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": true])
   }
 
@@ -394,7 +416,7 @@ import CoreMedia
   ) {
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
+    self.cleanUpPip()
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "error": error.localizedDescription])
-    cleanUpPip()
   }
 }
