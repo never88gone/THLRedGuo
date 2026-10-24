@@ -380,17 +380,6 @@ public struct SearchRootView: View {
                         Spacer()
                     }
                 }
-                .onAppear {
-                    runInitialSearchIfNeeded()
-                }
-                .onChange(of: initialQuery) { _ in runInitialSearchIfNeeded() }
-                .onChange(of: focusTrigger) { _ in
-                    if let firstId = viewModel.searchResults.first?.id {
-                        focusedTarget = .drama(firstId)
-                    } else {
-                        focusedTarget = .query
-                    }
-                }
                 .onChange(of: viewModel.isLoading) { loading in
                     if !loading && viewModel.hasSearched {
                         if let firstId = viewModel.searchResults.first?.id {
@@ -400,6 +389,24 @@ public struct SearchRootView: View {
                         }
                     }
                 }
+            }
+        }
+        .onAppear {
+            runInitialSearchIfNeeded()
+        }
+        .onChange(of: initialQuery) { _, newQuery in
+            NSLog("🎬 [SearchRootView] onChange initialQuery: %@", newQuery ?? "nil")
+            if let q = newQuery?.trimmingCharacters(in: .whitespacesAndNewlines), !q.isEmpty {
+                handledInitialQuery = q
+                viewModel.query = q
+                Task { await viewModel.executeSearch(keyword: q) }
+            }
+        }
+        .onChange(of: focusTrigger) { _ in
+            if let firstId = viewModel.searchResults.first?.id {
+                focusedTarget = .drama(firstId)
+            } else {
+                focusedTarget = .query
             }
         }
         .onExitCommand {
@@ -428,6 +435,8 @@ public struct SearchRootView: View {
         guard let query = initialQuery?.trimmingCharacters(in: .whitespacesAndNewlines),
               !query.isEmpty, handledInitialQuery != query else { return }
         handledInitialQuery = query
+        viewModel.query = query
+        NSLog("🎬 [SearchRootView] runInitialSearchIfNeeded 执行搜索: query=%@", query)
         Task { await viewModel.executeSearch(keyword: query) }
     }
 }

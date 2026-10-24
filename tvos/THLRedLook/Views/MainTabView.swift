@@ -294,6 +294,7 @@ public struct MainTabView: View {
                                     requestFocusSidebar()
                                 }
                             )
+                            .id("search_root_\(deepLinkQuery ?? "")_\(searchFocusTrigger)")
                             .padding(.top, 32)
                         case .library:
                             SavedLibraryView(
@@ -441,11 +442,13 @@ public struct MainTabView: View {
             let epStr = components.queryItems?.first(where: { $0.name == "episode" })?.value
             let ep = epStr.flatMap { Int($0) }
 
+            self.handoffDrama = nil
             self.selectedTab = .search
-            self.enterContentArea(for: .search)
+            self.searchFocusTrigger += 1
             self.deepLinkQuery = kw
             self.deepLinkEpisode = ep
-            NSLog("🎬 [THLRedLook] 响应 DeepLink 搜索: keyword=%@, episode=%ld", kw, ep ?? 0)
+            self.enterContentArea(for: .search)
+            NSLog("🎬 [THLRedLook] 响应 DeepLink 搜索: keyword=%@, episode=%ld, focusTrigger=%ld", kw, ep ?? 0, self.searchFocusTrigger)
         }
     }
 
