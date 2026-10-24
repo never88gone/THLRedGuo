@@ -66,47 +66,67 @@ public struct SettingsNavButton: View {
     public var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                // 左侧选中条指示器
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(isSelected ? TVTheme.primary : Color.clear)
-                    .frame(width: 4, height: 26)
+                // 左侧选中条指示器（获焦时为纯白发光条，选中未获焦时为品牌红指示条，未选中时隐藏）
+                RoundedRectangle(cornerRadius: 2.5)
+                    .fill(isFocused ? Color.white : (isSelected ? TVTheme.primary : Color.clear))
+                    .frame(width: isFocused ? 5 : 4, height: isFocused ? 28 : 22)
 
                 Image(systemName: category.icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(isFocused ? .white : (isSelected ? TVTheme.primary : .gray))
-                    .frame(width: 24)
+                    .font(.system(size: isFocused ? 22 : 20, weight: (isFocused || isSelected) ? .bold : .semibold))
+                    .foregroundColor(isFocused ? .white : (isSelected ? TVTheme.primary : Color.white.opacity(0.55)))
+                    .frame(width: 26)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(category.title)
-                        .font(.system(size: 19, weight: (isSelected || isFocused) ? .bold : .medium))
-                        .foregroundColor(isFocused ? .white : (isSelected ? .white : .white.opacity(0.75)))
+                        .font(.system(size: 19, weight: isFocused ? .heavy : (isSelected ? .bold : .medium)))
+                        .foregroundColor(isFocused ? .white : (isSelected ? Color.white : Color.white.opacity(0.72)))
                     Text(category.subtitle)
                         .font(.system(size: 12))
-                        .foregroundColor(isFocused ? .white.opacity(0.9) : (isSelected ? .white.opacity(0.7) : .gray))
+                        .foregroundColor(isFocused ? Color.white.opacity(0.95) : (isSelected ? Color.white.opacity(0.75) : Color.white.opacity(0.45)))
                 }
 
                 Spacer()
 
-                if isSelected {
+                if isFocused {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(isFocused ? .white : TVTheme.primary)
+                        .font(.system(size: 14, weight: .black))
+                        .foregroundColor(.white)
+                } else if isSelected {
+                    Circle()
+                        .fill(TVTheme.primary)
+                        .frame(width: 8, height: 8)
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 18)
                     .fill(
                         isFocused
-                            ? TVTheme.primary
-                            : (isSelected ? Color(red: 0.22, green: 0.14, blue: 0.17) : Color.clear)
+                            ? AnyShapeStyle(LinearGradient(colors: [TVTheme.primary, TVTheme.primaryHover], startPoint: .leading, endPoint: .trailing))
+                            : (isSelected ? AnyShapeStyle(Color(red: 0.22, green: 0.12, blue: 0.16).opacity(0.92)) : AnyShapeStyle(Color.white.opacity(0.03)))
                     )
             )
-            .tvFocusBorder(isFocused: isFocused, cornerRadius: 16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(
+                        isFocused
+                            ? Color.white
+                            : (isSelected ? TVTheme.primary.opacity(0.45) : Color.clear),
+                        lineWidth: isFocused ? 3.0 : (isSelected ? 1.5 : 0)
+                    )
+            )
+            .scaleEffect(isFocused ? 1.04 : 1.0)
+            .shadow(
+                color: isFocused ? TVTheme.primary.opacity(0.65) : Color.clear,
+                radius: isFocused ? 16 : 0,
+                x: 0,
+                y: isFocused ? 4 : 0
+            )
+            .animation(TVTheme.focusSpringAnimation, value: isFocused)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.vertical, 5)
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focusEffectDisabled()
         .accessibilityIdentifier("settings.nav.\(category.rawValue)")

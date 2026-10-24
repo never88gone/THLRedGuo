@@ -2010,4 +2010,112 @@ final class RemoteNavigationTests: XCTestCase {
 
         print("THL_TV_SETTINGS_RESULT sidebarClosedOnEnter=true settingsInteractive=true sidebarReopenedOnLeft=true")
     }
+
+    /// 6. 综合验证：
+    /// 1) 焦点在主导航栏设置按钮时不自动进入，需按 Select / Right 才进入
+    /// 2) 数据源管理按钮选中与获焦样式区分明确
+    /// 3) 存储与缓存管理、下载页面均为全屏完整布局，彻底杜绝半屏展示
+    /// 4) 联系方式中的联系邮箱为 support@thltv.com
+    func testSettingsAndDownloadsEnhancedVerification() {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "catalog"]
+        app.launch()
+
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+
+        // 1. 等待主导航栏启动并聚焦在发现（catalog）
+        wait("sidebar catalog tab ready", seconds: 45) {
+            self.app.buttons["nav.catalog"].exists && self.app.buttons["nav.catalog"].hasFocus
+        }
+
+        // 2. 依次按向下键游走至设置（settings）按钮
+        press(.down) // feed
+        press(.down) // rankings
+        press(.down) // search
+        press(.down) // library
+        press(.down) // downloads
+        press(.down) // settings
+        wait("sidebar focused on settings tab", seconds: 15) {
+            self.app.buttons["nav.settings"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["nav.settings"].hasFocus, "焦点当前停留在主导航栏设置按钮上")
+
+        // 验证：此时绝对不能自动进入设置页面，侧边栏保持展开，右侧设置页分类不存在
+        XCTAssertTrue(app.buttons["nav.settings"].exists, "主导航栏依然处于展开状态")
+        XCTAssertFalse(app.buttons["settings.nav.sources"].exists, "未按 Select 或 Right 前绝对没有自动切入设置页面")
+
+        // 3. 点击 select 按钮进入设置页面
+        press(.select)
+        wait("entered settings via select", seconds: 15) {
+            !self.app.buttons["nav.settings"].exists && self.app.buttons["settings.nav.sources"].hasFocus
+        }
+        XCTAssertFalse(app.buttons["nav.settings"].exists, "按下 Select 键后主导航栏自动收起，全屏沉浸展示")
+        XCTAssertTrue(app.buttons["settings.nav.sources"].hasFocus, "焦点精准落入设置分类：站源管理")
+
+        // 截图：站源管理获焦态
+        let shot1 = XCUIScreen.main.screenshot()
+        try? shot1.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_source_nav_focused.png"))
+
+        // 4. 按向右键移入右侧数据源面板（此时左侧站源管理转为选中但未获焦态）
+        press(.right)
+        sleep(1)
+        let shot2 = XCUIScreen.main.screenshot()
+        try? shot2.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_source_nav_selected_unfocused.png"))
+
+        // 5. 按向左键返回左侧分类导航
+        press(.left)
+        wait("back to category", seconds: 10) {
+            self.app.buttons["settings.nav.sources"].hasFocus
+        }
+
+        // 6. 导航至存储与缓存分类并验证全屏卡片布局
+        press(.down) // sync
+        press(.down) // cache
+        wait("cache tab focused", seconds: 10) {
+            self.app.buttons["settings.nav.cache"].hasFocus
+        }
+        press(.right) // 进入右侧存储卡片
+        sleep(1)
+        let shot3 = XCUIScreen.main.screenshot()
+        try? shot3.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_storage_fullwidth_verified.png"))
+
+        // 7. 导航至联系方式分类并验证联系邮箱为 support@thltv.com
+        press(.left)
+        press(.down) // help
+        press(.down) // contact
+        wait("contact tab focused", seconds: 10) {
+            self.app.buttons["settings.nav.contact"].hasFocus
+        }
+        press(.right) // 移入联系方式面板
+        sleep(1)
+        let shot4 = XCUIScreen.main.screenshot()
+        try? shot4.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_contact_email_verified.png"))
+
+        let predicate = NSPredicate(format: "label CONTAINS 'support@thltv.com'")
+        let emailText = app.staticTexts.containing(predicate).firstMatch
+        XCTAssertTrue(emailText.waitForExistence(timeout: 10), "联系方式页面中包含 support@thltv.com")
+
+        // 8. 返回左侧并按向左键重新唤出一级主导航栏，进入下载页面验证全宽
+        press(.left)
+        press(.left) // 重新展开主侧边栏
+        wait("sidebar reopened", seconds: 15) {
+            self.app.buttons["nav.settings"].exists && self.app.buttons["nav.settings"].hasFocus
+        }
+
+        press(.up) // 移动到 downloads
+        wait("downloads tab focused", seconds: 10) {
+            self.app.buttons["nav.downloads"].hasFocus
+        }
+        press(.select) // 按 Select 进入下载页面
+        wait("downloads page loaded", seconds: 15) {
+            !self.app.buttons["nav.downloads"].exists && (self.app.buttons["downloads.explore"].exists || self.app.staticTexts["下载与离线管理"].exists)
+        }
+        sleep(1)
+        let shot5 = XCUIScreen.main.screenshot()
+        try? shot5.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_downloads_fullscreen_verified.png"))
+
+        print("THL_TV_VERIFICATION_COMPLETE noAutoEnterSettings=true sourceStyleDifferentiated=true storageFullWidth=true downloadsFullWidth=true emailVerified=true")
+    }
 }

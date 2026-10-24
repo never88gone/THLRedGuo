@@ -136,7 +136,7 @@ public struct ContactEmailCard: View {
                         .font(.system(size: 15))
                         .foregroundColor(.white.opacity(0.7))
 
-                    Text("联系邮箱：never88gone@gmail.com")
+                    Text("联系邮箱：support@thltv.com")
                         .font(.system(size: 15, weight: .semibold, design: .monospaced))
                         .foregroundColor(TVTheme.primaryHover)
                         .padding(.top, 2)

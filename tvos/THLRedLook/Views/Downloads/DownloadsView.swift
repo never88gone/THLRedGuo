@@ -20,12 +20,12 @@ public struct DownloadsView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     HStack(spacing: 20) {
                         Text("下载与离线管理")
-                            .font(.title2)
-                            .bold()
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(.white)
                         Spacer()
                         Text("共 \(viewModel.jobs.count) 个下载任务")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.6))
 
                         if !viewModel.jobs.isEmpty {
                             TVButton(title: "全部继续", icon: "play.fill") {
@@ -40,21 +40,49 @@ public struct DownloadsView: View {
                     .padding(.top, 24)
 
                     if viewModel.jobs.isEmpty {
-                        VStack(spacing: 24) {
-                            Spacer()
-                            Image(systemName: "arrow.down.circle")
-                                .font(.system(size: 64))
-                                .foregroundColor(.secondary)
-                            Text("暂无缓存任务，可在剧集详情页选择「缓存全剧」")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            TVButton(title: "去浏览短剧", icon: "sparkles", isProminent: true, isExternalFocused: isExploreFocused) {
-                                onRequestFocusTopNav?()
+                        HStack(alignment: .top, spacing: 32) {
+                            // 左侧：离线任务状态与引导
+                            VStack(spacing: 22) {
+                                Spacer()
+                                Image(systemName: "arrow.down.circle")
+                                    .font(.system(size: 68))
+                                    .foregroundColor(.white.opacity(0.35))
+                                Text("暂无缓存任务")
+                                    .font(.system(size: 26, weight: .bold))
+                                    .foregroundColor(.white)
+                                Text("可在剧集详情页选择「缓存全剧」或指定剧集，下载完成后即可在大屏端享受极致流畅的离线免网播放。")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white.opacity(0.6))
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: 420)
+
+                                TVButton(title: "去浏览短剧", icon: "sparkles", isProminent: true, isExternalFocused: isExploreFocused) {
+                                    onRequestFocusTopNav?()
+                                }
+                                .focused($isExploreFocused)
+                                .accessibilityIdentifier("downloads.explore")
+                                .padding(.top, 8)
+                                Spacer()
                             }
-                            .focused($isExploreFocused)
-                            .accessibilityIdentifier("downloads.explore")
-                            Spacer()
+                            .padding(32)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(
+                                RoundedRectangle(cornerRadius: 24)
+                                    .fill(Color(red: 0.11, green: 0.11, blue: 0.15))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 24)
+                                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            )
+
+                            // 右侧：大屏投屏与同网络设备互联
+                            ScrollView(.vertical, showsIndicators: false) {
+                                LanSyncView()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
+                        .padding(.horizontal, 48)
+                        .padding(.bottom, 36)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         ScrollView {
@@ -96,7 +124,6 @@ public struct DownloadsView: View {
 
                                         Spacer()
 
-                                        // 动作按钮（预留上侧、右侧防裁切间距）
                                         HStack(spacing: 20) {
                                             if job.isCompleted {
                                                 TVButton(title: "播放", icon: "play.fill", isProminent: true) {
@@ -130,8 +157,10 @@ public struct DownloadsView: View {
                         .clipShape(Rectangle().inset(by: -30))
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .fullScreenCover(item: $playingLocalJob) { job in
             TVPlayerView(
                 drama: job.drama,
@@ -163,15 +192,16 @@ public struct LanSyncView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 20) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("局域网互联与接续播放")
                         .font(.title2)
                         .bold()
+                        .foregroundColor(.white)
                     Text("本机已开启 Bonjour 服务（_zgj-link._tcp），支持手机或电脑端推送大屏播放及追剧同步。")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.6))
                 }
                 Spacer()
                 if lanService.isSearching {
@@ -183,8 +213,7 @@ public struct LanSyncView: View {
                     }
                 }
             }
-            .padding(.horizontal, 48)
-            .padding(.top, 24)
+            .padding(.top, 8)
 
             // 手机推送大屏待命提示
             HStack(spacing: 16) {
@@ -194,21 +223,28 @@ public struct LanSyncView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("大屏投屏待命已就绪")
                         .font(.headline)
+                        .foregroundColor(.white)
                     Text("在糖葫芦Haw手机端播放页面点击「投屏到电视」，画面将直接在本机无缝接续播放。")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.6))
                 }
                 Spacer()
             }
-            .padding(24)
-            .tvPanelStyle()
-            .padding(.horizontal, 48)
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(red: 0.12, green: 0.12, blue: 0.16))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            )
 
             // 发现的设备列表
             VStack(alignment: .leading, spacing: 14) {
                 Text("发现的同网络设备")
                     .font(.headline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.8))
 
                 if lanService.discoveredDevices.isEmpty {
                     Text("暂未发现同网段运行的客户端设备")
@@ -225,6 +261,7 @@ public struct LanSyncView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(device.name)
                                         .font(.headline)
+                                        .foregroundColor(.white)
                                     Text("IP: \(device.host) · 端口: \(device.port) · 版本: \(device.version)")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
@@ -243,10 +280,10 @@ public struct LanSyncView: View {
                     }
                 }
             }
-            .padding(.horizontal, 48)
 
             Spacer()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .alert(isPresented: Binding(
             get: { syncNotice != nil },
             set: { if !$0 { syncNotice = nil } }

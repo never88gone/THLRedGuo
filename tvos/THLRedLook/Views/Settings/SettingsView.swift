@@ -81,7 +81,6 @@ public struct SettingsView: View {
                     .fill(Color(red: 0.10, green: 0.10, blue: 0.13).opacity(0.95))
             )
             .focusSection()
-            .defaultFocus($focusedCategory, selectedCategory)
             .onMoveCommand { direction in
                 if direction == .left {
                     onRequestFocusTopNav?()
@@ -177,9 +176,11 @@ public struct SettingsView: View {
                 }
             }
             selectedCategory = targetCat
-            focusedCategory = targetCat
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                focusedCategory = targetCat
+            // 正常启动或侧边栏浏览状态绝不自动抢焦，必须由用户按下 select 或 right 键明确切入
+            if let testPage = testPage, testPage != "settings" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    focusedCategory = targetCat
+                }
             }
 
             if args.contains("-testCustomSource") {
