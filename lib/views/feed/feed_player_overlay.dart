@@ -73,6 +73,7 @@ class FeedPlayerOverlay extends StatelessWidget {
           onDanmaku,
         ),
         _action('detail', Icons.info_outline, '剧集详情', onDetail),
+        _action('settings', Icons.tune, '播放设置', onSettings),
       ];
       final progress = duration.inMilliseconds > 0
           ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
@@ -94,17 +95,28 @@ class FeedPlayerOverlay extends StatelessWidget {
                   : const SizedBox.shrink(),
             ),
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 40, 16, 4),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xD9000000)],
+          // 底部暗色渐变（仅作视觉层次，不拦截任何触控事件）
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 260,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0xD9000000)],
+                  ),
                 ),
               ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 40, 16, 12),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -180,35 +192,18 @@ class FeedPlayerOverlay extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: actions,
                     ),
-                  Row(
-                    children: [
-                      IconButton(
-                        key: const ValueKey('feed-play-pause'),
-                        tooltip: playing ? '暂停' : '播放',
-                        onPressed: enabled ? onTogglePlayback : null,
-                        color: Colors.white,
-                        icon: Icon(playing ? Icons.pause : Icons.play_arrow),
-                      ),
-                      Expanded(
-                        child: _FeedProgress(
-                          key: const ValueKey('feed-progress'),
-                          value: progress,
-                          onSeek: enabled && duration > Duration.zero
-                              ? onSeek
-                              : null,
-                        ),
-                      ),
-                      IconButton(
-                        key: const ValueKey('feed-settings'),
-                        tooltip: '播放设置',
-                        onPressed: onSettings,
-                        color: Colors.white,
-                        icon: const Icon(Icons.tune),
-                      ),
-                    ],
-                  ),
                 ],
               ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _FeedProgress(
+              key: const ValueKey('feed-progress'),
+              value: progress,
+              onSeek: enabled && duration > Duration.zero ? onSeek : null,
             ),
           ),
         ],
@@ -277,76 +272,71 @@ class _FeedProgressState extends State<_FeedProgress> {
             onHorizontalDragCancel:
                 isInteractive ? () => setState(() => _dragging = null) : null,
             child: SizedBox(
-              height: 32,
+              height: 20,
               width: width,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 140),
-                    height: trackHeight,
-                    width: width,
-                    decoration: BoxDecoration(
-                      color: AppColors.whiteWithAlpha(0.24),
-                      borderRadius: BorderRadius.circular(trackHeight / 2),
-                    ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // 播放进度渐变单线
-                        Align(
-                          alignment: Alignment.centerLeft,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  height: trackHeight,
+                  width: width,
+                  decoration: BoxDecoration(
+                    color: AppColors.whiteWithAlpha(0.24),
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // 播放进度渐变单线（左右顶到屏幕边缘）
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          width: progressWidth,
+                          height: trackHeight,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                AppColors.hongguoOrange,
+                                AppColors.hongguoRed,
+                                AppColors.hongguoRedLight,
+                              ],
+                            ),
+                            boxShadow: isDragging
+                                ? [
+                                    BoxShadow(
+                                      color:
+                                          AppColors.hongguoRedWithAlpha(0.6),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        ),
+                      ),
+                      // 拖拽手势响应指示微点（静止播放时不显示任何滑块，仅在拖拽微调时给用户清晰反馈）
+                      if (isDragging && progressWidth > 0)
+                        Positioned(
+                          left: (progressWidth - 5).clamp(0.0, width - 10),
+                          top: (trackHeight - 10) / 2,
                           child: Container(
-                            width: progressWidth,
-                            height: trackHeight,
+                            width: 10,
+                            height: 10,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [
-                                  AppColors.hongguoOrange,
-                                  AppColors.hongguoRed,
-                                  AppColors.hongguoRedLight,
-                                ],
-                              ),
-                              borderRadius:
-                                  BorderRadius.circular(trackHeight / 2),
-                              boxShadow: isDragging
-                                  ? [
-                                      BoxShadow(
-                                        color:
-                                            AppColors.hongguoRedWithAlpha(0.6),
-                                        blurRadius: 6,
-                                        spreadRadius: 1,
-                                      ),
-                                    ]
-                                  : null,
+                              shape: BoxShape.circle,
+                              color: AppColors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.hongguoRedWithAlpha(0.8),
+                                  blurRadius: 6,
+                                  spreadRadius: 2,
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        // 拖拽手势响应指示微点（静止播放时不显示任何滑块，仅在拖拽微调时给用户清晰反馈）
-                        if (isDragging && progressWidth > 0)
-                          Positioned(
-                            left: (progressWidth - 5).clamp(0.0, width - 10),
-                            top: (trackHeight - 10) / 2,
-                            child: Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.white,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.hongguoRedWithAlpha(0.8),
-                                    blurRadius: 6,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
