@@ -94,6 +94,44 @@ class LunaPlayerStreams implements PlayerStream {
   }
 }
 
+class _LunaVideoPlayerController extends VideoPlayerController {
+  _LunaVideoPlayerController.file(super.file, {super.videoPlayerOptions})
+    : super.file();
+
+  _LunaVideoPlayerController.networkUrl(
+    super.uri, {
+    super.formatHint,
+    super.httpHeaders,
+    super.videoPlayerOptions,
+  }) : super.networkUrl();
+
+  final _pendingSeeks = <Future<void>>{};
+  bool _retiring = false;
+  Future<void>? _releaseFuture;
+
+  @override
+  Future<void> seekTo(Duration position) async {
+    if (_retiring) return;
+    final completion = Completer<void>();
+    _pendingSeeks.add(completion.future);
+    try {
+      await super.seekTo(position);
+    } finally {
+      _pendingSeeks.remove(completion.future);
+      completion.complete();
+    }
+  }
+
+  @override
+  Future<void> dispose() {
+    _retiring = true;
+    return _releaseFuture ??= () async {
+      await Future.wait(_pendingSeeks.toList());
+      await super.dispose();
+    }();
+  }
+}
+
 /// 采用和 LunaTV-Mobile 完全相同架构的 ExoPlayer (AndroidX Media3) 播放器封装，
 /// 同时对上层播控 UI (PlayerControls & TelevisionControls) 暴露完全兼容的 Player 契约。
 class LunaExoPlayer implements Player {
@@ -333,12 +371,12 @@ class LunaExoPlayer implements Player {
           ? uri.toFilePath()
           : url;
       DiaryService.add('[ExoPlayer] 本地缓存播放');
-      c = VideoPlayerController.file(
+      c = _LunaVideoPlayerController.file(
         File(filePath),
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
       );
     } else {
-      c = VideoPlayerController.networkUrl(
+      c = _LunaVideoPlayerController.networkUrl(
         uri!,
         formatHint: formatHint,
         httpHeaders: headers,
@@ -374,7 +412,7 @@ class LunaExoPlayer implements Player {
           retryHeaders['Accept'] =
               'application/vnd.apple.mpegurl,application/x-mpegURL,*/*';
         }
-        c = VideoPlayerController.networkUrl(
+        c = _LunaVideoPlayerController.networkUrl(
           uri,
           formatHint: alternateFormat,
           httpHeaders: retryHeaders,

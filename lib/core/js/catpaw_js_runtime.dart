@@ -108,27 +108,49 @@ class CatPawSearchResult {
 class CatPawJsRuntime {
   static String? _cachedDeviceSession;
   static const String _deviceSessionKey = 'thl_hongguo_device_session';
-  static const String _defaultDeviceSession =
-      '{"ac":"wifi","channel":"update_64","aid":"8662","app_name":"novelread","version_code":"73932","version_name":"7.3.9.32","manifest_version_code":"73932","update_version_code":"73932","pv_player":"73932","device_platform":"android","os":"android","ssmix":"a","device_type":"25053RT47C","device_brand":"Redmi","language":"zh","os_api":"36","os_version":"16","resolution":"1280*2772","dpi":"520","host_abi":"arm64-v8a","dragon_device_type":"phone","compliance_status":"0","need_personal_recommend":"1","player_so_load":"1","is_android_pad_screen":"0","iid":"3102193510285178","device_id":"3102193510281082","cdid":"ce682f4d-2693-454f-8d8a-d3bdc2a87037"}';
+  static bool _deviceSessionLoaded = false;
+  static Future<void>? _deviceSessionLoading;
 
-  /// 预先加载持久化的官方设备认证 Session
-  static Future<void> preloadDeviceSession() async {
+  static bool _validDeviceSession(String? value) {
+    if (value == null) return false;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _cachedDeviceSession =
-          prefs.getString(_deviceSessionKey) ?? _defaultDeviceSession;
+      final data = jsonDecode(value);
+      return data is Map &&
+          ['iid', 'device_id'].every(
+            (key) =>
+                data[key] is String &&
+                RegExp(r'^[1-9]\d{9,23}$').hasMatch(data[key] as String),
+          );
     } catch (_) {
-      _cachedDeviceSession ??= _defaultDeviceSession;
+      return false;
     }
   }
 
-  /// 获取当前内存中的设备会话（可用于调试或诊断）
-  static String? get cachedDeviceSession =>
-      _cachedDeviceSession ?? _defaultDeviceSession;
+  static Future<void> preloadDeviceSession() async {
+    if (_deviceSessionLoaded) return;
+    if (_deviceSessionLoading != null) return _deviceSessionLoading;
+    _deviceSessionLoading = () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final stored = prefs.getString(_deviceSessionKey);
+        if (_cachedDeviceSession == null && _validDeviceSession(stored)) {
+          _cachedDeviceSession = stored;
+        }
+      } catch (_) {
+      } finally {
+        _deviceSessionLoaded = true;
+        _deviceSessionLoading = null;
+      }
+    }();
+    await _deviceSessionLoading;
+  }
 
-  /// 测试辅助方法：重置设备会话
+  static String? get cachedDeviceSession => _cachedDeviceSession;
+
   static void resetDeviceSessionForTesting([String? session]) {
-    _cachedDeviceSession = session;
+    _cachedDeviceSession = _validDeviceSession(session) ? session : null;
+    _deviceSessionLoaded = true;
+    _deviceSessionLoading = null;
   }
 
   late final JavascriptRuntime _rt;
@@ -136,6 +158,7 @@ class CatPawJsRuntime {
   final bool _isOwnedClient;
   final SourceDiagnostics diagnostics;
   final String diagnosticContext;
+  String? _injectedDeviceSession;
   bool _ready = false;
   bool _isDisposed = false;
   final Set<Completer<void>> _requestAborts = {};
@@ -155,6 +178,7 @@ class CatPawJsRuntime {
 
   bool get isReady => _ready;
   bool get isDisposed => _isDisposed;
+  bool get hasPendingWork => _activeRequests > 0 || _activeEvals > 0;
 
   Future<void> init(String script) async {
     if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
@@ -197,7 +221,12 @@ class CatPawJsRuntime {
   void cancelPending() {
     if (_isDisposed || !_ready) return;
     _cancellation++;
-    _rt.evaluate('globalThis.__hongguoCancelled = true;');
+    _rt.evaluate(r'''
+globalThis.__hongguoCancelled = true;
+Object.keys(globalThis.__fetchWaiters || {}).forEach(function(id) { __rejectFetch(id, 'CANCELLED'); });
+globalThis.__fetchPendingQueue = [];
+''');
+    _rt.executePendingJob();
     for (final abort in _requestAborts.toList()) {
       if (!abort.isCompleted) abort.complete();
     }
@@ -272,15 +301,7 @@ globalThis.console = {
     _rt.evaluate(_htmlShim);
     _rt.evaluate(_fetchShim);
 
-    // 注入设备认证持久化桥接，避免每次冷启动/重新初始化产生额外的设备注册网络延迟
-    if (_cachedDeviceSession != null && _cachedDeviceSession!.isNotEmpty) {
-      final safeEncoded = jsonEncode(_cachedDeviceSession);
-      _rt.evaluate('''
-try {
-  globalThis.__hongguoCachedDevice = JSON.parse($safeEncoded);
-} catch (_) {}
-''');
-    }
+    _syncDeviceSession();
     _rt.evaluate(r'''
 globalThis.__pendingSavedDevice = null;
 globalThis.__native_save_device = function(json) {
@@ -314,17 +335,17 @@ globalThis.__native_save_device = function(json) {
       final body = params['body']?.toString();
 
       final uri = Uri.parse(url);
-      final responseLimit =
+      final officialMetadata =
           uri.scheme == 'https' &&
-              uri.host == 'reading.snssdk.com' &&
-              {
-                '/reading/bookapi/bookmall/tab/v',
-                '/reading/bookapi/bookmall/cell/change/v',
-              }.contains(uri.path) &&
-              uri.queryParameters['bottom_tab_type'] == '7' &&
-              uri.queryParameters['tab_type'] == '16'
-          ? 12 * 1024 * 1024
-          : 2 * 1024 * 1024;
+          (uri.host == 'reading.snssdk.com' ||
+              uri.host.endsWith('.fqnovel.com')) &&
+          {
+            '/novel/player/video_detail/v1/',
+            '/reading/bookapi/search/tab/v',
+            '/reading/bookapi/bookmall/tab/v',
+            '/reading/bookapi/bookmall/cell/change/v',
+          }.contains(uri.path);
+      final responseLimit = (officialMetadata ? 12 : 2) * 1024 * 1024;
       final abort = Completer<void>();
       _requestAborts.add(abort);
       final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 20000).clamp(
@@ -430,6 +451,7 @@ globalThis.__native_save_device = function(json) {
     final res = await _evalAsync(
       'typeof spider !== "undefined" && typeof spider.home === "function" ? spider.home($filter) : { class: [], filters: {} }',
       timeout: const Duration(seconds: 40),
+      operation: '详情解析',
     );
     final map = (res is Map) ? res : {};
     final classes = _toListOfMaps(map['class'] ?? map['classes'] ?? []);
@@ -561,6 +583,7 @@ globalThis.__native_save_device = function(json) {
       res = await _evalAsync(
         'typeof spider !== "undefined" && typeof spider.play === "function" ? spider.play(${jsonEncode(flag)}, ${jsonEncode(id)}, $flagsJson) : { parse: 0, url: "" }',
         timeout: const Duration(seconds: 60),
+        operation: '播放取流',
       );
     } on CatPawSourceFailure {
       rethrow;
@@ -625,6 +648,7 @@ globalThis.__native_save_device = function(json) {
       res = await _evalAsync(
         'typeof spider !== "undefined" && typeof spider.search === "function" ? spider.search(${jsonEncode(keyword)}, $quick, $page) : []',
         timeout: const Duration(seconds: 60),
+        operation: '搜索调用',
       );
     } catch (error) {
       final code = error is CatPawSourceFailure
@@ -667,19 +691,27 @@ globalThis.__native_save_device = function(json) {
   Future<dynamic> _evalAsync(
     String jsCode, {
     Duration timeout = const Duration(seconds: 30),
+    String operation = '',
   }) async {
     _assertReady();
+    final cancellation = _cancellation;
+    final stopwatch = Stopwatch()..start();
+    var queueMs = 0;
+    Object? failure;
     final prevQueue = _evalQueue;
     final queueCompleter = Completer<void>();
     _evalQueue = queueCompleter.future;
-    try {
-      await prevQueue;
-    } catch (_) {}
-    _assertReady();
-
     _activeEvals++;
-    final cancellation = _cancellation;
     try {
+      try {
+        await prevQueue;
+      } catch (_) {}
+      queueMs = stopwatch.elapsedMilliseconds;
+      if (cancellation != _cancellation || _isDisposed) {
+        throw CatPawSourceFailure.playback('cancelled');
+      }
+      _assertReady();
+      _syncDeviceSession();
       _rt.evaluate('globalThis.__hongguoCancelled = false;');
       final evalStart = _rt.evaluate(
         '__startEval(function() { return ($jsCode); })',
@@ -693,7 +725,6 @@ globalThis.__native_save_device = function(json) {
         throw Exception('JS 任务初始化失败: ${evalStart.rawResult}');
       }
 
-      final stopwatch = Stopwatch()..start();
       dynamic rawResult;
 
       while (true) {
@@ -701,6 +732,7 @@ globalThis.__native_save_device = function(json) {
           throw CatPawSourceFailure.playback('cancelled');
         }
         if (stopwatch.elapsed > timeout) {
+          cancelPending();
           throw TimeoutException('数据请求超时，请检查网络或稍后重试', timeout);
         }
 
@@ -785,7 +817,25 @@ globalThis.__native_save_device = function(json) {
         );
       }
       return data;
+    } catch (error) {
+      failure = error;
+      rethrow;
     } finally {
+      if (operation.isNotEmpty) {
+        diagnostics.add(
+          SourceDiagnosticEntry(
+            at: DateTime.now().toUtc(),
+            context: diagnosticContext,
+            stage: '$operation（排队 ${queueMs}ms）',
+            elapsedMs: stopwatch.elapsedMilliseconds,
+            errorCode: failure is CatPawSourceFailure
+                ? failure.code
+                : failure == null
+                ? ''
+                : SourceDiagnostics.networkCode(failure),
+          ),
+        );
+      }
       queueCompleter.complete();
       _activeEvals--;
       if (_isDisposed &&
@@ -797,13 +847,55 @@ globalThis.__native_save_device = function(json) {
     }
   }
 
+  void _syncDeviceSession() {
+    final session = _cachedDeviceSession;
+    if (_injectedDeviceSession == session) return;
+    if (session == null) {
+      _rt.evaluate('delete globalThis.__hongguoCachedDevice;');
+    } else {
+      _rt.evaluate(
+        'globalThis.__hongguoCachedDevice = JSON.parse(${jsonEncode(session)});',
+      );
+    }
+    _injectedDeviceSession = session;
+  }
+
+  String? snapshotDetail(String id) {
+    if (!_ready || _isDisposed || !RegExp(r'^\d{10,30}$').hasMatch(id)) {
+      return null;
+    }
+    final result = _rt.evaluate(
+      'JSON.stringify(globalThis.__hongguoDetailCache && globalThis.__hongguoDetailCache.get(${jsonEncode(id)}) || globalThis.__hongguoFeedDetails && globalThis.__hongguoFeedDetails.get(${jsonEncode(id)}) || null)',
+    );
+    final value = result.stringResult;
+    return result.isError || value.isEmpty || value == 'null' ? null : value;
+  }
+
+  void restoreDetail(String id, String snapshot) {
+    if (!_ready || _isDisposed || !RegExp(r'^\d{10,30}$').hasMatch(id)) return;
+    _rt.evaluate('''
+(function() {
+  const entry = JSON.parse(${jsonEncode(snapshot)});
+  if (!entry || !entry.data || !Number.isFinite(entry.updated) || Date.now() - entry.updated > 300000) return;
+  const cache = globalThis.__hongguoDetailCache || (globalThis.__hongguoDetailCache = new Map());
+  if (!(cache instanceof Map)) return;
+  const previous = cache.get(${jsonEncode(id)});
+  if (previous && previous.updated >= entry.updated) return;
+  cache.set(${jsonEncode(id)}, entry);
+  while (cache.size > 16) cache.delete(cache.keys().next().value);
+})();
+''');
+  }
+
   void _syncSavedDevice() {
     try {
       final check = _rt.evaluate('globalThis.__pendingSavedDevice');
       final val = check.stringResult;
       if (val.isNotEmpty && val != 'null' && val != 'undefined') {
         _rt.evaluate('globalThis.__pendingSavedDevice = null;');
+        if (!_validDeviceSession(val)) return;
         _cachedDeviceSession = val;
+        _injectedDeviceSession = val;
         unawaited(() async {
           try {
             final prefs = await SharedPreferences.getInstance();
@@ -1184,55 +1276,106 @@ var html = (function() {
 
 class CatPawRuntimePool {
   final http.Client _httpClient;
+  final bool _ownsClient;
   final Map<String, CatPawJsRuntime> _pool = {};
   final Map<String, String> _scripts = {};
+  final Map<String, Future<CatPawJsRuntime>> _pending = {};
+  final Map<String, int> _generations = {};
   bool _isDisposed = false;
 
   CatPawRuntimePool([http.Client? httpClient])
-    : _httpClient = httpClient ?? http.Client();
+    : _httpClient = httpClient ?? http.Client(),
+      _ownsClient = httpClient == null;
 
   bool get isDisposed => _isDisposed;
 
-  Future<CatPawJsRuntime> get(String sourceId, String script) async {
-    if (_isDisposed) {
-      throw StateError('CatPawRuntimePool 已经销毁');
+  Future<CatPawJsRuntime> get(
+    String sourceId,
+    String script, {
+    String scope = 'catalog',
+  }) async {
+    if (_isDisposed) throw StateError('CatPawRuntimePool 已经销毁');
+    final key = '$sourceId\u0000$scope';
+    if (_scripts[key] == script) {
+      final pending = _pending[key];
+      if (pending != null) return pending;
+      final runtime = _pool[key];
+      if (runtime != null) return runtime;
     }
-    if (_pool.containsKey(sourceId)) {
-      if (_scripts[sourceId] == script) {
-        return _pool[sourceId]!;
+    _removeKey(key);
+    final generation = _generations[key]!;
+    _scripts[key] = script;
+    final runtime = CatPawJsRuntime(_httpClient);
+    final future = () async {
+      try {
+        await runtime.init(script);
+        if (_isDisposed || _generations[key] != generation) {
+          throw CatPawSourceFailure.playback('cancelled');
+        }
+        _pool[key] = runtime;
+        return runtime;
+      } catch (_) {
+        runtime.dispose();
+        rethrow;
       }
-      remove(sourceId);
+    }();
+    _pending[key] = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_pending[key], future)) _pending.remove(key);
     }
-
-    final rt = CatPawJsRuntime(_httpClient);
-    await rt.init(script);
-    _pool[sourceId] = rt;
-    _scripts[sourceId] = script;
-    return rt;
   }
 
-  void cancelPending() {
-    for (final runtime in _pool.values) {
-      runtime.cancelPending();
+  void _removeKey(String key) {
+    _generations[key] = (_generations[key] ?? 0) + 1;
+    _pending.remove(key);
+    _scripts.remove(key);
+    _pool.remove(key)?.dispose();
+  }
+
+  void cancelPending({String? sourceId, String? scope}) {
+    for (final key in _scripts.keys.toList()) {
+      final parts = key.split('\u0000');
+      if (sourceId != null && parts.first != sourceId) continue;
+      if (scope != null && parts.last != scope) continue;
+      if (_pending.containsKey(key) || _pool[key]?.hasPendingWork == true) {
+        _removeKey(key);
+      }
+    }
+  }
+
+  void shareDetail(String sourceId, String id, CatPawJsRuntime target) {
+    if (sourceId != 'hongguo') return;
+    for (final entry in _pool.entries) {
+      if (!entry.key.startsWith('$sourceId\u0000') ||
+          identical(entry.value, target)) {
+        continue;
+      }
+      final snapshot = entry.value.snapshotDetail(id);
+      if (snapshot != null) target.restoreDetail(id, snapshot);
     }
   }
 
   void remove(String sourceId) {
-    _scripts.remove(sourceId);
-    final rt = _pool.remove(sourceId);
-    rt?.dispose();
+    for (final key
+        in _scripts.keys
+            .where((key) => key.startsWith('$sourceId\u0000'))
+            .toList()) {
+      _removeKey(key);
+    }
   }
 
   void clear() {
-    for (final rt in _pool.values) {
-      rt.dispose();
+    for (final key in _scripts.keys.toList()) {
+      _removeKey(key);
     }
-    _pool.clear();
-    _scripts.clear();
   }
 
   void disposeAll() {
+    if (_isDisposed) return;
     _isDisposed = true;
     clear();
+    if (_ownsClient) _httpClient.close();
   }
 }

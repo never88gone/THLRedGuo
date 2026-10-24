@@ -551,7 +551,7 @@ class NativeRepository extends AppRepository {
       'command': command,
     }))['count'],
   );
-  int _playbackSequence = DateTime.now().microsecondsSinceEpoch;
+  static int _playbackSequence = DateTime.now().microsecondsSinceEpoch;
   bool _nativeAllSourcesActivated = false;
 
   @override
