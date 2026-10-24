@@ -66,7 +66,6 @@ public struct CatalogView: View {
         .fullScreenCover(item: $selectedDrama) { drama in
             DramaDetailView(drama: drama)
         }
-        .onChange(of: viewModel.items) { _, _ in finishPendingRowFocus() }
         .onChange(of: viewModel.categories) { _, _ in
             if pendingCategoryFocus { focusSelectedCategory() }
         }
@@ -83,6 +82,7 @@ public struct CatalogView: View {
             DispatchQueue.main.async { focusSelectedCategory() }
         }
         .task(id: jsService.activeSourceId) {
+            guard !jsService.activeSourceId.isEmpty else { return }
             await viewModel.reloadAll(initialCategory: initialCategory)
         }
         .onExitCommand {
@@ -162,40 +162,53 @@ public struct CatalogView: View {
     }
 
     private var catalogGrid: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 36) {
-                ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, drama in
-                    DramaCardView(
-                        drama: drama,
-                        isFocused: focusedTarget == .card(drama.id),
-                        forceFocused: forceFocusFirstCard && index == 0,
-                        onUpCommand: index < columns.count ? { focusSelectedCategory() } : nil,
-                        onDownCommand: index + columns.count >= viewModel.items.count && viewModel.hasMore ? {
-                            if viewModel.errorMessage != nil { focusedTarget = .reloadButton }
-                            else { focusNextRow(after: drama.id) }
-                        } : nil
-                    ) { selectedDrama = drama }
-                    .focused($focusedTarget, equals: .card(drama.id))
-                    .accessibilityIdentifier("catalog.result.\(index)")
-                    .onAppear {
-                        if index >= viewModel.items.count - 4 {
-                            Task { await viewModel.loadNextPage() }
+        ScrollViewReader { scroll in
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 36) {
+                    ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, drama in
+                        DramaCardView(
+                            drama: drama,
+                            isFocused: focusedTarget == .card(drama.id),
+                            forceFocused: forceFocusFirstCard && index == 0,
+                            onUpCommand: {
+                                if index < columns.count { focusSelectedCategory() }
+                                else { focusCard(viewModel.items[index - columns.count].id, scroll: scroll) }
+                            },
+                            onDownCommand: {
+                                if viewModel.errorMessage != nil { focusedTarget = .reloadButton }
+                                else { focusNextRow(after: drama.id, scroll: scroll) }
+                            }
+                        ) { selectedDrama = drama }
+                        .id(drama.id)
+                        .focused($focusedTarget, equals: .card(drama.id))
+                        .accessibilityIdentifier("catalog.result.\(index)")
+                        .onAppear {
+                            if index >= viewModel.items.count - 4 {
+                                Task { await viewModel.loadNextPage() }
+                            }
                         }
                     }
                 }
+                .padding(.horizontal, 48)
+                .padding(.vertical, 28)
+                if viewModel.isLoadingMore {
+                    ProgressView("正在加载更多短剧...").padding(.vertical, 28)
+                }
+                if let message = viewModel.errorMessage {
+                    Text(message).foregroundColor(.secondary)
+                    retryButton.padding(.bottom, 28)
+                }
             }
-            .padding(.horizontal, 48)
-            .padding(.vertical, 28)
-            if viewModel.isLoadingMore {
-                ProgressView("正在加载更多短剧...").padding(.vertical, 28)
+            .focusSection()
+            .defaultFocus($focusedTarget, viewModel.items.first.map { FocusTarget.card($0.id) })
+            .onChange(of: viewModel.items) { _, _ in finishPendingRowFocus(scroll: scroll) }
+            .onChange(of: viewModel.isLoadingMore) { _, loading in
+                if !loading { finishPendingRowFocus(scroll: scroll) }
             }
-            if let message = viewModel.errorMessage {
-                Text(message).foregroundColor(.secondary)
-                retryButton.padding(.bottom, 28)
+            .onChange(of: focusedTarget) { _, target in
+                if case .card(let id) = target { scroll.scrollTo(id, anchor: .center) }
             }
         }
-        .focusSection()
-        .defaultFocus($focusedTarget, viewModel.items.first.map { FocusTarget.card($0.id) })
     }
 
     private var retryButton: some View {
@@ -242,26 +255,32 @@ public struct CatalogView: View {
         focusedTarget = .category(focusID(target))
     }
 
-    private func focusNextRow(after id: String) {
+    private func focusNextRow(after id: String, scroll: ScrollViewProxy) {
         pendingNextRow = id
-        Task {
-            await viewModel.loadNextPage()
-            finishPendingRowFocus()
-        }
+        finishPendingRowFocus(scroll: scroll)
     }
 
-    private func finishPendingRowFocus() {
+    private func finishPendingRowFocus(scroll: ScrollViewProxy) {
         guard let id = pendingNextRow, focusedTarget == .card(id),
               let index = viewModel.items.firstIndex(where: { $0.id == id }) else { return }
-        guard index + columns.count < viewModel.items.count else {
+        let nextRow = (index / columns.count + 1) * columns.count
+        guard nextRow < viewModel.items.count else {
             if !viewModel.hasMore || viewModel.errorMessage != nil { pendingNextRow = nil }
+            else if !viewModel.isLoadingMore {
+                Task { await viewModel.loadNextPage() }
+            }
             return
         }
-        let nextID = viewModel.items[index + columns.count].id
+        let nextID = viewModel.items[min(index + columns.count, viewModel.items.count - 1)].id
         pendingNextRow = nil
+        focusCard(nextID, scroll: scroll)
+    }
+
+    private func focusCard(_ id: String, scroll: ScrollViewProxy) {
+        scroll.scrollTo(id, anchor: .center)
         DispatchQueue.main.async {
-            guard focusedTarget == .card(id), selectedDrama == nil else { return }
-            focusedTarget = .card(nextID)
+            guard selectedDrama == nil else { return }
+            focusedTarget = .card(id)
         }
     }
 }

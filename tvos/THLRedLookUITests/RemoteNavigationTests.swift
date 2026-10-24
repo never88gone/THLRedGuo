@@ -2515,3 +2515,95 @@ final class RemoteNavigationTests: XCTestCase {
         print("THL_TV_ICLOUD_SYNC_VERIFIED toggle=true syncNow=true status=true")
     }
 }
+
+extension RemoteNavigationTests {
+    func testListLoadingCatalogPagingAndFocus() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "catalog", "-thl_icloud_sync_enabled", "NO", "-thl_tv_cached_home_dramas", "[]", "-thl_tv_cached_categories", "[]"]
+        let start = Date()
+        app.launch()
+        wait("catalog first list", seconds: 60) { self.app.buttons["catalog.result.0"].exists }
+        print("THL_TV_LIST firstCatalogMs=\(Int(Date().timeIntervalSince(start) * 1000))")
+        wait("catalog sidebar initial focus") { self.app.buttons["nav.catalog"].hasFocus }
+        press(.right)
+        wait("catalog header focus") { self.app.buttons["catalog.category.app:discover:all"].hasFocus }
+        press(.down, focus: "catalog.result.0")
+        press(.right, focus: "catalog.result.1")
+        Thread.sleep(forTimeInterval: 1)
+        XCTAssertTrue(app.buttons["catalog.result.1"].hasFocus)
+        press(.left, focus: "catalog.result.0")
+        press(.down, focus: "catalog.result.6")
+        press(.down, focus: "catalog.result.12")
+        wait("catalog next column loaded", seconds: 60) { self.app.buttons["catalog.result.13"].exists }
+        press(.right, focus: "catalog.result.13")
+        let title = app.buttons["catalog.result.13"].label
+        press(.select)
+        wait("catalog detail ready", seconds: 60) { self.app.buttons["detail.play"].hasFocus }
+        press(.menu)
+        wait("catalog card restored") { self.app.buttons["catalog.result.13"].hasFocus }
+        XCTAssertEqual(app.buttons["catalog.result.13"].label, title)
+        press(.menu, focus: "nav.catalog")
+        press(.right)
+        wait("catalog header restored") { self.app.buttons["catalog.category.app:discover:all"].hasFocus }
+        press(.right, focus: "catalog.category.app:discover:playlet")
+        wait("switched catalog first batch", seconds: 60) { self.app.buttons["catalog.result.0"].exists }
+        press(.down, focus: "catalog.result.0")
+        press(.down, focus: "catalog.result.6")
+        press(.up, focus: "catalog.result.0")
+        press(.up, focus: "catalog.category.app:discover:playlet")
+        press(.menu, focus: "nav.catalog")
+        print("THL_TV_LIST_RESULT catalog=true autoPaging=true appendKeepsFocus=true gridDirections=true detailReturn=true categorySwitch=true menuReturn=true")
+        app.terminate()
+    }
+
+    func testListLoadingFeedPagingAndFocus() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "feed", "-thl_icloud_sync_enabled", "NO"]
+        let start = Date()
+        app.launch()
+        wait("feed first list", seconds: 60) { self.app.buttons["player.wake"].exists }
+        print("THL_TV_LIST firstFeedMs=\(Int(Date().timeIntervalSince(start) * 1000))")
+        let first = try automaticFeedReady()
+        press(.select)
+        wait("feed controls focus") { self.app.buttons["player.playPause"].hasFocus }
+        let initialProgress = app.staticTexts["feed.progress"].label
+        print("THL_TV_LIST feedInitial=\(initialProgress)")
+        press(.menu, focus: "player.wake")
+        var titles = [first.title]
+        for _ in 0..<4 {
+            press(.down)
+            let checkpoint = try automaticFeedReady(differentFrom: titles.last!)
+            titles.append(checkpoint.title)
+        }
+        XCTAssertEqual(Set(titles).count, 5)
+        press(.up)
+        let previous = try automaticFeedReady(title: titles[3])
+        press(.select)
+        wait("feed final controls focus") { self.app.buttons["player.playPause"].hasFocus }
+        print("THL_TV_LIST feedFinal=\(app.staticTexts["feed.progress"].label)")
+        press(.up, focus: "player.nextDrama")
+        press(.right, focus: "player.favorite")
+        press(.right, focus: "player.detail")
+        press(.select)
+        wait("feed detail opens", seconds: 60) { self.app.buttons["detail.play"].hasFocus }
+        XCTAssertTrue(app.staticTexts[previous.title].exists)
+        press(.down)
+        wait("feed detail selection focus") {
+            self.yaoSnapshots().contains { $0.hasFocus && ($0.identifier.hasPrefix("detail.season.") || $0.identifier.hasPrefix("detail.chunk.") || $0.identifier.hasPrefix("detail.episode.")) }
+        }
+        press(.menu)
+        wait("feed detail returns to original control", seconds: 60) { self.app.buttons["player.detail"].hasFocus }
+        press(.down, focus: "player.playPause")
+        press(.menu, focus: "player.wake")
+        press(.menu, focus: "nav.feed")
+        Thread.sleep(forTimeInterval: 1)
+        XCTAssertTrue(app.buttons["nav.feed"].hasFocus)
+        press(.right)
+        _ = try automaticFeedReady(title: previous.title, minimum: previous.position)
+        press(.menu, focus: "nav.feed")
+        print("THL_TV_LIST_RESULT feed=true unique=5 verticalSwitch=true autoPaging=true previous=true controlsFocus=true detailEntry=true detailTitle=true detailSelection=true detailReturn=true menuReturn=true resume=true")
+        app.terminate()
+    }
+}

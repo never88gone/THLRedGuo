@@ -70,6 +70,7 @@
 		A75AFF05E2765687A3A41090 /* SettingsContactPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */; };
 		AC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */; };
 		A4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */; };
+		90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -162,6 +163,7 @@
 		B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsContactPanel.swift; sourceTree = "<group>"; };
 		BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAboutPanel.swift; sourceTree = "<group>"; };
 		B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceDiagnosticsSheetView.swift; sourceTree = "<group>"; };
+		ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListLoadingTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -236,6 +238,7 @@
 				DDF46F916F921E87B28F33AB /* PlaybackTests.swift */,
 				83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */,
 				9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */,
+				ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */,
 			);
 			path = THLRedLookTests;
 			sourceTree = "<group>";
@@ -654,6 +657,7 @@
 				BC5B31CB27136862380FB32F /* PlaybackTests.swift in Sources */,
 				3F654B7E4306B53376917E16 /* CENCDecoderTests.swift in Sources */,
 				CABD071B5C68D672495450B9 /* LocalLibraryTests.swift in Sources */,
+				90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

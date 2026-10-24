@@ -4,11 +4,12 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
     public static let shared = NativeRepository()
     private let bridge = NativeBridge.shared
     private let danmakuBridge = NativeBridge()
+    private let feedBridge = NativeBridge()
 
     public init() {}
 
     public func loadVideoFeed(page: Int, session: String) async throws -> VideoFeedPage {
-        let result = try await bridge.request(action: "feed", payload: ["source": "hongguo", "page": page, "session": session])
+        let result = try await feedBridge.request(action: "feed", payload: ["source": "hongguo", "page": page, "session": session])
         let data = try JSONSerialization.data(withJSONObject: result)
         return try JSONDecoder().decode(VideoFeedPage.self, from: data)
     }

@@ -330,13 +330,7 @@ public struct TVPlayerView: View {
                         viewModel.showControls()
                     }
                     .onExitCommand(perform: onRemoteMenuPressed)
-                    .onMoveCommand { direction in
-                        if direction == .right {
-                            handleQuickSeek(by: 10)
-                        } else if direction == .left {
-                            handleQuickSeek(by: -10)
-                        }
-                    }
+                    .onMoveCommand(perform: handlePictureMoveCommand)
 
                     // 右侧步进快进锚点
                     Button(action: {
@@ -431,27 +425,25 @@ public struct TVPlayerView: View {
                 viewModel.togglePlayPause()
             }
             .onExitCommand(perform: onRemoteMenuPressed)
-            .onMoveCommand { direction in
-                print("THL_GLOBAL_ON_MOVE_COMMAND: direction=\(direction)")
-                if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible {
-                    switch direction {
-                    case .left:
-                        handleQuickSeek(by: -10)
-                    case .right:
-                        handleQuickSeek(by: 10)
-                    case .up:
-                        if let feedActions, feedActions.canGoPrevious {
-                            feedActions.onPrevious()
-                        }
-                    case .down:
-                        if feedActions != nil {
-                            Task { _ = await nextFeedDrama() }
-                        }
-                    default:
-                        break
-                    }
-                }
-            }
+            .onMoveCommand(perform: handlePictureMoveCommand)
+    }
+
+    private func handlePictureMoveCommand(_ direction: MoveCommandDirection) {
+        guard isInteractive, !isSwitchingFeed,
+              !viewModel.isControlsVisible, !viewModel.isEpisodeDrawerVisible,
+              !viewModel.isDanmakuSettingsVisible, !viewModel.isSpeedSheetVisible else { return }
+        switch direction {
+        case .left:
+            handleQuickSeek(by: -10)
+        case .right:
+            handleQuickSeek(by: 10)
+        case .up:
+            if let feedActions, feedActions.canGoPrevious { feedActions.onPrevious() }
+        case .down:
+            if feedActions != nil { Task { _ = await nextFeedDrama() } }
+        default:
+            break
+        }
     }
 
     private func applyStateListeners<Content: View>(to content: Content) -> some View {

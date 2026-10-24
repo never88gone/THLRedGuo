@@ -34,6 +34,7 @@ public final class HomeViewModel: ObservableObject {
         }
 
         store.$currentSourceId
+            .removeDuplicates()
             .dropFirst()
             .sink { [weak self] _ in
                 Task { [weak self] in await self?.reloadAll() }
@@ -79,35 +80,38 @@ public final class HomeViewModel: ObservableObject {
 
         let targetCategory = initialCategory ?? selectedCategory.id
 
-        // 并行发起分类与首屏短剧网络请求，消除串行网络等待
-        async let categoriesTask = repository.loadCategories(source: source)
-        async let catalogTask = repository.loadCatalog(source: source, category: targetCategory, page: 1, query: "", force: true)
+        if let initialCategory,
+           let category = categories.first(where: { $0.id == initialCategory || $0.name == initialCategory }) {
+            selectedCategory = category
+        } else if let initialCategory {
+            selectedCategory = CatalogCategory(id: initialCategory, name: selectedCategory.name)
+        }
 
+        async let categoriesTask = try? repository.loadCategories(source: source)
         do {
-            let (loadedCategories, catalogResult) = try await (categoriesTask, catalogTask)
+            let catalogResult = try await repository.loadCatalog(source: source, category: targetCategory, page: 1, query: "", force: true)
             guard !Task.isCancelled, generation == ticket, activeSourceId == source else { return }
+            store.refreshDramas(catalogResult.items)
+            items = filterAndSort(dramas: catalogResult.items)
+            currentPage = catalogResult.page
+            hasMore = catalogResult.hasMore
+            isLoading = false
+            errorMessage = nil
 
+            let loadedCategories = await categoriesTask ?? []
+            guard !Task.isCancelled, generation == ticket, activeSourceId == source else { return }
             if !loadedCategories.isEmpty {
-                self.categories = loadedCategories
-                self.selectedCategory = loadedCategories.first(where: { $0.id == initialCategory || $0.name == initialCategory })
+                categories = loadedCategories
+                selectedCategory = loadedCategories.first(where: { $0.id == targetCategory || $0.name == targetCategory })
                     ?? loadedCategories.first(where: { $0.id == selectedCategory.id }) ?? loadedCategories.first ?? .all
+            } else if categories.isEmpty {
+                categories = [.all]
             }
-
-            self.store.refreshDramas(catalogResult.items)
-            self.items = filterAndSort(dramas: catalogResult.items)
-            self.currentPage = catalogResult.page
-            self.hasMore = catalogResult.hasMore
-            self.isLoading = false
-            self.errorMessage = nil
-
-            // 更新持久化缓存供下一次冷启动秒开
-            self.store.saveCachedCatalog(categories: loadedCategories, dramas: catalogResult.items)
+            store.saveCachedCatalog(categories: categories, dramas: catalogResult.items)
         } catch {
             guard !Task.isCancelled, generation == ticket, activeSourceId == source else { return }
-            self.isLoading = false
-            if self.items.isEmpty {
-                self.errorMessage = error.localizedDescription
-            }
+            isLoading = false
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -156,22 +160,6 @@ public final class HomeViewModel: ObservableObject {
             items = filterAndSort(dramas: result.items)
             currentPage = result.page
             hasMore = result.hasMore
-
-            // 电视大屏优化：在后台静默加载第 2 页扩充分页容量，首屏立即呈现不等待
-            if items.count < 40 && hasMore {
-                let nextPage = currentPage + 1
-                Task {
-                    if let nextResult = try? await repository.loadCatalog(source: source, category: category, page: nextPage, query: "", force: false) {
-                        guard !Task.isCancelled, generation == ticket, activeSourceId == source,
-                              selectedCategory.id == category else { return }
-                        store.refreshDramas(nextResult.items)
-                        var seen = Set(items.map(\.id))
-                        items.append(contentsOf: filterAndSort(dramas: nextResult.items).filter { seen.insert($0.id).inserted })
-                        currentPage = nextResult.page
-                        hasMore = nextResult.hasMore
-                    }
-                }
-            }
         } catch {
             guard !Task.isCancelled, generation == ticket, activeSourceId == source,
                   selectedCategory.id == category else { return }
@@ -180,7 +168,7 @@ public final class HomeViewModel: ObservableObject {
     }
 
     public func retry() async {
-        if items.isEmpty { await reloadAll() }
+        if currentPage == 0 || items.isEmpty { await reloadAll() }
         else {
             errorMessage = nil
             await loadNextPage()
@@ -197,16 +185,14 @@ public final class HomeViewModel: ObservableObject {
         defer { if generation == ticket { isLoadingMore = false } }
         do {
             let result = try await repository.loadCatalog(source: source, category: category, page: page, query: "", force: false)
-            guard !Task.isCancelled, generation == ticket, activeSourceId == source,
-                  selectedCategory.id == category else { return }
+            guard !Task.isCancelled, generation == ticket, activeSourceId == source else { return }
             store.refreshDramas(result.items)
             var seen = Set(items.map(\.id))
             items.append(contentsOf: filterAndSort(dramas: result.items).filter { seen.insert($0.id).inserted })
             hasMore = result.hasMore
             currentPage = result.page
         } catch {
-            guard !Task.isCancelled, generation == ticket, activeSourceId == source,
-                  selectedCategory.id == category else { return }
+            guard !Task.isCancelled, generation == ticket, activeSourceId == source else { return }
             errorMessage = error.localizedDescription
         }
     }

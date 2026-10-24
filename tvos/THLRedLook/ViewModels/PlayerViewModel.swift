@@ -295,10 +295,15 @@ public final class PlayerViewModel: ObservableObject {
         saveCurrentProgress()
         playbackGeneration += 1
 
-        self.drama = drama
-        if let allEpisodes, !allEpisodes.isEmpty {
-            self.allEpisodes = allEpisodes
+        prefetchTask?.cancel()
+        prefetchTask = nil
+        if let cached = preloadedEpisode, let url = cached.decryptedURL, url != decryptedURL {
+            CENCMP4Decryptor.shared.removePlaybackCache(at: url)
         }
+        preloadedEpisode = nil
+        identityVerified = false
+        self.drama = drama
+        self.allEpisodes = allEpisodes ?? []
         self.currentEpisodeIndex = initialEpisodeIndex
         self.currentTime = max(0, initialPosition)
         self.duration = 0

@@ -34,11 +34,13 @@ public final class VideoFeedViewModel: ObservableObject {
     private var session = UUID().uuidString
     private var generation = 0
     private var pageTask: Task<Void, Never>?
+    private let preloadEnabled: Bool
     private let loadPage: (Int, String) async throws -> VideoFeedPage
 
-    public init(loadPage: @escaping (Int, String) async throws -> VideoFeedPage = { page, session in
+    public init(preloadEnabled: Bool = true, loadPage: @escaping (Int, String) async throws -> VideoFeedPage = { page, session in
         try await NativeRepository.shared.loadVideoFeed(page: page, session: session)
     }) {
+        self.preloadEnabled = preloadEnabled
         self.loadPage = loadPage
     }
 
@@ -47,12 +49,16 @@ public final class VideoFeedViewModel: ObservableObject {
     public var canGoNext: Bool { currentIndex + 1 < items.count || hasMore }
 
     public func start() async {
-        if items.isEmpty && hasMore {
+        if items.isEmpty && !needsRefresh { errorMessage = nil }
+        var emptyPages = 0
+        while items.isEmpty && hasMore && errorMessage == nil && emptyPages < 3 {
             await loadMore()
+            emptyPages += 1
         }
         if items.isEmpty && errorMessage == nil {
             errorMessage = "暂时没有可播放的推荐，请重试或换一批"
         }
+        if items.count < 3 { prefetch() }
         preloadAround(index: currentIndex)
     }
 
@@ -74,6 +80,7 @@ public final class VideoFeedViewModel: ObservableObject {
         page = 0
         hasMore = true
         needsRefresh = false
+        errorMessage = nil
         await start()
     }
 
@@ -157,7 +164,7 @@ public final class VideoFeedViewModel: ObservableObject {
     // MARK: - 全链路异步预解析与预热缓冲 (Preload Pipeline)
 
     public func preloadAround(index: Int) {
-        guard index >= 0 && index < items.count else { return }
+        guard preloadEnabled, index >= 0 && index < items.count else { return }
         // 优先预热当前项、下一部、下两部以及上一部
         let offsets = [0, 1, 2, -1]
         for offset in offsets {
