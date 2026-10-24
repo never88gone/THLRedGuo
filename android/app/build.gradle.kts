@@ -32,7 +32,7 @@ android {
 
     defaultConfig {
         applicationId = "com.never88gone.redlook"
-        minSdk = 26
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         val rawCode = runCatching { flutter.versionCode }.getOrNull()
         versionCode = if (rawCode != null && rawCode > 0 && rawCode < 2100000000) rawCode else (System.currentTimeMillis() / 1000).toInt()

@@ -22,6 +22,7 @@ import 'package:THLRedLook/core/media/media_library.dart';
 import 'package:THLRedLook/utils/smoke/package_smoke.dart';
 import 'package:THLRedLook/core/lan/lan_controller.dart';
 import 'package:THLRedLook/pages/player/player_page.dart';
+import 'package:THLRedLook/core/player/pip_manager.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_assets.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
 import 'package:THLRedLook/utils/privacy/privacy_lock_controller.dart';
@@ -158,6 +159,11 @@ class _AppBootstrapState extends State<AppBootstrap>
           privacyController = privacy;
           store = localStore;
           repository.access = store;
+          PipManager.instance.initialize(
+            navigatorKey: navigator,
+            repository: repository,
+            store: store,
+          );
           MediaLibrary.attach(repository, store!);
           LanController.current?.dispose();
           final link = LanController(

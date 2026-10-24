@@ -18,6 +18,9 @@ import CoreMedia
   private var pipReadyForDisplayObservation: NSKeyValueObservation?
   private var pipTimeoutWorkItem: DispatchWorkItem?
   private var pipCheckTimer: Timer?
+  private var currentPipDramaId: String?
+  private var currentPipEpisodeIndex: Int = 0
+  private var currentPipMetadata: [String: Any]?
 
   override func application(
     _ application: UIApplication,
@@ -81,6 +84,10 @@ import CoreMedia
           let headers = args?["headers"] as? [String: String] ?? [:]
           let positionMs = args?["position"] as? Int ?? 0
           let speed = (args?["speed"] as? NSNumber)?.floatValue ?? 1.0
+
+          self.currentPipDramaId = args?["dramaId"] as? String
+          self.currentPipEpisodeIndex = args?["episodeIndex"] as? Int ?? 0
+          self.currentPipMetadata = args?["detail"] as? [String: Any]
 
           let sourceX = (args?["x"] as? NSNumber)?.doubleValue
           let sourceY = (args?["y"] as? NSNumber)?.doubleValue
@@ -464,11 +471,34 @@ import CoreMedia
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": true])
   }
 
+  func pictureInPictureController(
+    _ pictureInPictureController: AVPictureInPictureController,
+    restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
+  ) {
+    let positionMs = Int((pipPlayer?.currentTime().seconds ?? 0) * 1000)
+    logPip("restoreUserInterfaceForPictureInPictureStopWithCompletionHandler: pos=\(positionMs)")
+    var args: [String: Any] = [
+      "position": positionMs,
+      "episodeIndex": self.currentPipEpisodeIndex
+    ]
+    if let dramaId = self.currentPipDramaId {
+      args["dramaId"] = dramaId
+    }
+    if let metadata = self.currentPipMetadata {
+      args["detail"] = metadata
+    }
+    deviceChannel?.invokeMethod("restorePictureInPictureUI", arguments: args, result: { _ in
+      completionHandler(true)
+    })
+  }
+
   func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
     let positionMs = Int((pipPlayer?.currentTime().seconds ?? 0) * 1000)
     logPip("didStopPictureInPicture at pos=\(positionMs)")
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "position": positionMs])
     cleanUpPip()
+    self.currentPipDramaId = nil
+    self.currentPipMetadata = nil
   }
 
   func pictureInPictureController(

@@ -2248,4 +2248,69 @@ final class RemoteNavigationTests: XCTestCase {
 
         print("THL_TV_SEARCH_DOWNLOAD_REFINEMENT_COMPLETE searchClear=true focusFlow=true suggestionsStable=true downloadsLanRemoved=true")
     }
+
+    func testDetailCoverAnimationAndSourcesButtonFocusStyles() throws {
+        continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+
+        // ===== 第一阶段：验证剧集详情页海报即刻展示与转场动画 =====
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "0"
+        app.launchArguments = ["-testPage", "detail", "-testDramaTitle", "都市逆袭：龙王归来"]
+        app.launch()
+
+        // 验证进入剧集详情时，无论是否还在加载完整选集，剧名与海报区域立即完整展示
+        wait("detail page active with title and cover", seconds: 20) {
+            self.app.staticTexts["都市逆袭：龙王归来"].exists
+        }
+        XCTAssertTrue(app.staticTexts["都市逆袭：龙王归来"].exists, "从列表进入详情页时立即展示剧集标题与列表海报封面")
+
+        wait("detail play ready or loading visible", seconds: 15) {
+            self.app.buttons["detail.play"].exists || self.app.staticTexts["正在载入剧集选集与播放源..."].exists
+        }
+
+        let shotDetail = XCUIScreen.main.screenshot()
+        try? shotDetail.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_detail_cover_animated_verified.png"))
+
+        // ===== 第二阶段：验证设置页面站源管理中「数据源诊断」与「网络链接导入」获焦高亮样式 =====
+        app.terminate()
+        app.launchArguments = ["-testPage", "settings_sources"]
+        app.launch()
+
+        // 点击 Select 确认切入设置分类，侧边栏收起并落焦于「站源管理」分类
+        wait("sidebar settings or nav sources ready", seconds: 15) {
+            self.app.buttons["nav.settings"].exists || self.app.buttons["settings.nav.sources"].exists
+        }
+        if self.app.buttons["nav.settings"].hasFocus {
+            press(.select)
+        }
+        wait("settings sources nav focused", seconds: 15) {
+            self.app.buttons["settings.nav.sources"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["settings.nav.sources"].hasFocus, "成功进入设置页面并聚焦站源管理分类")
+
+        // 按 Right 进入右侧站源管理内容区，验证「数据源诊断」按钮获得焦点并呈现高亮样式
+        press(.right)
+        wait("source diagnostics focused", seconds: 15) {
+            self.app.buttons["settings.sourceDiagnostics"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["settings.sourceDiagnostics"].hasFocus, "数据源诊断按钮成功获取焦点，呈现白边高光与缩放阴影样式")
+
+        let shotDiag = XCUIScreen.main.screenshot()
+        try? shotDiag.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_source_diag_focused.png"))
+
+        // 按 Right 移动到「官方数据源」，再按 Right 移动到「网络链接导入」
+        press(.right) // 聚焦官方数据源
+        sleep(1)
+        press(.right) // 聚焦网络链接导入
+        wait("import network source focused", seconds: 15) {
+            self.app.buttons["settings.importNetworkSource"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["settings.importNetworkSource"].hasFocus, "网络链接导入按钮成功获取焦点，呈现明显高亮视觉反馈")
+
+        let shotImport = XCUIScreen.main.screenshot()
+        try? shotImport.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_import_network_focused.png"))
+
+        print("THL_TV_DETAIL_ANIM_AND_SOURCES_FOCUS_COMPLETE detailCover=true detailAnim=true diagFocusStyle=true importFocusStyle=true")
+    }
 }

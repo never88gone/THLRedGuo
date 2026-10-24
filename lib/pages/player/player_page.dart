@@ -16,6 +16,7 @@ import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
 import 'package:THLRedLook/core/player/luna_exo_player.dart';
 import 'package:THLRedLook/core/player/encrypted_playback.dart';
+import 'package:THLRedLook/core/player/pip_manager.dart';
 import 'package:THLRedLook/core/danmaku/danmaku_controller.dart';
 import 'package:THLRedLook/views/download/download_picker.dart';
 import 'package:THLRedLook/pages/downloads/downloads_page.dart';
@@ -565,42 +566,46 @@ class _PlayerScreenState extends State<PlayerScreen>
       return;
     }
     _pictureInPictureHandlerInstalled = true;
-    AppDevice.channel.setMethodCallHandler((call) async {
-      if (call.method == 'pipLog') {
-        debugPrint('[PiP-Native] ${call.arguments}');
-        return;
-      }
-      if (call.method == 'pictureInPictureChanged') {
-        final arguments = call.arguments;
-        final active = arguments is Map && arguments['active'] == true;
-        final error = arguments is Map ? arguments['error'] as String? : null;
-        final position =
-            arguments is Map ? (arguments['position'] as num?)?.toInt() : null;
-
-        if (error != null && error.isNotEmpty) {
-          _notice('画中画提示: ${_localizePipError(error)}');
-        }
-
-        if (active) {
-          if (Platform.isIOS && _player.state.playing) {
-            unawaited(_player.pause());
+    PipManager.instance.registerPictureInPictureSession(
+      detail: widget.detail,
+      episodeIndex: _index,
+      positionMs: _player.state.position.inMilliseconds,
+      onRestoreCurrentPlayer: (positionMs) {
+        if (mounted && !_closed) {
+          if (positionMs > 0) {
+            unawaited(_seekTo(Duration(milliseconds: positionMs)));
           }
-        } else {
-          if (position != null && position > 0) {
-            unawaited(_seekTo(Duration(milliseconds: position)));
-          }
+          _setPictureInPictureStatus(active: false);
           if (_playIntent && !_loading && _error == null) {
             unawaited(_player.play());
           }
         }
-
-        _setPictureInPictureStatus(
-          active: active,
-          requested: false,
-          delayHiddenPause: !active,
-        );
-      }
-    });
+      },
+      onPictureInPictureStatusChanged: (active, error, position) {
+        if (mounted && !_closed) {
+          if (error != null && error.isNotEmpty) {
+            _notice('画中画提示: ${_localizePipError(error)}');
+          }
+          if (active) {
+            if (Platform.isIOS && _player.state.playing) {
+              unawaited(_player.pause());
+            }
+          } else {
+            if (position != null && position > 0) {
+              unawaited(_seekTo(Duration(milliseconds: position)));
+            }
+            if (_playIntent && !_loading && _error == null) {
+              unawaited(_player.play());
+            }
+          }
+          _setPictureInPictureStatus(
+            active: active,
+            requested: false,
+            delayHiddenPause: !active,
+          );
+        }
+      },
+    );
     unawaited(_refreshPictureInPictureStatus());
   }
 
@@ -816,10 +821,53 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (targetUrl.isNotEmpty) 'url': targetUrl,
       if (targetHeaders.isNotEmpty) 'headers': targetHeaders,
       'title': widget.detail.drama.title,
+      'dramaId': widget.detail.drama.id,
+      'episodeIndex': _index,
+      'detail': widget.detail.toJson(),
       'position': _player.state.position.inMilliseconds,
       'speed': _speed,
     };
     if (sourceRect != null) arguments.addAll(sourceRect);
+    PipManager.instance.registerPictureInPictureSession(
+      detail: widget.detail,
+      episodeIndex: _index,
+      positionMs: _player.state.position.inMilliseconds,
+      onRestoreCurrentPlayer: (positionMs) {
+        if (mounted && !_closed) {
+          if (positionMs > 0) {
+            unawaited(_seekTo(Duration(milliseconds: positionMs)));
+          }
+          _setPictureInPictureStatus(active: false);
+          if (_playIntent && !_loading && _error == null) {
+            unawaited(_player.play());
+          }
+        }
+      },
+      onPictureInPictureStatusChanged: (active, error, position) {
+        if (mounted && !_closed) {
+          if (error != null && error.isNotEmpty) {
+            _notice('画中画提示: ${_localizePipError(error)}');
+          }
+          if (active) {
+            if (Platform.isIOS && _player.state.playing) {
+              unawaited(_player.pause());
+            }
+          } else {
+            if (position != null && position > 0) {
+              unawaited(_seekTo(Duration(milliseconds: position)));
+            }
+            if (_playIntent && !_loading && _error == null) {
+              unawaited(_player.play());
+            }
+          }
+          _setPictureInPictureStatus(
+            active: active,
+            requested: false,
+            delayHiddenPause: !active,
+          );
+        }
+      },
+    );
     debugPrint('[PiP-Dart] enterPictureInPicture args: url=$targetUrl, pos=${arguments['position']}, sourceRect=$sourceRect');
     try {
       final status = await AppDevice.channel.invokeMapMethod<String, dynamic>(
@@ -2019,7 +2067,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     _errorTimer?.cancel();
     _pictureInPictureExitTimer?.cancel();
     if (_pictureInPictureHandlerInstalled) {
-      AppDevice.channel.setMethodCallHandler(null);
+      PipManager.instance.notifyPlayerDisposed();
     }
     _interactions.dispose();
     _playerFocus.dispose();

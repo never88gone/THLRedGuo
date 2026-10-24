@@ -11,6 +11,14 @@ public struct SettingsSourcesPanel: View {
     @State private var importURLString = ""
     @State private var isImporting = false
 
+    private enum SourcesFocus: Hashable {
+        case diagnostics
+        case officialSource
+        case importNetwork
+        case clearAll
+    }
+    @FocusState private var focusedButton: SourcesFocus?
+
     public init(
         showingSourceDiagnostics: Binding<Bool>,
         saveNotice: Binding<String?>
@@ -29,21 +37,28 @@ public struct SettingsSourcesPanel: View {
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.65))
             }
-            
-            TVButton(title: "数据源诊断", icon: "stethoscope", isProminent: false) {
-                showingSourceDiagnostics = true
-            }
-            .accessibilityIdentifier("settings.sourceDiagnostics")
 
             // 顶部操作栏
             HStack(spacing: 20) {
+                TVButton(
+                    title: "数据源诊断",
+                    icon: "stethoscope",
+                    isProminent: false,
+                    isExternalFocused: focusedButton == .diagnostics
+                ) {
+                    showingSourceDiagnostics = true
+                }
+                .focused($focusedButton, equals: .diagnostics)
+                .accessibilityIdentifier("settings.sourceDiagnostics")
+
                 let isHongguoInstalled = jsService.sources.contains(where: { ($0["id"] as? String) == "hongguo" })
                 let isHongguoActive = jsService.activeSourceId == "hongguo"
 
                 TVButton(
                     title: isHongguoInstalled ? (isHongguoActive ? "官方数据源 (已激活)" : "设为默认源") : "导入官方数据源",
                     icon: isHongguoActive ? "checkmark.circle.fill" : "sparkles.tv.fill",
-                    isProminent: !isHongguoActive
+                    isProminent: !isHongguoActive,
+                    isExternalFocused: focusedButton == .officialSource
                 ) {
                     Task {
                         isImporting = true
@@ -56,21 +71,37 @@ public struct SettingsSourcesPanel: View {
                         }
                     }
                 }
+                .focused($focusedButton, equals: .officialSource)
+                .accessibilityIdentifier("settings.officialSource")
 
-                TVButton(title: "网络链接导入", icon: "plus.app.fill") {
+                TVButton(
+                    title: "网络链接导入",
+                    icon: "plus.app.fill",
+                    isProminent: false,
+                    isExternalFocused: focusedButton == .importNetwork
+                ) {
                     showingImportAlert = true
                 }
+                .focused($focusedButton, equals: .importNetwork)
+                .accessibilityIdentifier("settings.importNetworkSource")
 
                 let hasCustomSources = jsService.sources.contains(where: { (($0["id"] as? String) ?? "").lowercased() != "hongguo" })
                 if hasCustomSources {
-                    TVButton(title: "清空自定义源", icon: "trash.circle.fill") {
+                    TVButton(
+                        title: "清空自定义源",
+                        icon: "trash.circle.fill",
+                        isProminent: false,
+                        isExternalFocused: focusedButton == .clearAll
+                    ) {
                         showingClearAllAlert = true
                     }
+                    .focused($focusedButton, equals: .clearAll)
                     .accessibilityIdentifier("settings.clearAllSources")
                 }
 
                 Spacer()
             }
+            .focusSection()
             .padding(.bottom, 16)
             
             Text("已安装插件列表")

@@ -342,6 +342,13 @@ class DramaDetail {
   final Drama drama;
   final List<Episode> episodes;
   final String warning;
+
+  Map<String, dynamic> toJson() => {
+    'drama': drama.toJson(),
+    'chapters': [for (final ep in episodes) ep.raw],
+    'warning': warning,
+  };
+
   factory DramaDetail.fromJson(Map<String, dynamic> json) {
     final rows = json['chapters'] as List? ?? const [];
     return DramaDetail(
