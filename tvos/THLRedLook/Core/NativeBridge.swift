@@ -688,7 +688,7 @@ public actor NativeBridge {
                 ]
             }
 
-            let scriptExpr = try spiderExpression("category", [cat, pg, false, ["initialBatch": 24]])
+            let scriptExpr = try spiderExpression("category", [cat, pg, false, ["initialBatch": 12]])
             let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
             guard res?["ok"] as? Bool == true else {
                 throw SourceAPIError.sourceUnavailable(res?["error"] as? String ?? "发现数据请求失败，请重试")

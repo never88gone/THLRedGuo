@@ -2550,8 +2550,8 @@ extension RemoteNavigationTests {
         app.launchArguments = ["-testPage", "catalog", "-thl_icloud_sync_enabled", "NO", "-thl_tv_cached_home_dramas", "[]", "-thl_tv_cached_categories", "[]"]
         let start = Date()
         app.launch()
-        wait("catalog first list", seconds: 60) { self.app.buttons["catalog.result.0"].exists }
-        print("THL_TV_LIST firstCatalogMs=\(Int(Date().timeIntervalSince(start) * 1000))")
+        wait("catalog first list", seconds: 60) { self.app.buttons["catalog.result.11"].exists }
+        print("THL_TV_LIST firstCatalogTwelveMs=\(Int(Date().timeIntervalSince(start) * 1000))")
         wait("catalog sidebar initial focus") { self.app.buttons["nav.catalog"].hasFocus }
         press(.right)
         wait("catalog header focus") { self.app.buttons["catalog.category.app:discover:all"].hasFocus }
@@ -2562,14 +2562,16 @@ extension RemoteNavigationTests {
         press(.left, focus: "catalog.result.0")
         press(.down, focus: "catalog.result.6")
         press(.down, focus: "catalog.result.12")
-        wait("catalog next column loaded", seconds: 60) { self.app.buttons["catalog.result.13"].exists }
-        press(.right, focus: "catalog.result.13")
-        let title = app.buttons["catalog.result.13"].label
+        press(.down, focus: "catalog.result.18")
+        press(.down, focus: "catalog.result.24")
+        wait("catalog next pages loaded", seconds: 60) { self.app.buttons["catalog.result.25"].exists }
+        press(.right, focus: "catalog.result.25")
+        let title = app.buttons["catalog.result.25"].label
         press(.select)
         wait("catalog detail ready", seconds: 60) { self.app.buttons["detail.play"].hasFocus }
         press(.menu)
-        wait("catalog card restored") { self.app.buttons["catalog.result.13"].hasFocus }
-        XCTAssertEqual(app.buttons["catalog.result.13"].label, title)
+        wait("catalog card restored") { self.app.buttons["catalog.result.25"].hasFocus }
+        XCTAssertEqual(app.buttons["catalog.result.25"].label, title)
         press(.menu, focus: "nav.catalog")
         press(.right)
         wait("catalog header restored") { self.app.buttons["catalog.category.app:discover:all"].hasFocus }

@@ -2068,7 +2068,7 @@ spider.danmaku = function (id, startMs, durationMs) {
     return text(sub.find(item => item.is_selected)?.sub_title);
   }
 
-  async function savePage(state, page, cell, data, params) {
+  async function savePage(state, page, cell, data, params, minimum = 1) {
     if (!cell) throw failure('官方接口未返回剧集列表，请重试', 'INVALID_RESPONSE');
     const seen = new Set();
     for (const [previous, value] of state.pages) if (previous < page) for (const row of value.list) seen.add(row.vod_id);
@@ -2093,7 +2093,7 @@ spider.danmaku = function (id, startMs, durationMs) {
     appendCell(cell);
 
     let rounds = 0;
-    while (!list.length && hasMore && rounds < 5) {
+    while (list.length < minimum && hasMore && rounds < 5) {
       rounds++;
       const nextParams = {
         ...params,
@@ -2104,10 +2104,16 @@ spider.danmaku = function (id, startMs, durationMs) {
         limit: 40,
         change_type: 1
       };
-      const nextRes = await api('/reading/bookapi/bookmall/cell/change/v', nextParams);
-      const nextCell = nextRes.data?.cell_view;
+      let nextRes;
+      try {
+        nextRes = await api('/reading/bookapi/bookmall/cell/change/v', nextParams);
+        if (!nextRes.data?.cell_view) throw failure('官方接口未返回剧集列表，请重试', 'INVALID_RESPONSE');
+      } catch (error) {
+        if (list.length) break;
+        throw error;
+      }
+      const nextCell = nextRes.data.cell_view;
       const nextData = nextRes.data;
-      if (!nextCell || !nextData) throw failure('官方接口未返回剧集列表，请重试', 'INVALID_RESPONSE');
       const prevOff = offset;
       offset = number(nextData.next_offset ?? nextCell.next_offset);
       hasMore = nextData.has_more !== false && nextCell.has_more !== false && offset > prevOff;
@@ -2141,7 +2147,7 @@ spider.danmaku = function (id, startMs, durationMs) {
       while (states.size > 24) states.delete(states.keys().next().value);
       const initial = await first();
       state.category = initial.category;
-      return await savePage(state, page, initial.cell, initial.data || {}, initial.params);
+      return await savePage(state, page, initial.cell, initial.data || {}, initial.params, initial.minimum);
     }
     if (!state || Date.now() - state.updated > ttl) throw failure('列表游标已过期，请刷新后重试', 'CURSOR_EXPIRED');
     if (state.pages.has(page)) return state.pages.get(page);
@@ -2198,18 +2204,14 @@ spider.danmaku = function (id, startMs, durationMs) {
         sub_selected_items: '', unlimited_selector_change_type: 1,
         client_template: 2, client_req_type: 2
       };
-      const preview = genre === 'all' && choices.find(item => item.selector_item_id === genre).is_selected;
-      if (preview && !(number(extend?.initialBatch) > videos([cell]).length)) return { cell, params, category };
-      try {
-        const response = await api('/reading/bookapi/bookmall/cell/change/v', {
-          ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 40
-        });
-        if (!response.data?.cell_view && preview) return { cell, params, category };
-        return { cell: response.data?.cell_view, data: response.data || {}, params, category };
-      } catch (error) {
-        if (preview) return { cell, params, category };
-        throw error;
+      const minimum = Math.min(24, Math.max(1, number(extend?.initialBatch)));
+      if (genre === 'all' && choices.find(item => item.selector_item_id === genre).is_selected) {
+        return { cell, params, category, minimum };
       }
+      const response = await api('/reading/bookapi/bookmall/cell/change/v', {
+        ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 40
+      });
+      return { cell: response.data?.cell_view, data: response.data || {}, params, category, minimum };
     });
   };
 

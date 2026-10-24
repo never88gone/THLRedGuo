@@ -107,7 +107,7 @@ final class StartupPerformanceTests: XCTestCase {
         let repo = NativeRepository.shared
         let start = Date()
         let first = try await repo.loadCatalog(source: "hongguo", category: "app:discover:all", force: true)
-        XCTAssertGreaterThanOrEqual(first.items.count, 12)
+        guard first.items.count >= 12 else { return XCTFail("首批剧集不足一屏: \(first.items.count)") }
         print("THL_STARTUP_CATALOG count=\(first.items.count) ms=\(Int(Date().timeIntervalSince(start)*1000)) page=\(first.page)")
         let second = try await repo.loadCatalog(source: "hongguo", category: "app:discover:all", page: 2)
         XCTAssertTrue(Set(first.items.map(\.id)).intersection(second.items.map(\.id)).isEmpty)
@@ -133,7 +133,18 @@ final class StartupPerformanceTests: XCTestCase {
             XCTAssertFalse(audio.isEmpty)
             if !(model.plan?.decryptionKey.isEmpty ?? true) { XCTAssertNotNil(stats) }
             print("THL_STARTUP_LIVE index=\(index) detailMs=\(detailMs) firstFrameMs=\(elapsed) audio=\(audio.count) bytes=\(stats?["bytesFetched"] ?? 0) media=\(stats?["mediaBytes"] ?? 0)")
-            model.onDisappear()
+            if index == 0, detail.episodes.count > 1 {
+                model.seekTo(target: max(0, model.duration - 1))
+                try await wait(seconds: 45) { model.currentEpisodeIndex == 2 && model.currentTime > 0.2 && !model.isLoading }
+                let next = try XCTUnwrap(model.player)
+                try attach(next)
+                try await wait { self.layer?.isReadyForDisplay == true }
+                print("THL_STARTUP_CONTINUOUS episode=2 rendered=true")
+                model.onDisappear()
+                clean(next)
+            } else {
+                model.onDisappear()
+            }
             clean(player)
         }
     }

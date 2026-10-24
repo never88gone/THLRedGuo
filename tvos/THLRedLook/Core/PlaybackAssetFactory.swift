@@ -47,7 +47,7 @@ enum PlaybackAssetFactory {
     }
 }
 
-private final class CENCAssetLoader: NSObject, AVAssetResourceLoaderDelegate {
+private final class CENCAssetLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecked Sendable {
     let session: CENCStreamSession
     let queue = DispatchQueue(label: "THLRedLook.CENC.ResourceLoader")
     private let length: Int64
