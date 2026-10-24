@@ -104,4 +104,43 @@ void main() {
     expect(find.text('追剧与观看状态'), findsNothing);
     expect(find.text('追剧'), findsOneWidget);
   });
+
+  testWidgets('剧集详情页：海报卡片升级为大图，支持点击全屏大图预览，且简介与播放信息具备高对比衬底', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore(await SharedPreferences.getInstance());
+    final repository = _MockDetailRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DetailScreen(
+          drama: _mockDrama,
+          repository: repository,
+          store: store,
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 1. 验证海报封面升级为 126x189 大图尺寸
+    final coverHero = find.byKey(const ValueKey('drama-cover-preview'));
+    expect(coverHero, findsOneWidget);
+
+    // 2. 验证简介与提示文字正常渲染
+    expect(find.text('一代战神退役归来，发现家中变故...'), findsOneWidget);
+
+    // 3. 点击海报封面，打开大图预览弹窗
+    await tester.tap(coverHero);
+    await tester.pumpAndSettle();
+
+    // 验证全屏大图预览弹窗呈现，带有关闭按钮
+    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+
+    // 点击关闭按钮关闭弹窗
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+    expect(find.byType(InteractiveViewer), findsNothing);
+  });
 }

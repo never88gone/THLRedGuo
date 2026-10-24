@@ -461,25 +461,30 @@ class _DetailScreenState extends State<DetailScreen> {
             constraints: const BoxConstraints(maxWidth: 1200),
             child: Stack(
               children: [
-                // 1. 顶部大图海报毛玻璃托底背景（向下自然淡化融入背景，无生硬裁切线）
+                // 1. 顶部大图海报毛玻璃托底背景（深度暗色渐变遮罩，保证强光背景下文字极致清晰）
                 Positioned(
                   top: 0,
                   left: 0,
                   right: 0,
-                  height: 500,
+                  height: 560,
                   child: DramaBackdrop(
                     drama: drama,
                     repository: widget.repository,
-                    sigma: 32.0,
+                    sigma: 36.0,
                     fadeBottom: true,
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withValues(alpha: 0.38),
-                        Colors.transparent,
+                        AppColors.blackWithAlpha(0.55),
+                        AppColors.blackWithAlpha(0.80),
+                        Theme.of(context)
+                            .colorScheme
+                            .surface
+                            .withValues(alpha: 0.96),
+                        Theme.of(context).colorScheme.surface,
                       ],
-                      stops: const [0.0, 0.55],
+                      stops: const [0.0, 0.45, 0.82, 1.0],
                     ),
                   ),
                 ),
@@ -951,6 +956,60 @@ class _DetailScreenState extends State<DetailScreen> {
     return ((width - 40) / minimum).floor().clamp(1, 12);
   }
 
+  void _showCoverBigImage(BuildContext context, Drama drama) {
+    if (drama.cover.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      barrierColor: AppColors.blackWithAlpha(0.92),
+      builder: (dialogContext) {
+        return GestureDetector(
+          onTap: () => Navigator.of(dialogContext).pop(),
+          child: Scaffold(
+            backgroundColor: AppColors.transparent,
+            body: Stack(
+              fit: StackFit.expand,
+              children: [
+                Center(
+                  child: InteractiveViewer(
+                    minScale: 0.8,
+                    maxScale: 3.5,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: DramaCover(
+                          drama: drama,
+                          repository: widget.repository,
+                          radius: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SafeArea(
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: AppColors.white,
+                          size: 28,
+                        ),
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _overview(Drama drama) {
     final colors = Theme.of(context).colorScheme;
     final metaInfo = [
@@ -967,15 +1026,44 @@ class _DetailScreenState extends State<DetailScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Hero(
-              tag: 'drama-cover-${widget.drama.id}',
-              child: SizedBox(
-                width: 104,
-                height: 156,
-                child: DramaCover(
-                  drama: drama,
-                  repository: widget.repository,
-                  radius: 14,
+            GestureDetector(
+              key: const ValueKey('drama-cover-preview'),
+              onTap: () => _showCoverBigImage(context, drama),
+              child: Tooltip(
+                message: '点击查看海报大图',
+                child: Hero(
+                  tag: 'drama-cover-${widget.drama.id}',
+                  child: SizedBox(
+                    width: 126,
+                    height: 189,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: DramaCover(
+                            drama: drama,
+                            repository: widget.repository,
+                            radius: 14,
+                          ),
+                        ),
+                        Positioned(
+                          right: 6,
+                          bottom: 6,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppColors.blackWithAlpha(0.6),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.zoom_in_rounded,
+                              size: 14,
+                              color: AppColors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1096,13 +1184,28 @@ class _DetailScreenState extends State<DetailScreen> {
                   if (metaInfo.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        metaInfo.join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colors.onSurfaceVariant.withValues(alpha: 0.8),
-                          fontSize: 11,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.blackWithAlpha(0.40),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: AppColors.whiteWithAlpha(0.12),
+                            width: 0.6,
+                          ),
+                        ),
+                        child: Text(
+                          metaInfo.join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.onSurface,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -1125,20 +1228,52 @@ class _DetailScreenState extends State<DetailScreen> {
         ),
         if (drama.description.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text(
-            drama.description,
-            maxLines: _expandedDescription ? null : 3,
-            overflow: _expandedDescription
-                ? TextOverflow.visible
-                : TextOverflow.ellipsis,
-            style: TextStyle(color: colors.onSurfaceVariant, height: 1.6),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () =>
-                  setState(() => _expandedDescription = !_expandedDescription),
-              child: Text(_expandedDescription ? '收起简介' : '展开简介'),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: colors.outlineVariant.withValues(alpha: 0.2),
+                width: 0.6,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  drama.description,
+                  maxLines: _expandedDescription ? null : 3,
+                  overflow: _expandedDescription
+                      ? TextOverflow.visible
+                      : TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.onSurface.withValues(alpha: 0.95),
+                    fontSize: 13,
+                    height: 1.6,
+                  ),
+                ),
+                if (drama.description.length > 40)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => setState(
+                        () => _expandedDescription = !_expandedDescription,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          _expandedDescription ? '收起简介' : '展开简介',
+                          style: const TextStyle(
+                            color: AppColors.hongguoRed,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
