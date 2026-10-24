@@ -222,6 +222,8 @@ import CoreMedia
   private func cleanUpPip() {
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
+    self.pipCheckTimer?.invalidate()
+    self.pipCheckTimer = nil
     self.pipObservation?.invalidate()
     self.pipObservation = nil
     self.pipReadyForDisplayObservation?.invalidate()
@@ -303,11 +305,13 @@ import CoreMedia
     var hasStartedPip = false
     let attemptStartPip: () -> Void = { [weak self] in
       guard let self = self, !hasStartedPip else { return }
-      guard let pipCtrl = self.pipController, let currentLayer = self.pipPlayerLayer else { return }
+      guard let pipCtrl = self.pipController else { return }
 
-      // 核心防错保护：必须等到图层首帧视频画面渲染就绪且画中画控制器判定可能，方可调用系统 startPictureInPicture
-      if currentLayer.isReadyForDisplay && pipCtrl.isPictureInPicturePossible {
+      // 只要系统判定 isPictureInPicturePossible，或 layer 已就绪，即可启动
+      if pipCtrl.isPictureInPicturePossible {
         hasStartedPip = true
+        self.pipCheckTimer?.invalidate()
+        self.pipCheckTimer = nil
         self.pipObservation?.invalidate()
         self.pipObservation = nil
         self.pipReadyForDisplayObservation?.invalidate()
@@ -326,20 +330,36 @@ import CoreMedia
         self.pipItemStatusObservation?.invalidate()
         self.pipItemStatusObservation = nil
 
+        var hasTriggeredPlay = false
         let beginPlayAndObserve = { [weak self] in
-          guard let self = self else { return }
+          guard let self = self, !hasTriggeredPlay else { return }
+          hasTriggeredPlay = true
           self.pipPlayer?.playImmediately(atRate: speed)
 
-          // 监听 isReadyForDisplay：首帧画面真正渲染到屏幕
+          // 1. 监听 isReadyForDisplay：首帧画面渲染到屏幕
           self.pipReadyForDisplayObservation = self.pipPlayerLayer?.observe(\.isReadyForDisplay, options: [.new, .initial]) { _, _ in
             DispatchQueue.main.async {
               attemptStartPip()
             }
           }
 
-          // 监听 isPictureInPicturePossible：系统画中画通道完全就绪
+          // 2. 监听 isPictureInPicturePossible：系统通道就绪
           self.pipObservation = self.pipController?.observe(\.isPictureInPicturePossible, options: [.new, .initial]) { _, _ in
             DispatchQueue.main.async {
+              attemptStartPip()
+            }
+          }
+
+          // 3. 轻量轮询保底（每 200ms 检测一次），彻底规避 KVO 漏报或时序死锁
+          self.pipCheckTimer?.invalidate()
+          self.pipCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] timer in
+            guard let self = self else {
+              timer.invalidate()
+              return
+            }
+            if hasStartedPip || (self.pipController?.isPictureInPictureActive ?? false) {
+              timer.invalidate()
+            } else {
               attemptStartPip()
             }
           }
@@ -347,7 +367,12 @@ import CoreMedia
 
         if positionMs > 0 {
           let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
-          player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+          // 容错兜底：若网络流 seek 在 0.6 秒内未回调，立刻自动进入播放，绝不死等
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            beginPlayAndObserve()
+          }
+          let tolerance = CMTime(value: 500, timescale: 1000)
+          player.seek(to: seekTime, toleranceBefore: tolerance, toleranceAfter: tolerance) { _ in
             DispatchQueue.main.async {
               beginPlayAndObserve()
             }
@@ -395,6 +420,8 @@ import CoreMedia
   func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
+    self.pipCheckTimer?.invalidate()
+    self.pipCheckTimer = nil
     self.pipObservation?.invalidate()
     self.pipObservation = nil
     self.pipReadyForDisplayObservation?.invalidate()
