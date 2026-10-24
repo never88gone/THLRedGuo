@@ -109,7 +109,13 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
 
   Future<void> _move(int direction) async {
     var target = feed.index + direction;
-    if (target >= feed.items.length && feed.hasMore) await feed.loadMore();
+    if (target >= feed.items.length) {
+      if (feed.hasMore) {
+        await feed.loadMore();
+      } else {
+        await feed.nextBatch();
+      }
+    }
     if (!mounted ||
         !_pages.hasClients ||
         target < 0 ||
@@ -246,10 +252,10 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                Expanded(
+                                const Expanded(
                                   child: Text(
-                                    '${feed.index + 1} / ${feed.items.length} · 上滑换剧',
-                                    style: const TextStyle(
+                                    '上滑换剧',
+                                    style: TextStyle(
                                       color: Colors.white70,
                                       fontSize: 12,
                                     ),
@@ -274,9 +280,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                                 IconButton(
                                   key: const ValueKey('feed-next'),
                                   tooltip: '下一部',
-                                  onPressed: feed.index + 1 < feed.items.length
-                                      ? () => unawaited(_move(1))
-                                      : null,
+                                  onPressed: () => unawaited(_move(1)),
                                   color: Colors.white,
                                   icon: const Icon(Icons.keyboard_arrow_down),
                                 ),
@@ -307,12 +311,6 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                                     ),
                                   ],
                                 ),
-                              ),
-                            if (!feed.hasMore &&
-                                feed.index == feed.items.length - 1)
-                              TextButton(
-                                onPressed: _refresh,
-                                child: const Text('已看完这批推荐 · 刷新换一批'),
                               ),
                           ],
                         ),

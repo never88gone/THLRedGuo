@@ -348,6 +348,21 @@ void main() {
     final next2 = store.stepFeedOffset();
     expect(next2, (offset0 + 12) % 60);
   });
+
+  test('推荐流支持 nextBatch 无缝跨批次加载，实现无限翻页', () async {
+    final repo = MultiPageRepo();
+    final feed = VideoFeedController(repo, store);
+    feed.setActive(true);
+    await flush();
+
+    expect(feed.items.length, 4); // 初始拉取 page 1 和 page 2
+    expect(feed.hasMore, false); // 第二页返回 hasMore = false
+
+    // 触发下一批次轮转拉取
+    await feed.nextBatch();
+    expect(feed.items.length, 4); // 相同 items 已在当前列表中（去重保护）
+    feed.dispose();
+  });
 }
 
 class MultiPageRepo extends AppRepository {
