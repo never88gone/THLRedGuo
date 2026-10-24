@@ -8,6 +8,7 @@ public struct RankingsView: View {
     @State private var pendingNextRow: String?
     @State private var pendingBoardFocus = false
     @State private var pendingCardFocus = false
+    @State private var autoSelectBoardTask: Task<Void, Never>?
 
     public enum FocusTarget: Hashable {
         case board(String)
@@ -144,6 +145,12 @@ public struct RankingsView: View {
                 pendingCardFocus = false
                 focusedTarget = .card(first.id)
                 NSLog("🎯 [FOCUS_TRACE] Rankings pendingCardFocus -> 成功聚焦首项卡片: %@", first.id)
+            } else if case .card(let currentId) = focusedTarget {
+                // 如果当前选中的卡片在内容刷新后不存在，平滑对齐到新内容的第一项
+                if !items.contains(where: { $0.id == currentId }), let first = items.first {
+                    focusedTarget = .card(first.id)
+                    NSLog("🎯 [FOCUS_TRACE] Rankings 内容切换平滑落焦首项卡片: %@", first.id)
+                }
             }
             NSLog("🎯 [FOCUS_TRACE] Rankings viewModel.items updated: count = %ld, firstId = %@", items.count, items.first?.id ?? "nil")
         }
@@ -153,6 +160,13 @@ public struct RankingsView: View {
                let index = viewModel.items.firstIndex(where: { $0.id == id }),
                index >= viewModel.items.count - columns.count {
                 Task { await viewModel.loadMore() }
+            }
+            if case .board(let id) = target {
+                if let board = viewModel.boards.first(where: { $0.id == id }) {
+                    scheduleAutoSelectBoard(board)
+                }
+            } else {
+                cancelAutoSelectBoard()
             }
             NSLog("🎯 [FOCUS_TRACE] Rankings focusedTarget = %@", String(describing: target))
         }
@@ -165,6 +179,7 @@ public struct RankingsView: View {
         }
         .onExitCommand {
             if selectedDrama == nil {
+                cancelAutoSelectBoard()
                 focusedTarget = nil
                 onRequestFocusTopNav?()
             }
@@ -181,10 +196,12 @@ public struct RankingsView: View {
                             isSelected: viewModel.selectedBoard?.id == board.id,
                             isFocused: focusedTarget == .board(board.id),
                             onUpCommand: {
+                                cancelAutoSelectBoard()
                                 focusedTarget = nil
                                 onRequestFocusTopNav?()
                             },
                             onDownCommand: {
+                                cancelAutoSelectBoard()
                                 focusFirstCard()
                             },
                             onLeftCommand: {
@@ -195,6 +212,7 @@ public struct RankingsView: View {
                             }
                         ) {
                             pendingNextRow = nil
+                            cancelAutoSelectBoard()
                             viewModel.selectBoard(board)
                         }
                         .id("board_\(board.id)")
@@ -242,6 +260,7 @@ public struct RankingsView: View {
         guard let index = boards.firstIndex(where: { $0.id == board.id }) else { return }
         let nextIndex = index + offset
         if nextIndex < 0 {
+            cancelAutoSelectBoard()
             focusedTarget = nil
             onRequestFocusTopNav?()
             return
@@ -250,7 +269,27 @@ public struct RankingsView: View {
         let target = boards[nextIndex]
         pendingNextRow = nil
         focusedTarget = .board(target.id)
-        // 关键修复：左右移动仅切换遥控器焦点高亮，绝对不直接执行 viewModel.selectBoard，防止遥控器上下滑动时的微小水平位移导致误横向切榜！
+        scheduleAutoSelectBoard(target)
+    }
+
+    private func scheduleAutoSelectBoard(_ board: RankingBoard) {
+        guard viewModel.selectedBoard?.id != board.id else { return }
+        autoSelectBoardTask?.cancel()
+        autoSelectBoardTask = Task { @MainActor in
+            // 防抖 200ms：快速滑动掠过时不频繁发请求，一旦焦点停留自动切换内容，无需用户额外按确认键
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled else { return }
+            if case .board(let currentId) = focusedTarget, currentId == board.id {
+                pendingNextRow = nil
+                viewModel.selectBoard(board)
+                NSLog("🎯 [FOCUS_TRACE] Rankings 标题切换自动更新内容: %@", board.name)
+            }
+        }
+    }
+
+    private func cancelAutoSelectBoard() {
+        autoSelectBoardTask?.cancel()
+        autoSelectBoardTask = nil
     }
 
     private func focusNextRow(after id: String) {
