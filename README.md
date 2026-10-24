@@ -27,10 +27,6 @@
   > 覆盖 iOS (iPhone / iPad) 与 Apple tvOS 客厅大屏版，点击链接即可通过苹果官方 TestFlight 一键安装并接收版本更新。
 - **💬 Telegram 官方交流与反馈**：[https://t.me/tanghulutvos](https://t.me/tanghulutvos) （频道 / 群组：`@tanghulutvos`）
   > 欢迎加入 Telegram 官方交流群获取最新动态、交流反馈与建议。
-- **🐙 GitHub 开源项目**：[https://github.com/never88gone/THLRedGuo](https://github.com/never88gone/THLRedGuo)
-  > 官方开源代码仓库，欢迎 Star、提 Issue 或提交 PR，共同完善跨平台短剧体验。
-- **📧 官方支持邮箱**：[support@thltv.com](mailto:support@thltv.com)
-  > 接收问题反馈、功能建议与合作咨询，我们将尽快回复与排查。
 
 ---
 
