@@ -2040,11 +2040,14 @@ final class RemoteNavigationTests: XCTestCase {
         wait("sidebar focused on settings tab", seconds: 15) {
             self.app.buttons["nav.settings"].hasFocus
         }
-        XCTAssertTrue(app.buttons["nav.settings"].hasFocus, "焦点当前停留在主导航栏设置按钮上")
-
-        // 验证：此时绝对不能自动进入设置页面，侧边栏保持展开，右侧设置页分类不存在
+        XCTAssertTrue(app.buttons["nav.settings"].hasFocus, "焦点当前稳固停留在主导航栏设置按钮上，绝未自动跳入内容页面")
         XCTAssertTrue(app.buttons["nav.settings"].exists, "主导航栏依然处于展开状态")
-        XCTAssertFalse(app.buttons["settings.nav.sources"].exists, "未按 Select 或 Right 前绝对没有自动切入设置页面")
+        // 验证：导航栏切换到设置后，右侧内容区已经自动联动变化为设置页面，但焦点保持在侧边栏上
+        wait("settings content updated in background", seconds: 10) {
+            self.app.staticTexts["系统设置"].exists
+        }
+        XCTAssertTrue(app.staticTexts["系统设置"].exists, "导航栏移动至设置项后，右侧内容区已自动变化为设置页面")
+        XCTAssertFalse(app.buttons["settings.nav.sources"].hasFocus, "焦点并未进入内容页面")
 
         // 3. 点击 select 按钮进入设置页面
         press(.select)
@@ -2083,8 +2086,16 @@ final class RemoteNavigationTests: XCTestCase {
 
         // 7. 导航至联系方式分类并验证联系邮箱为 support@thltv.com
         press(.left)
-        press(.down) // help
-        press(.down) // contact
+        if !app.buttons["settings.nav.contact"].hasFocus {
+            if app.buttons["settings.nav.about"].hasFocus {
+                press(.up, focus: "settings.nav.contact")
+            } else {
+                for _ in 0..<3 {
+                    if self.app.buttons["settings.nav.contact"].hasFocus { break }
+                    press(.down)
+                }
+            }
+        }
         wait("contact tab focused", seconds: 10) {
             self.app.buttons["settings.nav.contact"].hasFocus
         }

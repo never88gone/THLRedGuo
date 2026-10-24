@@ -333,7 +333,8 @@ public struct MainTabView: View {
                 }
                 .onChange(of: focusedNavTab) { _, newTab in
                     NSLog("🎯 [FOCUS_TRACE] Sidebar focusedNavTab = %@", newTab?.rawValue ?? "nil")
-                    if let _ = newTab {
+                    if let tab = newTab {
+                        selectedTab = tab
                         if columnVisibility != .all {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                                 columnVisibility = .all

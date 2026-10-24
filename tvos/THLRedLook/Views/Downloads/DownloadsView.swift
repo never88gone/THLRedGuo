@@ -176,7 +176,9 @@ public struct DownloadsView: View {
         }
         .onChange(of: focusTrigger) { _, _ in
             if viewModel.jobs.isEmpty {
-                isExploreFocused = true
+                DispatchQueue.main.async {
+                    isExploreFocused = true
+                }
             }
         }
     }
