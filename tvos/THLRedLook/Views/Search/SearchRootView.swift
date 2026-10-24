@@ -9,6 +9,7 @@ public struct SearchRootView: View {
 
     private enum SearchFocus: Hashable {
         case query
+        case clearIcon
         case clear
         case submit
         case suggestion(String)
@@ -63,7 +64,9 @@ public struct SearchRootView: View {
                             .onMoveCommand { direction in
                                 switch direction {
                                 case .right:
-                                    if !viewModel.query.isEmpty || viewModel.hasSearched {
+                                    if !viewModel.query.isEmpty {
+                                        focusedTarget = .clearIcon
+                                    } else if viewModel.hasSearched {
                                         focusedTarget = .clear
                                     } else {
                                         focusedTarget = .submit
@@ -87,11 +90,54 @@ public struct SearchRootView: View {
                                     viewModel.clearSearch()
                                     focusedTarget = .query
                                 }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.white.opacity(0.6))
-                                        .font(.system(size: 20))
+                                    let isIconFocused = focusedTarget == .clearIcon
+                                    ZStack {
+                                        Circle()
+                                            .fill(
+                                                isIconFocused
+                                                    ? AnyShapeStyle(LinearGradient(
+                                                        colors: [Color(red: 0.95, green: 0.22, blue: 0.28), Color(red: 0.78, green: 0.12, blue: 0.18)],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ))
+                                                    : AnyShapeStyle(Color.white.opacity(0.12))
+                                            )
+                                            .frame(width: 34, height: 34)
+
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 15, weight: .bold))
+                                            .foregroundColor(isIconFocused ? .white : .white.opacity(0.65))
+
+                                        if isIconFocused {
+                                            Circle()
+                                                .stroke(Color.white, lineWidth: 2.5)
+                                                .frame(width: 34, height: 34)
+                                        }
+                                    }
+                                    .scaleEffect(isIconFocused ? 1.15 : 1.0)
+                                    .shadow(color: isIconFocused ? Color.red.opacity(0.85) : Color.clear, radius: 10, x: 0, y: 0)
+                                    .animation(TVTheme.focusSpringAnimation, value: isIconFocused)
                                 }
-                                .buttonStyle(PlainButtonStyle())
+                                .buttonStyle(TVZeroHighlightButtonStyle())
+                                .focusEffectDisabled()
+                                .focused($focusedTarget, equals: .clearIcon)
+                                .accessibilityIdentifier("search.clear_icon")
+                                .onMoveCommand { direction in
+                                    switch direction {
+                                    case .left:
+                                        focusedTarget = .query
+                                    case .right:
+                                        if !viewModel.query.isEmpty || viewModel.hasSearched {
+                                            focusedTarget = .clear
+                                        } else {
+                                            focusedTarget = .submit
+                                        }
+                                    case .down:
+                                        focusContentBelowInput()
+                                    case .up:
+                                        break
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, 24)
@@ -100,7 +146,12 @@ public struct SearchRootView: View {
 
                         // 独立清空搜索按钮（有输入或已执行搜索时可见，一键清除文字与结果）
                         if !viewModel.query.isEmpty || viewModel.hasSearched {
-                            TVButton(title: "清空", icon: "xmark.circle", isProminent: false) {
+                            TVButton(
+                                title: "清空",
+                                icon: "xmark.circle",
+                                isProminent: false,
+                                isExternalFocused: focusedTarget == .clear
+                            ) {
                                 viewModel.clearSearch()
                                 focusedTarget = .query
                             }
@@ -109,7 +160,11 @@ public struct SearchRootView: View {
                             .onMoveCommand { direction in
                                 switch direction {
                                 case .left:
-                                    focusedTarget = .query
+                                    if !viewModel.query.isEmpty {
+                                        focusedTarget = .clearIcon
+                                    } else {
+                                        focusedTarget = .query
+                                    }
                                 case .right:
                                     focusedTarget = .submit
                                 case .down:
@@ -120,7 +175,12 @@ public struct SearchRootView: View {
                             }
                         }
 
-                        TVButton(title: "搜索", icon: "magnifyingglass", isProminent: true) {
+                        TVButton(
+                            title: "搜索",
+                            icon: "magnifyingglass",
+                            isProminent: true,
+                            isExternalFocused: focusedTarget == .submit
+                        ) {
                             Task { await viewModel.executeSearch() }
                         }
                         .accessibilityIdentifier("search.submit")
@@ -130,6 +190,8 @@ public struct SearchRootView: View {
                             case .left:
                                 if !viewModel.query.isEmpty || viewModel.hasSearched {
                                     focusedTarget = .clear
+                                } else if !viewModel.query.isEmpty {
+                                    focusedTarget = .clearIcon
                                 } else {
                                     focusedTarget = .query
                                 }
@@ -189,7 +251,12 @@ public struct SearchRootView: View {
                                     .font(.system(size: 20, weight: .bold))
                                     .foregroundColor(.white.opacity(0.75))
                                 Spacer()
-                                TVButton(title: "清空历史", icon: "trash", isProminent: false) {
+                                TVButton(
+                                    title: "清空历史",
+                                    icon: "trash",
+                                    isProminent: false,
+                                    isExternalFocused: focusedTarget == .clearHistory
+                                ) {
                                     viewModel.clearHistory()
                                 }
                                 .accessibilityIdentifier("search.clearHistory")

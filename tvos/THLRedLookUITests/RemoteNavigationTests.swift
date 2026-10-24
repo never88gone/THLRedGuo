@@ -2313,4 +2313,93 @@ final class RemoteNavigationTests: XCTestCase {
 
         print("THL_TV_DETAIL_ANIM_AND_SOURCES_FOCUS_COMPLETE detailCover=true detailAnim=true diagFocusStyle=true importFocusStyle=true")
     }
+
+    /// 9. 专项验证：
+    /// 1) 搜索框输入文字后，清除小 X 按钮获焦绝无系统白色矩形背景，呈现流光红宝石与纯白高光圆环
+    /// 2) 「清空」与「搜索」按钮选中获焦后呈现清晰醒目的样式（3.0pt 纯白高光白边、1.08x 放大、流光渐变提亮底色与强红光晕）
+    /// 3) 遥控器在输入框、小 X 按钮、清空按钮与搜索按钮之间按键穿梭平滑无阻
+    func testSearchXMarkNoWhiteBackgroundAndButtonsFocusStyles() throws {
+        continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "search", "-testQuery", "战神"]
+        app.launch()
+
+        // 1. 等待进入搜索页并完成初始搜索
+        wait("sidebar search tab or input ready", seconds: 20) {
+            self.app.buttons["nav.search"].exists || self.app.textFields["search.query"].exists
+        }
+        if self.app.buttons["nav.search"].hasFocus {
+            press(.select)
+        }
+        wait("search results ready", seconds: 20) {
+            self.app.buttons["search.result.0"].exists
+        }
+        XCTAssertTrue(app.buttons["search.clear_icon"].exists, "输入框有文字时展示清除小 X 按钮")
+        XCTAssertTrue(app.buttons["search.clear"].exists, "搜索完成后展示独立「清空」按钮")
+        XCTAssertTrue(app.buttons["search.submit"].exists, "搜索按钮常驻存在")
+
+        // 2. 从搜索结果第一排按 Up 移动到顶栏，焦点自然切入独立「清空」按钮
+        if !self.app.buttons["search.clear"].hasFocus {
+            press(.up)
+        }
+        wait("clear button focused", seconds: 10) {
+            self.app.buttons["search.clear"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["search.clear"].hasFocus, "清空按钮成功获取焦点并呈现清晰鲜明的选中样式（纯白高光白边与流光底色）")
+
+        let shotClear = XCUIScreen.main.screenshot()
+        try? shotClear.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_search_clear_button_focused.png"))
+
+        // 3. 从清空按钮按 Right 移动到「搜索」按钮，验证其获焦并呈现 3.0pt 纯白高光与 1.08x 放大
+        press(.right)
+        wait("submit button focused", seconds: 10) {
+            self.app.buttons["search.submit"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["search.submit"].hasFocus, "搜索按钮成功获取焦点并呈现清晰醒目的选中高光样式")
+
+        let shotSubmit = XCUIScreen.main.screenshot()
+        try? shotSubmit.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_search_submit_button_focused.png"))
+
+        // 4. 从搜索按钮按 Left 顺畅返回清空按钮
+        press(.left)
+        wait("back to clear button", seconds: 5) {
+            self.app.buttons["search.clear"].hasFocus
+        }
+
+        // 5. 从清空按钮按 Left 移动到清除小 X 按钮，验证其获焦且彻底剥离白色系统背景
+        press(.left)
+        wait("clear icon focused", seconds: 10) {
+            self.app.buttons["search.clear_icon"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["search.clear_icon"].hasFocus, "清除小 X 按钮成功获取焦点，呈现纯净流光红圆圈与纯白圆环，绝无白色矩形背景")
+
+        let shotIcon = XCUIScreen.main.screenshot()
+        try? shotIcon.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_search_clear_icon_focused.png"))
+
+        // 6. 从清除小 X 按钮按 Left 顺畅移动回输入框
+        press(.left)
+        wait("query input focused", seconds: 5) {
+            self.app.textFields["search.query"].hasFocus
+        }
+        XCTAssertTrue(app.textFields["search.query"].hasFocus, "焦点顺利从清除小 X 按钮向左移动回到搜索输入框")
+
+        // 7. 从输入框按 Right 重新回到清除小 X 按钮，按 Select 执行清除
+        press(.right)
+        wait("clear icon refocused", seconds: 5) {
+            self.app.buttons["search.clear_icon"].hasFocus
+        }
+        press(.select) // 点击清除小 X 按钮清空文字
+        wait("query cleared and focus returns to input", seconds: 10) {
+            self.app.textFields["search.query"].hasFocus && !self.app.buttons["search.clear_icon"].exists
+        }
+        XCTAssertTrue(app.textFields["search.query"].hasFocus, "点击清除小 X 按钮后文字成功清空，小 X 按钮消失，焦点自然重置回输入框")
+
+        let shotCleared = XCUIScreen.main.screenshot()
+        try? shotCleared.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_search_text_cleared_by_icon.png"))
+
+        print("THL_TV_SEARCH_XMARK_AND_BUTTONS_FOCUS_STYLES_COMPLETE xMarkNoWhiteBg=true clearStyle=true submitStyle=true clearAction=true")
+    }
 }

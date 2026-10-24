@@ -427,21 +427,21 @@ private struct TVButtonLabel: View {
             RoundedRectangle(cornerRadius: 14)
                 .fill(
                     isProminent
-                        ? (effectiveFocused ? TVTheme.primaryHover : TVTheme.primary)
-                        : (effectiveFocused ? Color(red: 0.28, green: 0.22, blue: 0.26) : Color(red: 0.16, green: 0.14, blue: 0.18))
+                        ? (effectiveFocused ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.95, green: 0.22, blue: 0.28), Color(red: 0.78, green: 0.12, blue: 0.18)], startPoint: .topLeading, endPoint: .bottomTrailing)) : AnyShapeStyle(TVTheme.primary))
+                        : (effectiveFocused ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.36, green: 0.18, blue: 0.25), Color(red: 0.24, green: 0.12, blue: 0.18)], startPoint: .topLeading, endPoint: .bottomTrailing)) : AnyShapeStyle(Color(red: 0.16, green: 0.14, blue: 0.18)))
                 )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .stroke(
                     effectiveFocused ? Color.white : (isProminent ? Color.clear : Color.white.opacity(0.12)),
-                    lineWidth: effectiveFocused ? 2.5 : 1.0
+                    lineWidth: effectiveFocused ? 3.0 : 1.0
                 )
         )
-        .scaleEffect(effectiveFocused ? 1.05 : 1.0)
+        .scaleEffect(effectiveFocused ? 1.08 : 1.0)
         .shadow(
-            color: effectiveFocused ? TVTheme.focusedShadowColor : Color.clear,
-            radius: effectiveFocused ? 14 : 0,
+            color: effectiveFocused ? Color.red.opacity(0.85) : Color.clear,
+            radius: effectiveFocused ? 16 : 0,
             x: 0,
             y: effectiveFocused ? 4 : 0
         )
