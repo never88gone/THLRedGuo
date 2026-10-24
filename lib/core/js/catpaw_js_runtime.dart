@@ -328,9 +328,9 @@ globalThis.__native_save_device = function(json) {
           : 2 * 1024 * 1024;
       final abort = Completer<void>();
       _requestAborts.add(abort);
-      final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 12000).clamp(
+      final timeoutMs = ((params['timeoutMs'] as num?)?.toInt() ?? 20000).clamp(
         1,
-        12000,
+        30000,
       );
       final timer = Timer(Duration(milliseconds: timeoutMs), () {
         timedOut = true;
@@ -430,6 +430,7 @@ globalThis.__native_save_device = function(json) {
     _assertReady();
     final res = await _evalAsync(
       'typeof spider !== "undefined" && typeof spider.home === "function" ? spider.home($filter) : { class: [], filters: {} }',
+      timeout: const Duration(seconds: 40),
     );
     final map = (res is Map) ? res : {};
     final classes = _toListOfMaps(map['class'] ?? map['classes'] ?? []);
@@ -447,6 +448,7 @@ globalThis.__native_save_device = function(json) {
     final extendJson = jsonEncode(extend ?? {});
     final res = await _evalAsync(
       'typeof spider !== "undefined" && typeof spider.category === "function" ? spider.category(${jsonEncode(tid)}, $page, $filter, $extendJson) : { list: [], page: $page, pagecount: 1 }',
+      timeout: const Duration(seconds: 40),
     );
     final map = (res is Map) ? res : {};
     final list = _toListOfMaps(map['list'] ?? []);
@@ -471,6 +473,7 @@ globalThis.__native_save_device = function(json) {
     _assertReady();
     final res = await _evalAsync(
       'typeof spider !== "undefined" && typeof spider.detail === "function" ? spider.detail(${jsonEncode(id)}) : { vod_id: ${jsonEncode(id)} }',
+      timeout: const Duration(seconds: 40),
     );
     final map = (res is Map) ? res : {};
     dynamic vod = map['vod'];
@@ -667,7 +670,7 @@ globalThis.__native_save_device = function(json) {
 
   Future<dynamic> _evalAsync(
     String jsCode, {
-    Duration timeout = const Duration(seconds: 15),
+    Duration timeout = const Duration(seconds: 30),
   }) async {
     _assertReady();
     final prevQueue = _evalQueue;
@@ -702,7 +705,7 @@ globalThis.__native_save_device = function(json) {
           throw CatPawSourceFailure.playback('cancelled');
         }
         if (stopwatch.elapsed > timeout) {
-          throw TimeoutException('JS 表达式执行超时', timeout);
+          throw TimeoutException('数据请求超时，请检查网络或稍后重试', timeout);
         }
 
         // 1. 处理待发起的网络请求

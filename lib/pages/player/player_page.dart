@@ -566,6 +566,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     _pictureInPictureHandlerInstalled = true;
     AppDevice.channel.setMethodCallHandler((call) async {
+      if (call.method == 'pipLog') {
+        debugPrint('[PiP-Native] ${call.arguments}');
+        return;
+      }
       if (call.method == 'pictureInPictureChanged') {
         final arguments = call.arguments;
         final active = arguments is Map && arguments['active'] == true;
@@ -753,6 +757,47 @@ class _PlayerScreenState extends State<PlayerScreen>
     _notice('正在启动画中画...');
     _setPictureInPictureStatus(requested: true);
 
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || _closed) return;
+
+    final mediaUrl = _plan?.url.isNotEmpty == true
+        ? _plan!.url
+        : (_player is LunaExoPlayer ? _player.mediaUri : '');
+    final headers = _plan?.headers ?? const <String, String>{};
+
+    String targetUrl = mediaUrl;
+    Map<String, String> targetHeaders = headers;
+    final isEncryptedStream = Platform.isIOS &&
+        _plan != null &&
+        _plan!.decryptionKey.isNotEmpty &&
+        !_plan!.local;
+
+    if (isEncryptedStream) {
+      _notice('正在准备画中画视频...');
+      try {
+        final prepared = await _encryptedPlayback.prepare(
+          _plan!,
+          forceCache: true,
+          progress: (val) {
+            if (mounted && !_closed) {
+              _notice('正在准备画中画 ${(val * 100).round()}%');
+            }
+          },
+        );
+        if (_closed || !mounted) return;
+        targetUrl = prepared.url;
+        targetHeaders = prepared.headers;
+      } catch (e) {
+        debugPrint('[PiP-Dart] 准备画中画加密视频失败: $e');
+        _notice('准备画中画视频失败: $e');
+        _setPictureInPictureStatus(requested: false);
+        if (Platform.isIOS && wasPlaying && !_closed) {
+          unawaited(_player.play());
+        }
+        return;
+      }
+    }
+
     _pictureInPictureExitTimer?.cancel();
     _pictureInPictureExitTimer = Timer(const Duration(seconds: 8), () {
       if (!_closed && _pictureInPictureRequested && !_pictureInPictureActive) {
@@ -764,28 +809,24 @@ class _PlayerScreenState extends State<PlayerScreen>
       }
     });
 
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || _closed) return;
     final sourceRect = _pictureInPictureSourceRect();
-    final mediaUrl = _plan?.url.isNotEmpty == true
-        ? _plan!.url
-        : (_player is LunaExoPlayer ? _player.mediaUri : '');
-    final headers = _plan?.headers ?? const <String, String>{};
     final arguments = <String, dynamic>{
       'width': width,
       'height': height,
-      if (mediaUrl.isNotEmpty) 'url': mediaUrl,
-      if (headers.isNotEmpty) 'headers': headers,
+      if (targetUrl.isNotEmpty) 'url': targetUrl,
+      if (targetHeaders.isNotEmpty) 'headers': targetHeaders,
       'title': widget.detail.drama.title,
       'position': _player.state.position.inMilliseconds,
       'speed': _speed,
     };
     if (sourceRect != null) arguments.addAll(sourceRect);
+    debugPrint('[PiP-Dart] enterPictureInPicture args: url=$targetUrl, pos=${arguments['position']}, sourceRect=$sourceRect');
     try {
       final status = await AppDevice.channel.invokeMapMethod<String, dynamic>(
         'enterPictureInPicture',
         arguments,
       );
+      debugPrint('[PiP-Dart] enterPictureInPicture return: $status');
       if (!mounted || _closed) return;
       final supported = status?['supported'] == true;
       final active = status?['active'] == true;

@@ -3,8 +3,14 @@ import Combine
 
 @MainActor
 public final class SearchViewModel: ObservableObject {
+    public static let defaultHotKeywords = [
+        "都市逆袭", "战神归来", "隐忍龙王", "现代甜宠",
+        "真假千金", "天降萌宝", "神豪首富", "狂龙出狱",
+        "重生复仇", "九龙至尊", "绝品神医", "无双战王"
+    ]
+
     @Published public var query = ""
-    @Published public var suggestions: [String] = []
+    @Published public var suggestions: [String] = SearchViewModel.defaultHotKeywords
     @Published public var searchResults: [Drama] = []
     @Published public var isLoading = false
     @Published public var isLoadingMore = false
@@ -43,7 +49,7 @@ public final class SearchViewModel: ObservableObject {
                 isLoadingMore = false
                 hasMore = false
                 searchResults = []
-                suggestions = []
+                suggestions = Self.defaultHotKeywords
                 hasSearched = false
                 errorMessage = nil
             }
@@ -63,18 +69,58 @@ public final class SearchViewModel: ObservableObject {
     }
 
     private func fetchSuggestions(for text: String) async {
-        guard !activeSourceId.isEmpty else {
-            suggestions = []
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            // 输入为空时获取热搜词，若失败绝不清空，保留默认精选词
+            guard !activeSourceId.isEmpty else {
+                if suggestions.isEmpty { suggestions = Self.defaultHotKeywords }
+                return
+            }
+            let source = activeSourceId
+            do {
+                let loaded = try await repository.loadSuggestions(query: "")
+                guard !Task.isCancelled, query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, activeSourceId == source else { return }
+                if !loaded.isEmpty {
+                    suggestions = loaded
+                } else if suggestions.isEmpty {
+                    suggestions = Self.defaultHotKeywords
+                }
+            } catch {
+                guard !Task.isCancelled, query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, activeSourceId == source else { return }
+                if suggestions.isEmpty {
+                    suggestions = Self.defaultHotKeywords
+                }
+            }
             return
         }
+
+        // 输入非空时获取动态联想词
+        guard !activeSourceId.isEmpty else { return }
         let source = activeSourceId
         do {
-            let loaded = try await repository.loadSuggestions(query: text)
+            let loaded = try await repository.loadSuggestions(query: trimmed)
             guard !Task.isCancelled, query == text, activeSourceId == source else { return }
-            suggestions = loaded
+            let filtered = loaded.isEmpty ? Self.defaultHotKeywords.filter { $0.contains(trimmed) } : loaded
+            suggestions = filtered.isEmpty ? Self.defaultHotKeywords : filtered
         } catch {
             guard !Task.isCancelled, query == text, activeSourceId == source else { return }
-            suggestions = []
+            let matched = Self.defaultHotKeywords.filter { $0.contains(trimmed) }
+            suggestions = matched.isEmpty ? Self.defaultHotKeywords : matched
+        }
+    }
+
+    public func clearSearch() {
+        debounceTask?.cancel()
+        query = ""
+        searchResults = []
+        hasSearched = false
+        isLoading = false
+        isLoadingMore = false
+        hasMore = false
+        errorMessage = nil
+        suggestions = Self.defaultHotKeywords
+        Task {
+            await fetchSuggestions(for: "")
         }
     }
 
@@ -87,7 +133,6 @@ public final class SearchViewModel: ObservableObject {
         submittedSource = !activeSourceId.isEmpty ? activeSourceId : "hongguo"
         submittedQuery = target
         query = target
-        suggestions = []
         hasMore = false
         isLoadingMore = false
         isLoading = true

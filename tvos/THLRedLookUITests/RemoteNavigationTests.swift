@@ -2129,4 +2129,123 @@ final class RemoteNavigationTests: XCTestCase {
 
         print("THL_TV_VERIFICATION_COMPLETE noAutoEnterSettings=true sourceStyleDifferentiated=true storageFullWidth=true downloadsFullWidth=true emailVerified=true")
     }
+
+    /// 7. 专项验证：
+    /// 1) 搜索页面支持清空已搜索文字与结果
+    /// 2) 搜索页面焦点移动顺畅无阻，消除死锁
+    /// 3) 搜索页面“猜你想搜”稳定展示，绝不中途消失
+    /// 4) 下载页面已彻底移除局域网投屏功能，符合纯粹 tvOS 定位
+    func testSearchClearAndFocusFlowAndDownloadsClean() {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "search"]
+        app.launch()
+
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+
+        // 1. 等待主导航栏启动就绪并按 Select 进入搜索内容区
+        wait("sidebar search tab focused", seconds: 25) {
+            self.app.buttons["nav.search"].exists && self.app.buttons["nav.search"].hasFocus
+        }
+        press(.select) // 进入搜索页面，收起侧边栏
+        wait("search input focused", seconds: 15) {
+            !self.app.buttons["nav.search"].exists && self.app.textFields["search.query"].exists && self.app.textFields["search.query"].hasFocus
+        }
+
+        // 2. 验证“猜你想搜”稳定展示，停留 3 秒绝不消失
+        wait("hot suggestions visible", seconds: 10) {
+            self.app.staticTexts["猜你想搜"].exists
+        }
+        sleep(3)
+        XCTAssertTrue(app.staticTexts["猜你想搜"].exists, "停留等待后「猜你想搜」依然稳定展示，未发生消失")
+
+        // 3. 验证焦点在输入框与建议词、搜索按钮间畅通移动
+        press(.down) // 移动到猜你想搜第一个词
+        sleep(1)
+        press(.up) // 回到输入框
+        wait("back to query", seconds: 10) {
+            self.app.textFields["search.query"].hasFocus
+        }
+        XCTAssertTrue(app.textFields["search.query"].hasFocus, "焦点从建议词顺利返回输入框")
+
+        press(.right) // 移动到搜索按钮
+        wait("submit button focused", seconds: 10) {
+            self.app.buttons["search.submit"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["search.submit"].hasFocus, "焦点顺利向右移动到搜索按钮")
+
+        press(.left) // 移动回输入框
+        wait("query refocused", seconds: 10) {
+            self.app.textFields["search.query"].hasFocus
+        }
+
+        // 4. 选择一个建议词执行搜索
+        press(.down)
+        press(.select) // 点击建议词触发搜索
+        wait("search completed", seconds: 20) {
+            self.app.buttons["search.result.0"].exists || self.app.staticTexts["未找到相关剧集，请尝试更换关键词"].exists
+        }
+
+        let shotSearch = XCUIScreen.main.screenshot()
+        try? shotSearch.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_search_results_verified.png"))
+
+        // 5. 验证清空搜索功能：移动到“清空”按钮并点击
+        wait("clear button exists", seconds: 10) {
+            self.app.buttons["search.clear"].exists
+        }
+        XCTAssertTrue(app.buttons["search.clear"].exists, "搜索完成后展示「清空」按钮")
+
+        if !self.app.buttons["search.clear"].hasFocus {
+            press(.up)
+        }
+        if !self.app.buttons["search.clear"].hasFocus {
+            if self.app.textFields["search.query"].hasFocus {
+                press(.right)
+            } else if self.app.buttons["search.submit"].hasFocus {
+                press(.left)
+            } else {
+                press(.up)
+            }
+        }
+        wait("clear button focused", seconds: 10) {
+            self.app.buttons["search.clear"].hasFocus
+        }
+        press(.select) // 点击清空
+
+        // 验证清空后重置为初始状态，猜你想搜重新可见
+        wait("search cleared and restored", seconds: 10) {
+            self.app.staticTexts["猜你想搜"].exists && !self.app.buttons["search.result.0"].exists
+        }
+        XCTAssertTrue(app.staticTexts["猜你想搜"].exists, "点击清空后文字已清空并恢复展示猜你想搜")
+
+        let shotCleared = XCUIScreen.main.screenshot()
+        try? shotCleared.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_search_cleared_verified.png"))
+
+        // 6. 验证下载页面：唤出侧边栏并进入下载页面
+        press(.left) // 唤出侧边栏
+        wait("sidebar opened", seconds: 15) {
+            self.app.buttons["nav.search"].exists && self.app.buttons["nav.search"].hasFocus
+        }
+
+        press(.down) // library
+        press(.down) // downloads
+        wait("downloads tab focused", seconds: 10) {
+            self.app.buttons["nav.downloads"].hasFocus
+        }
+        press(.select) // 进入下载页面
+        wait("downloads page loaded", seconds: 15) {
+            !self.app.buttons["nav.downloads"].exists && self.app.staticTexts["下载与离线管理"].exists
+        }
+
+        // 验证下载页面绝无任何局域网投屏残留
+        XCTAssertFalse(app.staticTexts["局域网互联与接续播放"].exists, "下载页面已彻底移除局域网投屏功能")
+        XCTAssertFalse(app.staticTexts["大屏投屏待命已就绪"].exists, "下载页面已彻底移除大屏投屏文案")
+        XCTAssertTrue(app.buttons["downloads.explore"].exists, "下载页面全屏展示离线缓存管理与去浏览短剧按钮")
+
+        let shotDownloads = XCUIScreen.main.screenshot()
+        try? shotDownloads.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_downloads_clean_verified.png"))
+
+        print("THL_TV_SEARCH_DOWNLOAD_REFINEMENT_COMPLETE searchClear=true focusFlow=true suggestionsStable=true downloadsLanRemoved=true")
+    }
 }

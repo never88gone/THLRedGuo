@@ -17,6 +17,7 @@ import CoreMedia
   private var pipItemStatusObservation: NSKeyValueObservation?
   private var pipReadyForDisplayObservation: NSKeyValueObservation?
   private var pipTimeoutWorkItem: DispatchWorkItem?
+  private var pipCheckTimer: Timer?
 
   override func application(
     _ application: UIApplication,
@@ -81,10 +82,19 @@ import CoreMedia
           let positionMs = args?["position"] as? Int ?? 0
           let speed = (args?["speed"] as? NSNumber)?.floatValue ?? 1.0
 
+          let sourceX = (args?["x"] as? NSNumber)?.doubleValue
+          let sourceY = (args?["y"] as? NSNumber)?.doubleValue
+          let sourceW = (args?["width"] as? NSNumber)?.doubleValue
+          let sourceH = (args?["height"] as? NSNumber)?.doubleValue
+          var sourceRect: CGRect? = nil
+          if let x = sourceX, let y = sourceY, let w = sourceW, let h = sourceH, w > 0, h > 0 {
+            sourceRect = CGRect(x: x, y: y, width: w, height: h)
+          }
+
           let targetUrl = self.parseMediaUrl(urlStr)
 
           if let url = targetUrl {
-            self.startPip(with: url, headers: headers, positionMs: positionMs, speed: speed, result: result)
+            self.startPip(with: url, headers: headers, positionMs: positionMs, speed: speed, sourceRect: sourceRect, result: result)
           } else if let controller = self.pipController, controller.isPictureInPicturePossible {
             controller.startPictureInPicture()
             result(["supported": true, "active": false, "requested": true])
@@ -181,6 +191,10 @@ import CoreMedia
   private func parseMediaUrl(_ urlStr: String) -> URL? {
     let clean = urlStr.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !clean.isEmpty else { return nil }
+    if clean.hasPrefix("file://") {
+      let path = String(clean.dropFirst(7))
+      return URL(fileURLWithPath: path)
+    }
     if clean.hasPrefix("/") {
       return URL(fileURLWithPath: clean)
     }
@@ -219,6 +233,13 @@ import CoreMedia
     return UIApplication.shared.keyWindow?.rootViewController
   }
 
+  private func logPip(_ message: String) {
+    NSLog("[PiP-Native] %@", message)
+    DispatchQueue.main.async { [weak self] in
+      self?.deviceChannel?.invokeMethod("pipLog", arguments: message)
+    }
+  }
+
   private func cleanUpPip() {
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
@@ -239,13 +260,20 @@ import CoreMedia
     self.pipController = nil
   }
 
-  private func startPip(with url: URL, headers: [String: String], positionMs: Int, speed: Float, result: @escaping FlutterResult) {
-    NSLog("[PiP-Debug] startPip with url: %@, pos: %d", url.absoluteString, positionMs)
+  private func startPip(
+    with url: URL,
+    headers: [String: String],
+    positionMs: Int,
+    speed: Float,
+    sourceRect: CGRect?,
+    result: @escaping FlutterResult
+  ) {
+    logPip("startPip: url=\(url.absoluteString), pos=\(positionMs), speed=\(speed), sourceRect=\(String(describing: sourceRect))")
     ensureAudioSessionConfigured()
     self.cleanUpPip()
 
     var assetOptions: [String: Any] = [:]
-    if !headers.isEmpty {
+    if !url.isFileURL && !headers.isEmpty {
       assetOptions["AVURLAssetHTTPHeaderFieldsKey"] = headers
     }
     let asset = AVURLAsset(url: url, options: assetOptions)
@@ -267,20 +295,17 @@ import CoreMedia
       return
     }
 
-    var targetBounds = rootVC.view.bounds
-    if targetBounds.width <= 0 || targetBounds.height <= 0 {
-      targetBounds = UIScreen.main.bounds
-    }
+    let targetBounds = sourceRect ?? rootVC.view.bounds
 
-    // 宿主容器挂载于顶层，确保 CoreAnimation 与 Pegasus 能够完整捕捉可见视频画面执行飞出动画
     let view = UIView(frame: targetBounds)
     view.backgroundColor = .black
+    view.alpha = 0
     view.isUserInteractionEnabled = false
     rootVC.view.addSubview(view)
     self.pipContainerView = view
 
     let layer = AVPlayerLayer(player: player)
-    layer.frame = targetBounds
+    layer.frame = view.bounds
     layer.videoGravity = .resizeAspect
     view.layer.addSublayer(layer)
     self.pipPlayerLayer = layer
@@ -308,21 +333,26 @@ import CoreMedia
       guard let self = self, !hasStartedPip else { return }
       guard let pipCtrl = self.pipController else { return }
 
-      NSLog("[PiP-Debug] attemptStartPip: isPictureInPicturePossible = %d, isReadyForDisplay = %d",
-            pipCtrl.isPictureInPicturePossible, self.pipPlayerLayer?.isReadyForDisplay ?? false)
-      if pipCtrl.isPictureInPicturePossible {
-        hasStartedPip = true
-        NSLog("[PiP-Debug] Calling pipCtrl.startPictureInPicture()...")
-        self.pipCheckTimer?.invalidate()
-        self.pipCheckTimer = nil
-        self.pipObservation?.invalidate()
-        self.pipObservation = nil
-        self.pipReadyForDisplayObservation?.invalidate()
-        self.pipReadyForDisplayObservation = nil
+      let isPossible = pipCtrl.isPictureInPicturePossible
+      let isReady = self.pipPlayerLayer?.isReadyForDisplay ?? false
+      self.logPip("attemptStartPip check: isPossible=\(isPossible), isReadyForDisplay=\(isReady)")
 
-        self.ensureAudioSessionConfigured()
-        pipCtrl.startPictureInPicture()
+      guard isPossible && isReady else {
+        return
       }
+
+      hasStartedPip = true
+      self.logPip("Calling pipCtrl.startPictureInPicture() with layer ready!")
+      self.pipCheckTimer?.invalidate()
+      self.pipCheckTimer = nil
+      self.pipObservation?.invalidate()
+      self.pipObservation = nil
+      self.pipReadyForDisplayObservation?.invalidate()
+      self.pipReadyForDisplayObservation = nil
+
+      self.pipContainerView?.alpha = 1.0
+      self.ensureAudioSessionConfigured()
+      pipCtrl.startPictureInPicture()
     }
 
     // 监听 playerItem 状态，在 readyToPlay 时进行 seek 和播放
@@ -337,6 +367,7 @@ import CoreMedia
         let beginPlayAndObserve = { [weak self] in
           guard let self = self, !hasTriggeredPlay else { return }
           hasTriggeredPlay = true
+          self.logPip("beginPlayAndObserve: start playing and observing")
           self.pipPlayer?.playImmediately(atRate: speed)
 
           // 1. 监听 isReadyForDisplay：首帧画面渲染到屏幕
@@ -353,7 +384,7 @@ import CoreMedia
             }
           }
 
-          // 3. 轻量轮询保底（每 200ms 检测一次），彻底规避 KVO 漏报或时序死锁
+          // 3. 轻量轮询保底（每 200ms 检测一次）
           self.pipCheckTimer?.invalidate()
           self.pipCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] timer in
             guard let self = self else {
@@ -370,7 +401,6 @@ import CoreMedia
 
         if positionMs > 0 {
           let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
-          // 容错兜底：若网络流 seek 在 0.6 秒内未回调，立刻自动进入播放，绝不死等
           DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             beginPlayAndObserve()
           }
@@ -389,7 +419,7 @@ import CoreMedia
         self.pipItemStatusObservation?.invalidate()
         self.pipItemStatusObservation = nil
         let errorMsg = item.error?.localizedDescription ?? "视频加载异常"
-        NSLog("[PiP] AVPlayerItem failed: %@", errorMsg)
+        self.logPip("AVPlayerItem failed: \(errorMsg)")
         self.cleanUpPip()
         self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: [
           "active": false,
@@ -406,7 +436,7 @@ import CoreMedia
     let timeoutItem = DispatchWorkItem { [weak self] in
       guard let self = self else { return }
       if !(self.pipController?.isPictureInPictureActive ?? false) {
-        NSLog("[PiP] Start PiP timeout (8s)")
+        self.logPip("Start PiP timeout (8s)")
         self.cleanUpPip()
         self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: [
           "active": false,
@@ -421,7 +451,7 @@ import CoreMedia
   }
 
   func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-    NSLog("[PiP-Debug] didStartPictureInPicture triggered successfully!")
+    logPip("didStartPictureInPicture triggered successfully!")
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
     self.pipCheckTimer?.invalidate()
@@ -430,13 +460,13 @@ import CoreMedia
     self.pipObservation = nil
     self.pipReadyForDisplayObservation?.invalidate()
     self.pipReadyForDisplayObservation = nil
-    // 小窗已成功从屏幕飞出，隐藏原生全黑容器，完整呈现 Flutter 页面居中的画中画控制卡片
     self.pipContainerView?.isHidden = true
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": true])
   }
 
   func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
     let positionMs = Int((pipPlayer?.currentTime().seconds ?? 0) * 1000)
+    logPip("didStopPictureInPicture at pos=\(positionMs)")
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "position": positionMs])
     cleanUpPip()
   }
@@ -445,7 +475,8 @@ import CoreMedia
     _ pictureInPictureController: AVPictureInPictureController,
     failedToStartPictureInPictureWithError error: Error
   ) {
-    NSLog("[PiP-Debug] failedToStartPictureInPictureWithError: %@", error.localizedDescription)
+    let err = error as NSError
+    logPip("failedToStartPictureInPictureWithError: domain=\(err.domain), code=\(err.code), desc=\(err.localizedDescription), userInfo=\(err.userInfo)")
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
     self.cleanUpPip()
