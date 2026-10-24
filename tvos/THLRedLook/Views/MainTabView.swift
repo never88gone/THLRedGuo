@@ -327,9 +327,7 @@ public struct MainTabView: View {
                     .background(TVTheme.backgroundGradient.ignoresSafeArea())
                 }
                 .onExitCommand {
-                    if selectedTab != .settings {
-                        requestFocusSidebar()
-                    }
+                    requestFocusSidebar()
                 }
                 .onChange(of: focusedNavTab) { _, newTab in
                     NSLog("🎯 [FOCUS_TRACE] Sidebar focusedNavTab = %@", newTab?.rawValue ?? "nil")

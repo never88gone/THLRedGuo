@@ -74,7 +74,8 @@ public struct DramaDetailView: View {
                             .frame(width: geo.size.width, height: geo.size.height)
                             .clipped()
                             .blur(radius: 50)
-                            .opacity(0.3)
+                            .opacity(appearAnimation ? 0.35 : 0.0)
+                            .animation(.easeOut(duration: 0.6), value: appearAnimation)
                     }
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
@@ -87,15 +88,21 @@ public struct DramaDetailView: View {
                     VStack(alignment: .leading, spacing: 28) {
                         // 剧集头部资料区（无顶部多余返回按钮，直接由遥控器实体 Menu/Back 键退出；始终展示列表带来的封面与剧名）
                         HStack(alignment: .top, spacing: 40) {
-                            // 海报视图（严格限定尺寸并剪裁，防止超大图撑爆布局，带沉浸式入场缩放动画）
+                            // 封面海报：沉浸式电影级入场过渡动画（从列表小卡片尺度向上升腾展开）
                             PosterArtworkView(drama: currentDrama, cornerRadius: 16)
                                 .frame(width: 220, height: 320)
                                 .clipped()
-                                .shadow(color: Color.black.opacity(0.6), radius: 14, x: 0, y: 6)
-                                .scaleEffect(appearAnimation ? 1.0 : 0.88)
-                                .animation(.spring(response: 0.48, dampingFraction: 0.78), value: appearAnimation)
+                                .shadow(
+                                    color: Color.black.opacity(appearAnimation ? 0.75 : 0.2),
+                                    radius: appearAnimation ? 24 : 6,
+                                    x: 0,
+                                    y: appearAnimation ? 12 : 3
+                                )
+                                .scaleEffect(appearAnimation ? 1.0 : 0.72)
+                                .offset(y: appearAnimation ? 0 : 36)
+                                .animation(.spring(response: 0.52, dampingFraction: 0.75, blendDuration: 0.2), value: appearAnimation)
 
-                            // 标题、标签、简介与动作
+                            // 标题、标签、简介与动作（紧随封面海报自然错峰滑入）
                             VStack(alignment: .leading, spacing: 18) {
                                 Text(currentDrama.title)
                                     .font(.system(size: 40, weight: .bold))
@@ -228,6 +235,9 @@ public struct DramaDetailView: View {
                                     .padding(.leading, 6)
                                 }
                             }
+                            .offset(x: appearAnimation ? 0 : 28)
+                            .opacity(appearAnimation ? 1.0 : 0.0)
+                            .animation(.easeOut(duration: 0.45).delay(0.08), value: appearAnimation)
                         }
                         .padding(.top, 16)
 
@@ -404,9 +414,6 @@ public struct DramaDetailView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 48)
                 }
-                .scaleEffect(appearAnimation ? 1.0 : 0.94)
-                .opacity(appearAnimation ? 1.0 : 0.0)
-                .offset(y: appearAnimation ? 0 : 20)
                 .onChange(of: returningEpisode) { _, number in
                     guard let number else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -423,7 +430,7 @@ public struct DramaDetailView: View {
                 }
                 .defaultFocus($focusedTarget, .play)
                 .onAppear {
-                    withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
+                    withAnimation(.spring(response: 0.52, dampingFraction: 0.75)) {
                         appearAnimation = true
                     }
                     guard !hasAppeared else { return }

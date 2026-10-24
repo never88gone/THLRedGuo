@@ -31,32 +31,8 @@ public struct SettingsView: View {
 
     public var body: some View {
         HStack(spacing: 36) {
-            // 左侧：分类导航侧边栏
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 16) {
-                    Image("applogo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 48, height: 48)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                        )
-                        .shadow(color: TVTheme.primary.opacity(0.4), radius: 8, x: 0, y: 4)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("系统设置")
-                            .font(.system(size: 30, weight: .bold))
-                            .foregroundColor(.white)
-                        Text("糖葫芦Haw · 控制中心")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-
+            // 左侧：分类导航侧边栏（纯净分类列表，不设多余 header，与主导航栏形成清晰层级区分）
+            VStack(alignment: .leading, spacing: 14) {
                 VStack(spacing: 12) {
                     ForEach(SettingsCategory.allCases) { category in
                         SettingsNavButton(
@@ -70,6 +46,7 @@ public struct SettingsView: View {
                         .focused($focusedCategory, equals: category)
                     }
                 }
+                .padding(.top, 12)
 
                 Spacer()
             }
@@ -81,6 +58,9 @@ public struct SettingsView: View {
                     .fill(Color(red: 0.10, green: 0.10, blue: 0.13).opacity(0.95))
             )
             .focusSection()
+            .onExitCommand {
+                onRequestFocusTopNav?()
+            }
             .onMoveCommand { direction in
                 if direction == .left {
                     onRequestFocusTopNav?()

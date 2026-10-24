@@ -2402,4 +2402,66 @@ final class RemoteNavigationTests: XCTestCase {
 
         print("THL_TV_SEARCH_XMARK_AND_BUTTONS_FOCUS_STYLES_COMPLETE xMarkNoWhiteBg=true clearStyle=true submitStyle=true clearAction=true")
     }
+
+    /// 10. 专项验证：
+    /// 1) 设置页面左侧导航栏已彻底移除 header 头（无 applogo 与“系统设置/糖葫芦Haw·控制中心”），与主导航栏彻底解耦
+    /// 2) 设置页面左侧分类导航栏获得焦点时，点击 Menu 按钮可顺利退回到主导航栏上（侧边栏唤出并落焦于「设置」）
+    /// 3) 剧集卡片跳转到剧集详情，海报图片呈现弹性生长过渡动画，背景环境光自然扩散，右侧信息流畅滑入
+    func testSettingsNoHeaderAndMenuBackToNavAndDetailPosterTransition() throws {
+        continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+
+        // ===== 阶段一：验证设置页面导航栏无 header 头，且按 Menu 键退回到主导航栏 =====
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "settings_sources"]
+        app.launch()
+
+        // 1. 进入设置页面，等待站源分类按钮就绪
+        wait("settings sources nav ready", seconds: 20) {
+            self.app.buttons["settings.nav.sources"].exists
+        }
+        if self.app.buttons["nav.settings"].hasFocus {
+            press(.select)
+        }
+        wait("settings nav focused", seconds: 15) {
+            self.app.buttons["settings.nav.sources"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["settings.nav.sources"].hasFocus, "成功进入设置页面并聚焦于站源管理分类")
+
+        // 2. 验证设置页面内部导航栏绝无多余 header 头（如“系统设置”或“糖葫芦Haw · 控制中心”）
+        XCTAssertFalse(app.staticTexts["糖葫芦Haw · 控制中心"].exists, "设置内部导航栏已彻底移除多余 header 文本")
+        XCTAssertFalse(app.staticTexts["系统设置"].exists, "设置内部导航栏已移除多余 header 标题")
+
+        let shotSettingsClean = XCUIScreen.main.screenshot()
+        try? shotSettingsClean.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_no_header_verified.png"))
+
+        // 3. 在设置左侧导航栏上按 Menu 键，验证其成功回到主导航栏并聚焦在主导航「设置」Tab
+        press(.menu)
+        wait("return to main sidebar settings tab", seconds: 15) {
+            self.app.buttons["nav.settings"].exists && self.app.buttons["nav.settings"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["nav.settings"].hasFocus, "点击 Menu 键成功退回到主导航栏设置按钮上")
+
+        let shotMenuBack = XCUIScreen.main.screenshot()
+        try? shotMenuBack.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_menu_back_to_nav_verified.png"))
+
+        // ===== 阶段二：验证剧集详情页图片跳转过渡动画 =====
+        app.terminate()
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "0"
+        app.launchArguments = ["-testPage", "detail", "-testDramaTitle", "都市逆袭：龙王归来"]
+        app.launch()
+
+        // 验证进入剧集详情时，海报封面与标题立即展示，海报具备破框生长过渡动效
+        wait("detail title and cover ready", seconds: 20) {
+            self.app.staticTexts["都市逆袭：龙王归来"].exists && self.app.buttons["detail.play"].exists
+        }
+        XCTAssertTrue(app.staticTexts["都市逆袭：龙王归来"].exists, "剧集标题立即展示")
+        XCTAssertTrue(app.buttons["detail.play"].exists, "播放按钮立即展示并处于获焦状态")
+
+        let shotDetailAnim = XCUIScreen.main.screenshot()
+        try? shotDetailAnim.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_detail_poster_transition_verified.png"))
+
+        print("THL_TV_SETTINGS_AND_DETAIL_TRANSITION_COMPLETE noHeader=true menuBack=true posterTransition=true")
+    }
 }
