@@ -7,10 +7,12 @@ public struct RankingsView: View {
     @State private var selectedDrama: Drama?
     @State private var pendingNextRow: String?
     @State private var pendingBoardFocus = false
+    @State private var pendingCardFocus = false
 
     public enum FocusTarget: Hashable {
         case board(String)
         case card(String)
+        case retryButton
     }
     @FocusState private var focusedTarget: FocusTarget?
 
@@ -43,42 +45,7 @@ public struct RankingsView: View {
                 }
             } else {
                 VStack(spacing: 20) {
-                    // 榜单切换 Tab（支持横向遥控平滑滚动，并预留上侧、左侧、右侧防裁切间距）
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 24) {
-                            ForEach(viewModel.boards.filter(\.isAllowedOnTV)) { board in
-                                TVRankingBoardButton(
-                                    board: board,
-                                    isSelected: viewModel.selectedBoard?.id == board.id,
-                                    isFocused: focusedTarget == .board(board.id),
-                                    onUpCommand: {
-                                        focusedTarget = nil
-                                        onRequestFocusTopNav?()
-                                    },
-                                    onDownCommand: {
-                                        if let first = viewModel.items.first {
-                                            focusedTarget = .card(first.id)
-                                            NSLog("🎯 [FOCUS_TRACE] Rankings onDownCommand -> 成功聚焦首项卡片: %@", first.id)
-                                        } else {
-                                            NSLog("🎯 [FOCUS_TRACE] Rankings onDownCommand -> items 为空，等待加载完成")
-                                        }
-                                    },
-                                    onLeftCommand: { moveBoard(from: board, offset: -1) },
-                                    onRightCommand: { moveBoard(from: board, offset: 1) }
-                                ) {
-                                    viewModel.selectBoard(board)
-                                }
-                                .focused($focusedTarget, equals: .board(board.id))
-                                .accessibilityIdentifier("ranking.board.\(board.id)")
-                            }
-                        }
-                        .padding(.horizontal, 48)
-                        .padding(.top, 24)
-                        .padding(.bottom, 12)
-                    }
-                    .clipShape(Rectangle().inset(by: -30))
-                    .focusSection()
-                    .defaultFocus($focusedTarget, .board(viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id ?? ""))
+                    boardsHeader
 
                     if viewModel.isLoading && viewModel.items.isEmpty {
                         Spacer()
@@ -93,12 +60,21 @@ public struct RankingsView: View {
                             Text(viewModel.errorMessage ?? "当前榜单暂无可展示剧集")
                                 .font(.system(size: 24, weight: .medium))
                                 .foregroundColor(.white.opacity(0.6))
-                            TVButton(title: "重新加载榜单", icon: "arrow.clockwise") {
+                            TVButton(
+                                title: "重新加载榜单",
+                                icon: "arrow.clockwise",
+                                isFocused: focusedTarget == .retryButton,
+                                onUpCommand: {
+                                    focusSelectedBoard()
+                                }
+                            ) {
                                 Task {
                                     await viewModel.loadBoards(forSource: currentActiveSource)
                                     await viewModel.loadRankings()
                                 }
                             }
+                            .focused($focusedTarget, equals: .retryButton)
+                            .accessibilityIdentifier("ranking.retry")
                         }
                         Spacer()
                     } else {
@@ -110,9 +86,8 @@ public struct RankingsView: View {
                                             drama: drama,
                                             isFocused: focusedTarget == .card(drama.id),
                                             onUpCommand: (index < columns.count) ? {
-                                                let targetBoard = viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id ?? ""
-                                                focusedTarget = .board(targetBoard)
-                                                NSLog("🎯 [FOCUS_TRACE] Rankings 卡片第 1 行按向上 -> 精确回到当前榜单: %@", targetBoard)
+                                                focusSelectedBoard()
+                                                NSLog("🎯 [FOCUS_TRACE] Rankings 卡片第 1 行按向上 -> 精确回到当前榜单")
                                             } : nil,
                                             onDownCommand: index + columns.count >= viewModel.items.count && viewModel.hasMore ? {
                                                 focusNextRow(after: drama.id)
@@ -151,7 +126,6 @@ public struct RankingsView: View {
                             .padding(.horizontal, 48)
                             .padding(.vertical, 24)
                         }
-                        .focusSection()
                         .defaultFocus($focusedTarget, viewModel.items.first.map { FocusTarget.card($0.id) })
                     }
                 }
@@ -166,6 +140,11 @@ public struct RankingsView: View {
         }
         .onChange(of: viewModel.items) { items in
             finishPendingRowFocus()
+            if pendingCardFocus, let first = items.first {
+                pendingCardFocus = false
+                focusedTarget = .card(first.id)
+                NSLog("🎯 [FOCUS_TRACE] Rankings pendingCardFocus -> 成功聚焦首项卡片: %@", first.id)
+            }
             NSLog("🎯 [FOCUS_TRACE] Rankings viewModel.items updated: count = %ld, firstId = %@", items.count, items.first?.id ?? "nil")
         }
         .onChange(of: focusedTarget) { target in
@@ -192,24 +171,86 @@ public struct RankingsView: View {
         }
     }
 
+    private var boardsHeader: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 24) {
+                    ForEach(viewModel.boards.filter(\.isAllowedOnTV)) { board in
+                        TVRankingBoardButton(
+                            board: board,
+                            isSelected: viewModel.selectedBoard?.id == board.id,
+                            isFocused: focusedTarget == .board(board.id),
+                            onUpCommand: {
+                                focusedTarget = nil
+                                onRequestFocusTopNav?()
+                            },
+                            onDownCommand: {
+                                focusFirstCard()
+                            },
+                            onLeftCommand: {
+                                moveBoardFocus(from: board, offset: -1)
+                            },
+                            onRightCommand: {
+                                moveBoardFocus(from: board, offset: 1)
+                            }
+                        ) {
+                            pendingNextRow = nil
+                            viewModel.selectBoard(board)
+                        }
+                        .id("board_\(board.id)")
+                        .focused($focusedTarget, equals: .board(board.id))
+                        .accessibilityIdentifier("ranking.board.\(board.id)")
+                    }
+                }
+                .padding(.horizontal, 48)
+                .padding(.top, 24)
+                .padding(.bottom, 12)
+            }
+            .clipShape(Rectangle().inset(by: -30))
+            .defaultFocus($focusedTarget, .board(viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id ?? ""))
+            .onChange(of: focusedTarget) { target in
+                if case .board(let id) = target {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        proxy.scrollTo("board_\(id)", anchor: .center)
+                    }
+                }
+            }
+        }
+    }
+
     private func focusSelectedBoard() {
         guard let target = viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id else { return }
         pendingBoardFocus = false
         focusedTarget = .board(target)
     }
 
-    private func moveBoard(from board: RankingBoard, offset: Int) {
+    private func focusFirstCard() {
+        if let first = viewModel.items.first {
+            pendingCardFocus = false
+            focusedTarget = .card(first.id)
+            NSLog("🎯 [FOCUS_TRACE] Rankings onDownCommand -> 成功聚焦首项卡片: %@", first.id)
+        } else if viewModel.errorMessage != nil {
+            focusedTarget = .retryButton
+        } else {
+            pendingCardFocus = true
+            NSLog("🎯 [FOCUS_TRACE] Rankings onDownCommand -> items 为空，等待加载完成并落焦")
+        }
+    }
+
+    private func moveBoardFocus(from board: RankingBoard, offset: Int) {
         let boards = viewModel.boards.filter(\.isAllowedOnTV)
         guard let index = boards.firstIndex(where: { $0.id == board.id }) else { return }
-        if index + offset < 0 {
+        let nextIndex = index + offset
+        if nextIndex < 0 {
             focusedTarget = nil
             onRequestFocusTopNav?()
             return
         }
-        let target = boards[min(max(index + offset, 0), boards.count - 1)]
+        guard nextIndex < boards.count else { return }
+        let target = boards[nextIndex]
         pendingNextRow = nil
-        viewModel.selectBoard(target)
         focusedTarget = .board(target.id)
+        // 关键修复：左右移动仅切换遥控器焦点高亮，绝对不直接执行 viewModel.selectBoard，防止遥控器上下滑动时的微小水平位移导致误横向切榜！
     }
 
     private func focusNextRow(after id: String) {

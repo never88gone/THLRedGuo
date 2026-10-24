@@ -98,18 +98,17 @@ public final class RankingsViewModel: ObservableObject {
         guard selectedBoard?.id != board.id else { return }
         generation += 1
         loadTask?.cancel()
-        isLoading = false
         isLoadingMore = false
         errorMessage = nil
         selectedBoard = board
         if let cached = cachedByBoard[board.id] {
+            isLoading = false
             apply(cached)
             return
         }
-        items = []
-        ranks = [:]
+        // 平滑切换：不粗暴清空 items，保留旧数据展示，杜绝下方视图瞬时坍塌导致焦点丢失
+        isLoading = true
         hasMore = false
-        loadTask?.cancel()
         loadTask = Task {
             await loadRankings()
         }
