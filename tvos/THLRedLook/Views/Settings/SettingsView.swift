@@ -82,6 +82,11 @@ public struct SettingsView: View {
             )
             .focusSection()
             .defaultFocus($focusedCategory, selectedCategory)
+            .onMoveCommand { direction in
+                if direction == .left {
+                    onRequestFocusTopNav?()
+                }
+            }
 
             // 右侧内容区：各个子面板高度解耦独立维护
             ScrollView(.vertical, showsIndicators: false) {
@@ -124,14 +129,15 @@ public struct SettingsView: View {
         }
         .padding(.horizontal, 48)
         .padding(.vertical, 24)
-        .defaultFocus($focusedCategory, selectedCategory)
         .onChange(of: focusedCategory) { newCat in
             if let cat = newCat {
                 selectedCategory = cat
             }
         }
         .onChange(of: focusSidebarTrigger) { _ in
-            focusedCategory = selectedCategory
+            DispatchQueue.main.async {
+                focusedCategory = selectedCategory
+            }
         }
         .onExitCommand {
             if focusedCategory == nil {

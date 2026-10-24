@@ -1963,4 +1963,51 @@ final class RemoteNavigationTests: XCTestCase {
 
         print("THL_TV_SETTINGS_RESULT aboutPanelPure=true aboutPanelFocused=true")
     }
+
+    /// 5. 验证进入设置页面后一级主导航栏自动关闭，设置分类完全可用且可自由操作与返回
+    func testEnterSettingsHidesSidebarAndEnablesInteraction() {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "settings"]
+        app.launch()
+
+        // 1. 等待侧边栏启动就绪，聚焦在设置 Tab
+        wait("sidebar settings tab exists and focused", seconds: 45) {
+            self.app.buttons["nav.settings"].exists && self.app.buttons["nav.settings"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["nav.settings"].hasFocus, "初始焦点在一级主导航栏设置项上")
+
+        // 2. 按向右键进入设置页面
+        press(.right)
+
+        // 3. 验证主导航栏已被立即关闭/隐藏（不存在于当前可见视图），焦点已稳固落在设置页面的分类上
+        wait("sidebar hidden and settings category focused", seconds: 15) {
+            !self.app.buttons["nav.settings"].exists && (self.app.buttons["settings.nav.sources"].hasFocus || self.app.buttons["settings.nav.sources"].exists)
+        }
+        XCTAssertFalse(app.buttons["nav.settings"].exists, "一级主导航栏已彻底关闭收起，绝无遮挡")
+        XCTAssertTrue(app.buttons["settings.nav.sources"].hasFocus, "焦点已成功进入设置页面的站源管理分类")
+
+        // 4. 验证在设置页面内可以自由流畅操作：向下移动焦点至 iCloud 同步
+        press(.down, focus: "settings.nav.sync")
+        XCTAssertTrue(app.buttons["settings.nav.sync"].hasFocus, "在设置页面内向下移动聚焦到 iCloud 同步")
+
+        // 5. 再次向下移动至存储与缓存
+        press(.down, focus: "settings.nav.cache")
+        XCTAssertTrue(app.buttons["settings.nav.cache"].hasFocus, "在设置页面内向下移动聚焦到存储与缓存")
+
+        // 6. 从左侧分类按向左键，验证一级主导航栏能够顺滑重新唤出并聚焦
+        press(.left)
+        wait("sidebar reopened", seconds: 15) {
+            self.app.buttons["nav.settings"].exists && self.app.buttons["nav.settings"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["nav.settings"].hasFocus, "在设置分类按向左键，成功重新唤出一级主导航栏并聚焦")
+
+        // 7. 截图归档
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+        let shot = XCUIScreen.main.screenshot()
+        try? shot.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_sidebar_toggle_verified.png"))
+
+        print("THL_TV_SETTINGS_RESULT sidebarClosedOnEnter=true settingsInteractive=true sidebarReopenedOnLeft=true")
+    }
 }

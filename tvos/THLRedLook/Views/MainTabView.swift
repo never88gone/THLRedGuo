@@ -340,6 +340,13 @@ public struct MainTabView: View {
                             }
                         }
                         selectedTab = tab
+                    } else {
+                        // 当焦点离开侧边栏（进入设置页等主内容区），立即平滑收起侧边栏浮层，杜绝遮挡内容与阻碍操作
+                        if columnVisibility != .detailOnly {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                columnVisibility = .detailOnly
+                            }
+                        }
                     }
                 }
             }
