@@ -240,6 +240,7 @@ import CoreMedia
   }
 
   private func startPip(with url: URL, headers: [String: String], positionMs: Int, speed: Float, result: @escaping FlutterResult) {
+    NSLog("[PiP-Debug] startPip with url: %@, pos: %d", url.absoluteString, positionMs)
     ensureAudioSessionConfigured()
     self.cleanUpPip()
 
@@ -307,9 +308,11 @@ import CoreMedia
       guard let self = self, !hasStartedPip else { return }
       guard let pipCtrl = self.pipController else { return }
 
-      // 只要系统判定 isPictureInPicturePossible，或 layer 已就绪，即可启动
+      NSLog("[PiP-Debug] attemptStartPip: isPictureInPicturePossible = %d, isReadyForDisplay = %d",
+            pipCtrl.isPictureInPicturePossible, self.pipPlayerLayer?.isReadyForDisplay ?? false)
       if pipCtrl.isPictureInPicturePossible {
         hasStartedPip = true
+        NSLog("[PiP-Debug] Calling pipCtrl.startPictureInPicture()...")
         self.pipCheckTimer?.invalidate()
         self.pipCheckTimer = nil
         self.pipObservation?.invalidate()
@@ -418,6 +421,7 @@ import CoreMedia
   }
 
   func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+    NSLog("[PiP-Debug] didStartPictureInPicture triggered successfully!")
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
     self.pipCheckTimer?.invalidate()
@@ -441,6 +445,7 @@ import CoreMedia
     _ pictureInPictureController: AVPictureInPictureController,
     failedToStartPictureInPictureWithError error: Error
   ) {
+    NSLog("[PiP-Debug] failedToStartPictureInPictureWithError: %@", error.localizedDescription)
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
     self.cleanUpPip()
