@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:THLRedLook/core/store/local_store.dart';
@@ -10,11 +11,13 @@ import 'package:THLRedLook/core/store/follow_state.dart';
 import 'package:THLRedLook/core/player/playback_preferences.dart';
 
 /// 跨苹果生态 (iOS / macOS / tvOS) 原生 iCloud 键值同步服务
-class ICloudSyncService extends ChangeNotifier {
-  ICloudSyncService._();
+class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
+  ICloudSyncService._() : _channel = const MethodChannel('duanju/icloud');
+  @visibleForTesting
+  ICloudSyncService.testing(this._channel);
   static final ICloudSyncService instance = ICloudSyncService._();
 
-  static const MethodChannel _channel = MethodChannel('duanju/icloud');
+  final MethodChannel _channel;
 
   static const String keyHistory = 'thl_icloud_sync_v1_history';
   static const String keyFollows = 'thl_icloud_sync_v1_follows';
@@ -25,9 +28,12 @@ class ICloudSyncService extends ChangeNotifier {
 
   bool _initialized = false;
   bool _isSyncing = false;
+  bool _syncPending = false;
+  int _syncGeneration = 0;
   DateTime? _lastSyncDate;
   String _lastStatusMessage = '未开启';
   Timer? _debounceTimer;
+  LocalStore? _store;
 
   bool get isSupported =>
       !kIsWeb &&
@@ -44,6 +50,8 @@ class ICloudSyncService extends ChangeNotifier {
   void initialize(LocalStore store) {
     if (_initialized || !isSupported) return;
     _initialized = true;
+    _store = store;
+    WidgetsBinding.instance.addObserver(this);
 
     final timestamp = store.preferences.getInt(prefLastSyncDate);
     if (timestamp != null && timestamp > 0) {
@@ -55,6 +63,11 @@ class ICloudSyncService extends ChangeNotifier {
 
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onICloudChanged') {
+        if ((call.arguments as Map?)?['reason'] == 2) {
+          _lastStatusMessage = 'iCloud 同步空间不足，本地记录已保留';
+          notifyListeners();
+          return;
+        }
         if (isSyncEnabled(store.preferences)) {
           debugPrint('☁️ [iCloud] 收到原生外部数据变动通知，触发云端同步合并...');
           await syncWithCloud(store);
@@ -69,7 +82,18 @@ class ICloudSyncService extends ChangeNotifier {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final store = _store;
+    if (state == AppLifecycleState.resumed && store != null) {
+      unawaited(syncWithCloud(store));
+    }
+  }
+
   Future<void> setSyncEnabled(bool enabled, LocalStore store) async {
+    _syncGeneration++;
+    _debounceTimer?.cancel();
+    _syncPending = false;
     await store.preferences.setBool(prefSyncEnabled, enabled);
     _lastStatusMessage = enabled ? '正在同步...' : '已停用';
     notifyListeners();
@@ -80,33 +104,61 @@ class ICloudSyncService extends ChangeNotifier {
 
   /// 执行双向数据同步：拉取云端、合并冲突并回写最新数据
   Future<void> syncWithCloud(LocalStore store) async {
-    if (!isSupported || !isSyncEnabled(store.preferences) || _isSyncing) return;
+    if (!isSupported || !isSyncEnabled(store.preferences)) return;
+    if (_isSyncing) {
+      _syncPending = true;
+      return;
+    }
+    final generation = _syncGeneration;
+    final profile = store.profile.id;
+    bool current() =>
+        generation == _syncGeneration &&
+        isSyncEnabled(store.preferences) &&
+        store.profile.id == profile &&
+        !store.locked;
+    if (!current()) return;
+    _debounceTimer?.cancel();
 
     _isSyncing = true;
     _lastStatusMessage = '正在同步...';
     notifyListeners();
 
     try {
-      await _channel.invokeMethod('synchronize');
+      final available = await _channel.invokeMethod<bool>('synchronize');
+      if (available != true) {
+        throw StateError('iCloud 暂不可用');
+      }
 
       // 1. 获取远端观看记录 (History)
-      final historyRaw = await _channel.invokeMethod<String>('getString', {'key': keyHistory});
+      final historyRaw = await _channel.invokeMethod<String>('getString', {
+        'key': keyHistory,
+      });
       final List<WatchEntry> remoteHistory = [];
+      var historySkipped = false;
       if (historyRaw != null && historyRaw.isNotEmpty) {
         try {
           final list = jsonDecode(historyRaw) as List;
           for (final item in list) {
-            remoteHistory.add(WatchEntry.fromJson(Map<String, dynamic>.from(item as Map)));
+            try {
+              remoteHistory.add(
+                WatchEntry.fromJson(Map<String, dynamic>.from(item as Map)),
+              );
+            } catch (_) {
+              historySkipped = true;
+            }
           }
         } catch (e) {
-          debugPrint('解析云端历史记录异常: $e');
+          rethrow;
         }
       }
 
       // 2. 获取远端追剧信息 (Follows)
-      final followsRaw = await _channel.invokeMethod<String>('getString', {'key': keyFollows});
+      final followsRaw = await _channel.invokeMethod<String>('getString', {
+        'key': keyFollows,
+      });
       final Map<String, FollowState> remoteFollows = {};
       final List<Drama> remoteDramas = [];
+      var dramasSkipped = false;
       if (followsRaw != null && followsRaw.isNotEmpty) {
         try {
           final map = jsonDecode(followsRaw) as Map<String, dynamic>;
@@ -138,29 +190,40 @@ class ICloudSyncService extends ChangeNotifier {
           }
           if (map['dramas'] is List) {
             for (final d in map['dramas'] as List) {
-              remoteDramas.add(Drama.fromJson(Map<String, dynamic>.from(d as Map)));
+              try {
+                remoteDramas.add(
+                  Drama.fromJson(Map<String, dynamic>.from(d as Map)),
+                );
+              } catch (_) {
+                dramasSkipped = true;
+              }
             }
           }
         } catch (e) {
-          debugPrint('解析云端追剧信息异常: $e');
+          rethrow;
         }
       }
 
       // 3. 获取远端配置项 (Settings)
-      final settingsRaw = await _channel.invokeMethod<String>('getString', {'key': keySettings});
+      final settingsRaw = await _channel.invokeMethod<String>('getString', {
+        'key': keySettings,
+      });
       String? remoteSource;
       bool? remoteDanmaku;
+      final Map<String, dynamic> remoteSettings = {};
       if (settingsRaw != null && settingsRaw.isNotEmpty) {
         try {
           final sMap = jsonDecode(settingsRaw) as Map<String, dynamic>;
+          remoteSettings.addAll(sMap);
           remoteSource = sMap['source'] as String?;
           remoteDanmaku = sMap['danmaku'] as bool?;
         } catch (e) {
-          debugPrint('解析云端配置项异常: $e');
+          rethrow;
         }
       }
 
       // 4. 双向合并逻辑
+      if (!current()) return;
       // 4.1 合并观看记录：同一剧集保留 updatedAt 较新者
       final Map<String, WatchEntry> mergedHistory = {};
       for (final local in store.history) {
@@ -174,7 +237,10 @@ class ICloudSyncService extends ChangeNotifier {
         }
       }
       final sortedHistory = mergedHistory.values.toList()
-        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        ..sort((a, b) {
+          final order = b.updatedAt.compareTo(a.updatedAt);
+          return order != 0 ? order : a.drama.id.compareTo(b.drama.id);
+        });
 
       // 4.2 合并追剧列表
       final Map<String, Drama> mergedFavorites = {};
@@ -195,19 +261,20 @@ class ICloudSyncService extends ChangeNotifier {
               ? localState
               : remoteState;
         } else {
-          mergedStates[id] = localState ??
+          mergedStates[id] =
+              localState ??
               remoteState ??
-              FollowState.initial(
-                mergedFavorites[id]!,
-                store.watched(id),
-              );
+              FollowState.initial(mergedFavorites[id]!, store.watched(id));
         }
       }
 
       // 4.3 合并设置项
       PlaybackPreferences? updatedPlayback;
-      if (remoteDanmaku != null && remoteDanmaku != store.playbackPreferences.danmaku) {
-        updatedPlayback = store.playbackPreferences.copyWith(danmaku: remoteDanmaku);
+      if (remoteDanmaku != null &&
+          remoteDanmaku != store.playbackPreferences.danmaku) {
+        updatedPlayback = store.playbackPreferences.copyWith(
+          danmaku: remoteDanmaku,
+        );
       }
 
       // 5. 应用合并结果到本地 LocalStore
@@ -218,55 +285,102 @@ class ICloudSyncService extends ChangeNotifier {
         source: remoteSource,
         playback: updatedPlayback,
       );
+      if (!current()) return;
 
       // 6. 回写云端（确保云端也是最新的合并结果）
-      await _channel.invokeMethod('setString', {
-        'key': keyHistory,
-        'value': jsonEncode(sortedHistory.take(300).map((e) => e.toJson()).toList()),
-      });
+      var wrote = false;
+      String historyContent(Iterable<WatchEntry> entries) {
+        final ordered = entries.toList()
+          ..sort((a, b) => a.drama.id.compareTo(b.drama.id));
+        return jsonEncode(ordered.map((e) => e.toJson()).toList());
+      }
+
+      Future<void> write(String key, Object value) async {
+        if (!current()) return;
+        await _channel.invokeMethod('setString', {
+          'key': key,
+          'value': jsonEncode(value),
+        });
+        wrote = true;
+      }
+
+      if (!historySkipped &&
+          historyContent(remoteHistory) !=
+              historyContent(sortedHistory.take(300))) {
+        await write(
+          keyHistory,
+          sortedHistory.take(300).map((e) => e.toJson()).toList(),
+        );
+      }
 
       final followsPayload = {
-        'follows': {for (final e in mergedStates.entries) e.key: e.value.status.name},
+        'follows': {
+          for (final e in mergedStates.entries) e.key: e.value.status.name,
+        },
         'dramas': mergedFavorites.values.map((d) => d.toJson()).toList(),
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
       };
-      await _channel.invokeMethod('setString', {
-        'key': keyFollows,
-        'value': jsonEncode(followsPayload),
-      });
+      String followsContent(
+        Map<String, FollowState> states,
+        Iterable<Drama> dramas,
+      ) {
+        final ordered = dramas.toList()..sort((a, b) => a.id.compareTo(b.id));
+        final keys = states.keys.toList()..sort();
+        return jsonEncode({
+          'follows': {for (final key in keys) key: states[key]!.status.name},
+          'dramas': ordered.map((d) => d.toJson()).toList(),
+        });
+      }
+
+      if (!dramasSkipped &&
+          followsContent(remoteFollows, remoteDramas) !=
+              followsContent(mergedStates, mergedFavorites.values)) {
+        await write(keyFollows, followsPayload);
+      }
 
       final settingsPayload = {
+        ...remoteSettings,
         'source': store.source,
         'danmaku': store.playbackPreferences.danmaku,
-        'speed': store.playbackPreferences.speed,
-        'quality': store.playbackPreferences.quality,
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
       };
-      await _channel.invokeMethod('setString', {
-        'key': keySettings,
-        'value': jsonEncode(settingsPayload),
-      });
+      if (settingsPayload.entries.any(
+        (e) => e.key != 'updatedAt' && remoteSettings[e.key] != e.value,
+      )) {
+        await write(keySettings, settingsPayload);
+      }
 
       final metaPayload = {
         'device': defaultTargetPlatform == TargetPlatform.iOS ? 'iOS' : 'macOS',
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       };
-      await _channel.invokeMethod('setString', {
-        'key': keyMeta,
-        'value': jsonEncode(metaPayload),
-      });
-
-      await _channel.invokeMethod('synchronize');
+      if (wrote) {
+        await write(keyMeta, metaPayload);
+        if (!current()) return;
+        if (await _channel.invokeMethod<bool>('synchronize') != true) {
+          throw StateError('iCloud 上传失败');
+        }
+      }
+      if (!current()) return;
 
       _lastSyncDate = DateTime.now();
-      await store.preferences.setInt(prefLastSyncDate, _lastSyncDate!.millisecondsSinceEpoch);
-      _lastStatusMessage = '已同步 (${sortedHistory.length}条记录, ${mergedFavorites.length}部追剧)';
+      await store.preferences.setInt(
+        prefLastSyncDate,
+        _lastSyncDate!.millisecondsSinceEpoch,
+      );
+      _lastStatusMessage = historySkipped || dramasSkipped
+          ? '部分记录格式不兼容，已保留云端原文'
+          : '已合并 (${sortedHistory.length}条记录, ${mergedFavorites.length}部追剧)，等待 iCloud 分发';
     } catch (e) {
       debugPrint('iCloud 同步失败: $e');
-      _lastStatusMessage = '同步遇到异常，稍后重试';
+      if (current()) _lastStatusMessage = 'iCloud 同步失败，本地记录已保留，请重试';
     } finally {
       _isSyncing = false;
       notifyListeners();
+      if (_syncPending) {
+        _syncPending = false;
+        unawaited(syncWithCloud(store));
+      }
     }
   }
 
@@ -277,5 +391,15 @@ class ICloudSyncService extends ChangeNotifier {
     _debounceTimer = Timer(const Duration(seconds: 2), () {
       syncWithCloud(store);
     });
+  }
+
+  @override
+  void dispose() {
+    _syncGeneration++;
+    _debounceTimer?.cancel();
+    _channel.setMethodCallHandler(null);
+    WidgetsBinding.instance.removeObserver(this);
+    _store = null;
+    super.dispose();
   }
 }

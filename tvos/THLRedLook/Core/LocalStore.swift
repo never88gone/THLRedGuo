@@ -22,8 +22,11 @@ public final class LocalStore: ObservableObject {
     @Published public private(set) var searchHistory: [String] = []
     @Published public var danmakuEnabled: Bool = true {
         didSet {
+            guard danmakuEnabled != oldValue else { return }
             defaults.set(danmakuEnabled, forKey: danmakuKey)
-            ICloudSyncService.shared.scheduleUpload(store: self)
+            if !applyingCloudData {
+                cloudUpload(self)
+            }
         }
     }
     @Published public var danmakuStyle: TVDanmakuStyle = TVDanmakuStyle() {
@@ -40,6 +43,8 @@ public final class LocalStore: ObservableObject {
     @Published public var cachedHomeDramas: [Drama] = []
 
     private let defaults: UserDefaults
+    private let cloudUpload: (LocalStore) -> Void
+    private var applyingCloudData = false
     private let danmakuKey = "thl_tv_danmaku_enabled"
     private let danmakuStyleKey = "thl_tv_danmaku_style"
     private let historyKey = "zgj_tv_history"
@@ -52,8 +57,9 @@ public final class LocalStore: ObservableObject {
     private let cachedCategoriesKey = "thl_tv_cached_categories"
     private let cachedHomeDramasKey = "thl_tv_cached_home_dramas"
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = .standard, cloudUpload: @escaping (LocalStore) -> Void = { ICloudSyncService.shared.scheduleUpload(store: $0) }) {
         self.defaults = defaults
+        self.cloudUpload = cloudUpload
         loadFromStorage()
     }
 
@@ -122,9 +128,12 @@ public final class LocalStore: ObservableObject {
     }
 
     public func setSource(_ id: String) {
+        guard id != currentSourceId else { return }
         currentSourceId = id
         defaults.set(id, forKey: currentSourceKey)
-        ICloudSyncService.shared.scheduleUpload(store: self)
+        if !applyingCloudData {
+            cloudUpload(self)
+        }
     }
 
     public func saveCachedCatalog(categories: [CatalogCategory], dramas: [Drama]) {
@@ -186,7 +195,7 @@ public final class LocalStore: ObservableObject {
         if let data = try? JSONEncoder().encode(history) {
             defaults.set(data, forKey: historyKey)
         }
-        ICloudSyncService.shared.scheduleUpload(store: self)
+        cloudUpload(self)
     }
 
     // MARK: - Follow State
@@ -219,10 +228,14 @@ public final class LocalStore: ObservableObject {
         if let dramaData = try? JSONEncoder().encode(followedDramas) {
             defaults.set(dramaData, forKey: followedDramasKey)
         }
-        ICloudSyncService.shared.scheduleUpload(store: self)
+        cloudUpload(self)
     }
 
-    public func applySyncedData(history: [WatchEntry], follows: [String: FollowState], followedDramas: [Drama]) {
+    public func applySyncedData(history: [WatchEntry], follows: [String: FollowState], followedDramas: [Drama], source: String? = nil, danmaku: Bool? = nil) {
+        applyingCloudData = true
+        defer { applyingCloudData = false }
+        if let source, !source.isEmpty { setSource(source) }
+        if let danmaku { danmakuEnabled = danmaku }
         self.history = history
         self.follows = follows
         self.followedDramas = followedDramas

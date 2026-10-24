@@ -24,13 +24,11 @@ class AppDelegate: FlutterAppDelegate {
           let key = args?["key"] as? String ?? ""
           let val = args?["value"] as? String ?? ""
           kv.set(val, forKey: key)
-          kv.synchronize()
           result(true)
         case "remove":
           let args = call.arguments as? [String: Any]
           let key = args?["key"] as? String ?? ""
           kv.removeObject(forKey: key)
-          kv.synchronize()
           result(true)
         case "synchronize":
           result(kv.synchronize())
@@ -43,9 +41,9 @@ class AppDelegate: FlutterAppDelegate {
         forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
         object: nil,
         queue: .main
-      ) { [weak self] _ in
-        NSUbiquitousKeyValueStore.default.synchronize()
-        self?.icloudChannel?.invokeMethod("onICloudChanged", arguments: nil)
+      ) { [weak self] notification in
+        let reason = notification.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int
+        self?.icloudChannel?.invokeMethod("onICloudChanged", arguments: ["reason": reason ?? 0])
       }
     }
   }
