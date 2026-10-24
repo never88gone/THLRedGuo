@@ -953,6 +953,14 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Widget _overview(Drama drama) {
     final colors = Theme.of(context).colorScheme;
+    final metaInfo = [
+      if (drama.releaseStatus.isNotEmpty && drama.releaseStatus != 'unknown')
+        drama.releaseLabel,
+      if (drama.onlineDate.isNotEmpty) '${drama.onlineDate} 上线',
+      if (drama.heat.isNotEmpty) '热度 ${drama.heat}',
+      if (drama.views.isNotEmpty) '播放 ${drama.views}',
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -971,7 +979,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -982,18 +990,18 @@ class _DetailScreenState extends State<DetailScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
-                      fontSize: 20,
+                      fontSize: 19,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
-                    runSpacing: 6,
+                    runSpacing: 4,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
+                          horizontal: 7,
+                          vertical: 2.5,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.hongguoRed.withValues(alpha: 0.15),
@@ -1015,8 +1023,8 @@ class _DetailScreenState extends State<DetailScreen> {
                       if (drama.episodes > 0)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
+                            horizontal: 7,
+                            vertical: 2.5,
                           ),
                           decoration: BoxDecoration(
                             color: colors.surfaceContainerHighest.withValues(
@@ -1036,8 +1044,8 @@ class _DetailScreenState extends State<DetailScreen> {
                       if (drama.category.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
+                            horizontal: 7,
+                            vertical: 2.5,
                           ),
                           decoration: BoxDecoration(
                             color: colors.surfaceContainerHighest.withValues(
@@ -1055,74 +1063,66 @@ class _DetailScreenState extends State<DetailScreen> {
                         ),
                     ],
                   ),
-                  if (drama.releaseStatus.isNotEmpty &&
-                      drama.releaseStatus != 'unknown')
+                  if (drama.tags.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Wrap(
+                        spacing: 5,
+                        runSpacing: 4,
+                        children: [
+                          for (final tag in drama.tags.take(4))
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.surfaceContainerHighest.withValues(
+                                  alpha: 0.5,
+                                ),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Text(
+                                tag,
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
+                                  fontSize: 10.5,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (metaInfo.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        drama.releaseLabel,
+                        metaInfo.join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: colors.onSurfaceVariant,
-                          fontSize: 12,
+                          color: colors.onSurfaceVariant.withValues(alpha: 0.8),
+                          fontSize: 11,
                         ),
                       ),
                     ),
-                  if (drama.vip && drama.source != 'hongguo' && !drama.id.startsWith('hongguo:'))
+                  if (drama.vip &&
+                      drama.source != 'hongguo' &&
+                      !drama.id.startsWith('hongguo:'))
                     Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         'VIP 内容',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
+                  const SizedBox(height: 8),
+                  _followingControls(drama),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        _followingControls(drama),
-        if (drama.onlineDate.isNotEmpty ||
-            drama.heat.isNotEmpty ||
-            drama.views.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text(
-              [
-                if (drama.onlineDate.isNotEmpty) '${drama.onlineDate} 上线',
-                if (drama.heat.isNotEmpty) '热度 ${drama.heat}',
-                if (drama.views.isNotEmpty) '播放 ${drama.views}',
-              ].join(' · '),
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-            ),
-          ),
-        if (drama.tags.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final tag in drama.tags.take(12))
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      child: Text(
-                        tag,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
         if (drama.description.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(
@@ -1362,74 +1362,373 @@ class _DetailScreenState extends State<DetailScreen> {
   );
 }
 
+  Color _followStatusColor(FollowStatus status) {
+    switch (status) {
+      case FollowStatus.planned:
+        return AppColors.hongguoAmber;
+      case FollowStatus.watching:
+        return AppColors.hongguoRed;
+      case FollowStatus.watched:
+        return AppColors.success;
+    }
+  }
+
+  IconData _followStatusIcon(FollowStatus status, {bool filled = true}) {
+    switch (status) {
+      case FollowStatus.planned:
+        return filled ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded;
+      case FollowStatus.watching:
+        return filled
+            ? Icons.play_circle_fill_rounded
+            : Icons.play_circle_outline_rounded;
+      case FollowStatus.watched:
+        return filled
+            ? Icons.check_circle_rounded
+            : Icons.check_circle_outline_rounded;
+    }
+  }
+
+  String _followStatusDescription(FollowStatus status) {
+    switch (status) {
+      case FollowStatus.planned:
+        return '加入想看清单，不错过更新提醒';
+      case FollowStatus.watching:
+        return '正在追更中，首页常驻快速观看';
+      case FollowStatus.watched:
+        return '已看完本剧全部集数';
+    }
+  }
+
+  Widget _buildStatusOptionTile({
+    required BuildContext sheetContext,
+    required Drama drama,
+    required FollowStatus status,
+    required bool isSelected,
+  }) {
+    final colors = Theme.of(sheetContext).colorScheme;
+    final statusColor = _followStatusColor(status);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () async {
+          Navigator.of(sheetContext).pop();
+          if (_profileEpoch != widget.store.profileEpoch) return;
+          await saveUserChange(
+            context,
+            () => widget.store.setFollowStatus(drama, status),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: isSelected
+                ? statusColor.withValues(alpha: 0.12)
+                : colors.surfaceContainerHighest.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected
+                  ? statusColor.withValues(alpha: 0.55)
+                  : colors.outlineVariant.withValues(alpha: 0.25),
+              width: isSelected ? 1.4 : 0.8,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? statusColor.withValues(alpha: 0.2)
+                      : colors.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _followStatusIcon(status, filled: isSelected),
+                  color: isSelected ? statusColor : colors.onSurfaceVariant,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      status.label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w600,
+                        color: isSelected ? statusColor : colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _followStatusDescription(status),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: statusColor,
+                  size: 22,
+                )
+              else
+                Icon(
+                  Icons.circle_outlined,
+                  color: colors.outlineVariant.withValues(alpha: 0.4),
+                  size: 20,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showFollowStatusSheet(
+    BuildContext context,
+    Drama drama,
+    FollowState? state,
+  ) async {
+    final colors = Theme.of(context).colorScheme;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: colors.outlineVariant.withValues(alpha: 0.2),
+                    width: 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.black.withValues(alpha: 0.25),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color:
+                                colors.onSurfaceVariant.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '追剧与观看状态',
+                                  style: Theme.of(sheetContext)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  drama.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: colors.onSurfaceVariant,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                            color: colors.onSurfaceVariant,
+                            onPressed: () => Navigator.of(sheetContext).pop(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      for (final status in FollowStatus.values) ...[
+                        _buildStatusOptionTile(
+                          sheetContext: sheetContext,
+                          drama: drama,
+                          status: status,
+                          isSelected: state?.status == status,
+                        ),
+                        if (status != FollowStatus.values.last)
+                          const SizedBox(height: 8),
+                      ],
+                      if (state != null) ...[
+                        const SizedBox(height: 14),
+                        Divider(
+                          height: 1,
+                          thickness: 0.8,
+                          color: colors.outlineVariant.withValues(alpha: 0.25),
+                        ),
+                        const SizedBox(height: 10),
+                        InkWell(
+                          onTap: () async {
+                            Navigator.of(sheetContext).pop();
+                            if (_profileEpoch != widget.store.profileEpoch) {
+                              return;
+                            }
+                            await saveUserChange(
+                              context,
+                              () => widget.store.toggleFavorite(drama),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: 10,
+                              horizontal: 16,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.bookmark_remove_outlined,
+                                  size: 18,
+                                  color: AppColors.hongguoRed,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  '从追剧清单中移出',
+                                  style: TextStyle(
+                                    color: AppColors.hongguoRed,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _followingControls(Drama drama) {
     final state = widget.store.following(drama.id);
+    final colors = Theme.of(context).colorScheme;
+    final isFollowed = state != null;
+    final statusColor = isFollowed
+        ? _followStatusColor(state.status)
+        : colors.onSurface;
+
     return Wrap(
       spacing: 8,
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        PopupMenuButton<String>(
-          key: const ValueKey('follow-status'),
-          tooltip: '追剧与观看状态',
-          onSelected: (value) async {
-            if (_profileEpoch != widget.store.profileEpoch) return;
-            if (value == 'remove') {
-              await saveUserChange(
-                context,
-                () => widget.store.toggleFavorite(drama),
-              );
-            } else {
-              final status = FollowStatus.values.firstWhere(
-                (status) => status.name == value,
-              );
-              await saveUserChange(
-                context,
-                () => widget.store.setFollowStatus(drama, status),
-              );
-            }
-          },
-          itemBuilder: (_) => [
-            for (final status in FollowStatus.values)
-              CheckedPopupMenuItem(
-                value: status.name,
-                checked: state?.status == status,
-                child: Text(status.label),
-              ),
-            if (state != null)
-              const PopupMenuItem(value: 'remove', child: Text('取消追剧')),
-          ],
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 48),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: state == null
-                  ? Theme.of(context).colorScheme.surfaceContainerHighest
-                  : Theme.of(context).colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  state?.status == FollowStatus.watched
-                      ? Icons.check_circle_outline
-                      : state == null
-                      ? Icons.bookmark_add_outlined
-                      : Icons.bookmark_rounded,
-                  size: 20,
+        Material(
+          color: Colors.transparent,
+          child: Tooltip(
+            message: '追剧与观看状态',
+            child: InkWell(
+              key: const ValueKey('follow-status'),
+              onTap: () => _showFollowStatusSheet(context, drama, state),
+              borderRadius: BorderRadius.circular(14),
+              child: Ink(
+                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: isFollowed
+                      ? statusColor.withValues(alpha: 0.14)
+                      : colors.surfaceContainerHighest.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isFollowed
+                        ? statusColor.withValues(alpha: 0.45)
+                        : colors.outlineVariant.withValues(alpha: 0.3),
+                    width: 0.8,
+                  ),
                 ),
-                const SizedBox(width: 8),
-                Text(state?.label ?? '加入追剧'),
-                const SizedBox(width: 4),
-                const Icon(Icons.expand_more_rounded, size: 18),
-              ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isFollowed
+                          ? _followStatusIcon(state.status, filled: true)
+                          : Icons.bookmark_add_outlined,
+                      size: 14,
+                      color: isFollowed ? statusColor : colors.onSurface,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      state?.label ?? '追剧',
+                      style: TextStyle(
+                        color: isFollowed ? statusColor : colors.onSurface,
+                        fontSize: 11.5,
+                        fontWeight:
+                            isFollowed ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.expand_more_rounded,
+                      size: 14,
+                      color: isFollowed ? statusColor : colors.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
         if (state != null && state.hasUpdates)
           ActionChip(
-            label: Text('${state.updateLabel} · 标为已读'),
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: EdgeInsets.zero,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+            label: Text(
+              '${state.updateLabel} · 标为已读',
+              style: const TextStyle(fontSize: 10.5),
+            ),
             onPressed: () => saveUserChange(
               context,
               () => widget.store.markUpdatesRead(drama.id),
