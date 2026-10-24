@@ -29,6 +29,7 @@ DramaDetail detail(Drama drama) => DramaDetail(drama, [
 
 class Repo extends AppRepository {
   final pages = <int>[];
+  final sessions = <String>[];
   final details = <String>[];
   bool failMore = false;
   String moreCode = '';
@@ -37,6 +38,7 @@ class Repo extends AppRepository {
   @override
   Future<FeedPage> videoFeed({int page = 1, required String session}) async {
     pages.add(page);
+    sessions.add(session);
     if (page == 1 && first != null) return first!.future;
     if (page > 1 && failMore) throw AppFailure('合成断网', code: moreCode);
     return FeedPage(
@@ -83,6 +85,49 @@ void main() {
     store = LocalStore(await SharedPreferences.getInstance());
   });
   tearDown(() => store.dispose());
+  test(
+    'first unseen feed uses bootstrap batch and refresh rotates offset',
+    () async {
+      final repo = Repo();
+      final feed = VideoFeedController(repo, store);
+      await feed.refresh();
+      expect(repo.sessions.single.endsWith('_0'), true);
+      await feed.refresh();
+      expect(repo.sessions.last.endsWith('_6'), true);
+      feed.dispose();
+      await store.markFeedSeen(a.id);
+      final returning = VideoFeedController(repo, store);
+      await returning.refresh();
+      expect(repo.sessions.last.endsWith('_12'), true);
+      returning.dispose();
+    },
+  );
+  test(
+    'list refresh does not wait for player disposal but playback still does',
+    () async {
+      final repo = Repo();
+      final feed = VideoFeedController(repo, store);
+      final lease = feed.playback.acquire();
+      try {
+        var finished = false;
+        final refresh = feed.refresh().then((_) => finished = true);
+        await flush();
+        expect(finished, true);
+        expect(feed.items, isNotEmpty);
+        expect(feed.loading, false);
+        feed.setActive(true);
+        await flush();
+        expect(repo.details, isEmpty);
+        await lease.releaseAfter(Future.value());
+        await refresh;
+        await flush();
+        expect(feed.detail?.drama.id, a.id);
+      } finally {
+        await lease.releaseAfter(Future.value());
+        feed.dispose();
+      }
+    },
+  );
   test(
     'does not fetch off tab, keeps items and stops preparing while hidden',
     () async {

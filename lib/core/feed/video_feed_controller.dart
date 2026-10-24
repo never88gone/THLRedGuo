@@ -59,7 +59,9 @@ class VideoFeedController extends ChangeNotifier {
     final generation = ++_generation;
     _selection++;
     final retainId = preserveCurrent ? current?.drama.id : null;
-    final offset = store.stepFeedOffset();
+    final offset = _session.isEmpty && store.feedSeenIds.isEmpty
+        ? 0
+        : store.stepFeedOffset();
     _session = '${DateTime.now().microsecondsSinceEpoch}_$offset';
     _selectionTimer?.cancel();
     items = [];
@@ -73,8 +75,6 @@ class VideoFeedController extends ChangeNotifier {
     restartRequired = false;
     notifyListeners();
     try {
-      await playback.idle;
-      if (_disposed || generation != _generation || !allowed) return;
       final result = await repository.videoFeed(page: 1, session: _session);
       if (_disposed || generation != _generation || !allowed) return;
       final filtered = _filterSeen(result.items, retainId: retainId);
@@ -139,9 +139,10 @@ class VideoFeedController extends ChangeNotifier {
       );
       if (_disposed || generation != _generation || !allowed) return;
       final existingIds = items.map((e) => e.drama.id).toSet();
-      final fresh = _filterSeen(result.items, retainId: retainId)
-          .where((e) => !existingIds.contains(e.drama.id))
-          .toList();
+      final fresh = _filterSeen(
+        result.items,
+        retainId: retainId,
+      ).where((e) => !existingIds.contains(e.drama.id)).toList();
       items = [...items, ...fresh];
       _page = result.page;
       hasMore = result.hasMore;
@@ -212,15 +213,13 @@ class VideoFeedController extends ChangeNotifier {
     try {
       final offset = store.stepFeedOffset();
       final newSession = '${DateTime.now().microsecondsSinceEpoch}_$offset';
-      final result = await repository.videoFeed(
-        page: 1,
-        session: newSession,
-      );
+      final result = await repository.videoFeed(page: 1, session: newSession);
       if (_disposed || generation != _generation || !allowed) return;
       final existingIds = items.map((e) => e.drama.id).toSet();
-      var fresh = _filterSeen(result.items, retainId: retainId)
-          .where((e) => !existingIds.contains(e.drama.id))
-          .toList();
+      var fresh = _filterSeen(
+        result.items,
+        retainId: retainId,
+      ).where((e) => !existingIds.contains(e.drama.id)).toList();
       if (fresh.isEmpty && result.items.isNotEmpty) {
         fresh = result.items
             .where((e) => !existingIds.contains(e.drama.id))

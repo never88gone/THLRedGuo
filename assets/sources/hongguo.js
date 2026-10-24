@@ -2092,34 +2092,28 @@ spider.danmaku = function (id, startMs, durationMs) {
     }
     appendCell(cell);
 
-    // 分页数量目标设置为 20：适配 tvOS 与桌面端大屏一屏超过 20 条的需求，若单次下发不足 20 条且接口有更多数据，自动换一批补足 20 条
-    const TARGET_SIZE = 20;
     let rounds = 0;
-    while (list.length < TARGET_SIZE && hasMore && rounds < 5) {
+    while (!list.length && hasMore && rounds < 5) {
       rounds++;
-      try {
-        const nextParams = {
-          ...params,
-          cell_id: text(currentCell.cell_id_str || previous?.cell_id),
-          offset: offset,
-          session_id: text(currentData.session_id || currentCell.session_id),
-          rank_version: text(currentData.rank_version || currentCell.rank_version),
-          limit: 40,
-          change_type: 1
-        };
-        const nextRes = await api('/reading/bookapi/bookmall/cell/change/v', nextParams);
-        const nextCell = nextRes.data?.cell_view;
-        const nextData = nextRes.data;
-        if (!nextCell || !nextData) break;
-        const prevOff = offset;
-        offset = number(nextData.next_offset ?? nextCell.next_offset);
-        hasMore = nextData.has_more !== false && nextCell.has_more !== false && offset > prevOff;
-        currentCell = nextCell;
-        currentData = nextData;
-        appendCell(nextCell);
-      } catch (_) {
-        break;
-      }
+      const nextParams = {
+        ...params,
+        cell_id: text(currentCell.cell_id_str || previous?.cell_id),
+        offset: offset,
+        session_id: text(currentData.session_id || currentCell.session_id),
+        rank_version: text(currentData.rank_version || currentCell.rank_version),
+        limit: 40,
+        change_type: 1
+      };
+      const nextRes = await api('/reading/bookapi/bookmall/cell/change/v', nextParams);
+      const nextCell = nextRes.data?.cell_view;
+      const nextData = nextRes.data;
+      if (!nextCell || !nextData) throw failure('官方接口未返回剧集列表，请重试', 'INVALID_RESPONSE');
+      const prevOff = offset;
+      offset = number(nextData.next_offset ?? nextCell.next_offset);
+      hasMore = nextData.has_more !== false && nextCell.has_more !== false && offset > prevOff;
+      currentCell = nextCell;
+      currentData = nextData;
+      appendCell(nextCell);
     }
 
     hasMore = hasMore && list.length > 0;
@@ -2196,29 +2190,20 @@ spider.danmaku = function (id, startMs, durationMs) {
       if (typeof legacyCategory === 'function') return legacyCategory(tid, page, filter, extend);
       throw failure('分类已更新，请重新选择分类', 'INVALID_CATEGORY');
     }
-    try {
-      return await paged('discover:' + genre, page, async () => {
-        const { cell, choices } = await discoveryTab();
-        const category = genre === 'all' ? '短剧' : text(choices.find(item => item.selector_item_id === genre).show_name);
-        const params = {
-          cell_id: text(cell.cell_id_str), tab_type: 8, selected_items: genre,
-          sub_selected_items: '', unlimited_selector_change_type: 1,
-          client_template: 2, client_req_type: 2
-        };
-        if (genre === 'all' && choices.find(item => item.selector_item_id === genre).is_selected) return { cell, params, category };
-        const response = await api('/reading/bookapi/bookmall/cell/change/v', {
-          ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 40
-        });
-        return { cell: response.data?.cell_view, data: response.data || {}, params, category };
+    return await paged('discover:' + genre, page, async () => {
+      const { cell, choices } = await discoveryTab();
+      const category = genre === 'all' ? '短剧' : text(choices.find(item => item.selector_item_id === genre).show_name);
+      const params = {
+        cell_id: text(cell.cell_id_str), tab_type: 8, selected_items: genre,
+        sub_selected_items: '', unlimited_selector_change_type: 1,
+        client_template: 2, client_req_type: 2
+      };
+      if (genre === 'all' && choices.find(item => item.selector_item_id === genre).is_selected) return { cell, params, category };
+      const response = await api('/reading/bookapi/bookmall/cell/change/v', {
+        ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 40
       });
-    } catch (e) {
-      if (typeof legacyCategory === 'function') {
-        try {
-          return await legacyCategory(tid, page, filter, extend);
-        } catch (_) {}
-      }
-      throw e;
-    }
+      return { cell: response.data?.cell_view, data: response.data || {}, params, category };
+    });
   };
 
   spider.suggestions = async function (word) {
@@ -2417,15 +2402,15 @@ spider.danmaku = function (id, startMs, durationMs) {
     }
     if (!cell || !data) throw failure('首页推荐暂不可用，请重试', 'INVALID_RESPONSE');
 
-    const cellId = text(cell.cell_id_str || state.cellId || params?.cell_id);
-    const sessionId = text(data.session_id || tab?.session_id || state.sessionId);
+    let cellId = text(cell.cell_id_str || state.cellId || params?.cell_id);
+    let sessionId = text(data.session_id || cell.session_id || tab?.session_id || state.sessionId);
     state.cellId = cellId;
     state.sessionId = sessionId;
 
     let previous = number(params?.offset);
     let offset = (page === 1 && !params) ? Math.max(number(tab.next_offset), videos([cell]).length) : number(data.next_offset);
     let hasMore = (page === 1 && !params) ? tab.bottom_unlimited === true && videos([cell]).length > 0 :
-      data.has_more === true && offset > previous && videos([cell]).length > 0;
+      data.has_more === true && offset > previous;
 
     const list = [];
     function appendVideos(targetCell) {
@@ -2462,34 +2447,31 @@ spider.danmaku = function (id, startMs, durationMs) {
 
     appendVideos(cell);
 
-    // 分页数量目标设置为 10：若单次下发不足 10 条且接口有更多数据，自动换一批补足 10 条
-    // 分页数量目标设置为 20：适配 tvOS 与桌面端大屏一屏超过 20 条的需求，若单次下发不足 20 条且接口有更多数据，自动换一批补足 20 条
-    const TARGET_SIZE = 20;
     let rounds = 0;
-    while (list.length < TARGET_SIZE && hasMore && rounds < 5) {
+    while (!list.length && hasMore && rounds < 5) {
       rounds++;
-      try {
-        const nextRes = await api('/reading/bookapi/bookmall/cell/change/v', {
-          tab_type: 16, bottom_tab_type: 7, client_template: 7, client_req_type: 2,
-          change_type: 1, cell_id: cellId,
-          offset: offset, session_id: sessionId
-        });
-        const nextCell = nextRes.data?.cell_view;
-        const nextData = nextRes.data;
-        if (!nextCell || !nextData) break;
-        const prevOff = offset;
-        offset = number(nextData.next_offset);
-        hasMore = nextData.has_more === true && offset > prevOff;
-        appendVideos(nextCell);
-      } catch (_) {
-        break;
-      }
+      const nextRes = await api('/reading/bookapi/bookmall/cell/change/v', {
+        tab_type: 16, bottom_tab_type: 7, client_template: 7, client_req_type: 2,
+        change_type: 1, cell_id: cellId,
+        offset: offset, session_id: sessionId
+      });
+      const nextCell = nextRes.data?.cell_view;
+      const nextData = nextRes.data;
+      if (!nextCell || !nextData) throw failure('官方接口未返回剧集列表，请重试', 'INVALID_RESPONSE');
+      const prevOff = offset;
+      offset = number(nextData.next_offset);
+      hasMore = nextData.has_more === true && offset > prevOff;
+      cellId = text(nextCell.cell_id_str || cellId);
+      sessionId = text(nextData.session_id || nextCell.session_id || sessionId);
+      appendVideos(nextCell);
     }
 
     hasMore = hasMore && list.length > 0;
     const result = { list, page, pagecount: hasMore ? page + 1 : page, hasMore };
     state.pages.set(page, result);
     state.updated = Date.now();
+    state.cellId = cellId;
+    state.sessionId = sessionId;
     state.cursor = hasMore ? {
       tab_type: 16, bottom_tab_type: 7, client_template: 7, client_req_type: 2,
       change_type: 1, cell_id: cellId,
