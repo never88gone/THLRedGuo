@@ -282,6 +282,10 @@ var spider = {
       hongguoScript += r"""
 globalThis.fetch = async function(url, options) {
   if (String(url).indexOf('/service/2/device_register/') >= 0) return {status:200,text:async()=>JSON.stringify({device_id_str:"7345678901234567001",install_id_str:"7345678901234567002"})};
+  if (String(url).indexOf('/reading/bookapi/bookmall/tab/v') >= 0) {
+    const names = {all:'全部',playlet:'真人剧',motion_comic:'漫剧',ai_playlet:'AI剧'};
+    return {status:200,text:async()=>JSON.stringify({code:0,data:{tab_item:[{tab_type:8,cell_data:[{cell_id_str:'synthetic',cell_data:[],cell_selector:{outer_row:{items:Object.keys(names).map(id=>({selector_item_id:id,show_name:names[id],is_selected:id==='all'}))}}}]}]}})};
+  }
   if (String(url).indexOf('/reading/bookapi/search/tab/v') >= 0) {
     const offset = /[?&]offset=(\d+)/.exec(String(url));
     const first = !offset || offset[1] === "0";
@@ -388,7 +392,12 @@ globalThis.fetch = async function(url, options) {
       expect(activeRes['data']['active'], equals('hongguo'));
     });
 
-    test('3. 分类获取 (categories) 与官方三类验证', () async {
+    test('3. 分类获取 (categories) 与官方找剧四分类验证', () async {
+      await engine.dispatch({
+        'action': 'jsSource.load',
+        'script': hongguoScript,
+        'fileName': 'hongguo.js',
+      });
       final catRes = await engine.dispatch({
         'action': 'categories',
         'source': 'hongguo',
@@ -398,8 +407,13 @@ globalThis.fetch = async function(url, options) {
       final ids = list.map((c) => c['id']).toList();
       final names = list.map((c) => c['name']).toList();
 
-      expect(ids, containsAll(['real-drama', 'comic-drama', 'ai-drama']));
-      expect(names, containsAll(['真人剧', '漫剧', 'AI剧']));
+      expect(ids, [
+        'app:discover:all',
+        'app:discover:playlet',
+        'app:discover:motion_comic',
+        'app:discover:ai_playlet',
+      ]);
+      expect(names, ['全部', '真人剧', '漫剧', 'AI剧']);
     });
 
     test('4. 榜单配置 (rankingBoards) 验证', () async {

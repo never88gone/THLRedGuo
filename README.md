@@ -1,5 +1,14 @@
 # 糖葫芦Haw (THLRedLook)
 
+<p align="left">
+  <a href="https://github.com/never88gone/THLRedGuo/stargazers"><img src="https://img.shields.io/github/stars/never88gone/THLRedGuo?style=flat-square&logo=github&color=e02424" alt="GitHub Stars" /></a>
+  <a href="https://github.com/never88gone/THLRedGuo/network/members"><img src="https://img.shields.io/github/forks/never88gone/THLRedGuo?style=flat-square&logo=github" alt="GitHub Forks" /></a>
+  <img src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20tvOS%20%7C%20Windows%20%7C%20macOS-blue?style=flat-square" alt="Supported Platforms" />
+  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.44+-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter SDK" /></a>
+  <a href="https://testflight.apple.com/join/rkvvdp7J"><img src="https://img.shields.io/badge/TestFlight-Public%20Beta-black?style=flat-square&logo=apple" alt="Apple TestFlight" /></a>
+  <a href="https://t.me/tanghulutvos"><img src="https://img.shields.io/badge/Telegram-Group-26A5E4?style=flat-square&logo=telegram&logoColor=white" alt="Telegram Group" /></a>
+</p>
+
 > ⚠️ **免责声明 (Disclaimer)**：
 > 1. **仅供学习研究**：本项目仅供编程技术交流、Flutter 跨平台与 Apple tvOS 原生应用架构研究使用，严禁用于任何商业牟利或侵权用途；
 > 2. **纯客户端工具，无内容存储**：本项目为纯本地端侧播放器工具，无需注册登录即可直接使用；开发者不搭建、不运营任何流媒体服务器，不提供、不存储、不分发任何音视频资源；
@@ -166,3 +175,16 @@ flutter pub get
 # 启动本地调试（全平台支持）
 flutter run
 ```
+
+---
+
+## 📈 Star 历史趋势 (Star History)
+
+<a href="https://star-history.com/#never88gone/THLRedGuo&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=never88gone/THLRedGuo&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=never88gone/THLRedGuo&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=never88gone/THLRedGuo&type=Date" />
+ </picture>
+</a>
+

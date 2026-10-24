@@ -579,7 +579,7 @@ class DartCoreEngine {
     final rt = await _getSpiderRuntime(source);
     if (rt != null) {
       try {
-        final homeRes = await rt.home(filter: false);
+        final homeRes = await rt.home(filter: source == 'hongguo');
         if (homeRes.classes.isNotEmpty) {
           return homeRes.classes
               .map(
@@ -590,8 +590,11 @@ class DartCoreEngine {
               )
               .toList();
         }
-      } catch (_) {}
+      } catch (_) {
+        if (source == 'hongguo') rethrow;
+      }
     }
+    if (source == 'hongguo') throw StateError('官方找剧分类暂不可用，请重试');
     return _getCategoriesForSource(source);
   }
 
@@ -732,7 +735,13 @@ class DartCoreEngine {
     bool hasMore = false;
     final rt = await _getSpiderRuntime(source);
     if (rt != null) {
-      final res = await rt.category(category, page);
+      final res = await rt.category(
+        category,
+        page,
+        extend: source == 'hongguo' && page == 1
+            ? const {'initialBatch': 12}
+            : null,
+      );
       dramas = res.list
           .map((vod) => _mapVodToDrama(source, vod, category))
           .toList();
