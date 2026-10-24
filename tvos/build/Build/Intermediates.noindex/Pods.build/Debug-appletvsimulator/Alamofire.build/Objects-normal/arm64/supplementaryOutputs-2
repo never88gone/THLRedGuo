@@ -1,0 +1,37 @@
+{
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Alamofire/Source/Core/DataRequest.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataRequest.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataRequest.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataRequest.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataRequest.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataRequest.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Alamofire/Source/Core/DataStreamRequest.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataStreamRequest.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataStreamRequest.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataStreamRequest.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataStreamRequest.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DataStreamRequest.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Alamofire/Source/Extensions/DispatchQueue+Alamofire.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DispatchQueue+Alamofire.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DispatchQueue+Alamofire.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DispatchQueue+Alamofire.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DispatchQueue+Alamofire.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/DispatchQueue+Alamofire.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Alamofire/Source/Features/Combine.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Combine.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Combine.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Combine.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Combine.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Combine.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Alamofire/Source/Features/Concurrency.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Concurrency.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Concurrency.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Concurrency.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Concurrency.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Alamofire.build/Objects-normal/arm64/Concurrency.swiftdeps"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/ScrollView.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ScrollView.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ScrollView.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ScrollView.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ScrollView.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ScrollView.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/SearchField.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SearchField.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SearchField.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SearchField.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SearchField.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SearchField.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/SecureField.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SecureField.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SecureField.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SecureField.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SecureField.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SecureField.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/Sheet.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Sheet.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Sheet.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Sheet.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Sheet.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Sheet.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/SignInWithAppleButton.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SignInWithAppleButton.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SignInWithAppleButton.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SignInWithAppleButton.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SignInWithAppleButton.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/SignInWithAppleButton.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/Slider.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Slider.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Slider.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Slider.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Slider.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/Slider.swiftdeps"
+  }
+}

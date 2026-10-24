@@ -1,0 +1,44 @@
+{
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/IntrospectionSelector.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionSelector.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionSelector.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionSelector.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionSelector.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionSelector.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/IntrospectionView.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionView.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionView.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionView.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionView.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/IntrospectionView.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/List.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/List.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/List.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/List.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/List.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/List.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/ListCell.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListCell.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListCell.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListCell.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListCell.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListCell.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/ListWithBorderedStyle.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithBorderedStyle.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithBorderedStyle.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithBorderedStyle.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithBorderedStyle.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithBorderedStyle.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/SwiftUIIntrospect/Sources/ViewTypes/ListWithGroupedStyle.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithGroupedStyle.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithGroupedStyle.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithGroupedStyle.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithGroupedStyle.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/SwiftUIIntrospect.build/Objects-normal/arm64/ListWithGroupedStyle.swiftdeps"
+  }
+}

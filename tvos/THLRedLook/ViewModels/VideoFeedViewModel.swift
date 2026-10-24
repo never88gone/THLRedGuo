@@ -166,7 +166,7 @@ public final class VideoFeedViewModel: ObservableObject {
     public func preloadAround(index: Int) {
         guard preloadEnabled, index >= 0 && index < items.count else { return }
         // 优先预热当前项、下一部、下两部以及上一部
-        let offsets = [0, 1, 2, -1]
+        let offsets = [0, 1]
         for offset in offsets {
             let targetIdx = index + offset
             guard targetIdx >= 0 && targetIdx < items.count else { continue }
@@ -191,12 +191,12 @@ public final class VideoFeedViewModel: ObservableObject {
         let task = Task { [weak self] () -> PlaybackPlan? in
             guard let self else { return nil }
             do {
-                let detail = try await NativeRepository.shared.loadDetail(drama: item.drama, store: LocalStore.shared)
+                let detail = try await NativeRepository.preloading.loadDetail(drama: item.drama, store: LocalStore.shared)
                 let episodes = detail.episodes
                 let targetEpisode = episodes.first { $0.number == item.episode } ?? episodes.first
                 let targetIndex = targetEpisode?.number ?? item.episode
 
-                let resolved = try await NativeRepository.shared.resolvePlayback(
+                let resolved = try await NativeRepository.preloading.resolvePlayback(
                     drama: detail.drama,
                     episode: targetEpisode,
                     episodeIndex: targetIndex,
@@ -204,42 +204,16 @@ public final class VideoFeedViewModel: ObservableObject {
                 )
                 guard !Task.isCancelled else { return nil }
 
-                let effectivePlan: PlaybackPlan
-                if !resolved.decryptionKey.isEmpty, let remoteURL = URL(string: resolved.url) {
-                    let decryptedURL = try await CENCMP4Decryptor.shared.decrypt(
-                        remoteURL: remoteURL,
-                        headers: resolved.headers,
-                        hexKey: resolved.decryptionKey,
-                        mediaBytes: resolved.mediaBytes
-                    )
-                    guard !Task.isCancelled else {
-                        CENCMP4Decryptor.shared.removePlaybackCache(at: decryptedURL)
-                        return nil
-                    }
-                    if let oldDec = self.decryptedURLs[dramaId], oldDec != decryptedURL {
-                        CENCMP4Decryptor.shared.removePlaybackCache(at: oldDec)
-                    }
-                    self.decryptedURLs[dramaId] = decryptedURL
-                    effectivePlan = PlaybackPlan(
-                        url: decryptedURL.absoluteString,
-                        headers: [:],
-                        decryptionKey: "",
-                        quality: resolved.quality,
-                        qualities: resolved.qualities,
-                        danmakuId: resolved.danmakuId
-                    )
-                } else {
-                    effectivePlan = resolved
+                let prepared = try await PlaybackAssetFactory.prepare(resolved)
+                guard !Task.isCancelled else {
+                    if let local = prepared.decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: local) }
+                    return nil
                 }
-
+                if let local = prepared.decryptedURL { self.decryptedURLs[dramaId] = local }
+                VideoCacheManager.shared.preload(asset: prepared.asset, for: resolved.url, namespace: "feed")
                 self.feedEpisodes[dramaId] = episodes
-                self.feedPlans[dramaId] = effectivePlan
-
-                // 立即加入 VideoCacheManager 静音预热前 3 秒分片
-                VideoCacheManager.shared.preload(
-                    items: [(url: effectivePlan.url, headers: effectivePlan.headers)],
-                    namespace: "feed"
-                )
+                self.feedPlans[dramaId] = resolved
+                let effectivePlan = resolved
 
                 return effectivePlan
             } catch {

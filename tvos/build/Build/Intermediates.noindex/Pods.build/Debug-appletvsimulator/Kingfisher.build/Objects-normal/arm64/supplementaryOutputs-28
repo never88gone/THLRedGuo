@@ -1,0 +1,51 @@
+{
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Kingfisher/Sources/Extensions/NSButton+Kingfisher.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSButton+Kingfisher.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSButton+Kingfisher.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSButton+Kingfisher.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSButton+Kingfisher.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSButton+Kingfisher.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Kingfisher/Sources/Extensions/NSTextAttachment+Kingfisher.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSTextAttachment+Kingfisher.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSTextAttachment+Kingfisher.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSTextAttachment+Kingfisher.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSTextAttachment+Kingfisher.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NSTextAttachment+Kingfisher.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Kingfisher/Sources/Extensions/PHLivePhotoView+Kingfisher.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHLivePhotoView+Kingfisher.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHLivePhotoView+Kingfisher.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHLivePhotoView+Kingfisher.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHLivePhotoView+Kingfisher.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHLivePhotoView+Kingfisher.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Kingfisher/Sources/General/ImageSource/PHPickerResultImageDataProvider.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHPickerResultImageDataProvider.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHPickerResultImageDataProvider.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHPickerResultImageDataProvider.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHPickerResultImageDataProvider.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PHPickerResultImageDataProvider.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Kingfisher/Sources/General/ImageSource/PhotosPickerItemImageDataProvider.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PhotosPickerItemImageDataProvider.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PhotosPickerItemImageDataProvider.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PhotosPickerItemImageDataProvider.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PhotosPickerItemImageDataProvider.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/PhotosPickerItemImageDataProvider.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Kingfisher/Sources/Networking/NetworkMetrics.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMetrics.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMetrics.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMetrics.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMetrics.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMetrics.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/Pods/Kingfisher/Sources/Networking/NetworkMonitor.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMonitor.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMonitor.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMonitor.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMonitor.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/Objects-normal/arm64/NetworkMonitor.swiftdeps"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "version": 0,
+  "use-external-names": false,
+  "case-sensitive": false,
+  "roots": [{
+    "type": "directory",
+    "name": "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Products/Debug-appletvsimulator/Kingfisher/Kingfisher.framework/Modules",
+    "contents": [{
+      "type": "file",
+      "name": "module.modulemap",
+      "external-contents": "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/unextended-module.modulemap",
+    }]
+    },
+    {
+    "type": "directory",
+    "name": "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Products/Debug-appletvsimulator/Kingfisher/Kingfisher.framework/Headers",
+    "contents": [{
+      "type": "file",
+      "name": "Kingfisher-Swift.h",
+      "external-contents": "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/Pods.build/Debug-appletvsimulator/Kingfisher.build/unextended-interface-header.h",
+    }]
+  }]
+}

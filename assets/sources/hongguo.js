@@ -2198,11 +2198,18 @@ spider.danmaku = function (id, startMs, durationMs) {
         sub_selected_items: '', unlimited_selector_change_type: 1,
         client_template: 2, client_req_type: 2
       };
-      if (genre === 'all' && choices.find(item => item.selector_item_id === genre).is_selected) return { cell, params, category };
-      const response = await api('/reading/bookapi/bookmall/cell/change/v', {
-        ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 40
-      });
-      return { cell: response.data?.cell_view, data: response.data || {}, params, category };
+      const preview = genre === 'all' && choices.find(item => item.selector_item_id === genre).is_selected;
+      if (preview && !(number(extend?.initialBatch) > videos([cell]).length)) return { cell, params, category };
+      try {
+        const response = await api('/reading/bookapi/bookmall/cell/change/v', {
+          ...params, unlimited_selector_change_type: 2, change_type: 1, offset: 0, limit: 40
+        });
+        if (!response.data?.cell_view && preview) return { cell, params, category };
+        return { cell: response.data?.cell_view, data: response.data || {}, params, category };
+      } catch (error) {
+        if (preview) return { cell, params, category };
+        throw error;
+      }
     });
   };
 

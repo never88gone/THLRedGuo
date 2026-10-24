@@ -1,0 +1,30 @@
+{
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Core/LocalStore.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LocalStore.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LocalStore.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LocalStore.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LocalStore.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LocalStore.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Core/NativeBridge.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeBridge.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeBridge.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeBridge.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeBridge.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeBridge.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Core/NativeRepository.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeRepository.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeRepository.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeRepository.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeRepository.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/NativeRepository.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Models/LanModels.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LanModels.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LanModels.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LanModels.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LanModels.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/LanModels.swiftdeps"
+  }
+}

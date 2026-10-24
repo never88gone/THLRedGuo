@@ -1,12 +1,29 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/player/encrypted_playback.dart';
+import 'package:THLRedLook/utils/diary/diary_service.dart';
 import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/pages/player/player_page.dart';
+
+class _PipEpisode {
+  _PipEpisode(this.index, this.source, this.playable, this.media);
+
+  final int index;
+  final PlaybackPlan source;
+  final PlaybackPlan playable;
+  final EncryptedPlayback media;
+
+  Future<void> dispose(AppRepository repository) async {
+    await media.close().catchError((Object _) {});
+    await repository.release(source.session).catchError((Object _) {});
+  }
+}
 
 /// 全局画中画管理器，负责画中画状态监听与小窗恢复时自动跳转回播放器页面
 class PipManager {
@@ -27,9 +44,19 @@ class PipManager {
   bool _isPlayerActive = false;
   Future<void> Function()? _releasePlaybackResource;
 
+  int _quality = 0;
+  double _speed = 1;
+  bool _localOnly = false;
+  bool _advancing = false;
+  int _advanceGeneration = 0;
+  _PipEpisode? _currentEpisode;
+  Future<_PipEpisode>? _nextEpisode;
+  int? _nextEpisodeIndex;
+
   void Function(int positionMs)? _onRestoreCurrentPlayer;
   void Function(bool active, String? error, int? position)?
   _onPictureInPictureStatusChanged;
+  void Function(int episodeIndex)? _onEpisodeAdvanced;
 
   void initialize({
     required GlobalKey<NavigatorState> navigatorKey,
@@ -66,12 +93,24 @@ class PipManager {
     required void Function(int positionMs) onRestoreCurrentPlayer,
     required void Function(bool active, String? error, int? position)
     onPictureInPictureStatusChanged,
+    void Function(int episodeIndex)? onEpisodeAdvanced,
+    int quality = 0,
+    double speed = 1,
+    bool localOnly = false,
   }) {
+    if (_detail?.drama.id != detail.drama.id ||
+        _episodeIndex != episodeIndex) {
+      _resetAdvance();
+    }
     _detail = detail;
     _episodeIndex = episodeIndex;
+    _quality = quality;
+    _speed = speed;
+    _localOnly = localOnly;
     _isPlayerActive = true;
     _onRestoreCurrentPlayer = onRestoreCurrentPlayer;
     _onPictureInPictureStatusChanged = onPictureInPictureStatusChanged;
+    _onEpisodeAdvanced = onEpisodeAdvanced;
     AppDevice.channel.setMethodCallHandler(_handleMethodCall);
   }
 
@@ -80,21 +119,180 @@ class PipManager {
     _isPlayerActive = false;
     _onRestoreCurrentPlayer = null;
     _onPictureInPictureStatusChanged = null;
+    _onEpisodeAdvanced = null;
   }
 
   /// 画中画彻底关闭（小窗被关闭或播放结束）
   void notifyPictureInPictureStopped() {
     _clearPlaybackResource();
+    _resetAdvance();
     _detail = null;
     _episodeIndex = 0;
     _isPlayerActive = false;
     _onRestoreCurrentPlayer = null;
     _onPictureInPictureStatusChanged = null;
+    _onEpisodeAdvanced = null;
+  }
+
+  bool get _autoAdvanceEnabled =>
+      _store?.playbackPreferences.autoAdvance ?? true;
+
+  void _resetAdvance() {
+    _advanceGeneration++;
+    final repository = _repository;
+    final current = _currentEpisode;
+    final next = _nextEpisode;
+    _currentEpisode = null;
+    _nextEpisode = null;
+    _nextEpisodeIndex = null;
+    if (repository == null) return;
+    if (current != null) unawaited(current.dispose(repository));
+    if (next != null) {
+      unawaited(
+        next
+            .then((episode) => episode.dispose(repository))
+            .catchError((Object _) {}),
+      );
+    }
+  }
+
+  Future<_PipEpisode> _buildEpisode(int index) async {
+    final detail = _detail;
+    final repository = _repository;
+    if (detail == null || repository == null) {
+      throw AppFailure('画中画剧集信息已失效', code: 'pip_context');
+    }
+    final episode = detail.episodes[index];
+    final media = EncryptedPlayback();
+    PlaybackPlan? source;
+    try {
+      source = _localOnly
+          ? await repository.localPlayback(detail.drama, episode)
+          : await repository.resolve(
+              detail.drama,
+              episode,
+              quality: _quality,
+            );
+      if (source == null || source.url.isEmpty) {
+        throw AppFailure('未获取到下一集播放地址', code: 'pip_next');
+      }
+      final playable = source.decryptionKey.isNotEmpty
+          ? await media.prepare(source, forceCache: true)
+          : source;
+      return _PipEpisode(index, source, playable, media);
+    } catch (_) {
+      await media.close().catchError((Object _) {});
+      if (source != null) {
+        await repository.release(source.session).catchError((Object _) {});
+      }
+      rethrow;
+    }
+  }
+
+  void _prefetchNextEpisode() {
+    if (!Platform.isIOS || !_autoAdvanceEnabled) return;
+    final detail = _detail;
+    final repository = _repository;
+    if (detail == null || repository == null) return;
+    final next = _episodeIndex + 1;
+    if (next >= detail.episodes.length || _nextEpisodeIndex == next) return;
+    final generation = _advanceGeneration;
+    final future = _buildEpisode(next);
+    _nextEpisode = future;
+    _nextEpisodeIndex = next;
+    unawaited(
+      future.then<void>(
+        (episode) async {
+          if (generation != _advanceGeneration) {
+            await episode.dispose(repository);
+          }
+        },
+        onError: (Object error) {
+          if (generation == _advanceGeneration &&
+              identical(_nextEpisode, future)) {
+            _nextEpisode = null;
+            _nextEpisodeIndex = null;
+          }
+          DiaryService.add('[PiP] 预备下一集失败: 集=${next + 1}, $error');
+        },
+      ),
+    );
+  }
+
+  Future<_PipEpisode> _takeEpisode(int index) async {
+    final pending = _nextEpisodeIndex == index ? _nextEpisode : null;
+    _nextEpisode = null;
+    _nextEpisodeIndex = null;
+    if (pending != null) {
+      try {
+        return await pending;
+      } catch (_) {}
+    }
+    return _buildEpisode(index);
+  }
+
+  Future<void> _advanceToNextEpisode() async {
+    final detail = _detail;
+    final repository = _repository;
+    if (_advancing ||
+        detail == null ||
+        repository == null ||
+        !_autoAdvanceEnabled) {
+      return;
+    }
+    final next = _episodeIndex + 1;
+    if (next >= detail.episodes.length) return;
+    _advancing = true;
+    final generation = _advanceGeneration;
+    try {
+      final episode = await _takeEpisode(next);
+      if (generation != _advanceGeneration) {
+        await episode.dispose(repository);
+        return;
+      }
+      final status = await AppDevice.channel
+          .invokeMapMethod<String, dynamic>('replacePictureInPictureItem', {
+            'url': episode.playable.url,
+            if (episode.playable.headers.isNotEmpty)
+              'headers': episode.playable.headers,
+            'episodeIndex': next,
+            'speed': _speed,
+          });
+      if (status?['replaced'] != true || generation != _advanceGeneration) {
+        await episode.dispose(repository);
+        return;
+      }
+      final previous = _currentEpisode;
+      _currentEpisode = episode;
+      _episodeIndex = next;
+      if (previous != null) unawaited(previous.dispose(repository));
+      DiaryService.add(
+        '[PiP] 自动播放下一集: 剧=${detail.drama.cleanSourceId}, 集=${detail.episodes[next].number}',
+      );
+      _onEpisodeAdvanced?.call(next);
+      _prefetchNextEpisode();
+    } catch (error) {
+      DiaryService.add('[PiP] 自动播放下一集失败: 集=${next + 1}, $error');
+    } finally {
+      _advancing = false;
+    }
   }
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     if (call.method == 'pipLog') {
       debugPrint('[PiP-Native] ${call.arguments}');
+      return true;
+    }
+
+    if (call.method == 'pictureInPictureEnded') {
+      unawaited(_advanceToNextEpisode());
+      return true;
+    }
+
+    if (call.method == 'pictureInPictureItemFailed') {
+      final arguments = call.arguments;
+      final error = arguments is Map ? arguments['error'] : null;
+      DiaryService.add('[PiP] 下一集加载失败: $error');
       return true;
     }
 
@@ -106,8 +304,11 @@ class PipManager {
           ? (arguments['position'] as num?)?.toInt()
           : null;
 
-      if (!active) {
+      if (active) {
+        _prefetchNextEpisode();
+      } else {
         _clearPlaybackResource();
+        _resetAdvance();
         if (!_isPlayerActive) {
           _detail = null;
         }

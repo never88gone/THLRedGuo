@@ -1,0 +1,23 @@
+{
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Views/MainTabView.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/MainTabView.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/MainTabView.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/MainTabView.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/MainTabView.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/MainTabView.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Views/TVTheme.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/TVTheme.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/TVTheme.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/TVTheme.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/TVTheme.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/TVTheme.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps"
+  }
+}

@@ -148,6 +148,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _pictureInPictureActive = false;
   bool _pictureInPictureRequested = false;
   bool _pictureInPictureHandlerInstalled = false;
+  int? _pipOriginalIndex;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   String _loadingMessage = '正在准备播放';
   String? _error;
@@ -287,8 +288,11 @@ class _PlayerScreenState extends State<PlayerScreen>
             _acceptErrors &&
             _error == null) {
           final duration = _player.state.duration;
+          final currentPosition = _player.state.position > Duration.zero
+              ? _player.state.position
+              : Duration(milliseconds: (_resumePosition * 1000).round());
           if (duration <= Duration.zero ||
-              _player.state.position < duration - const Duration(seconds: 2)) {
+              currentPosition < duration - const Duration(seconds: 2)) {
             _queueRecovery();
           } else if (_autoAdvance &&
               _foreground &&
@@ -559,25 +563,46 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
   }
 
-  void _configurePictureInPicture() {
-    if (widget.feed) return;
-    if (defaultTargetPlatform != TargetPlatform.android &&
-        defaultTargetPlatform != TargetPlatform.iOS) {
-      return;
-    }
+  void _syncPictureInPictureSession() {
     _pictureInPictureHandlerInstalled = true;
+    _pipOriginalIndex ??= _index;
     PipManager.instance.registerPictureInPictureSession(
       detail: widget.detail,
       episodeIndex: _index,
       positionMs: _player.state.position.inMilliseconds,
+      quality: _requestedQuality,
+      speed: _speed,
+      localOnly: widget.localOnly,
+      onEpisodeAdvanced: (nextIndex) {
+        if (mounted && !_closed) {
+          setState(() {
+            _index = nextIndex;
+            _openedIndex = nextIndex;
+          });
+          _menuRevision.value++;
+          unawaited(_saveProgress(flush: true));
+        }
+      },
       onRestoreCurrentPlayer: (positionMs) {
         if (mounted && !_closed) {
-          if (positionMs > 0) {
-            unawaited(_seekTo(Duration(milliseconds: positionMs)));
-          }
+          final advanced =
+              _pipOriginalIndex != null && _pipOriginalIndex != _index;
+          _pipOriginalIndex = null;
           _setPictureInPictureStatus(active: false);
-          if (_playIntent && !_loading && _error == null) {
-            unawaited(_player.play());
+          if (advanced) {
+            unawaited(
+              _play(
+                _index,
+                position: positionMs > 0 ? positionMs / 1000.0 : 0.0,
+              ),
+            );
+          } else {
+            if (positionMs > 0) {
+              unawaited(_seekTo(Duration(milliseconds: positionMs)));
+            }
+            if (_playIntent && !_loading && _error == null) {
+              unawaited(_player.play());
+            }
           }
         }
       },
@@ -587,15 +612,31 @@ class _PlayerScreenState extends State<PlayerScreen>
             _notice('画中画提示: ${_localizePipError(error)}');
           }
           if (active) {
+            _pipOriginalIndex = _index;
             if (Platform.isIOS && _player.state.playing) {
               unawaited(_player.pause());
             }
           } else {
-            if (position != null && position > 0) {
-              unawaited(_seekTo(Duration(milliseconds: position)));
-            }
-            if (_playIntent && !_loading && _error == null) {
-              unawaited(_player.play());
+            final advanced =
+                _pipOriginalIndex != null && _pipOriginalIndex != _index;
+            _pipOriginalIndex = null;
+            if (advanced) {
+              unawaited(
+                _play(
+                  _index,
+                  position:
+                      position != null && position > 0
+                          ? position / 1000.0
+                          : 0.0,
+                ),
+              );
+            } else {
+              if (position != null && position > 0) {
+                unawaited(_seekTo(Duration(milliseconds: position)));
+              }
+              if (_playIntent && !_loading && _error == null) {
+                unawaited(_player.play());
+              }
             }
           }
           _setPictureInPictureStatus(
@@ -606,6 +647,15 @@ class _PlayerScreenState extends State<PlayerScreen>
         }
       },
     );
+  }
+
+  void _configurePictureInPicture() {
+    if (widget.feed) return;
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
+    _syncPictureInPictureSession();
     unawaited(_refreshPictureInPictureStatus());
   }
 
@@ -829,46 +879,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       'speed': _speed,
     };
     if (sourceRect != null) arguments.addAll(sourceRect);
-    PipManager.instance.registerPictureInPictureSession(
-      detail: widget.detail,
-      episodeIndex: _index,
-      positionMs: _player.state.position.inMilliseconds,
-      onRestoreCurrentPlayer: (positionMs) {
-        if (mounted && !_closed) {
-          if (positionMs > 0) {
-            unawaited(_seekTo(Duration(milliseconds: positionMs)));
-          }
-          _setPictureInPictureStatus(active: false);
-          if (_playIntent && !_loading && _error == null) {
-            unawaited(_player.play());
-          }
-        }
-      },
-      onPictureInPictureStatusChanged: (active, error, position) {
-        if (mounted && !_closed) {
-          if (error != null && error.isNotEmpty) {
-            _notice('画中画提示: ${_localizePipError(error)}');
-          }
-          if (active) {
-            if (Platform.isIOS && _player.state.playing) {
-              unawaited(_player.pause());
-            }
-          } else {
-            if (position != null && position > 0) {
-              unawaited(_seekTo(Duration(milliseconds: position)));
-            }
-            if (_playIntent && !_loading && _error == null) {
-              unawaited(_player.play());
-            }
-          }
-          _setPictureInPictureStatus(
-            active: active,
-            requested: false,
-            delayHiddenPause: !active,
-          );
-        }
-      },
-    );
+    _syncPictureInPictureSession();
     debugPrint(
       '[PiP-Dart] enterPictureInPicture args: url=$targetUrl, pos=${arguments['position']}, sourceRect=$sourceRect',
     );
@@ -1594,6 +1605,9 @@ class _PlayerScreenState extends State<PlayerScreen>
           _syncDanmaku();
           _acknowledgeHandoff();
           _menuRevision.value++;
+          if (_pictureInPictureActive) {
+            _syncPictureInPictureSession();
+          }
         }
       });
     } catch (error) {

@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(Flutter)
 import Flutter
+#endif
 import AVFoundation
 
 private final class CENCRangeLoader: NSObject, URLSessionDataDelegate {
@@ -138,7 +140,7 @@ private final class CENCRangeLoader: NSObject, URLSessionDataDelegate {
     }
 }
 
-private actor CENCStreamSession {
+actor CENCStreamSession {
     private let loader: CENCRangeLoader
     private let key: [UInt8]
     private var length: Int64 = 0
@@ -276,6 +278,7 @@ private actor CENCStreamSession {
     }
 
     private func check() throws {
+        try Task.checkCancellation()
         if closed { throw CancellationError() }
     }
 
@@ -299,6 +302,7 @@ private actor CENCStreamSession {
     }
 }
 
+#if canImport(Flutter)
 final class EncryptedMediaStream {
     private let lock = NSLock()
     private var sessions = [String: CENCStreamSession]()
@@ -383,3 +387,4 @@ final class EncryptedMediaStream {
         return FlutterError(code: "ios_stream_\(error.code)", message: message, details: nil)
     }
 }
+#endif

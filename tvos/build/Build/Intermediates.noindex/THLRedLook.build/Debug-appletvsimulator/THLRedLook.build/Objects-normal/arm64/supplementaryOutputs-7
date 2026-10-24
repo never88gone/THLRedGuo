@@ -1,0 +1,37 @@
+{
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Views/Detail/DramaDetailView.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DramaDetailView.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DramaDetailView.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DramaDetailView.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DramaDetailView.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DramaDetailView.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Views/Downloads/DownloadsView.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DownloadsView.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DownloadsView.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DownloadsView.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DownloadsView.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/DownloadsView.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Views/Library/SavedLibraryView.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SavedLibraryView.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SavedLibraryView.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SavedLibraryView.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SavedLibraryView.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SavedLibraryView.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Views/Rankings/RankingsView.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/RankingsView.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/RankingsView.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/RankingsView.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/RankingsView.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/RankingsView.swiftdeps"
+  },
+  "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/THLRedLook/Views/Search/SearchRootView.swift" : {
+    "const-values" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SearchRootView.swiftconstvalues",
+    "dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SearchRootView.d",
+    "diagnostics" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SearchRootView.dia",
+    "object" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SearchRootView.o",
+    "swift-dependencies" : "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/build/Build/Intermediates.noindex/THLRedLook.build/Debug-appletvsimulator/THLRedLook.build/Objects-normal/arm64/SearchRootView.swiftdeps"
+  }
+}

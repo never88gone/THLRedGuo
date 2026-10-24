@@ -1,0 +1,4 @@
+
+module Kingfisher.__Swift {
+  exclude header "Kingfisher-Swift.h"
+}

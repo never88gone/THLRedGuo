@@ -22,6 +22,8 @@ import CoreMedia
   private var currentPipDramaId: String?
   private var currentPipEpisodeIndex: Int = 0
   private var currentPipMetadata: [String: Any]?
+  private var pipEndObserver: NSObjectProtocol?
+  private var pipReplaceStatusObservation: NSKeyValueObservation?
 
   override func application(
     _ application: UIApplication,
@@ -120,6 +122,19 @@ import CoreMedia
               "error": urlStr.isEmpty ? "未找到当前播放的视频地址" : "视频地址解析失败，请检查播放状态"
             ])
           }
+          return
+        }
+        if call.method == "replacePictureInPictureItem" {
+          let args = call.arguments as? [String: Any]
+          let urlStr = args?["url"] as? String ?? ""
+          let headers = args?["headers"] as? [String: String] ?? [:]
+          let episodeIndex = args?["episodeIndex"] as? Int ?? self.currentPipEpisodeIndex
+          let speed = (args?["speed"] as? NSNumber)?.floatValue ?? 1.0
+          guard let url = self.parseMediaUrl(urlStr) else {
+            result(["replaced": false, "error": "视频地址解析失败"])
+            return
+          }
+          self.replacePipItem(with: url, headers: headers, episodeIndex: episodeIndex, speed: speed, result: result)
           return
         }
         if call.method == "stopPictureInPicture" {
@@ -264,6 +279,12 @@ import CoreMedia
     self.pipReadyForDisplayObservation = nil
     self.pipItemStatusObservation?.invalidate()
     self.pipItemStatusObservation = nil
+    self.pipReplaceStatusObservation?.invalidate()
+    self.pipReplaceStatusObservation = nil
+    if let observer = self.pipEndObserver {
+      NotificationCenter.default.removeObserver(observer)
+      self.pipEndObserver = nil
+    }
     self.pipPlayer?.pause()
     self.pipPlayer = nil
     self.pipPlayerLayer?.removeFromSuperlayer()
@@ -271,6 +292,70 @@ import CoreMedia
     self.pipContainerView?.removeFromSuperview()
     self.pipContainerView = nil
     self.pipController = nil
+  }
+
+  private func observePipItemEnd(_ item: AVPlayerItem) {
+    if let observer = self.pipEndObserver {
+      NotificationCenter.default.removeObserver(observer)
+    }
+    self.pipEndObserver = NotificationCenter.default.addObserver(
+      forName: .AVPlayerItemDidPlayToEndTime,
+      object: item,
+      queue: .main
+    ) { [weak self] _ in
+      guard let self = self, self.pipController?.isPictureInPictureActive ?? false else { return }
+      self.logPip("PiP item reached end: episode=\(self.currentPipEpisodeIndex)")
+      self.deviceChannel?.invokeMethod("pictureInPictureEnded", arguments: [
+        "episodeIndex": self.currentPipEpisodeIndex
+      ])
+    }
+  }
+
+  private func replacePipItem(
+    with url: URL,
+    headers: [String: String],
+    episodeIndex: Int,
+    speed: Float,
+    result: @escaping FlutterResult
+  ) {
+    guard let player = self.pipPlayer, self.pipController?.isPictureInPictureActive ?? false else {
+      result(["replaced": false, "error": "画中画已关闭"])
+      return
+    }
+    logPip("replacePipItem: episode=\(episodeIndex), url=\(url.absoluteString)")
+    var assetOptions: [String: Any] = [:]
+    if !url.isFileURL && !headers.isEmpty {
+      assetOptions["AVURLAssetHTTPHeaderFieldsKey"] = headers
+    }
+    let item = AVPlayerItem(asset: AVURLAsset(url: url, options: assetOptions))
+    self.pipReplaceStatusObservation?.invalidate()
+    self.pipReplaceStatusObservation = item.observe(\.status, options: [.new]) { [weak self] observed, _ in
+      DispatchQueue.main.async {
+        guard let self = self else { return }
+        switch observed.status {
+        case .readyToPlay:
+          self.pipReplaceStatusObservation?.invalidate()
+          self.pipReplaceStatusObservation = nil
+          self.pipPlayer?.playImmediately(atRate: speed)
+        case .failed:
+          self.pipReplaceStatusObservation?.invalidate()
+          self.pipReplaceStatusObservation = nil
+          let message = observed.error?.localizedDescription ?? "视频加载异常"
+          self.logPip("replacePipItem failed: \(message)")
+          self.deviceChannel?.invokeMethod("pictureInPictureItemFailed", arguments: [
+            "episodeIndex": episodeIndex,
+            "error": message
+          ])
+        default:
+          break
+        }
+      }
+    }
+    self.currentPipEpisodeIndex = episodeIndex
+    self.observePipItemEnd(item)
+    player.replaceCurrentItem(with: item)
+    player.playImmediately(atRate: speed)
+    result(["replaced": true])
   }
 
   private func startPip(
@@ -297,6 +382,7 @@ import CoreMedia
       player.preventsDisplaySleepDuringVideoPlayback = true
     }
     self.pipPlayer = player
+    self.observePipItemEnd(playerItem)
 
     guard let rootVC = self.activeRootViewController else {
       result([

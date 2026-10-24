@@ -2,11 +2,13 @@ import Foundation
 
 public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStreamProviderProtocol, DanmakuProviderProtocol {
     public static let shared = NativeRepository()
-    private let bridge = NativeBridge.shared
+    static let preloading = NativeRepository(bridge: NativeBridge())
+    private let bridge: NativeBridge
+    private let playbackBridge = NativeBridge()
     private let danmakuBridge = NativeBridge()
     private let feedBridge = NativeBridge()
 
-    public init() {}
+    public init(bridge: NativeBridge = .shared) { self.bridge = bridge }
 
     public func loadVideoFeed(page: Int, session: String) async throws -> VideoFeedPage {
         let result = try await feedBridge.request(action: "feed", payload: ["source": "hongguo", "page": page, "session": session])
@@ -158,7 +160,7 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
         if let chapter = episode?.rawChapter {
             payload["chapter"] = chapter
         }
-        let resp = try await bridge.request(action: "resolve", payload: payload)
+        let resp = try await playbackBridge.request(action: "resolve", payload: payload)
         let data = try JSONSerialization.data(withJSONObject: resp)
         let plan = try JSONDecoder().decode(PlaybackPlan.self, from: data)
         guard !plan.url.isEmpty else {

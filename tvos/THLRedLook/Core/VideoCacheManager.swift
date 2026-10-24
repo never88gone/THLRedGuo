@@ -41,6 +41,15 @@ public final class VideoCacheManager: NSObject {
         }
     }
 
+    func cachedPlayer(for urlString: String, namespace: String) -> AVPlayer? {
+        queue.sync {
+            let key = "\(namespace)_\(urlString)"
+            guard let player = players[key], player.currentItem != nil else { return nil }
+            updateLRU(key, namespace: namespace)
+            return player
+        }
+    }
+
     private func createPlayer(for urlString: String, headers: [String: String]) -> AVPlayer {
         guard let url = URL(string: urlString) else {
             return AVPlayer()
@@ -62,6 +71,22 @@ public final class VideoCacheManager: NSObject {
         player.automaticallyWaitsToMinimizeStalling = true
 
         return player
+    }
+
+    func preload(asset: AVURLAsset, for urlString: String, namespace: String) {
+        queue.sync {
+            let key = "\(namespace)_\(urlString)"
+            if players[key] == nil {
+                let item = AVPlayerItem(asset: asset)
+                item.preferredForwardBufferDuration = 3
+                let player = AVPlayer(playerItem: item)
+                player.automaticallyWaitsToMinimizeStalling = true
+                players[key] = player
+                updateLRU(key, namespace: namespace)
+                trimPlayers(for: namespace)
+            }
+            enqueueWarmup(keys: [key])
+        }
     }
 
     // MARK: - LRU 队列更新与淘汰

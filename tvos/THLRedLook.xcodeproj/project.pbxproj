@@ -72,6 +72,10 @@
 		A4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */; };
 		90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */; };
 		81C7FE1DA08787168F35C136 /* ICloudSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */; };
+		46A67D6BBFE54AF28CD2FBE5 /* PlaybackAssetFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C07BD5FD8B42DAB56D1F2E /* PlaybackAssetFactory.swift */; };
+		BC32017434634EDB97D9747C /* EncryptedMediaStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5AC1048D4D429CBF09340E /* EncryptedMediaStream.swift */; };
+		C2CF716976FB47A0AF61ABA3 /* CENCStreamIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = D176E2EF155444349D7D7EAB /* CENCStreamIndex.swift */; };
+		7689C3C1BE0A477888B3828B /* StartupPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -166,6 +170,10 @@
 		B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceDiagnosticsSheetView.swift; sourceTree = "<group>"; };
 		ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListLoadingTests.swift; sourceTree = "<group>"; };
 		8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ICloudSyncTests.swift; sourceTree = "<group>"; };
+		F4C07BD5FD8B42DAB56D1F2E /* PlaybackAssetFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackAssetFactory.swift; sourceTree = "<group>"; };
+		EE5AC1048D4D429CBF09340E /* EncryptedMediaStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../ios/Runner/EncryptedMediaStream.swift"; sourceTree = SOURCE_ROOT; };
+		D176E2EF155444349D7D7EAB /* CENCStreamIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../ios/Runner/CENCStreamIndex.swift"; sourceTree = SOURCE_ROOT; };
+		E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupPerformanceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -242,6 +250,7 @@
 				9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */,
 				ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */,
 				8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */,
+				E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */,
 			);
 			path = THLRedLookTests;
 			sourceTree = "<group>";
@@ -317,6 +326,9 @@
 				B10000112C00000100000001 /* NativeBridge.swift */,
 				B10000122C00000100000001 /* NativeRepository.swift */,
 				B10000982C00000100000001 /* CENCMP4Decryptor.swift */,
+				D176E2EF155444349D7D7EAB /* CENCStreamIndex.swift */,
+				EE5AC1048D4D429CBF09340E /* EncryptedMediaStream.swift */,
+				F4C07BD5FD8B42DAB56D1F2E /* PlaybackAssetFactory.swift */,
 				B10000992C00000100000001 /* PlatformProtocols.swift */,
 				B10000132C00000100000001 /* LanSyncService.swift */,
 				B10000142C00000100000001 /* DownloadService.swift */,
@@ -662,6 +674,7 @@
 				CABD071B5C68D672495450B9 /* LocalLibraryTests.swift in Sources */,
 				90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */,
 				81C7FE1DA08787168F35C136 /* ICloudSyncTests.swift in Sources */,
+				7689C3C1BE0A477888B3828B /* StartupPerformanceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -693,6 +706,9 @@
 				A10000112C00000100000001 /* NativeBridge.swift in Sources */,
 				A10000122C00000100000001 /* NativeRepository.swift in Sources */,
 				A10000982C00000100000001 /* CENCMP4Decryptor.swift in Sources */,
+				C2CF716976FB47A0AF61ABA3 /* CENCStreamIndex.swift in Sources */,
+				BC32017434634EDB97D9747C /* EncryptedMediaStream.swift in Sources */,
+				46A67D6BBFE54AF28CD2FBE5 /* PlaybackAssetFactory.swift in Sources */,
 				A10000992C00000100000001 /* PlatformProtocols.swift in Sources */,
 				A10000132C00000100000001 /* LanSyncService.swift in Sources */,
 				A10000142C00000100000001 /* DownloadService.swift in Sources */,

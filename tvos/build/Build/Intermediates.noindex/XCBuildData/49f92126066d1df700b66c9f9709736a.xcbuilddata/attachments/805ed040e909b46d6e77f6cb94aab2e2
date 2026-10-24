@@ -1,0 +1,4 @@
+
+module SwiftUIIntrospect.Swift {
+  header "SwiftUIIntrospect-Swift.h"
+}

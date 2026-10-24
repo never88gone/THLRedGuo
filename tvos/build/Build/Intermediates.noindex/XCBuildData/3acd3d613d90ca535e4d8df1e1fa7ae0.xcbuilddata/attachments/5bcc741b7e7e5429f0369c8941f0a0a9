@@ -1,0 +1,4 @@
+
+module SwiftUIIntrospect.__Swift {
+  exclude header "SwiftUIIntrospect-Swift.h"
+}

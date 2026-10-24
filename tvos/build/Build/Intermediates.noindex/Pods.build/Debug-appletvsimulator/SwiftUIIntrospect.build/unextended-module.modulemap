@@ -1,0 +1,10 @@
+framework module SwiftUIIntrospect {
+  umbrella header "SwiftUIIntrospect-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module SwiftUIIntrospect.__Swift {
+  exclude header "SwiftUIIntrospect-Swift.h"
+}

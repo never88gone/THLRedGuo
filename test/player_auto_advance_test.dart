@@ -1,11 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/player/pip_manager.dart';
 import 'package:THLRedLook/core/player/playback_preferences.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/views/player/player_menu.dart';
 import 'package:THLRedLook/views/television/television_controls.dart';
+
+class _MockAdvanceRepo extends AppRepository {
+  final Map<int, String> resolvedUrls = {};
+  int releaseCount = 0;
+
+  @override
+  Future<PlaybackPlan> resolve(Drama drama, Episode episode, {int quality = 0}) async {
+    final url = 'https://video.mock/stream_ep_${episode.number}.mp4';
+    resolvedUrls[episode.number] = url;
+    return PlaybackPlan(
+      url: url,
+      session: 'session_${episode.number}',
+    );
+  }
+
+  @override
+  Future<void> release(String session) async {
+    releaseCount++;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -161,6 +188,162 @@ void main() {
       final tvBtnFinder = find.byKey(const ValueKey('tv-auto-advance'));
       expect(tvBtnFinder, findsOneWidget);
       expect(find.text('自动连播：关'), findsOneWidget);
+    });
+
+    test('5. 画中画自动连播：收到 pictureInPictureEnded 时自动请求并无缝切换下一集', () async {
+      const channel = MethodChannel('duanju/device');
+      final nativeCalls = <MethodCall>[];
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final store = LocalStore(prefs);
+      final repo = _MockAdvanceRepo();
+      final navKey = GlobalKey<NavigatorState>();
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        nativeCalls.add(call);
+        if (call.method == 'replacePictureInPictureItem') {
+          return {'replaced': true};
+        }
+        return null;
+      });
+
+      PipManager.instance.initialize(
+        navigatorKey: navKey,
+        repository: repo,
+        store: store,
+      );
+
+      final drama = const Drama(
+        id: 'test_pip_drama',
+        source: 'hongguo',
+        title: '画中画连播测试剧',
+        episodes: 5,
+      );
+      final detail = DramaDetail(
+        drama,
+        List.generate(
+          5,
+          (i) => Episode({'id': '$i', 'currentEpisode': i + 1, 'title': '第${i + 1}集'}, i + 1),
+        ),
+      );
+
+      int? advancedIndex;
+      PipManager.instance.registerPictureInPictureSession(
+        detail: detail,
+        episodeIndex: 0,
+        positionMs: 1000,
+        onRestoreCurrentPlayer: (_) {},
+        onPictureInPictureStatusChanged: (_, _, _) {},
+        onEpisodeAdvanced: (index) {
+          advancedIndex = index;
+        },
+      );
+
+      // 模拟进入画中画
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(
+          const MethodCall('pictureInPictureChanged', {'active': true}),
+        ),
+        (_) {},
+      );
+
+      // 原生通知当前集播完
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(
+          const MethodCall('pictureInPictureEnded', {'episodeIndex': 0}),
+        ),
+        (_) {},
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      final replaceCall = nativeCalls.firstWhere(
+        (c) => c.method == 'replacePictureInPictureItem',
+        orElse: () => const MethodCall('none'),
+      );
+      expect(replaceCall.method, 'replacePictureInPictureItem');
+      expect(replaceCall.arguments['episodeIndex'], 1);
+      expect(replaceCall.arguments['url'], 'https://video.mock/stream_ep_2.mp4');
+      expect(advancedIndex, 1);
+
+      PipManager.instance.notifyPictureInPictureStopped();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    test('6. 画中画自动连播：当 autoAdvance=false 时，播完不触发切集', () async {
+      const channel = MethodChannel('duanju/device');
+      final nativeCalls = <MethodCall>[];
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final store = LocalStore(prefs);
+      await store.setPlaybackPreferences(
+        store.playbackPreferences.copyWith(autoAdvance: false),
+      );
+      final repo = _MockAdvanceRepo();
+      final navKey = GlobalKey<NavigatorState>();
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        nativeCalls.add(call);
+        return null;
+      });
+
+      PipManager.instance.initialize(
+        navigatorKey: navKey,
+        repository: repo,
+        store: store,
+      );
+
+      final drama = const Drama(
+        id: 'test_pip_drama',
+        source: 'hongguo',
+        title: '画中画连播测试剧',
+        episodes: 5,
+      );
+      final detail = DramaDetail(
+        drama,
+        List.generate(
+          5,
+          (i) => Episode({'id': '$i', 'currentEpisode': i + 1, 'title': '第${i + 1}集'}, i + 1),
+        ),
+      );
+
+      int? advancedIndex;
+      PipManager.instance.registerPictureInPictureSession(
+        detail: detail,
+        episodeIndex: 0,
+        positionMs: 1000,
+        onRestoreCurrentPlayer: (_) {},
+        onPictureInPictureStatusChanged: (_, _, _) {},
+        onEpisodeAdvanced: (index) {
+          advancedIndex = index;
+        },
+      );
+
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(
+          const MethodCall('pictureInPictureEnded', {'episodeIndex': 0}),
+        ),
+        (_) {},
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      final replaceCalls = nativeCalls.where((c) => c.method == 'replacePictureInPictureItem');
+      expect(replaceCalls.isEmpty, isTrue);
+      expect(advancedIndex, isNull);
+
+      PipManager.instance.notifyPictureInPictureStopped();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
     });
   });
 }

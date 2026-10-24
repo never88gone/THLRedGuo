@@ -130,11 +130,11 @@ public final class PlayerViewModel: ObservableObject {
         if progressSaveTimer == nil { startProgressSaveTimer() }
 
         // 若外部已提前预加载就绪，0ms 瞬间挂载起播，彻底杜绝转圈等待
-        if let preloaded = self.initialPreloadedPlan, URL(string: preloaded.url) != nil {
+        if let preloaded = self.initialPreloadedPlan,
+           let poolPlayer = VideoCacheManager.shared.cachedPlayer(for: preloaded.url, namespace: "feed") {
             self.plan = preloaded
             self.selectedQuality = preloaded.quality
             VideoCacheManager.shared.focusOnVideo(urlString: preloaded.url, namespace: "feed")
-            let poolPlayer = VideoCacheManager.shared.getPlayer(for: preloaded.url, headers: preloaded.headers, namespace: "feed")
             self.startPlaybackWithPlayer(poolPlayer, seekTo: self.currentTime)
             self.isLoading = false
             NSLog("🎬 [PlayerVM] onAppear 命中预载方案(%@)，实现秒开起播", self.drama.title)
@@ -310,11 +310,11 @@ public final class PlayerViewModel: ObservableObject {
         self.errorMessage = nil
         self.isSeamlessTransitioning = true // 保持当前画面最后一帧，无黑闪
 
-        if let plan = preloadedPlan, URL(string: plan.url) != nil {
+        if let plan = preloadedPlan,
+           let poolPlayer = VideoCacheManager.shared.cachedPlayer(for: plan.url, namespace: "feed") {
             self.plan = plan
             self.selectedQuality = plan.quality
             VideoCacheManager.shared.focusOnVideo(urlString: plan.url, namespace: "feed")
-            let poolPlayer = VideoCacheManager.shared.getPlayer(for: plan.url, headers: plan.headers, namespace: "feed")
             startPlaybackWithPlayer(poolPlayer, seekTo: initialPosition)
             NSLog("🎬 [PlayerVM] switchFeedDrama 命中全链路预载(%@)，实现秒开起播", drama.title)
             return
@@ -445,33 +445,17 @@ public final class PlayerViewModel: ObservableObject {
             guard current() else { return }
             plan = resolved
             selectedQuality = resolved.quality
-            guard let url = URL(string: resolved.url), ["https", "http", "file"].contains(url.scheme ?? "") else {
+            guard let scheme = URL(string: resolved.url)?.scheme, ["https", "http", "file"].contains(scheme) else {
                 throw NSError(domain: "Player", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效播放地址"])
             }
-            let playbackURL: URL
-            var options: [String: Any] = [:]
-            if !resolved.decryptionKey.isEmpty {
-                let oldDec = decryptedURL
-                playbackURL = try await CENCMP4Decryptor.shared.decrypt(remoteURL: url, headers: resolved.headers, hexKey: resolved.decryptionKey, mediaBytes: resolved.mediaBytes)
-                guard current() else {
-                    CENCMP4Decryptor.shared.removePlaybackCache(at: playbackURL)
-                    return
-                }
-                if let old = oldDec, old != playbackURL {
-                    CENCMP4Decryptor.shared.removePlaybackCache(at: old)
-                }
-                decryptedURL = playbackURL
-            } else {
-                if let oldDec = decryptedURL {
-                    CENCMP4Decryptor.shared.removePlaybackCache(at: oldDec)
-                    decryptedURL = nil
-                }
-                playbackURL = url
-                if !resolved.headers.isEmpty { options["AVURLAssetHTTPHeaderFieldsKey"] = resolved.headers }
+            let prepared = try await PlaybackAssetFactory.prepare(resolved)
+            guard current() else {
+                if let local = prepared.decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: local) }
+                return
             }
-            guard current() else { return }
-            let asset = AVURLAsset(url: playbackURL, options: options.isEmpty ? nil : options)
-            startPlaybackWithItem(item: AVPlayerItem(asset: asset), seekTo: seekTo)
+            if let old = decryptedURL, old != prepared.decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: old) }
+            decryptedURL = prepared.decryptedURL
+            startPlaybackWithItem(item: AVPlayerItem(asset: prepared.asset), seekTo: seekTo)
             NSLog("[PlayerVM] prepared episode=%d encrypted=%d recovery=%d", episodeIndex, resolved.decryptionKey.isEmpty ? 0 : 1, recoveryAttempts)
             updateActiveDanmakus()
         } catch {
@@ -509,6 +493,7 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     func startPlaybackWithItem(item: AVPlayerItem, seekTo: Double) {
+        item.preferredForwardBufferDuration = 3
         releasePlayerObservers()
         let av: AVPlayer
         if let existing = player {
@@ -710,54 +695,26 @@ public final class PlayerViewModel: ObservableObject {
                 }
             }
             do {
-                let resolvedPlan = try await self?.repository.resolvePlayback(
+                let resolvedPlan = try await NativeRepository.preloading.resolvePlayback(
                     drama: targetDrama,
                     episode: targetEpisode,
                     episodeIndex: nextIndex,
                     quality: targetQuality
                 )
-                guard let resolvedPlan, !Task.isCancelled else { return }
+                guard !Task.isCancelled else { return }
 
-                guard let url = URL(string: resolvedPlan.url), ["https", "http", "file"].contains(url.scheme ?? "") else { return }
+                guard let scheme = URL(string: resolvedPlan.url)?.scheme, ["https", "http", "file"].contains(scheme) else { return }
 
-                let playbackURL: URL
-                var decryptedTempURL: URL? = nil
-                var options: [String: Any] = [:]
-
-                if !resolvedPlan.decryptionKey.isEmpty {
-                    let decrypted = try await CENCMP4Decryptor.shared.decrypt(
-                        remoteURL: url,
-                        headers: resolvedPlan.headers,
-                        hexKey: resolvedPlan.decryptionKey,
-                        mediaBytes: resolvedPlan.mediaBytes
-                    )
-                    guard !Task.isCancelled else {
-                        CENCMP4Decryptor.shared.removePlaybackCache(at: decrypted)
-                        return
-                    }
-                    decryptedTempURL = decrypted
-                    playbackURL = decrypted
-                } else {
-                    playbackURL = url
-                    if !resolvedPlan.headers.isEmpty {
-                        options["AVURLAssetHTTPHeaderFieldsKey"] = resolvedPlan.headers
-                    }
-                }
-
-                let asset = AVURLAsset(url: playbackURL, options: options.isEmpty ? nil : options)
+                let prepared = try await PlaybackAssetFactory.prepare(resolvedPlan)
+                let decryptedTempURL = prepared.decryptedURL
+                let asset = prepared.asset
                 _ = try? await asset.load(.isPlayable, .duration, .tracks)
                 guard !Task.isCancelled else {
                     if let temp = decryptedTempURL { CENCMP4Decryptor.shared.removePlaybackCache(at: temp) }
                     return
                 }
                 let item = AVPlayerItem(asset: asset)
-                item.preferredForwardBufferDuration = 15.0
-
-                // 联动 VideoCacheManager 启动后台静音预热，提前拉取媒体分片
-                VideoCacheManager.shared.preload(
-                    items: [(url: playbackURL.absoluteString, headers: resolvedPlan.headers)],
-                    namespace: "drama"
-                )
+                item.preferredForwardBufferDuration = 3
 
                 await MainActor.run {
                     guard let self, !self.closed, currentGen == self.playbackGeneration, !Task.isCancelled else {
