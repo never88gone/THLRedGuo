@@ -10,6 +10,7 @@ public final class AppEnvironment: ObservableObject {
     public let lanService = LanSyncService.shared
     public let downloadService = DownloadService.shared
     public let jsService = JSSourceService.shared
+    public let icloudSync = ICloudSyncService.shared
 
     public init() {}
 }
@@ -55,6 +56,7 @@ public struct TVLaunchSplashView: View {
 
 @main
 struct THLRedLookApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var env = AppEnvironment.shared
     @State private var showSplash: Bool = true
 
@@ -67,6 +69,7 @@ struct THLRedLookApp: App {
                     .environmentObject(env.lanService)
                     .environmentObject(env.downloadService)
                     .environmentObject(env.jsService)
+                    .environmentObject(env.icloudSync)
 
                 if showSplash {
                     TVLaunchSplashView()
@@ -77,6 +80,9 @@ struct THLRedLookApp: App {
             .preferredColorScheme(.dark)
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = env.store.resourceSettings.keepScreenOn
+                if ICloudSyncService.shared.isSyncEnabled {
+                    ICloudSyncService.shared.syncWithCloud()
+                }
                 Task {
                     await env.jsService.initialize()
                 }
@@ -84,6 +90,11 @@ struct THLRedLookApp: App {
                     withAnimation(.easeOut(duration: 0.5)) {
                         showSplash = false
                     }
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active && ICloudSyncService.shared.isSyncEnabled {
+                    ICloudSyncService.shared.syncWithCloud()
                 }
             }
         }

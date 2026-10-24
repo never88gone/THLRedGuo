@@ -483,7 +483,7 @@ class WatchEntry {
     'episode': episode,
     'position': position,
     'duration': duration,
-    'updatedAt': updatedAt.toIso8601String(),
+    'updatedAt': updatedAt.toUtc().toIso8601String(),
   };
   factory WatchEntry.fromJson(Map<String, dynamic> json) => WatchEntry(
     drama: Drama.fromJson(Map<String, dynamic>.from(json['drama'] as Map)),
@@ -491,7 +491,7 @@ class WatchEntry {
     position: (json['position'] as num?)?.toDouble() ?? 0,
     duration: (json['duration'] as num?)?.toDouble() ?? 0,
     updatedAt:
-        DateTime.tryParse(json['updatedAt'].toString()) ?? DateTime(2000),
+        DateTime.tryParse(json['updatedAt'].toString())?.toLocal() ?? DateTime(2000),
   );
 }
 

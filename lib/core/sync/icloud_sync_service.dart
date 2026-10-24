@@ -113,10 +113,26 @@ class ICloudSyncService extends ChangeNotifier {
           if (map['follows'] is Map) {
             final fMap = map['follows'] as Map;
             for (final entry in fMap.entries) {
-              if (entry.value is Map) {
-                remoteFollows[entry.key.toString()] = FollowState.fromJson(
-                  Map<String, dynamic>.from(entry.value as Map),
-                );
+              final key = entry.key.toString();
+              if (entry.value is String) {
+                final statusStr = (entry.value as String).toLowerCase();
+                FollowStatus status;
+                if (statusStr == 'watching') {
+                  status = FollowStatus.watching;
+                } else if (statusStr == 'watched' ||
+                    statusStr == 'finished' ||
+                    statusStr == 'completed') {
+                  status = FollowStatus.watched;
+                } else {
+                  status = FollowStatus.planned;
+                }
+                remoteFollows[key] = FollowState(status: status);
+              } else if (entry.value is Map) {
+                try {
+                  remoteFollows[key] = FollowState.fromJson(
+                    Map<String, dynamic>.from(entry.value as Map),
+                  );
+                } catch (_) {}
               }
             }
           }

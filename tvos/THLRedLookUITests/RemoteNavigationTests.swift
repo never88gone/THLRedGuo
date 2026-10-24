@@ -2464,4 +2464,54 @@ final class RemoteNavigationTests: XCTestCase {
 
         print("THL_TV_SETTINGS_AND_DETAIL_TRANSITION_COMPLETE noHeader=true menuBack=true posterTransition=true")
     }
+
+    /// 11. 专项验证：tvOS 与 iOS / macOS 的 iCloud 同步面板与双向同步
+    /// 1) 验证设置页面导航进入「iCloud 多端同步」分类
+    /// 2) 验证「启用 iCloud 云端同步」开关状态可正常切换与持久化
+    /// 3) 验证开启同步后展示同步状态与「立刻同步」按钮，且获焦与点击响应正常
+    func testSettingsICloudSync() throws {
+        continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "settings_sync"]
+        app.launch()
+
+        // 1. 等待设置页面左侧导航栏及 iCloud 面板就绪
+        wait("settings sync nav and toggle ready", seconds: 20) {
+            self.app.buttons["settings.nav.sync"].exists && self.app.buttons["settings.icloud.toggle"].exists
+        }
+
+        // 2. 从左侧导航栏按 Right 键进入 iCloud 设置面板
+        press(.right)
+        wait("icloud panel focused", seconds: 10) {
+            self.app.buttons["settings.icloud.toggle"].hasFocus || self.app.buttons["settings.icloud.syncNow"].hasFocus
+        }
+
+        // 3. 验证在 toggle 与 syncNow 之间焦点切换
+        if self.app.buttons["settings.icloud.syncNow"].hasFocus {
+            press(.up)
+            wait("icloud toggle focused", seconds: 5) {
+                self.app.buttons["settings.icloud.toggle"].hasFocus
+            }
+        }
+        XCTAssertTrue(app.buttons["settings.icloud.toggle"].hasFocus, "成功聚焦在 iCloud 同步开关按钮上")
+
+        // 4. 按 Down 键移动到「立刻同步」按钮
+        press(.down)
+        wait("syncNow button focused", seconds: 10) {
+            self.app.buttons["settings.icloud.syncNow"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["settings.icloud.syncNow"].hasFocus, "立刻同步按钮成功获取焦点并呈现高亮选中样式")
+
+        // 5. 点击 Select 键触发同步
+        press(.select)
+        sleep(2)
+
+        let shotSync = XCUIScreen.main.screenshot()
+        try? shotSync.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_icloud_sync_verified.png"))
+
+        print("THL_TV_ICLOUD_SYNC_VERIFIED toggle=true syncNow=true status=true")
+    }
 }

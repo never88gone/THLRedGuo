@@ -53,7 +53,7 @@ public final class ICloudSyncService: ObservableObject {
             self,
             selector: #selector(handleICloudChangeNotification(_:)),
             name: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
-            object: kvStore
+            object: nil
         )
 
         // 启动时同步并拉取云端
@@ -71,6 +71,7 @@ public final class ICloudSyncService: ObservableObject {
 
     @objc private func handleICloudChangeNotification(_ notification: Notification) {
         guard isSyncEnabled else { return }
+        kvStore.synchronize()
         DispatchQueue.main.async { [weak self] in
             NSLog("☁️ [iCloud] 收到云端数据变动通知，开始合并...")
             self?.syncWithCloud()
@@ -89,7 +90,42 @@ public final class ICloudSyncService: ObservableObject {
             self.kvStore.synchronize()
 
             let isoDecoder = JSONDecoder()
-            isoDecoder.dateDecodingStrategy = .iso8601
+            isoDecoder.dateDecodingStrategy = .custom { decoder in
+                let container = try decoder.singleValueContainer()
+                let dateStr = try container.decode(String.self)
+
+                let isoWithMs = ISO8601DateFormatter()
+                isoWithMs.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                if let date = isoWithMs.date(from: dateStr) { return date }
+
+                let isoStd = ISO8601DateFormatter()
+                isoStd.formatOptions = [.withInternetDateTime]
+                if let date = isoStd.date(from: dateStr) { return date }
+
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                let formats = [
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS",
+                    "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss",
+                    "yyyy-MM-dd HH:mm:ss"
+                ]
+                for fmt in formats {
+                    formatter.dateFormat = fmt
+                    if let date = formatter.date(from: dateStr) { return date }
+                }
+
+                if let timestamp = Double(dateStr) {
+                    return timestamp > 1_000_000_000_000
+                        ? Date(timeIntervalSince1970: timestamp / 1000.0)
+                        : Date(timeIntervalSince1970: timestamp)
+                }
+                return Date(timeIntervalSince1970: 0)
+            }
             let isoEncoder = JSONEncoder()
             isoEncoder.dateEncodingStrategy = .iso8601
 
@@ -106,9 +142,13 @@ public final class ICloudSyncService: ObservableObject {
             if let followsStr = self.kvStore.string(forKey: Self.keyFollows),
                let data = followsStr.data(using: .utf8),
                let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
-                if let dict = json["follows"] as? [String: String] {
+                if let dict = json["follows"] as? [String: Any] {
                     for (k, v) in dict {
-                        remoteFollows[k] = FollowState(rawValue: v) ?? .none
+                        if let str = v as? String {
+                            remoteFollows[k] = FollowState.from(string: str)
+                        } else if let map = v as? [String: Any], let statusStr = map["status"] as? String {
+                            remoteFollows[k] = FollowState.from(string: statusStr)
+                        }
                     }
                 }
                 if let dramaList = json["dramas"] as? [[String: Any]],

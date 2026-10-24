@@ -41,9 +41,10 @@ class AppDelegate: FlutterAppDelegate {
 
       NotificationCenter.default.addObserver(
         forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
-        object: NSUbiquitousKeyValueStore.default,
+        object: nil,
         queue: .main
       ) { [weak self] _ in
+        NSUbiquitousKeyValueStore.default.synchronize()
         self?.icloudChannel?.invokeMethod("onICloudChanged", arguments: nil)
       }
     }

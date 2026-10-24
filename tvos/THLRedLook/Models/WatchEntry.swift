@@ -18,6 +18,21 @@ public enum FollowState: String, CaseIterable, Identifiable, Codable {
         case .updated: return "有更新"
         }
     }
+
+    public static func from(string: String) -> FollowState {
+        switch string.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "wishlist", "planned":
+            return .wishlist
+        case "watching":
+            return .watching
+        case "watched", "finished", "completed":
+            return .watched
+        case "updated":
+            return .updated
+        default:
+            return .none
+        }
+    }
 }
 
 public struct WatchEntry: Identifiable, Hashable, Codable {
