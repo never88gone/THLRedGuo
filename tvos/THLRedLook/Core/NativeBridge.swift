@@ -455,10 +455,15 @@ public actor NativeBridge {
         }
 
         let isHongguo = sourceId.isEmpty || sourceId == "hongguo" || vid.hasPrefix("hongguo:")
-        let rawTags = (vod["vod_tag"] as? String)?.components(separatedBy: "·").filter { !$0.isEmpty } ?? []
+        var rawTags: [String] = []
+        if let tagList = vod["tags"] as? [String] {
+            rawTags = tagList
+        } else if let tagStr = (vod["vod_tag"] as? String) ?? (vod["tags"] as? String) {
+            rawTags = tagStr.components(separatedBy: CharacterSet(charactersIn: "·,，/ ")).filter { !$0.isEmpty }
+        }
         let cleanTags = rawTags.filter { t in
             let lower = t.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            return lower != "vip" && lower != "付费" && lower != "付费短剧" && lower != "vip专享"
+            return !lower.contains("vip") && !lower.contains("付费")
         }
 
         return [
@@ -473,7 +478,7 @@ public actor NativeBridge {
             "heat": vod["vod_heat"] as? String ?? "",
             "views": vod["vod_views"] as? String ?? "",
             "onlineDate": year,
-            "tags": cleanTags,
+            "tags": isHongguo ? cleanTags : rawTags,
             "releaseStatus": vod["vod_release_status"] as? String ?? remark,
             "vip": isHongguo ? false : (vod["vip"] as? Bool ?? false)
         ]
@@ -778,8 +783,23 @@ public actor NativeBridge {
                         freshDrama[k] = str
                     } else if let num = v as? Int, num > 0 {
                         freshDrama[k] = num
+                    } else if let b = v as? Bool {
+                        freshDrama[k] = b
+                    } else if let arr = v as? [String] {
+                        freshDrama[k] = arr
                     } else if freshDrama[k] == nil {
                         freshDrama[k] = v
+                    }
+                }
+
+                let isHongguo = targetSrc.isEmpty || targetSrc == "hongguo" || (freshDrama["id"] as? String ?? "").hasPrefix("hongguo:")
+                if isHongguo {
+                    freshDrama["vip"] = false
+                    if let currentTags = freshDrama["tags"] as? [String] {
+                        freshDrama["tags"] = currentTags.filter { t in
+                            let lower = t.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                            return !lower.contains("vip") && !lower.contains("付费")
+                        }
                     }
                 }
 

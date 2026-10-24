@@ -77,7 +77,7 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
             freshDrama = drama.merge(with: decoded)
         }
 
-        let isHongguo = drama.source == "hongguo" || drama.id.hasPrefix("hongguo:")
+        let isHongguo = drama.source == "hongguo" || drama.id.hasPrefix("hongguo:") || freshDrama.source == "hongguo" || freshDrama.id.hasPrefix("hongguo:")
         var episodes = [Episode]()
         for (i, row) in chaptersRaw.enumerated() {
             let id = row["id"] as? String ?? "\(drama.id)_\(i + 1)"
