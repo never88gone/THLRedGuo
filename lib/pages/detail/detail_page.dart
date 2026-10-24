@@ -1067,11 +1067,11 @@ class _DetailScreenState extends State<DetailScreen> {
                         ),
                       ),
                     ),
-                  if (drama.vipStatus != null)
+                  if (drama.vip && drama.source != 'hongguo' && !drama.id.startsWith('hongguo:'))
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        drama.vip ? 'VIP 内容' : '免费内容',
+                        'VIP 内容',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),

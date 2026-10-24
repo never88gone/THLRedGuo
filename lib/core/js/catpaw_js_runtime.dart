@@ -273,9 +273,8 @@ globalThis.console = {
     _rt.evaluate(_fetchShim);
 
     // 注入设备认证持久化桥接，避免每次冷启动/重新初始化产生额外的设备注册网络延迟
-    final sessionToInject = _cachedDeviceSession ?? _defaultDeviceSession;
-    if (sessionToInject.isNotEmpty) {
-      final safeEncoded = jsonEncode(sessionToInject);
+    if (_cachedDeviceSession != null && _cachedDeviceSession!.isNotEmpty) {
+      final safeEncoded = jsonEncode(_cachedDeviceSession);
       _rt.evaluate('''
 try {
   globalThis.__hongguoCachedDevice = JSON.parse($safeEncoded);
@@ -563,10 +562,7 @@ globalThis.__native_save_device = function(json) {
         'typeof spider !== "undefined" && typeof spider.play === "function" ? spider.play(${jsonEncode(flag)}, ${jsonEncode(id)}, $flagsJson) : { parse: 0, url: "" }',
         timeout: const Duration(seconds: 60),
       );
-    } on CatPawSourceFailure catch (e) {
-      if (e.code == 'cancelled') {
-        return const CatPawPlayResult(url: '', header: {}, parse: 0);
-      }
+    } on CatPawSourceFailure {
       rethrow;
     }
     final map = (res is Map) ? res : {};

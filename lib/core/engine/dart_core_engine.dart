@@ -478,7 +478,7 @@ class DartCoreEngine {
     final rt = await _getSpiderRuntime(source);
     if (rt != null) {
       try {
-        final homeRes = await rt.home(filter: source == 'hongguo');
+        final homeRes = await rt.home(filter: false);
         if (homeRes.classes.isNotEmpty) {
           return homeRes.classes
               .map(
@@ -489,9 +489,7 @@ class DartCoreEngine {
               )
               .toList();
         }
-      } catch (_) {
-        if (source == 'hongguo') rethrow;
-      }
+      } catch (_) {}
     }
     return _getCategoriesForSource(source);
   }
@@ -546,6 +544,18 @@ class DartCoreEngine {
     final rawDesc = (vod['vod_content']?.toString() ?? '').trim();
     final desc = rawDesc.isNotEmpty ? rawDesc : title;
 
+    final cleanTags = tags
+        .where((t) {
+          final lower = t.toLowerCase();
+          return lower != 'vip' &&
+              lower != '付费' &&
+              lower != '付费短剧' &&
+              lower != 'vip专享';
+        })
+        .toList();
+
+    final isHongguo = source.isEmpty || source == 'hongguo' || fullId.startsWith('hongguo:');
+
     return {
       'id': fullId,
       'source': source,
@@ -559,8 +569,9 @@ class DartCoreEngine {
       'category': dramaCategoryLabel(
         vod['vod_category']?.toString() ?? category,
       ),
-      'tags': tags,
+      'tags': cleanTags.isEmpty ? ['热播', '精选'] : cleanTags,
       'releaseStatus': vod['vod_release_status']?.toString() ?? '',
+      'vip': isHongguo ? false : (vod['vip'] == true),
     };
   }
 
@@ -713,7 +724,15 @@ class DartCoreEngine {
   Future<List<Map<String, dynamic>>> _getRankingBoards() async {
     final runtime = await _getSpiderRuntime('hongguo');
     if (runtime == null) throw StateError('榜单数据源不可用');
-    return runtime.rankingBoards();
+    try {
+      return await runtime.rankingBoards();
+    } catch (_) {
+      return const [
+        {'id': 'hongguo-hot', 'name': '热播榜'},
+        {'id': 'hongguo-new', 'name': '新剧榜'},
+        {'id': 'hongguo-search', 'name': '热搜榜'},
+      ];
+    }
   }
 
   Future<Map<String, dynamic>> _getRankings(Map<String, dynamic> input) async {
@@ -809,7 +828,8 @@ class DartCoreEngine {
 
     // 红果官方短剧全集均可直接解析直连播放，不设试看门槛与虚假 VIP 标签；
     // 仅针对非红果且明确受限的源保留 VIP 标注
-    if (source != 'hongguo' &&
+    final isHongguoDetail = source.isEmpty || source == 'hongguo' || dramaId.startsWith('hongguo:');
+    if (!isHongguoDetail &&
         accessibleCount > 0 &&
         accessibleCount < chapters.length) {
       for (var i = 0; i < chapters.length; i++) {
@@ -881,6 +901,19 @@ class DartCoreEngine {
           if (fallbackTarget != playTarget) {
             playRes = await rt.play('flag', fallbackTarget, flags: flags);
           }
+          if (playRes.url.isEmpty) {
+            try {
+              final refreshed = await rt.detail(sourceId);
+              final playUrl = refreshed.vod['vod_play_url']?.toString() ?? '';
+              final parsedChapters = _parseChaptersFromVodPlayUrl(playUrl);
+              if (parsedChapters.length >= episodeIndex && episodeIndex > 0) {
+                final newTarget = parsedChapters[episodeIndex - 1]['raw']?.toString();
+                if (newTarget != null && newTarget.isNotEmpty && newTarget != playTarget && newTarget != fallbackTarget) {
+                  playRes = await rt.play('flag', newTarget, flags: flags);
+                }
+              }
+            } catch (_) {}
+          }
         }
         if (playRes.url.isNotEmpty) {
           final streamUrl = playRes.url;
@@ -911,6 +944,54 @@ class DartCoreEngine {
         }
         sourceFailure = CatPawSourceFailure.playback(playRes.errorCode);
       } catch (error) {
+        if (error is CatPawSourceFailure &&
+            error.code == 'MISSING_EPISODE' &&
+            sourceId.isNotEmpty) {
+          try {
+            final refreshed = await rt.detail(sourceId);
+            final playUrl = refreshed.vod['vod_play_url']?.toString() ?? '';
+            final parsedChapters = _parseChaptersFromVodPlayUrl(playUrl);
+            if (parsedChapters.length >= episodeIndex && episodeIndex > 0) {
+              final newTarget = parsedChapters[episodeIndex - 1]['raw']?.toString();
+              if (newTarget != null && newTarget.isNotEmpty) {
+                final flags = <Map<String, String>>[
+                  if (input['avoidUrl'] is String &&
+                      (input['avoidUrl'] as String).isNotEmpty)
+                    {'avoidUrl': input['avoidUrl'] as String},
+                ];
+                final retryRes = await rt.play('flag', newTarget, flags: flags);
+                if (retryRes.url.isNotEmpty) {
+                  final streamUrl = retryRes.url;
+                  final mimeType = streamUrl.contains('.m3u8')
+                      ? 'application/x-mpegURL'
+                      : 'video/mp4';
+                  final detected = RegExp(
+                    r'/(2160|1080|720|480|360)p[./]',
+                  ).firstMatch(streamUrl);
+                  final effectiveQuality = retryRes.quality > 0
+                      ? retryRes.quality
+                      : int.tryParse(detected?.group(1) ?? '') ?? 0;
+                  return {
+                    'url': streamUrl,
+                    'session':
+                        'sess_${DateTime.now().microsecondsSinceEpoch}_$source',
+                    'headers': retryRes.header,
+                    'decryptionKey': retryRes.decryptionKey,
+                    'mediaBytes': retryRes.mediaBytes,
+                    'expiresAt': retryRes.expiresAt,
+                    'quality': effectiveQuality,
+                    'qualities': retryRes.qualities.isNotEmpty
+                        ? retryRes.qualities
+                        : [if (effectiveQuality > 0) effectiveQuality],
+                    'local': false,
+                    'mimeType': mimeType,
+                    'danmakuId': retryRes.danmakuId,
+                  };
+                }
+              }
+            }
+          } catch (_) {}
+        }
         sourceFailure = error;
       }
     }

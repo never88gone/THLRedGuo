@@ -454,6 +454,13 @@ public actor NativeBridge {
             epCount = Int(remark[match]) ?? 0
         }
 
+        let isHongguo = sourceId.isEmpty || sourceId == "hongguo" || vid.hasPrefix("hongguo:")
+        let rawTags = (vod["vod_tag"] as? String)?.components(separatedBy: "·").filter { !$0.isEmpty } ?? []
+        let cleanTags = rawTags.filter { t in
+            let lower = t.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return lower != "vip" && lower != "付费" && lower != "付费短剧" && lower != "vip专享"
+        }
+
         return [
             "id": vid.hasPrefix("\(sourceId):") ? vid : "\(sourceId):\(vid)",
             "source": sourceId,
@@ -466,8 +473,9 @@ public actor NativeBridge {
             "heat": vod["vod_heat"] as? String ?? "",
             "views": vod["vod_views"] as? String ?? "",
             "onlineDate": year,
-            "tags": (vod["vod_tag"] as? String)?.components(separatedBy: "·").filter { !$0.isEmpty } ?? [],
-            "releaseStatus": vod["vod_release_status"] as? String ?? remark
+            "tags": cleanTags,
+            "releaseStatus": vod["vod_release_status"] as? String ?? remark,
+            "vip": isHongguo ? false : (vod["vip"] as? Bool ?? false)
         ]
     }
 

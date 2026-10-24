@@ -194,7 +194,10 @@ class Drama {
   final String category;
   String get displayCategory => dramaCategoryLabel(category);
   final bool? vipStatus;
-  bool get vip => vipStatus == true;
+  bool get vip =>
+      (source == 'hongguo' || id.startsWith('hongguo:'))
+          ? false
+          : vipStatus == true;
   final String heat;
   final String views;
   final String onlineDate;
@@ -246,6 +249,12 @@ class Drama {
     if (!id.contains(':') && source.isNotEmpty && id.isNotEmpty) {
       id = '$source:$id';
     }
+    final isHongguo = source.isEmpty || source == 'hongguo' || id.startsWith('hongguo:');
+    final tags = (json['tags'] as List? ?? const [])
+        .whereType<String>()
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty && !_isVipOrPaidTag(t))
+        .toList();
     return Drama(
       id: id,
       source: source,
@@ -255,11 +264,11 @@ class Drama {
       cover: normalizeCoverUrl(json['cover'] as String? ?? ''),
       episodes: intValue(json['episodes']),
       category: category.isEmpty ? '' : dramaCategoryLabel(category),
-      vip: json['vip'] == true ? true : (json['vip'] == false ? false : null),
+      vip: isHongguo ? false : (json['vip'] == true ? true : (json['vip'] == false ? false : null)),
       heat: json['heat']?.toString() ?? '',
       views: json['views']?.toString() ?? '',
       onlineDate: json['onlineDate'] as String? ?? '',
-      tags: (json['tags'] as List? ?? const []).whereType<String>().toList(),
+      tags: tags,
       releaseStatus: json['releaseStatus'] as String? ?? '',
     );
   }
@@ -322,6 +331,16 @@ class Drama {
   }
 }
 
+bool _isVipOrPaidTag(String tag) {
+  final lower = tag.trim().toLowerCase();
+  return lower == 'vip' ||
+      lower == '付费' ||
+      lower == '付费短剧' ||
+      lower == 'vip专享' ||
+      lower == '付费内容' ||
+      lower == '付费解锁';
+}
+
 class Episode {
   Episode(this.raw, int fallback)
     : id = raw['id'] as String? ?? '',
@@ -329,7 +348,11 @@ class Episode {
       number = intValue(raw['currentEpisode']) > 0
           ? intValue(raw['currentEpisode'])
           : fallback,
-      vip = raw['vip'] == true;
+      vip = (raw['source'] == 'hongguo' ||
+              (raw['id'] as String? ?? '').startsWith('hongguo:') ||
+              (raw['url'] as String? ?? '').contains('hongguoduanju.com'))
+          ? false
+          : raw['vip'] == true;
   final Map<String, dynamic> raw;
   final String id;
   final String title;

@@ -144,8 +144,10 @@ class PlayerViewportView extends StatelessWidget {
     final videoTheme = television
         ? televisionTheme(AppTheme.dark)
         : AppTheme.dark;
+    final isHongguo = detail.drama.source == 'hongguo' || detail.drama.id.startsWith('hongguo:');
+    final isVipEp = !isHongguo && detail.episodes[index].vip;
     final title =
-        '${detail.drama.title} · 第 ${detail.episodes[index].number} 集${plan?.offline == true ? ' · 本地' : ''}${detail.episodes[index].vip ? ' · VIP 试看' : ''}${(plan?.routeIndex ?? 0) > 0 ? ' · 线路 ${plan!.routeIndex + 1}' : ''}';
+        '${detail.drama.title} · 第 ${detail.episodes[index].number} 集${plan?.offline == true ? ' · 本地' : ''}${isVipEp ? ' · VIP 试看' : ''}${(plan?.routeIndex ?? 0) > 0 ? ' · 线路 ${plan!.routeIndex + 1}' : ''}';
     final hideOverlayForPictureInPicture = pictureInPictureVisible;
     final Widget controls = hideOverlayForPictureInPicture
         ? Stack(

@@ -63,7 +63,7 @@ public struct Drama: Identifiable, Hashable, Codable {
     }
 
     public var isVIP: Bool {
-        vip == true
+        source != "hongguo" && !id.hasPrefix("hongguo:") && vip == true
     }
 
     public var releaseLabel: String {
@@ -131,11 +131,17 @@ public struct Drama: Identifiable, Hashable, Codable {
         }
 
         self.category = try container.decodeIfPresent(String.self, forKey: .category) ?? ""
-        self.vip = try container.decodeIfPresent(Bool.self, forKey: .vip)
+        let isHongguo = self.source == "hongguo" || self.id.hasPrefix("hongguo:")
+        let rawVip = try container.decodeIfPresent(Bool.self, forKey: .vip)
+        self.vip = isHongguo ? false : rawVip
         self.heat = try container.decodeIfPresent(String.self, forKey: .heat) ?? ""
         self.views = try container.decodeIfPresent(String.self, forKey: .views) ?? ""
         self.onlineDate = try container.decodeIfPresent(String.self, forKey: .onlineDate) ?? ""
-        self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        let rawTags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        self.tags = rawTags.filter { t in
+            let lower = t.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return lower != "vip" && lower != "付费" && lower != "付费短剧" && lower != "vip专享"
+        }
         self.releaseStatus = try container.decodeIfPresent(String.self, forKey: .releaseStatus) ?? ""
     }
 }

@@ -735,6 +735,27 @@ async function detail(id) {
     } catch (e) {}
   }
 
+  if (vidList.length > 0) {
+    try {
+      const detailCache = (globalThis.__hongguoDetailCache = globalThis.__hongguoDetailCache || new Map());
+      const cachedEntry = detailCache.get(String(cleanId));
+      const existingData = (cachedEntry && cachedEntry.data) || {};
+      const videoListFromVids = vidList.map(function (v) { return { vid: String(v), video_id: String(v) }; });
+      detailCache.set(String(cleanId), {
+        data: {
+          ...existingData,
+          series_id: String(cleanId),
+          series_title: title || existingData.series_title || "",
+          series_cover: cover || existingData.series_cover || "",
+          series_intro: desc || existingData.series_intro || "",
+          episode_cnt: epTotalCount || vidList.length,
+          video_list: videoListFromVids
+        },
+        updated: Date.now()
+      });
+    } catch (_) {}
+  }
+
   const epUrls = [];
   if (vidList.length > 0) {
     for (let i = 0; i < vidList.length; i++) {
@@ -835,7 +856,7 @@ async function play(flag, id, flags) {
     }
   }
 
-  // 2. 若未能获得有效的单集 vid（即 itemId 为空），尝试通过 App 官方 API 解析该集真实的 vid
+  // 2. 若未能获得有效的单集 vid（即 itemId 为空），尝试通过 App 官方 API 或 Web 详情解析该集真实的 vid
   if (!itemId && seriesId && !isCorruptedId(seriesId)) {
     const appDetail = await fetchAppDetail(seriesId);
     if (appDetail && Array.isArray(appDetail.video_list) && appDetail.video_list.length > 0) {
@@ -844,6 +865,36 @@ async function play(flag, id, flags) {
       if (targetEp && (targetEp.vid || targetEp.video_id)) {
         itemId = String(targetEp.vid || targetEp.video_id);
       }
+    }
+    if (!itemId && episodeIndex > 0) {
+      try {
+        const fullDetail = await spider.detail(seriesId);
+        const vod = fullDetail && Array.isArray(fullDetail.list) && fullDetail.list[0];
+        const playUrl = (vod && vod.vod_play_url) || "";
+        if (playUrl) {
+          const entries = playUrl.split("#");
+          for (let i = 0; i < entries.length; i++) {
+            const parts = entries[i].split("$");
+            if (parts.length >= 2) {
+              const numMatch = parts[0].match(/(\d+)/);
+              if (numMatch && Number(numMatch[1]) === episodeIndex) {
+                const vidM = /\/player\/[^/?#]+\/(\d+)/.exec(parts[1]) || /^(\d{10,})$/.exec(parts[1]);
+                if (vidM) {
+                  itemId = vidM[1];
+                  break;
+                }
+              }
+            }
+          }
+          if (!itemId && entries.length >= episodeIndex) {
+            const parts = entries[episodeIndex - 1].split("$");
+            if (parts.length >= 2) {
+              const vidM = /\/player\/[^/?#]+\/(\d+)/.exec(parts[1]) || /^(\d{10,})$/.exec(parts[1]);
+              if (vidM) itemId = vidM[1];
+            }
+          }
+        }
+      } catch (_) {}
     }
   }
 
@@ -1829,11 +1880,50 @@ Public License instead of this License.  But first, please read
     if (!match) {
       const indexed = /^(\d+)[/_](\d{1,5})$/.exec(target);
       if (!indexed) return existingPlay(flag, id, flags);
-      const detail = await fetchAppDetail(indexed[1]);
-      const episode = detail && detail.video_list && detail.video_list[Number(indexed[2]) - 1];
-      const exactId = episode && String(episode.vid || episode.video_id || '');
-      if (!/^\d+$/.test(exactId || '')) return { parse: 0, url: '', header: {}, error: 'MISSING_EPISODE' };
-      return spider.play(flag, BASE_URL + '/player/' + indexed[1] + '/' + exactId, flags);
+      let detail = await fetchAppDetail(indexed[1]);
+      let episode = detail && detail.video_list && detail.video_list[Number(indexed[2]) - 1];
+      let exactId = episode && String(episode.vid || episode.video_id || "");
+      if (!/^\d+$/.test(exactId || "")) {
+        try {
+          const fullDetail = await spider.detail(indexed[1]);
+          const vod = fullDetail && Array.isArray(fullDetail.list) && fullDetail.list[0];
+          const playUrl = (vod && vod.vod_play_url) || "";
+          if (playUrl) {
+            const epNum = Number(indexed[2]);
+            const entries = playUrl.split("#");
+            let resolvedUrl = "";
+            for (let i = 0; i < entries.length; i++) {
+              const item = entries[i];
+              const parts = item.split("$");
+              if (parts.length >= 2) {
+                const numMatch = parts[0].match(/(\d+)/);
+                if (numMatch && Number(numMatch[1]) === epNum) {
+                  resolvedUrl = parts[1];
+                  break;
+                }
+              }
+            }
+            if (!resolvedUrl && epNum > 0 && epNum <= entries.length) {
+              const parts = entries[epNum - 1].split("$");
+              if (parts.length >= 2) resolvedUrl = parts[1];
+            }
+            if (resolvedUrl && resolvedUrl !== target && !/^\d+[/_]\d{1,5}$/.test(resolvedUrl)) {
+              return spider.play(flag, resolvedUrl, flags);
+            }
+            const exactVidMatch = /\/player\/[^/?#]+\/(\d+)/.exec(resolvedUrl || "") || /^(\d{10,})$/.exec(resolvedUrl || "");
+            if (exactVidMatch) {
+              exactId = exactVidMatch[1];
+            }
+          }
+        } catch (_) {}
+        if (!/^\d+$/.test(exactId || "")) {
+          detail = await fetchAppDetail(indexed[1]);
+          episode = detail && detail.video_list && detail.video_list[Number(indexed[2]) - 1];
+          exactId = episode && String(episode.vid || episode.video_id || "");
+        }
+      }
+      if (!/^\d+$/.test(exactId || "")) return { parse: 0, url: "", header: {}, error: "MISSING_EPISODE" };
+      return spider.play(flag, BASE_URL + "/player/" + indexed[1] + "/" + exactId, flags);
     }
     const vid = match[2];
     const danmakuId = 'hongguo:' + match[1] + ':' + vid;
