@@ -382,7 +382,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     key: const ValueKey('settings-contact-entry'),
                     leading: const Icon(Icons.forum_outlined),
                     title: const Text('联系方式'),
-                    subtitle: const Text('Telegram 官方交流与反馈 · 直接跳转打开'),
+                    subtitle: const Text('官方邮箱 · GitHub 开源 · Telegram 交流'),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,
