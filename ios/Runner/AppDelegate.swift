@@ -7,6 +7,7 @@ import CoreMedia
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, AVPictureInPictureControllerDelegate {
+  private let encryptedMediaStream = EncryptedMediaStream()
   private var pipController: AVPictureInPictureController?
   private var pipPlayer: AVPlayer?
   private var pipPlayerLayer: AVPlayerLayer?
@@ -45,6 +46,12 @@ import CoreMedia
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "EncryptedMediaStream") {
+      let channel = FlutterMethodChannel(name: "duanju/encrypted_stream", binaryMessenger: registrar.messenger())
+      channel.setMethodCallHandler { [weak self] call, result in
+        self?.encryptedMediaStream.handle(call, result: result)
+      }
+    }
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "DeviceSettings") {
       let channel = FlutterMethodChannel(name: "duanju/device", binaryMessenger: registrar.messenger())
       self.deviceChannel = channel

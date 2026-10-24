@@ -772,7 +772,8 @@ class _PlayerScreenState extends State<PlayerScreen>
 
     String targetUrl = mediaUrl;
     Map<String, String> targetHeaders = headers;
-    final isEncryptedStream = Platform.isIOS &&
+    final isEncryptedStream =
+        Platform.isIOS &&
         _plan != null &&
         _plan!.decryptionKey.isNotEmpty &&
         !_plan!.local;
@@ -868,7 +869,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         }
       },
     );
-    debugPrint('[PiP-Dart] enterPictureInPicture args: url=$targetUrl, pos=${arguments['position']}, sourceRect=$sourceRect');
+    debugPrint(
+      '[PiP-Dart] enterPictureInPicture args: url=$targetUrl, pos=${arguments['position']}, sourceRect=$sourceRect',
+    );
     try {
       final status = await AppDevice.channel.invokeMapMethod<String, dynamic>(
         'enterPictureInPicture',
@@ -1222,6 +1225,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         ? PlaybackRecoveryAction.stop
         : _recovery.next(
             current,
+            decryptedStream: _encryptedPlayback.isStreamPlan(current),
             allowCache:
                 _player is LunaExoPlayer &&
                 (Platform.isAndroid || Platform.isIOS),
@@ -2052,6 +2056,14 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   @override
   void dispose() {
+    final retainStream =
+        Platform.isIOS &&
+        _pictureInPictureVisible &&
+        _plan != null &&
+        _encryptedPlayback.isStreamPlan(_plan!);
+    if (retainStream) {
+      PipManager.instance.retainPlaybackResource(_encryptedPlayback.close);
+    }
     _closed = true;
     unawaited(_player.pause().catchError((Object _) {}));
     final enhancementClosed = _enhancement.close();
@@ -2078,12 +2090,14 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     unawaited(widget.repository.release(_session));
     unawaited(_loader.close().catchError((Object _) {}));
-    unawaited(_encryptedPlayback.cancel().catchError((Object _) {}));
+    if (!retainStream) {
+      unawaited(_encryptedPlayback.cancel().catchError((Object _) {}));
+    }
     final closing = _operations.catchError((Object _) {}).then((_) async {
       await _interactions.pendingRates.catchError((Object _) {});
       await enhancementClosed.catchError((Object _) {});
       await _player.dispose();
-      await _encryptedPlayback.close();
+      if (!retainStream) await _encryptedPlayback.close();
     });
     unawaited(
       (_playbackLease?.releaseAfter(closing) ?? closing).catchError(

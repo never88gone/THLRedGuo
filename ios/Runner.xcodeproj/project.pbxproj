@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		814765F2AB9434E086902004 /* EncryptedMediaStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814765F2AB9434E086902003 /* EncryptedMediaStream.swift */; };
+		814765F2AB9434E086902002 /* CENCStreamIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814765F2AB9434E086902001 /* CENCStreamIndex.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
@@ -43,6 +45,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		814765F2AB9434E086902003 /* EncryptedMediaStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptedMediaStream.swift; sourceTree = "<group>"; };
+		814765F2AB9434E086902001 /* CENCStreamIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CENCStreamIndex.swift; sourceTree = "<group>"; };
 		053F7A7403ABABBA1FFD2016 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
@@ -140,6 +144,8 @@
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
+				814765F2AB9434E086902003 /* EncryptedMediaStream.swift */,
+				814765F2AB9434E086902001 /* CENCStreamIndex.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				38651745308B80FE001D48EC /* Runner.entitlements */,
@@ -385,6 +391,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
+				814765F2AB9434E086902004 /* EncryptedMediaStream.swift in Sources */,
+				814765F2AB9434E086902002 /* CENCStreamIndex.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 			);

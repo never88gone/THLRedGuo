@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/media/media_pipeline.dart';
+import 'package:THLRedLook/core/player/ios_encrypted_stream.dart';
+import 'package:THLRedLook/utils/diary/diary_service.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 
 class EncryptedPlayback {
@@ -13,14 +15,23 @@ class EncryptedPlayback {
     MediaExecutor? executor,
     Future<Directory> Function()? temporaryDirectory,
     bool? streamEncrypted,
+    IosEncryptedStream Function()? iosStreamFactory,
   }) : _executor = executor ?? FFmpegExecutor(),
+       _iosStreamFactory =
+           iosStreamFactory ?? (Platform.isIOS ? IosEncryptedStream.new : null),
        _streamEncrypted =
            streamEncrypted ?? (Platform.isAndroid || Platform.isIOS),
        _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory;
 
   final MediaExecutor _executor;
   final bool _streamEncrypted;
+  final IosEncryptedStream Function()? _iosStreamFactory;
   final Future<Directory> Function() _temporaryDirectory;
+  IosEncryptedStream? _stream;
+  PlaybackPlan? _streamOriginal;
+  String? _streamUrl;
+  bool isStreamPlan(PlaybackPlan plan) => _streamUrl == plan.url;
+
   HttpClient? _client;
   Directory? _ready;
   Future<void> _tail = Future.value();
@@ -29,8 +40,12 @@ class EncryptedPlayback {
 
   Future<void> cancel() async {
     _generation++;
+    final stream = _stream;
+    _stream = null;
     _client?.close(force: true);
-    await _executor.cancel();
+    final cancellation = _executor.cancel();
+    await stream?.close();
+    await cancellation;
   }
 
   Future<PlaybackPlan> prepare(
@@ -38,6 +53,7 @@ class EncryptedPlayback {
     void Function(double)? progress,
     bool forceCache = false,
   }) async {
+    if (isStreamPlan(plan) && _streamOriginal != null) plan = _streamOriginal!;
     final generation = ++_generation;
     final previous = _tail;
     final finished = Completer<void>();
@@ -50,6 +66,9 @@ class EncryptedPlayback {
     }
 
     try {
+      final previousStream = _stream;
+      _stream = null;
+      await previousStream?.close();
       _client?.close(force: true);
       await _executor.cancel();
       await previous;
@@ -64,7 +83,26 @@ class EncryptedPlayback {
         throw AppFailure('视频内容密钥无效', code: 'media_key');
       }
       if (_streamEncrypted && !plan.local && !forceCache) {
-        return plan;
+        final factory = _iosStreamFactory;
+        if (factory == null) return plan;
+        final stream = factory();
+        _stream = stream;
+        final clock = Stopwatch()..start();
+        try {
+          final prepared = await stream.open(plan);
+          check();
+          _streamOriginal = plan;
+          _streamUrl = prepared.url;
+          DiaryService.add(
+            '[Play] iOS 按需解密已准备: ${clock.elapsedMilliseconds}ms, 首批=${prepared.prefetchedBytes}, 总量=${prepared.mediaBytes}',
+          );
+          return prepared;
+        } catch (_) {
+          await stream.close();
+          if (identical(_stream, stream)) _stream = null;
+          check();
+          DiaryService.add('[Play] iOS 按需解密暂不可用，尝试缓存恢复');
+        }
       }
       final root = await _temporaryDirectory();
       check();
@@ -229,6 +267,8 @@ class EncryptedPlayback {
     _closed = true;
     await cancel();
     await _tail;
+    _streamOriginal = null;
+    _streamUrl = null;
     final ready = _ready;
     _ready = null;
     if (ready != null && await ready.exists()) {

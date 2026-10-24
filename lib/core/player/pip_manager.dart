@@ -25,10 +25,11 @@ class PipManager {
   DramaDetail? _detail;
   int _episodeIndex = 0;
   bool _isPlayerActive = false;
+  Future<void> Function()? _releasePlaybackResource;
 
   void Function(int positionMs)? _onRestoreCurrentPlayer;
   void Function(bool active, String? error, int? position)?
-      _onPictureInPictureStatusChanged;
+  _onPictureInPictureStatusChanged;
 
   void initialize({
     required GlobalKey<NavigatorState> navigatorKey,
@@ -42,6 +43,17 @@ class PipManager {
     AppDevice.channel.setMethodCallHandler(_handleMethodCall);
   }
 
+  void retainPlaybackResource(Future<void> Function() release) {
+    _clearPlaybackResource();
+    _releasePlaybackResource = release;
+  }
+
+  void _clearPlaybackResource() {
+    final release = _releasePlaybackResource;
+    _releasePlaybackResource = null;
+    if (release != null) unawaited(release().catchError((Object _) {}));
+  }
+
   void updateStore(LocalStore? store) {
     _store = store;
   }
@@ -53,7 +65,7 @@ class PipManager {
     required int positionMs,
     required void Function(int positionMs) onRestoreCurrentPlayer,
     required void Function(bool active, String? error, int? position)
-        onPictureInPictureStatusChanged,
+    onPictureInPictureStatusChanged,
   }) {
     _detail = detail;
     _episodeIndex = episodeIndex;
@@ -72,6 +84,7 @@ class PipManager {
 
   /// 画中画彻底关闭（小窗被关闭或播放结束）
   void notifyPictureInPictureStopped() {
+    _clearPlaybackResource();
     _detail = null;
     _episodeIndex = 0;
     _isPlayerActive = false;
@@ -89,10 +102,12 @@ class PipManager {
       final arguments = call.arguments;
       final active = arguments is Map && arguments['active'] == true;
       final error = arguments is Map ? arguments['error'] as String? : null;
-      final position =
-          arguments is Map ? (arguments['position'] as num?)?.toInt() : null;
+      final position = arguments is Map
+          ? (arguments['position'] as num?)?.toInt()
+          : null;
 
       if (!active) {
+        _clearPlaybackResource();
         if (!_isPlayerActive) {
           _detail = null;
         }
@@ -103,14 +118,15 @@ class PipManager {
 
     if (call.method == 'restorePictureInPictureUI') {
       final arguments = call.arguments;
-      final position =
-          arguments is Map ? (arguments['position'] as num?)?.toInt() ?? 0 : 0;
-      final episodeIdx =
-          arguments is Map ? (arguments['episodeIndex'] as num?)?.toInt() : null;
-      final rawDetail =
-          arguments is Map && arguments['detail'] is Map
-              ? Map<String, dynamic>.from(arguments['detail'] as Map)
-              : null;
+      final position = arguments is Map
+          ? (arguments['position'] as num?)?.toInt() ?? 0
+          : 0;
+      final episodeIdx = arguments is Map
+          ? (arguments['episodeIndex'] as num?)?.toInt()
+          : null;
+      final rawDetail = arguments is Map && arguments['detail'] is Map
+          ? Map<String, dynamic>.from(arguments['detail'] as Map)
+          : null;
 
       debugPrint(
         '[PiP-Manager] restorePictureInPictureUI received: pos=$position, isPlayerActive=$_isPlayerActive',
@@ -137,7 +153,10 @@ class PipManager {
       final currentStore = _store;
       final nav = _navigatorKey?.currentState;
 
-      if (restoreDetail != null && repo != null && currentStore != null && nav != null) {
+      if (restoreDetail != null &&
+          repo != null &&
+          currentStore != null &&
+          nav != null) {
         debugPrint(
           '[PiP-Manager] Pushing PlayerScreen back: drama=${restoreDetail.drama.title}, ep=$targetIdx, pos=$position',
         );
@@ -149,7 +168,9 @@ class PipManager {
               initialPosition: position > 0 ? position / 1000.0 : 0.0,
               repository: repo,
               store: currentStore,
-              playerFactory: playerFactory != null ? () => playerFactory!() : null,
+              playerFactory: playerFactory != null
+                  ? () => playerFactory!()
+                  : null,
               videoBuilder: videoBuilder,
             ),
           ),

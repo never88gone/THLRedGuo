@@ -18,7 +18,11 @@ class PlaybackRecovery {
     _cacheAttempted = false;
   }
 
-  PlaybackRecoveryAction next(PlaybackPlan? plan, {bool allowCache = false}) {
+  PlaybackRecoveryAction next(
+    PlaybackPlan? plan, {
+    bool allowCache = false,
+    bool decryptedStream = false,
+  }) {
     if (_attempts >= maxAttempts) {
       return PlaybackRecoveryAction.stop;
     }
@@ -26,7 +30,7 @@ class PlaybackRecovery {
         !_cacheAttempted &&
         plan != null &&
         !plan.local &&
-        plan.decryptionKey.isNotEmpty) {
+        (plan.decryptionKey.isNotEmpty || decryptedStream)) {
       _cacheAttempted = true;
       _attempts++;
       return PlaybackRecoveryAction.cache;
