@@ -162,8 +162,8 @@ public final class LocalStore: ObservableObject {
         let entry = WatchEntry(drama: current, episode: episode, position: min(position, duration), duration: duration, updatedAt: Date())
         history.removeAll { $0.drama.id == drama.id }
         history.insert(entry, at: 0)
-        if history.count > 100 {
-            history = Array(history.prefix(100))
+        if history.count > 300 {
+            history = Array(history.prefix(300))
         }
         saveHistory()
         if let index = followedDramas.firstIndex(where: { $0.id == drama.id }) {

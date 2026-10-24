@@ -208,6 +208,104 @@ void runICloudRegressionTests({String? fixtureJson}) {
     },
   );
 
+  test(
+    'old playback cache uploads on startup without replaying or changing timestamps',
+    () async {
+      const backupPath = String.fromEnvironment('OLD_HISTORY_LOCAL_BACKUP');
+      final rows = backupPath.isNotEmpty
+          ? jsonDecode(File(backupPath).readAsStringSync()) as List
+          : List.generate(180, (index) {
+              final row = Map<String, dynamic>.from(
+                (fixture['history'] as List).single as Map,
+              );
+              row['drama'] = {
+                ...Map<String, dynamic>.from(row['drama'] as Map),
+                'id': 'hongguo:old-ios-$index',
+                'sourceId': 'old-ios-$index',
+                'title': '旧记录合成剧 $index',
+                'cover': '',
+              };
+              row['episode'] = index % 24 + 1;
+              row['position'] = index + 0.25;
+              row['duration'] = 300;
+              row['updatedAt'] = DateTime(
+                2026,
+                9,
+                1,
+                10,
+                index,
+              ).toIso8601String();
+              return row;
+            });
+      store.dispose();
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      SharedPreferences.setMockInitialValues({
+        'history': jsonEncode(rows),
+        'favorites': jsonEncode((fixture['follows'] as Map)['dramas']),
+      });
+      final prefs = await SharedPreferences.getInstance();
+      store = LocalStore(prefs);
+      await prefs.setBool(ICloudSyncService.prefSyncEnabled, true);
+      await prefs.setInt(
+        ICloudSyncService.prefLastSyncDate,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      expect(store.history, hasLength(rows.length));
+      final expected = [
+        for (final entry in store.history)
+          {
+            'id': entry.drama.id,
+            'episode': entry.episode,
+            'position': entry.position,
+            'duration': entry.duration,
+            'updatedAtMillis': entry.updatedAt.millisecondsSinceEpoch,
+          },
+      ];
+      cloud.clear();
+      service.initialize(store);
+      for (
+        var i = 0;
+        i < 300 &&
+            (!cloud.containsKey(ICloudSyncService.keyHistory) ||
+                service.isSyncing);
+        i++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      final uploaded = jsonDecode(cloud[ICloudSyncService.keyHistory]!) as List;
+      expect(uploaded, hasLength(rows.length));
+      final byId = {
+        for (final row in uploaded) (row['drama'] as Map)['id']: row,
+      };
+      for (final row in expected) {
+        final actual = byId[row['id']]!;
+        expect(actual['episode'], row['episode']);
+        expect(actual['position'], row['position']);
+        expect(actual['duration'], row['duration']);
+        expect(
+          DateTime.parse(actual['updatedAt'] as String).millisecondsSinceEpoch,
+          row['updatedAtMillis'],
+        );
+        expect(actual['updatedAt'], endsWith('Z'));
+      }
+      expect(store.favorites, hasLength(1));
+      final writeCount = writes.length;
+      await service.syncWithCloud(store);
+      expect(writes.length, writeCount);
+      const exportPath = String.fromEnvironment('OLD_HISTORY_EXPORT');
+      if (exportPath.isNotEmpty) {
+        await File(exportPath).writeAsString(
+          jsonEncode({
+            'history': cloud[ICloudSyncService.keyHistory],
+            'expected': expected,
+            'count': rows.length,
+          }),
+        );
+      }
+    },
+  );
+
   test('unavailable iCloud is reported as failure and never uploads', () async {
     available = false;
     await service.syncWithCloud(store);

@@ -135,4 +135,104 @@ final class ICloudSyncTests: XCTestCase {
         XCTAssertEqual(store.history.count, 1)
         XCTAssertEqual(cloud.writes.count, count)
     }
+
+    private func oldHistoryDocument() throws -> [String: Any] {
+        if let path = ProcessInfo.processInfo.environment["ICLOUD_OLD_IOS_HISTORY"] {
+            return try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
+        }
+        let template = (try fixture()["history"] as! [[String: Any]])[0]
+        var rows: [[String: Any]] = []
+        var expected: [[String: Any]] = []
+        for index in 0..<180 {
+            var row = template
+            var drama = row["drama"] as! [String: Any]
+            drama["id"] = "hongguo:old-ios-\(index)"
+            drama["sourceId"] = "old-ios-\(index)"
+            drama["cover"] = ""
+            row["drama"] = drama
+            let date = Date(timeIntervalSince1970: 1_787_000_000 + Double(index * 60))
+            row["updatedAt"] = ISO8601DateFormatter().string(from: date)
+            rows.append(row)
+            expected.append(["id": drama["id"]!, "episode": row["episode"]!, "position": row["position"]!, "duration": row["duration"]!, "updatedAtMillis": date.timeIntervalSince1970 * 1000])
+        }
+        return ["history": String(decoding: try JSONSerialization.data(withJSONObject: rows), as: UTF8.self), "expected": expected, "count": rows.count]
+    }
+
+    private func verifyOldHistory(_ document: [String: Any]) throws {
+        let name = "THLRedLook.QA.ICloud.OldHistory." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.set(true, forKey: "thl_icloud_sync_enabled")
+        addTeardownBlock { defaults.removePersistentDomain(forName: name) }
+        let cloud = MemoryICloudStore()
+        let service = ICloudSyncService(kvStore: cloud, defaults: defaults, observeChanges: false)
+        let store = LocalStore(defaults: defaults, cloudUpload: { _ in })
+        let existing = Drama(id: "hongguo:tv-existing", title: "电视本地合成剧")
+        store.applySyncedData(history: [WatchEntry(drama: existing, episode: 2, position: 12, duration: 300)], follows: [existing.id: .wishlist], followedDramas: [existing])
+        service.syncWithCloud(store: store)
+        XCTAssertNotNil(service.lastSyncDate)
+        cloud.values[ICloudSyncService.keyHistory] = document["history"] as? String
+        service.syncWithCloud(store: store)
+        let expected = document["expected"] as! [[String: Any]]
+        XCTAssertEqual(store.history.count, expected.count + 1)
+        for row in expected {
+            let entry = try XCTUnwrap(store.getWatchEntry(dramaId: row["id"] as! String))
+            XCTAssertEqual(entry.episode, (row["episode"] as! NSNumber).intValue)
+            XCTAssertEqual(entry.position, (row["position"] as! NSNumber).doubleValue, accuracy: 0.001)
+            XCTAssertEqual(entry.duration, (row["duration"] as! NSNumber).doubleValue, accuracy: 0.001)
+            XCTAssertEqual(entry.updatedAt.timeIntervalSince1970 * 1000, (row["updatedAtMillis"] as! NSNumber).doubleValue, accuracy: 1)
+            let detail = DetailViewModel(drama: entry.drama, store: store)
+            XCTAssertEqual(detail.lastWatchEntry?.episode, entry.episode)
+            XCTAssertEqual(detail.lastWatchEntry?.position, entry.position)
+        }
+        XCTAssertEqual(LibraryViewModel(store: store).historyList.count, expected.count + 1)
+        let newDrama = Drama(id: "hongguo:tv-new", title: "电视新观看合成剧")
+        store.recordWatch(drama: newDrama, episode: 1, position: 8, duration: 300)
+        XCTAssertEqual(store.history.count, expected.count + 2)
+        let restored = LocalStore(defaults: defaults, cloudUpload: { _ in })
+        XCTAssertEqual(restored.history, store.history)
+        XCTAssertEqual(restored.followedDramas, [existing])
+        if expected.count == 180, let path = ProcessInfo.processInfo.environment["ICLOUD_OLD_TV_DEFAULTS"] {
+            let preferences: [String: Any] = [
+                "zgj_tv_history": try JSONEncoder().encode(restored.history),
+                "zgj_tv_follows": try JSONEncoder().encode(restored.follows),
+                "zgj_tv_followed_dramas": try JSONEncoder().encode(restored.followedDramas),
+                "zgj_tv_current_source": "hongguo",
+                "thl_icloud_sync_enabled": false
+            ]
+            try PropertyListSerialization.data(fromPropertyList: preferences, format: .xml, options: 0).write(to: URL(fileURLWithPath: path))
+        }
+        service.syncWithCloud(store: store)
+        let count = cloud.writes.count
+        service.syncWithCloud(store: store)
+        XCTAssertEqual(cloud.writes.count, count)
+        print("THL_OLD_HISTORY imported=\(expected.count) library=true resumeFields=true newPlaybackPreservesOld=true persisted=true favoritesPreserved=true")
+    }
+
+    func testOldIOSHistoryImportsEvenAfterLastSyncAndSurvivesNewTVPlayback() throws {
+        try verifyOldHistory(oldHistoryDocument())
+    }
+
+    func testArchivedIOSHistoryUsesTheSameImportAndResumePath() throws {
+        guard let path = ProcessInfo.processInfo.environment["ICLOUD_ARCHIVED_IOS_HISTORY"] else { throw XCTSkip("Archived history fixture not supplied") }
+        let document = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
+        try verifyOldHistory(document)
+    }
+
+    func testNewTVPlaybackRetainsTheSame300HistoryLimitAsIOS() {
+        let name = "THLRedLook.QA.ICloud.HistoryLimit." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: name) }
+        let store = LocalStore(defaults: defaults, cloudUpload: { _ in })
+        let entries = (0..<300).reversed().map { index in
+            WatchEntry(drama: Drama(id: "hongguo:limit-\(index)", title: "合成旧记录 \(index)"), episode: 2, position: 10, duration: 300, updatedAt: Date(timeIntervalSince1970: 1_787_000_000 + Double(index)))
+        }
+        store.applySyncedData(history: entries, follows: [:], followedDramas: [])
+        store.recordWatch(drama: entries[100].drama, episode: 3, position: 28, duration: 300)
+        XCTAssertEqual(Set(store.history.map(\.id)), Set(entries.map(\.id)))
+        store.recordWatch(drama: Drama(id: "hongguo:limit-new", title: "合成新观看"), episode: 1, position: 6, duration: 300)
+        XCTAssertEqual(store.history.count, 300)
+        XCTAssertNil(store.getWatchEntry(dramaId: "hongguo:limit-0"))
+        XCTAssertNotNil(store.getWatchEntry(dramaId: "hongguo:limit-new"))
+        XCTAssertEqual(LocalStore(defaults: defaults, cloudUpload: { _ in }).history, store.history)
+    }
 }

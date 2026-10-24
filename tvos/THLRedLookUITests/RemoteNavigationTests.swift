@@ -4,6 +4,33 @@ final class RemoteNavigationTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.never88gone.redlook")
     private let remote = XCUIRemote.shared
 
+    func testImportedOldIOSHistoryDisplaysAndPersistsWithRemoteFocus() throws {
+        guard ProcessInfo.processInfo.environment["ICLOUD_OLD_HISTORY_UI"] == "1" else { throw XCTSkip("Requires isolated imported history fixture") }
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "library", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        defer { app.terminate() }
+        wait("old history library ready", seconds: 30) { self.app.buttons["library.tab.history"].exists }
+        if app.buttons["nav.library"].hasFocus { press(.right) }
+        wait("old history header focused") { self.app.buttons["library.tab.history"].hasFocus }
+        press(.down, focus: "library.card.hongguo:tv-new")
+        press(.right, focus: "library.card.hongguo:tv-existing")
+        press(.right, focus: "library.card.hongguo:old-ios-179")
+        let value = app.buttons["library.card.hongguo:old-ios-179"].value as? String ?? ""
+        XCTAssertTrue(value.contains("第 12 集"))
+        XCTAssertTrue(value.contains("59%"))
+        press(.menu)
+        wait("old history menu restores navigation") { self.app.buttons["nav.library"].hasFocus }
+        press(.right)
+        wait("old history returns to header") { self.app.buttons["library.tab.history"].hasFocus }
+        app.terminate()
+        app.launch()
+        wait("old history survives restart", seconds: 30) { self.app.buttons["library.card.hongguo:old-ios-179"].exists }
+        XCTAssertEqual(app.buttons["library.card.hongguo:old-ios-179"].value as? String, value)
+        print("THL_OLD_HISTORY_UI oldEpisode=12 oldProgress=59% remoteFocus=true menuReturn=true restart=true")
+    }
+
     private func wait(_ description: String, seconds: Double = 15, _ condition: @escaping () -> Bool) {
         let predicate = NSPredicate { _, _ in condition() }
         let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: nil)], timeout: seconds)
