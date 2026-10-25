@@ -1,6 +1,34 @@
 import SwiftUI
 import Combine
 
+/// DeepLink 搜索请求协调器：彻底解耦视图生命周期与 SwiftUI 状态延迟
+@MainActor
+public final class DeepLinkSearchCoordinator: ObservableObject {
+    public static let shared = DeepLinkSearchCoordinator()
+
+    public struct Request: Identifiable, Equatable {
+        public let id = UUID()
+        public let keyword: String
+        public let episode: Int?
+        public let timestamp = Date()
+    }
+
+    @Published public private(set) var latestRequest: Request?
+
+    public init() {}
+
+    public func handle(keyword: String, episode: Int? = nil) {
+        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        NSLog("🚀 [DeepLinkCoordinator] Dispatching search request: '%@', episode=%@", trimmed, String(describing: episode))
+        self.latestRequest = Request(keyword: trimmed, episode: episode)
+    }
+
+    public func clearRequest() {
+        self.latestRequest = nil
+    }
+}
+
 @MainActor
 public final class AppEnvironment: ObservableObject {
     public static let shared = AppEnvironment()
@@ -11,6 +39,7 @@ public final class AppEnvironment: ObservableObject {
     public let downloadService = DownloadService.shared
     public let jsService = JSSourceService.shared
     public let icloudSync = ICloudSyncService.shared
+    public let deepLinkCoordinator = DeepLinkSearchCoordinator.shared
 
     public init() {}
 }
@@ -70,6 +99,7 @@ struct THLRedLookApp: App {
                     .environmentObject(env.downloadService)
                     .environmentObject(env.jsService)
                     .environmentObject(env.icloudSync)
+                    .environmentObject(env.deepLinkCoordinator)
 
                 if showSplash {
                     TVLaunchSplashView()
@@ -78,6 +108,9 @@ struct THLRedLookApp: App {
                 }
             }
             .preferredColorScheme(.dark)
+            .onOpenURL { url in
+                handleGlobalDeepLink(url)
+            }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = env.store.resourceSettings.keepScreenOn
                 if ICloudSyncService.shared.isSyncEnabled {
@@ -97,6 +130,20 @@ struct THLRedLookApp: App {
                     ICloudSyncService.shared.syncWithCloud()
                 }
             }
+        }
+    }
+
+    private func handleGlobalDeepLink(_ url: URL) {
+        guard let scheme = url.scheme?.lowercased(), scheme == "thlredlook" else { return }
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+        let host = components.host?.lowercased() ?? ""
+        if host == "search" {
+            let kw = components.queryItems?.first(where: { $0.name == "keyword" })?.value ?? ""
+            let epStr = components.queryItems?.first(where: { $0.name == "episode" })?.value
+            let ep = epStr.flatMap { Int($0) }
+            
+            NSLog("🎯 [THLRedLookApp] onOpenURL received: keyword='%@', episode=%@", kw, String(describing: ep))
+            DeepLinkSearchCoordinator.shared.handle(keyword: kw, episode: ep)
         }
     }
 }

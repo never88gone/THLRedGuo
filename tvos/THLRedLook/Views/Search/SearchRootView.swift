@@ -392,7 +392,28 @@ public struct SearchRootView: View {
             }
         }
         .onAppear {
-            runInitialSearchIfNeeded()
+            if let req = DeepLinkSearchCoordinator.shared.latestRequest {
+                NSLog("🎬 [SearchRootView] onAppear found active deepLink request: '%@'", req.keyword)
+                if handledInitialQuery != req.keyword || viewModel.searchResults.isEmpty {
+                    handledInitialQuery = req.keyword
+                    viewModel.query = req.keyword
+                    Task {
+                        await viewModel.executeSearch(keyword: req.keyword)
+                    }
+                }
+            } else {
+                runInitialSearchIfNeeded()
+            }
+        }
+        .onReceive(DeepLinkSearchCoordinator.shared.$latestRequest) { request in
+            guard let req = request else { return }
+            NSLog("🎬 [SearchRootView] onReceive deepLink request: '%@', id=%@", req.keyword, req.id.uuidString)
+            handledInitialQuery = req.keyword
+            viewModel.query = req.keyword
+            focusedTarget = .query
+            Task {
+                await viewModel.executeSearch(keyword: req.keyword)
+            }
         }
         .onChange(of: initialQuery) { _, newQuery in
             NSLog("🎬 [SearchRootView] onChange initialQuery: %@", newQuery ?? "nil")

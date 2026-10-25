@@ -294,7 +294,6 @@ public struct MainTabView: View {
                                     requestFocusSidebar()
                                 }
                             )
-                            .id("search_root_\(deepLinkQuery ?? "")_\(searchFocusTrigger)")
                             .padding(.top, 32)
                         case .library:
                             SavedLibraryView(
@@ -371,8 +370,16 @@ public struct MainTabView: View {
                 initialPosition: handoffPosition
             )
         }
-        .onOpenURL { url in
-            handleDeepLink(url)
+        .onReceive(DeepLinkSearchCoordinator.shared.$latestRequest) { request in
+            guard let req = request else { return }
+            NSLog("🎯 [MainTabView] Observed DeepLink request: '%@', episode=%@", req.keyword, String(describing: req.episode))
+            self.handoffDrama = nil
+            self.directPlayerDrama = nil
+            self.directDetailDrama = nil
+            self.selectedTab = .search
+            self.deepLinkQuery = req.keyword
+            self.deepLinkEpisode = req.episode
+            self.enterContentArea(for: .search)
         }
     }
 
@@ -430,25 +437,6 @@ public struct MainTabView: View {
             settingsSidebarTrigger += 1
         default:
             break
-        }
-    }
-
-    private func handleDeepLink(_ url: URL) {
-        guard let scheme = url.scheme?.lowercased(), scheme == "thlredlook" else { return }
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
-        let host = components.host?.lowercased() ?? ""
-        if host == "search" {
-            let kw = components.queryItems?.first(where: { $0.name == "keyword" })?.value ?? ""
-            let epStr = components.queryItems?.first(where: { $0.name == "episode" })?.value
-            let ep = epStr.flatMap { Int($0) }
-
-            self.handoffDrama = nil
-            self.selectedTab = .search
-            self.searchFocusTrigger += 1
-            self.deepLinkQuery = kw
-            self.deepLinkEpisode = ep
-            self.enterContentArea(for: .search)
-            NSLog("🎬 [THLRedLook] 响应 DeepLink 搜索: keyword=%@, episode=%ld, focusTrigger=%ld", kw, ep ?? 0, self.searchFocusTrigger)
         }
     }
 
