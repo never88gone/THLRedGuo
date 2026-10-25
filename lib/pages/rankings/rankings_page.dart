@@ -136,12 +136,27 @@ class _RankingsScreenState extends State<RankingsScreen> {
       );
       if (!mounted || generation != _generation) return;
       setState(() {
-        final rows = <String, RankingItem>{
-          if (more)
-            for (final item in _items) item.drama.id: item,
-          for (final item in result.items) item.drama.id: item,
-        };
-        _items = rows.values.toList()..sort((a, b) => a.rank.compareTo(b.rank));
+        if (!more) {
+          final seen = <String>{};
+          final list = <RankingItem>[];
+          for (final item in result.items) {
+            if (seen.add(item.drama.id)) {
+              final rank = list.length + 1;
+              list.add(RankingItem(rank, item.drama, metric: item.metric));
+            }
+          }
+          _items = list;
+        } else {
+          final existing = List<RankingItem>.from(_items);
+          final seen = existing.map((e) => e.drama.id).toSet();
+          for (final item in result.items) {
+            if (seen.add(item.drama.id)) {
+              final rank = existing.length + 1;
+              existing.add(RankingItem(rank, item.drama, metric: item.metric));
+            }
+          }
+          _items = existing;
+        }
         _page = result.page;
         _hasMore = result.hasMore;
         _updated = result.updatedText;

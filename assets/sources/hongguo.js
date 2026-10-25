@@ -2071,7 +2071,13 @@ spider.danmaku = function (id, startMs, durationMs) {
   async function savePage(state, page, cell, data, params, minimum = 1) {
     if (!cell) throw failure('官方接口未返回剧集列表，请重试', 'INVALID_RESPONSE');
     const seen = new Set();
-    for (const [previous, value] of state.pages) if (previous < page) for (const row of value.list) seen.add(row.vod_id);
+    let previousCount = 0;
+    for (const [previous, value] of state.pages) {
+      if (previous < page) {
+        for (const row of value.list) seen.add(row.vod_id);
+        previousCount += value.list.length;
+      }
+    }
     const previous = state.cursors.get(page);
     const list = [];
     let offset = number(data.next_offset ?? cell.next_offset);
@@ -2083,9 +2089,12 @@ spider.danmaku = function (id, startMs, durationMs) {
       for (const row of videos([c])) {
         if (!seen.has(row.vod_id)) {
           seen.add(row.vod_id);
+          const computedRank = state.isRanking
+            ? (previousCount + list.length + 1)
+            : (row.vod_rank || (number(previous?.offset) + list.length + 1));
           list.push({
             ...row, ...(state.category ? { vod_category: state.category } : {}),
-            vod_rank: row.vod_rank || number(previous?.offset) + list.length + 1
+            vod_rank: computedRank
           });
         }
       }
@@ -2147,6 +2156,7 @@ spider.danmaku = function (id, startMs, durationMs) {
       while (states.size > 24) states.delete(states.keys().next().value);
       const initial = await first();
       state.category = initial.category;
+      state.isRanking = Boolean(initial.isRanking || key.startsWith('hongguo-app:'));
       return await savePage(state, page, initial.cell, initial.data || {}, initial.params, initial.minimum);
     }
     if (!state || Date.now() - state.updated > ttl) throw failure('列表游标已过期，请刷新后重试', 'CURSOR_EXPIRED');
@@ -2272,7 +2282,7 @@ spider.danmaku = function (id, startMs, durationMs) {
       const selected = cell?.cell_selector?.outer_row?.items?.find(item => item.is_selected);
       const sub = selected?.sub_cell_selector?.outer_row?.items?.find(item => item.is_selected);
       if (selected?.selector_item_id !== group || sub?.selector_item_id !== board) throw failure('官方榜单配置已更新，请刷新榜单', 'INVALID_BOARD');
-      return { cell, params: { ...params, tab_type: 26 } };
+      return { cell, params: { ...params, tab_type: 26 }, isRanking: true };
     });
   };
 

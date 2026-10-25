@@ -116,7 +116,9 @@ public final class RankingsViewModel: ObservableObject {
 
     private func apply(_ result: DiscoveryPage<RankedDrama>) {
         items = result.items.map(\.drama)
-        ranks = Dictionary(result.items.map { ($0.drama.id, $0.rank) }, uniquingKeysWith: { _, last in last })
+        ranks = Dictionary(result.items.enumerated().map { index, item in
+            (item.drama.id, item.rank > 0 ? item.rank : (index + 1))
+        }, uniquingKeysWith: { first, _ in first })
         page = result.page
         hasMore = result.hasMore
     }
@@ -154,21 +156,33 @@ public final class RankingsViewModel: ObservableObject {
                 $0.drama.source.isEmpty || $0.drama.source.lowercased() == target
             }
             let previous = more ? cachedByBoard[board.id]?.items ?? [] : []
-            var seen = Set<String>()
-            let combined = (previous + sanitized).filter { seen.insert($0.drama.id).inserted }
-            let loaded = DiscoveryPage(items: combined, page: result.page, hasMore: result.hasMore)
+            var seen = Set(previous.map(\.drama.id))
+            var nextItems = previous
+            for item in sanitized {
+                if seen.insert(item.drama.id).inserted {
+                    let rank = nextItems.count + 1
+                    nextItems.append(RankedDrama(rank: rank, drama: item.drama, metric: item.metric))
+                }
+            }
+            let loaded = DiscoveryPage(items: nextItems, page: result.page, hasMore: result.hasMore)
             cachedByBoard[board.id] = loaded
             apply(loaded)
 
             // 电视大屏榜单优化：首次呈现后在后台静默补充第 2 页，扩充排行榜深度，不阻塞首屏交互
-            if !more && combined.count < 40 && result.hasMore {
+            if !more && nextItems.count < 40 && result.hasMore {
                 Task {
                     if let nextResult = try? await repository.loadRankingPage(board: board.id, page: 2) {
                         guard !Task.isCancelled, generation == ticket, currentSource == target else { return }
                         let nextSanitized = nextResult.items.filter {
                             $0.drama.source.isEmpty || $0.drama.source.lowercased() == target
                         }
-                        let merged = (combined + nextSanitized).filter { seen.insert($0.drama.id).inserted }
+                        var merged = nextItems
+                        for item in nextSanitized {
+                            if seen.insert(item.drama.id).inserted {
+                                let rank = merged.count + 1
+                                merged.append(RankedDrama(rank: rank, drama: item.drama, metric: item.metric))
+                            }
+                        }
                         let updated = DiscoveryPage(items: merged, page: nextResult.page, hasMore: nextResult.hasMore)
                         cachedByBoard[board.id] = updated
                         apply(updated)
