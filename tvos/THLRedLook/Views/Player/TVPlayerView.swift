@@ -290,7 +290,7 @@ public struct TVPlayerView: View {
                     onLeftArrow: { handleQuickSeek(by: -10) },
                     onRightArrow: { handleQuickSeek(by: 10) },
                     onSelect: { viewModel.showControls() },
-                    onPlayPause: { viewModel.showControls() },
+                    onPlayPause: { viewModel.togglePlayPause() },
                     onMenu: { onRemoteMenuPressed() }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -327,7 +327,7 @@ public struct TVPlayerView: View {
                     .accessibilityValue(playbackAccessibilityValue)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onPlayPauseCommand {
-                        viewModel.showControls()
+                        viewModel.togglePlayPause()
                     }
                     .onExitCommand(perform: onRemoteMenuPressed)
                     .onMoveCommand(perform: handlePictureMoveCommand)
@@ -540,7 +540,16 @@ public struct TVPlayerView: View {
     private var playbackAccessibilityValue: String {
         let position = viewModel.currentTime.isFinite
             ? String(format: "%.0f", max(0, viewModel.currentTime.rounded(.down))) : "0"
-        let state = viewModel.isPlaying ? "播放中" : viewModel.isLoading || viewModel.isBuffering ? "加载中" : "已暂停"
+        let state: String
+        if viewModel.isPlaying {
+            state = "播放中"
+        } else if !viewModel.wantsPlayback {
+            state = "已暂停"
+        } else if viewModel.isLoading || viewModel.isBuffering {
+            state = "加载中"
+        } else {
+            state = "已暂停"
+        }
         let val = "\(viewModel.drama.title) · 第 \(viewModel.currentEpisodeIndex) 集 · 已播放 \(position) 秒 · \(state)"
         NSLog("📺 [WAKE_VALUE] %@", val)
         return val

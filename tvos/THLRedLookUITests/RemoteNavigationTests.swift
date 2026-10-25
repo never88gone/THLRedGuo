@@ -1714,13 +1714,13 @@ final class RemoteNavigationTests: XCTestCase {
         // 1. 点击播放进入全屏播放器
         press(.select)
 
-        // 2. 等待起播唤醒层就绪（全屏播放无遮挡，player.wake 存在并进入起播状态）
+        // 2. 等待起播唤醒层就绪（全屏播放无遮挡，player.wake 存在并进入实际播放中状态）
         wait("player starts actively playing", seconds: 45) {
             guard let wake = self.yaoSnapshots().first(where: { $0.identifier == "player.wake" }) else { return false }
-            if let val = wake.value as? String, (val.contains("播放中") || val.contains("已播放")) {
+            if let val = wake.value as? String, val.contains("播放中") {
                 return true
             }
-            return wake.hasFocus
+            return false
         }
         XCTAssertFalse(app.buttons["player.playPause"].exists, "进入播放时控制栏默认不显示遮挡画面")
 
@@ -1768,6 +1768,64 @@ final class RemoteNavigationTests: XCTestCase {
         }
 
         print("THL_TV_QUICK_SEEK_DECOUPLED_RESULT rightSeekDirect=true leftSeekDirect=true noObscuringControls=true quickIndicatorShown=true selectAwakenControls=true menuDismissControls=true menuExit=true")
+    }
+
+    func testDirectPlayPauseWithoutControlsOverlay() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7694291604915358744", "-testDramaTitle", "播放按键直接暂停与播放测试"]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 45))
+        wait("detail play focused") { self.app.buttons["detail.play"].hasFocus }
+
+        // 1. 点击播放进入全屏播放器
+        press(.select)
+
+        // 2. 等待起播唤醒层就绪（全屏播放无遮挡，player.wake 存在并进入实际播放中状态）
+        wait("player starts actively playing", seconds: 45) {
+            guard let wake = self.yaoSnapshots().first(where: { $0.identifier == "player.wake" }) else { return false }
+            if let val = wake.value as? String, val.contains("播放中") {
+                return true
+            }
+            return false
+        }
+        XCTAssertFalse(app.buttons["player.playPause"].exists, "进入播放时控制栏默认不显示遮挡画面")
+
+        // 3. 按遥控器 Play/Pause 键，应该立即暂停，绝不弹出浮层！
+        press(.playPause)
+        XCTAssertFalse(app.buttons["player.playPause"].exists, "按Play/Pause键控制播放暂停，绝不弹出控制浮层")
+        wait("player state toggles to paused", seconds: 10) {
+            guard let wake = self.yaoSnapshots().first(where: { $0.identifier == "player.wake" }) else { return false }
+            let val = wake.value as? String ?? ""
+            return val.contains("已暂停")
+        }
+        XCTAssertFalse(app.buttons["player.playPause"].exists, "暂停后控制栏依然不弹出遮挡画面")
+
+        // 4. 再次按遥控器 Play/Pause 键，应该立即恢复播放，依然不弹出浮层！
+        press(.playPause)
+        XCTAssertFalse(app.buttons["player.playPause"].exists, "再次按Play/Pause键恢复播放，绝不弹出控制浮层")
+        wait("player state toggles back to playing", seconds: 10) {
+            guard let wake = self.yaoSnapshots().first(where: { $0.identifier == "player.wake" }) else { return false }
+            let val = wake.value as? String ?? ""
+            return val.contains("播放中")
+        }
+        XCTAssertFalse(app.buttons["player.playPause"].exists, "播放中控制栏保持纯净无遮挡")
+
+        // 5. 按 Select 键唤出浮层
+        press(.select)
+        wait("select awakens controls", seconds: 5) {
+            self.app.buttons["player.playPause"].exists && self.app.buttons["player.playPause"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["player.playPause"].hasFocus, "点击Select唤起控制栏并获焦播放/暂停键")
+
+        // 6. 按 Menu 退出控制栏并退出播放器
+        press(.menu)
+        wait("menu dismisses controls", seconds: 5) {
+            self.app.buttons["player.wake"].exists && !self.app.buttons["player.playPause"].exists
+        }
+        press(.menu)
+        print("THL_TV_DIRECT_PLAY_PAUSE_VERIFIED pauseWithoutControls=true resumeWithoutControls=true selectAwakensControls=true")
     }
 
     func testICloudSyncToggleAndSyncNowFocus() throws {

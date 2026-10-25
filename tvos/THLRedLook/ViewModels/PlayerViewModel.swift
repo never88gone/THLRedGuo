@@ -745,7 +745,9 @@ public final class PlayerViewModel: ObservableObject {
         if drama.id.starts(with: "test_") {
             playIntent.toggle()
             isPlaying = playIntent
-            showControls()
+            if isControlsVisible {
+                resetControlsHideTimer()
+            }
             return
         }
         guard let p = player else { return }
@@ -765,7 +767,9 @@ public final class PlayerViewModel: ObservableObject {
         }
         samplePlaybackClock()
         updateActiveDanmakus()
-        showControls()
+        if isControlsVisible {
+            resetControlsHideTimer()
+        }
     }
 
     public func seekBy(seconds: Double) {
