@@ -24,6 +24,7 @@
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
+            android:colorMode="default"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:supportsPictureInPicture="true"
@@ -41,6 +42,8 @@
         <service android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
             android:foregroundServiceType="dataSync" android:exported="false" android:stopWithTask="false"/>
         <meta-data android:name="flutterEmbedding" android:value="2"/>
+        <!-- 强制使用成熟稳定的 Skia 渲染引擎，彻底解决 Android TV 芯片在 Vulkan 下视频 Surface 纹理色彩矩阵映射失真与发灰问题 -->
+        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false"/>
     </application>
     <queries>
         <intent>

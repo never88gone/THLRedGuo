@@ -10,6 +10,7 @@ import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/views/player/player_menu.dart';
 import 'package:THLRedLook/views/television/television_controls.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
 
 class _MockAdvanceRepo extends AppRepository {
   final Map<int, String> resolvedUrls = {};
@@ -342,6 +343,34 @@ void main() {
       expect(advancedIndex, isNull);
 
       PipManager.instance.notifyPictureInPictureStopped();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    test('7. 电视模式下设备亮度接口返回 1.0 且不覆写屏幕背光破坏画质', () async {
+      const channel = MethodChannel('duanju/device');
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'deviceInfo') {
+          return {'television': true, 'version': '1.0.0'};
+        }
+        if (call.method == 'getBrightness') {
+          return 1.0;
+        }
+        if (call.method == 'setBrightness') {
+          return true;
+        }
+        return null;
+      });
+
+      final brightness = await AppDevice.getBrightness();
+      expect(brightness, 1.0);
+
+      await AppDevice.setBrightness(0.5);
+      expect(calls.any((c) => c.method == 'setBrightness'), isTrue);
+
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, null);
     });

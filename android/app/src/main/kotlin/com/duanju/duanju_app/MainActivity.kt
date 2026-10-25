@@ -99,7 +99,16 @@ class MainActivity : FlutterActivity() {
             savedInstanceState.getBoolean("duanju.televisionMode")
         } else isTelevisionDevice()
         super.onCreate(savedInstanceState)
-        if (televisionMode) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        if (televisionMode) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            window.setFormat(android.graphics.PixelFormat.RGBA_8888)
+            val lp = window.attributes
+            lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            window.attributes = lp
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            window.colorMode = ActivityInfo.COLOR_MODE_DEFAULT
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
             window.isStatusBarContrastEnforced = false
@@ -170,31 +179,40 @@ class MainActivity : FlutterActivity() {
                             ))
                         }
                         "getBrightness" -> {
-                            val lp = window.attributes
-                            val current = if (lp.screenBrightness >= 0f) {
-                                lp.screenBrightness.toDouble()
+                            if (televisionMode || isTelevisionDevice()) {
+                                result.success(1.0)
                             } else {
-                                try {
-                                    val sys = Settings.System.getInt(
-                                        contentResolver,
-                                        Settings.System.SCREEN_BRIGHTNESS
-                                    )
-                                    (sys / 255.0).coerceIn(0.0, 1.0)
-                                } catch (e: Exception) {
-                                    0.5
+                                val lp = window.attributes
+                                val current = if (lp.screenBrightness >= 0f) {
+                                    lp.screenBrightness.toDouble()
+                                } else {
+                                    try {
+                                        val sys = Settings.System.getInt(
+                                            contentResolver,
+                                            Settings.System.SCREEN_BRIGHTNESS
+                                        )
+                                        (sys / 255.0).coerceIn(0.0, 1.0)
+                                    } catch (e: Exception) {
+                                        0.5
+                                    }
                                 }
+                                result.success(current)
                             }
-                            result.success(current)
                         }
                         "setBrightness" -> {
-                            val value = call.argument<Double>("brightness")?.toFloat()
-                            if (value != null) {
-                                val lp = window.attributes
-                                lp.screenBrightness = value.coerceIn(0.01f, 1.0f)
-                                window.attributes = lp
+                            if (televisionMode || isTelevisionDevice()) {
+                                // 电视机由硬件自身画质引擎管理，忽略亮度覆写以保护电视原生画质与色阶
                                 result.success(true)
                             } else {
-                                result.error("invalid_arg", "缺少亮度数值", null)
+                                val value = call.argument<Double>("brightness")?.toFloat()
+                                if (value != null) {
+                                    val lp = window.attributes
+                                    lp.screenBrightness = value.coerceIn(0.01f, 1.0f)
+                                    window.attributes = lp
+                                    result.success(true)
+                                } else {
+                                    result.error("invalid_arg", "缺少亮度数值", null)
+                                }
                             }
                         }
                         "resetBrightness" -> {
