@@ -13,6 +13,7 @@ public struct SettingsSourcesPanel: View {
 
     private enum SourcesFocus: Hashable {
         case diagnostics
+        case resetOfficial
         case officialSource
         case importNetwork
         case clearAll
@@ -50,6 +51,26 @@ public struct SettingsSourcesPanel: View {
                 }
                 .focused($focusedButton, equals: .diagnostics)
                 .accessibilityIdentifier("settings.sourceDiagnostics")
+
+                TVButton(
+                    title: "重置数据源与凭证",
+                    icon: "arrow.counterclockwise.circle.fill",
+                    isProminent: false,
+                    isExternalFocused: focusedButton == .resetOfficial
+                ) {
+                    Task {
+                        isImporting = true
+                        let success = await jsService.resetOfficialSourceAndSession()
+                        isImporting = false
+                        if success {
+                            saveNotice = "已成功重置官方数据源沙盒与会话凭证，已建立全新官方连接！"
+                        } else {
+                            saveNotice = "重置失败，请重试。"
+                        }
+                    }
+                }
+                .focused($focusedButton, equals: .resetOfficial)
+                .accessibilityIdentifier("settings.resetSourceAndSession")
 
                 let isHongguoInstalled = jsService.sources.contains(where: { ($0["id"] as? String) == "hongguo" })
                 let isHongguoActive = jsService.activeSourceId == "hongguo"

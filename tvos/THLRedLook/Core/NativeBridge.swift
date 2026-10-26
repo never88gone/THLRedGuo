@@ -186,7 +186,12 @@ public actor NativeBridge {
         context.setObject(saveDeviceBlock, forKeyedSubscript: "__native_save_device" as NSString)
 
         if let cachedDevice = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session"), !cachedDevice.isEmpty {
-            context.evaluateScript("try { globalThis.__hongguoCachedDevice = JSON.parse(\(cachedDevice.debugDescription)); } catch(_) {}")
+            context.evaluateScript("""
+            try {
+                var raw = \(cachedDevice.debugDescription);
+                globalThis.__hongguoCachedDevice = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            } catch(_) {}
+            """)
         }
 
         // 2. 注入原生高性能 HTTP 请求桥接
@@ -615,6 +620,24 @@ public actor NativeBridge {
             activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : ""
             return ["ok": true, "active": activeSourceId]
 
+        case "jsSource.resetOfficial":
+            // 完整重置官方数据源沙盒文件、清空网络缓存与失效的官方设备会话凭据
+            UserDefaults.standard.removeObject(forKey: "thl_tv_hongguo_device_session")
+            httpSession.configuration.urlCache?.removeAllCachedResponses()
+            URLCache.shared.removeAllCachedResponses()
+            jsContexts.removeAll()
+            sourceScripts.removeValue(forKey: "hongguo")
+
+            let hongguoFile = sourcesDirURL.appendingPathComponent("hongguo.js")
+            let script = BuiltInHongguoJSContent
+            if !script.isEmpty {
+                try? script.write(to: hongguoFile, atomically: true, encoding: .utf8)
+                sourceScripts["hongguo"] = script
+            }
+            scanSourcesDirectory()
+            activeSourceId = "hongguo"
+            return ["ok": true, "active": activeSourceId]
+
         case "categories":
             let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? activeSourceId
             guard !targetSrc.isEmpty, let ctx = getOrCreateContext(sourceId: targetSrc) else {
@@ -663,6 +686,8 @@ public actor NativeBridge {
                         errCat = .dnsError
                     } else if rawCode == "SEARCH_REJECTED" || rawCode == "BUSINESS_REJECTED" || rawCode == "GUEST_REGISTRATION_FAILED" || errMsg.contains("官方搜索") || errMsg.contains("官方会话") {
                         errCat = .businessRejected
+                        UserDefaults.standard.removeObject(forKey: "thl_tv_hongguo_device_session")
+                        ctx.evaluateScript("delete globalThis.__hongguoCachedDevice; if (typeof Ae !== 'undefined') Ae = null;")
                     } else if rawCode == "INVALID_RESPONSE" {
                         errCat = .invalidResponse
                     } else {

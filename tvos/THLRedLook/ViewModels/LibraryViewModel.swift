@@ -364,6 +364,14 @@ public final class JSSourceService: ObservableObject {
         await setActiveSource("hongguo")
         return ok
     }
+
+    @discardableResult
+    public func resetOfficialSourceAndSession() async -> Bool {
+        let ok = (try? await repository.jsSourceResetOfficial()) ?? false
+        await refresh()
+        await setActiveSource("hongguo")
+        return ok
+    }
 }
 
 /// 官方数据源脚本内容

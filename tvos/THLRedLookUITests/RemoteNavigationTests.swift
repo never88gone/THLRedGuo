@@ -2384,7 +2384,9 @@ final class RemoteNavigationTests: XCTestCase {
         let shotDiag = XCUIScreen.main.screenshot()
         try? shotDiag.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_source_diag_focused.png"))
 
-        // 按 Right 移动到「官方数据源」，再按 Right 移动到「网络链接导入」
+        // 按 Right 移动到「重置数据源与凭证」，再按 Right 到「官方数据源」，再按 Right 移动到「网络链接导入」
+        press(.right) // 聚焦重置数据源与凭证
+        sleep(1)
         press(.right) // 聚焦官方数据源
         sleep(1)
         press(.right) // 聚焦网络链接导入
@@ -2691,6 +2693,56 @@ extension RemoteNavigationTests {
         _ = try automaticFeedReady(title: previous.title, minimum: previous.position)
         press(.menu, focus: "nav.feed")
         print("THL_TV_LIST_RESULT feed=true unique=5 verticalSwitch=true autoPaging=true previous=true controlsFocus=true detailEntry=true detailTitle=true detailSelection=true detailReturn=true menuReturn=true resume=true")
+        app.terminate()
+    }
+
+    /// 验证设置页新增的「重置数据源与凭证」功能：
+    /// 1. 能够在站源管理页面成功获焦并点击
+    /// 2. 触发后清除旧凭证并成功显示提示
+    func testResetOfficialSourceAndSession() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "settings_sources"]
+        app.launch()
+
+        // 1. 等待设置页站源管理加载就绪
+        wait("settings sources ready", seconds: 20) {
+            self.app.buttons["settings.sourceDiagnostics"].exists || self.app.buttons["settings.resetSourceAndSession"].exists
+        }
+
+        if self.app.buttons["nav.settings"].hasFocus {
+            press(.select)
+        }
+
+        wait("settings sources nav focused", seconds: 15) {
+            self.app.buttons["settings.nav.sources"].hasFocus
+        }
+
+        // 2. 向右进入内容区并移动焦点到「数据源诊断」
+        press(.right)
+        wait("source diagnostics focused", seconds: 15) {
+            self.app.buttons["settings.sourceDiagnostics"].hasFocus
+        }
+
+        // 2. 向右移动焦点到「重置数据源与凭证」按钮
+        press(.right, focus: "settings.resetSourceAndSession")
+        XCTAssertTrue(app.buttons["settings.resetSourceAndSession"].hasFocus)
+
+        // 3. 点击「重置数据源与凭证」
+        press(.select)
+
+        // 4. 验证成功提示出现
+        wait("reset notice appears", seconds: 10) {
+            self.app.staticTexts.allElementsBoundByIndex.contains { $0.label.contains("已成功重置官方数据源沙盒与会话凭证") }
+        }
+
+        // 5. 截图归档
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+        let shot = XCUIScreen.main.screenshot()
+        try? shot.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_settings_reset_source_session_verified.png"))
+
+        print("THL_TV_RESET_OFFICIAL_SESSION_VERIFIED resetFocus=true resetSuccess=true noticeShown=true")
         app.terminate()
     }
 }

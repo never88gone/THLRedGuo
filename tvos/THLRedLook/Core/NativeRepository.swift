@@ -289,6 +289,11 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
         return resp["ok"] as? Bool ?? false
     }
 
+    public func jsSourceResetOfficial() async throws -> Bool {
+        let resp = try await bridge.request(action: "jsSource.resetOfficial", payload: [:])
+        return resp["ok"] as? Bool ?? false
+    }
+
     public func jsSourceScan() async throws -> Int {
         let resp = try await bridge.request(action: "jsSource.scan", payload: [:])
         return resp["count"] as? Int ?? 0
