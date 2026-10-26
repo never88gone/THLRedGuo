@@ -404,6 +404,10 @@ public final class SourceDiagnostics: ObservableObject {
                         entry.searchTabsSummary = "分类列表[\(tabs.count)]: [" + tabDescs.joined(separator: ", ") + "]"
                         if !hasDrama {
                             entry.searchTabsSummary += " (缺少 29:剧集 分类)"
+                            let totalCount = tabs.reduce(0) { $0 + ((($1["data"] as? [Any])?.count) ?? 0) }
+                            if totalCount == 0 && entry.category == .none {
+                                entry.suggestion = "官方未返回短剧分类且列表为空（通常因局域网旁路由/分流代理将 snssdk.com 路由至海外导致地域版权限制）。应用已自动启用综合降级提取；若仍搜不到结果，建议将 snssdk.com 设为大陆直连，或在设置中重置数据源会话。"
+                            }
                         }
                     } else {
                         entry.category = .invalidResponse

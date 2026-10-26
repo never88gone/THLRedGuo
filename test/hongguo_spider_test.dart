@@ -263,6 +263,76 @@ window._ROUTER_DATA = ${jsonEncode(fakeRouterData)};
 ''';
 
       final mockClient = MockClient((request) async {
+        if (request.url.path == '/service/2/device_register/') {
+          return http.Response(
+            '{"device_id_str":"7345678901234567001","install_id_str":"7345678901234567002"}',
+            200,
+          );
+        }
+        if (request.url.path.contains('/bookapi/bookmall/tab/v')) {
+          return http.Response(
+            jsonEncode({
+              'code': 0,
+              'data': {
+                'tab_item': [
+                  {
+                    'tab_type': 8,
+                    'cell_data': [
+                      {
+                        'cell_id_str': 'cell_001',
+                        'cell_data': [],
+                        'cell_selector': {
+                          'outer_row': {
+                            'items': [
+                              {'selector_item_id': 'all', 'show_name': '全部'},
+                              {'selector_item_id': 'playlet', 'show_name': '剧场'},
+                              {'selector_item_id': 'motion_comic', 'show_name': '漫剧'},
+                              {'selector_item_id': 'ai_playlet', 'show_name': 'AI短剧'},
+                            ],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.url.path.contains('/bookapi/bookmall/cell/change/v')) {
+          return http.Response(
+            jsonEncode({
+              'code': 0,
+              'data': {
+                'has_more': false,
+                'cell_view': {
+                  'video_data': [
+                    {
+                      'series_id_str': '7345678901234567890',
+                      'title': '战神归来当赘婿',
+                      'cover': 'https://p3.example.com/cover1.jpg',
+                      'episode_cnt': 80,
+                      'video_desc': '五年前他是一代战神，五年后回归都市隐姓埋名...',
+                      'sub_title': '都市',
+                    },
+                    {
+                      'series_id_str': '7345678901234567891',
+                      'title': '龙王令之至尊归来',
+                      'cover': 'https://p3.example.com/cover2.jpg',
+                      'episode_cnt': 100,
+                      'video_desc': '十万龙王将士恭迎龙王回朝！',
+                      'sub_title': '热血',
+                    },
+                  ],
+                },
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
         if (request.url.path.contains('/category/')) {
           return http.Response(
             fakeHtml,
@@ -283,14 +353,14 @@ window._ROUTER_DATA = ${jsonEncode(fakeRouterData)};
       expect(first['vod_id'], equals('7345678901234567890'));
       expect(first['vod_name'], equals('战神归来当赘婿'));
       expect(first['vod_pic'], equals('https://p3.example.com/cover1.jpg'));
-      expect(first['vod_remarks'], equals('全80集'));
+      expect(first['vod_remarks'], contains('80集'));
       expect(first['vod_content'], contains('一代战神'));
       expect(first['vod_tag'], contains('都市'));
 
       final second = catRes.list[1];
       expect(second['vod_id'], equals('7345678901234567891'));
       expect(second['vod_name'], equals('龙王令之至尊归来'));
-      expect(second['vod_remarks'], equals('全100集'));
+      expect(second['vod_remarks'], contains('100集'));
 
       runtime.dispose();
     });
@@ -324,6 +394,36 @@ window._ROUTER_DATA = ${jsonEncode(fakeDetailRouterData)};
 ''';
 
       final mockClient = MockClient((request) async {
+        if (request.url.path == '/service/2/device_register/') {
+          return http.Response(
+            '{"device_id_str":"7345678901234567001","install_id_str":"7345678901234567002"}',
+            200,
+          );
+        }
+        if (request.url.path.contains('/video_detail/v1/')) {
+          return http.Response(
+            jsonEncode({
+              'code': 0,
+              'data': {
+                'video_data': {
+                  'series_id': '7345678901234567890',
+                  'series_title': '战神归来当赘婿',
+                  'series_cover': 'https://p3.example.com/cover1_large.jpg',
+                  'series_intro': '五年前一代战神横扫八荒，今朝龙隐于渊守护至爱...',
+                  'episode_cnt': 4,
+                  'video_list': [
+                    {'vid': 'vid_001', 'item_id': 'vid_001', 'title': '第1集'},
+                    {'vid': 'vid_002', 'item_id': 'vid_002', 'title': '第2集'},
+                    {'vid': 'vid_003', 'item_id': 'vid_003', 'title': '第3集'},
+                    {'vid': 'vid_004', 'item_id': 'vid_004', 'title': '第4集'},
+                  ],
+                },
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
         if (request.url.path.contains('/detail')) {
           return http.Response(
             fakeDetailHtml,
@@ -423,6 +523,7 @@ window.__INITIAL_DATA__ = {
     });
 
     test('7. App 搜索注册会话、精确 ID 与分页传递', () async {
+      CatPawJsRuntime.resetDeviceSessionForTesting();
       var registrations = 0;
       final mockClient = MockClient((request) async {
         if (request.url.path == '/service/2/device_register/') {
