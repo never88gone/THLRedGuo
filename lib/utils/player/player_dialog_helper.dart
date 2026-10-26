@@ -169,6 +169,7 @@ class PlayerDialogHelper {
     required VideoEnhancementController? enhancementForUi,
     required DanmakuController danmakuController,
     required PlaybackPreloader preloader,
+    PlaybackDecoderMode decoderMode = PlaybackDecoderMode.hardware,
   }) {
     return showDialog<TelevisionPlaybackSetting>(
       context: context,
@@ -190,6 +191,7 @@ class PlayerDialogHelper {
             preload: preload,
             preloadStatus: preloadStatus,
             enhancement: enhancementForUi,
+            decoderMode: decoderMode,
             onCompareEnhancement: () {
               unawaited(enhancement.toggleCompare());
               Navigator.pop(menuContext);

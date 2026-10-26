@@ -227,6 +227,9 @@ class _PlayerScreenState extends State<PlayerScreen>
                   logLevel: MPVLogLevel.error,
                 ),
               ));
+    if (_player is LunaExoPlayer) {
+      _player.setDecoderMode(preferences.decoderMode);
+    }
     _video = widget.videoBuilder == null && _player is! LunaExoPlayer
         ? VideoController(
             _player,
@@ -1770,6 +1773,10 @@ class _PlayerScreenState extends State<PlayerScreen>
       return;
     }
     final qualityChanged = nextPreferences.quality != _requestedQuality;
+    final decoderChanged = nextPreferences.decoderMode != _preferences.decoderMode;
+    if (_player is LunaExoPlayer) {
+      _player.setDecoderMode(nextPreferences.decoderMode);
+    }
     _enhancement.setPreferences(nextPreferences.enhancement);
     setState(() {
       _speed = nextPreferences.speed;
@@ -1787,6 +1794,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     await _interactions.applySpeed();
     if (qualityChanged && _plan?.offline != true) {
       await _retry(quality: nextPreferences.quality);
+    } else if (decoderChanged && _plan != null) {
+      DiaryService.add('[Player] 解码模式改变为 ${nextPreferences.decoderMode.label}，重新挂载播放器');
+      await _retry();
     }
   }
 
@@ -2039,6 +2049,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         enhancementForUi: _enhancementForUi,
         danmakuController: _danmaku,
         preloader: _preloader,
+        decoderMode: _preferences.decoderMode,
       );
     } finally {
       if (mounted && !_closed) setState(() => _panelOpen = false);
@@ -2053,6 +2064,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           danmaku: selection.danmaku,
           preload: selection.preload ?? _preloadEnabled,
           enhancement: selection.enhancement,
+          decoderMode: selection.decoderMode,
         ),
       );
     } catch (_) {

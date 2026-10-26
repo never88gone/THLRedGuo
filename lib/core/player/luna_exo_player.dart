@@ -6,6 +6,7 @@ import 'package:media_kit_video/media_kit_video.dart' as kit;
 import 'package:video_player/video_player.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
+import 'package:THLRedLook/core/player/playback_preferences.dart';
 
 /// 模拟与 media_kit.PlayerStream 接口对齐的流集合
 class LunaPlayerStreams implements PlayerStream {
@@ -143,6 +144,18 @@ class LunaExoPlayer implements Player {
   final Duration initializationTimeout;
   VoidCallback? _valueListener;
   Timer? _positionPollTimer;
+  Timer? _watchdogTimer;
+  int _consecutiveZeroSizeTicks = 0;
+  PlaybackDecoderMode _decoderMode = PlaybackDecoderMode.hardware;
+
+  PlaybackDecoderMode get decoderMode => _decoderMode;
+  bool get isHardwareDecoding => true;
+
+  void setDecoderMode(PlaybackDecoderMode mode) {
+    if (_decoderMode == mode) return;
+    _decoderMode = mode;
+    DiaryService.add('[ExoPlayer] 设置解码模式: ${mode.label}');
+  }
 
   int _openGeneration = 0;
   int _seekSequence = 0;
@@ -276,9 +289,13 @@ class LunaExoPlayer implements Player {
     _pendingSeekSequence = 0;
     _seekOperations = Future<void>.value();
     _positionPollTimer?.cancel();
+    _watchdogTimer?.cancel();
 
-    // 切换新节目时，旧控制器先静音/暂停，彻底防止新旧双重音频重叠
+    // 关键核心：在 Android TV 上，MediaCodec 硬件视频解码器通常仅支持单实例并发。
+    // 切换集数或换源时，必须严格执行串行释放：立即卸载旧控制器并彻底 dispose，
+    // 防止新旧两个 ExoPlayer 实例在底层同时竞争同一个硬件解码器导致底层崩溃或静默黑屏。
     final old = _controller;
+    _controller = null;
     if (old != null) {
       if (_valueListener != null) {
         try {
@@ -289,7 +306,16 @@ class LunaExoPlayer implements Player {
       try {
         await old.pause();
       } catch (_) {}
+      try {
+        await old.dispose();
+      } catch (_) {}
+      // 在 Android 电视端/低运存设备，底层 MediaCodec release 具有短暂的驱动回收延迟
+      // 让出微小等待周期，彻底释放硬件解码器句柄与 Surface
+      await Future<void>.delayed(const Duration(milliseconds: 60));
     }
+
+    if (_disposed || myGen != _openGeneration) return;
+    revision.value++;
 
     state = state.copyWith(completed: false);
     _safeAdd(stream.completedController, false);
@@ -453,19 +479,6 @@ class LunaExoPlayer implements Player {
       return;
     }
 
-    if (old != null) {
-      try {
-        await old.dispose();
-      } catch (_) {}
-    }
-
-    if (myGen != _openGeneration) {
-      try {
-        await c.dispose();
-      } catch (_) {}
-      return;
-    }
-
     _controller = c;
     _controllerError = null;
     final dur = c.value.duration;
@@ -495,6 +508,9 @@ class LunaExoPlayer implements Player {
     // 定时轮询真实播放位置 (与 LunaTV-Mobile 对齐)
     _startPositionPolling();
 
+    // 启动大屏黑屏与首帧无画面自愈看门狗
+    _startWatchdog(c, myGen);
+
     if (media.start != null && media.start! > Duration.zero) {
       try {
         await c.seekTo(media.start!);
@@ -520,6 +536,37 @@ class LunaExoPlayer implements Player {
       if (_pendingSeekSequence == 0 && pos != state.position) {
         state = state.copyWith(position: pos);
         _safeAdd(stream.positionController, pos);
+      }
+    });
+  }
+
+  void _startWatchdog(VideoPlayerController c, int gen) {
+    _watchdogTimer?.cancel();
+    _consecutiveZeroSizeTicks = 0;
+    _watchdogTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) async {
+      if (_disposed || gen != _openGeneration || _controller != c) {
+        timer.cancel();
+        return;
+      }
+      if (!c.value.isInitialized) return;
+      if (c.value.isPlaying && c.value.position > const Duration(seconds: 1)) {
+        final size = c.value.size;
+        if (size.width == 0 || size.height == 0) {
+          _consecutiveZeroSizeTicks++;
+          DiaryService.add(
+            '[ExoPlayer Watchdog] 警告: 正在播放中但视频画面尺寸为 0x0 (tick=$_consecutiveZeroSizeTicks)',
+          );
+          if (_consecutiveZeroSizeTicks >= 2) {
+            DiaryService.add('[ExoPlayer Watchdog] 尝试触发硬解管线冲洗 (Keyframe Flush)...');
+            try {
+              final pos = c.value.position;
+              await c.seekTo(pos);
+            } catch (_) {}
+          }
+        } else {
+          _consecutiveZeroSizeTicks = 0;
+          timer.cancel();
+        }
       }
     });
   }
@@ -680,6 +727,8 @@ class LunaExoPlayer implements Player {
     _seekOperations = Future<void>.value();
     _positionPollTimer?.cancel();
     _positionPollTimer = null;
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
     final c = _controller;
     _controller = null;
     _controllerError = null;
@@ -777,7 +826,10 @@ class LunaExoVideoView extends StatelessWidget {
               )
             else if (hasVideo)
               Center(
-                child: AspectRatio(aspectRatio: ratio, child: VideoPlayer(c)),
+                child: AspectRatio(
+                  aspectRatio: ratio,
+                  child: VideoPlayer(key: ObjectKey(c), c),
+                ),
               )
             else
               const ColoredBox(color: AppColors.black),

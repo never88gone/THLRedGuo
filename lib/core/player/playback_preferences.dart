@@ -3,6 +3,15 @@ import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
 
 const playbackSpeeds = [.5, .75, 1.0, 1.25, 1.5, 2.0, 3.0];
 
+enum PlaybackDecoderMode {
+  hardware('极速硬解优先', '启用 GPU/MediaCodec 硬件加速，大屏低功耗更流畅'),
+  compatible('兼容稳定模式', '单通道串行硬解防冲突，解决老旧芯片黑屏与拖慢');
+
+  const PlaybackDecoderMode(this.label, this.description);
+  final String label;
+  final String description;
+}
+
 class PlaybackPreferences {
   const PlaybackPreferences({
     this.speed = 1,
@@ -13,6 +22,7 @@ class PlaybackPreferences {
     this.danmakuStyle = const DanmakuStyle(),
     this.preload = true,
     this.enhancement = const VideoEnhancementPreferences(),
+    this.decoderMode = PlaybackDecoderMode.hardware,
   });
 
   final double speed;
@@ -23,6 +33,7 @@ class PlaybackPreferences {
   final DanmakuStyle danmakuStyle;
   final bool preload;
   final VideoEnhancementPreferences enhancement;
+  final PlaybackDecoderMode decoderMode;
 
   PlaybackPreferences copyWith({
     double? speed,
@@ -33,6 +44,7 @@ class PlaybackPreferences {
     DanmakuStyle? danmakuStyle,
     bool? preload,
     VideoEnhancementPreferences? enhancement,
+    PlaybackDecoderMode? decoderMode,
   }) => PlaybackPreferences(
     speed: speed ?? this.speed,
     quality: quality ?? this.quality,
@@ -42,6 +54,7 @@ class PlaybackPreferences {
     danmakuStyle: danmakuStyle ?? this.danmakuStyle,
     preload: preload ?? this.preload,
     enhancement: enhancement ?? this.enhancement,
+    decoderMode: decoderMode ?? this.decoderMode,
   );
 
   Map<String, dynamic> toJson() => {
@@ -53,6 +66,7 @@ class PlaybackPreferences {
     'danmakuStyle': danmakuStyle.toJson(),
     'preload': preload,
     'enhancement': enhancement.toJson(),
+    'decoderMode': decoderMode.name,
   };
 
   factory PlaybackPreferences.fromJson(Map<String, dynamic> value) {
@@ -65,6 +79,11 @@ class PlaybackPreferences {
         ? DanmakuStyle.fromJson(value['danmakuStyle'] as Map<String, dynamic>)
         : const DanmakuStyle();
     final preload = value['preload'] as bool? ?? true;
+    final decoderModeStr = value['decoderMode'] as String?;
+    final decoderMode = PlaybackDecoderMode.values.firstWhere(
+      (e) => e.name == decoderModeStr,
+      orElse: () => PlaybackDecoderMode.hardware,
+    );
     if (!playbackSpeeds.contains(speed) || quality < 0 || quality > 4320) {
       throw const FormatException('播放偏好无效');
     }
@@ -77,6 +96,7 @@ class PlaybackPreferences {
       danmakuStyle: danmakuStyle,
       preload: preload,
       enhancement: VideoEnhancementPreferences.fromJson(value['enhancement']),
+      decoderMode: decoderMode,
     );
   }
 }

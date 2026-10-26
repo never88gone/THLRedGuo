@@ -531,6 +531,7 @@ class TelevisionPlaybackSetting {
     this.danmaku,
     this.preload,
     this.enhancement,
+    this.decoderMode,
   });
   final double? speed;
   final int? quality;
@@ -538,6 +539,7 @@ class TelevisionPlaybackSetting {
   final bool? danmaku;
   final bool? preload;
   final VideoEnhancementPreferences? enhancement;
+  final PlaybackDecoderMode? decoderMode;
 }
 
 class TelevisionSettingsDialog extends StatelessWidget {
@@ -557,6 +559,7 @@ class TelevisionSettingsDialog extends StatelessWidget {
     this.preloadStatus = '',
     this.enhancement,
     this.onCompareEnhancement,
+    this.decoderMode = PlaybackDecoderMode.hardware,
   });
   final double speed;
   final int quality;
@@ -572,6 +575,7 @@ class TelevisionSettingsDialog extends StatelessWidget {
   final String preloadStatus;
   final VideoEnhancementController? enhancement;
   final VoidCallback? onCompareEnhancement;
+  final PlaybackDecoderMode decoderMode;
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -623,6 +627,32 @@ class TelevisionSettingsDialog extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
+            const SizedBox(height: 20),
+            const Text('解码模式', style: TextStyle(fontSize: 18)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final mode in PlaybackDecoderMode.values)
+                  RemoteButton(
+                    key: ValueKey('tv-decoder-${mode.name}'),
+                    label: mode.label,
+                    selected: mode == decoderMode,
+                    onPressed: () => Navigator.pop(
+                      context,
+                      TelevisionPlaybackSetting(decoderMode: mode),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              decoderMode == PlaybackDecoderMode.hardware
+                  ? '⚡ 推荐：MediaCodec 原生硬解加速，大屏低功耗、画质细腻。'
+                  : '🛡️ 兼容：单通道硬解串行保护，杜绝老旧电视黑屏与卡顿拖慢。',
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
             ),
             const SizedBox(height: 20),
             if (enhancement != null)
