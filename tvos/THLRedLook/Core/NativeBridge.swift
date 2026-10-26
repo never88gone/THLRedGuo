@@ -1,6 +1,34 @@
 import Foundation
 import JavaScriptCore
 
+final class HttpTraceHolder: @unchecked Sendable {
+    static let shared = HttpTraceHolder()
+    private let lock = NSLock()
+    private var _url = ""
+    private var _method = "GET"
+    private var _status = 0
+    private var _logId = ""
+    private var _snippet = ""
+    private var _tabsSummary = ""
+
+    func record(url: String, method: String, status: Int, logId: String, snippet: String, tabsSummary: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        _url = url
+        _method = method
+        _status = status
+        _logId = logId
+        _snippet = snippet
+        _tabsSummary = tabsSummary
+    }
+
+    var snapshot: (url: String, method: String, status: Int, logId: String, snippet: String, tabsSummary: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (_url, _method, _status, _logId, _snippet, _tabsSummary)
+    }
+}
+
 /// 纯 Swift 原生 CatPawOpen 协议桥接引擎
 /// 基于系统级 JavaScriptCore 运行时与 URLSession 端侧闭环执行 Spider 数据源解析。
 public actor NativeBridge {
@@ -234,12 +262,39 @@ public actor NativeBridge {
             let timedOut = semaphore.wait(timeout: .now() + timeout) == .timedOut
             if timedOut { task.cancel() }
             let response = result.snapshot(timedOut: timedOut)
+
+            var tabsDesc = ""
+            var snippet = ""
+            if !response.body.isEmpty {
+                let trimmed = response.body.trimmingCharacters(in: .whitespacesAndNewlines)
+                snippet = trimmed.count > 1200 ? String(trimmed.prefix(1197)) + "..." : trimmed
+                if url.path.contains("/search/tab/v"),
+                   let data = response.body.data(using: .utf8),
+                   let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                   let tabs = parsed["search_tabs"] as? [[String: Any]] {
+                    let descs = tabs.map { "\($0["tab_type"] ?? -1):\($0["title"] ?? $0["tab_name"] ?? "")((\(($0["data"] as? [Any])?.count ?? 0)条)" }
+                    tabsDesc = "tabs[\(tabs.count)]: [" + descs.joined(separator: ", ") + "]"
+                }
+            }
+
+            let logId = response.headers["x-tt-logid"] ?? response.headers["x-tt-traceid"] ?? response.headers["x-ss-req-ticket"] ?? ""
+            HttpTraceHolder.shared.record(
+                url: SourceDiagnostics.desensitizeUrl(url.absoluteString),
+                method: method,
+                status: response.status,
+                logId: logId,
+                snippet: snippet,
+                tabsSummary: tabsDesc
+            )
+
             recorder.record(
                 url: url,
                 context: diagnosticContext,
                 elapsedMs: Int((ProcessInfo.processInfo.systemUptime - started) * 1000),
                 status: response.status,
                 body: response.body,
+                method: method,
+                headers: response.headers,
                 errorCode: response.error,
                 error: response.rawError
             )
@@ -695,19 +750,35 @@ public actor NativeBridge {
                     }
                     let errDetail = "搜索执行失败: \(errMsg)"
                     let advice = SourceDiagnostics.advice(SourceDiagnosticEntry(context: diagnosticContext, stage: "搜索执行", category: errCat, errorDetail: errDetail))
+                    let trace = HttpTraceHolder.shared.snapshot
+                    let hasCached = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session") != nil
+                    let sessionStatus = hasCached ? "使用本地缓存设备凭据" : "全新游客会话"
                     diagnostics.add(SourceDiagnosticEntry(
                         context: diagnosticContext,
                         stage: "搜索执行",
+                        host: URL(string: trace.url)?.host ?? "reading.snssdk.com",
+                        url: trace.url,
+                        method: trace.method,
+                        logId: trace.logId,
+                        status: trace.status,
                         errorCode: rawCode.isEmpty ? errCat.tag : rawCode,
                         category: errCat,
                         errorDetail: errMsg,
-                        suggestion: advice
+                        suggestion: advice,
+                        responseSnippet: trace.snippet,
+                        searchTabsSummary: trace.tabsSummary,
+                        sessionStatus: sessionStatus
                     ))
                     throw NSError(domain: "CatPawOpen", code: -1, userInfo: [
                         NSLocalizedDescriptionKey: errMsg,
                         "diagnosticCategory": errCat.rawValue,
                         "diagnosticCode": rawCode.isEmpty ? errCat.tag : rawCode,
-                        "diagnosticAdvice": advice
+                        "diagnosticAdvice": advice,
+                        "diagnosticUrl": trace.url,
+                        "diagnosticLogId": trace.logId,
+                        "diagnosticSnippet": trace.snippet,
+                        "diagnosticTabs": trace.tabsSummary,
+                        "diagnosticSession": sessionStatus
                     ])
                 }
                 var searchItems: [[String: Any]] = []

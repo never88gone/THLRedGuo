@@ -31,6 +31,8 @@ class SourceDiagnosticEntry {
     required this.stage,
     this.host = '',
     this.url = '',
+    this.method = 'GET',
+    this.logId = '',
     this.status = 0,
     this.businessCode = '',
     this.errorCode = '',
@@ -40,6 +42,8 @@ class SourceDiagnosticEntry {
     this.errorTitle = '',
     this.errorMessage = '',
     this.advice = '',
+    this.responseSnippet = '',
+    this.searchTabsSummary = '',
   });
 
   final DateTime at;
@@ -47,6 +51,8 @@ class SourceDiagnosticEntry {
   final String stage;
   final String host;
   final String url;
+  final String method;
+  final String logId;
   final int status;
   final String businessCode;
   final String errorCode;
@@ -56,6 +62,8 @@ class SourceDiagnosticEntry {
   final String errorTitle;
   final String errorMessage;
   final String advice;
+  final String responseSnippet;
+  final String searchTabsSummary;
 
   bool get failed =>
       errorCode.isNotEmpty ||

@@ -52,6 +52,9 @@ public struct SourceDiagnosticEntry: Identifiable {
     public let context: String
     public let stage: String
     public var host = ""
+    public var url = ""
+    public var method = "GET"
+    public var logId = ""
     public var status = 0
     public var businessCode = ""
     public var errorCode = ""
@@ -60,6 +63,9 @@ public struct SourceDiagnosticEntry: Identifiable {
     public var category: DiagnosticCategory = .unknown
     public var errorDetail: String = ""
     public var suggestion: String = ""
+    public var responseSnippet: String = ""
+    public var searchTabsSummary: String = ""
+    public var sessionStatus: String = ""
 
     public var failed: Bool {
         !errorCode.isEmpty || category != .unknown && category != .invalidResponse
@@ -71,6 +77,8 @@ public struct SourceDiagnosticEntry: Identifiable {
         if !host.isEmpty { parts.append(host) }
         if status > 0 { parts.append("HTTP \(status)") }
         if !businessCode.isEmpty { parts.append("业务码 \(businessCode)") }
+        if !logId.isEmpty { parts.append("LogID: \(logId)") }
+        if !searchTabsSummary.isEmpty { parts.append(searchTabsSummary) }
         if !errorCode.isEmpty && errorCode != category.tag { parts.append(errorCode) }
         if elapsedMs > 0 { parts.append("\(elapsedMs)ms") }
         if let count { parts.append("\(count) 条结果") }
@@ -82,6 +90,9 @@ public struct SourceDiagnosticEntry: Identifiable {
         context: String,
         stage: String,
         host: String = "",
+        url: String = "",
+        method: String = "GET",
+        logId: String = "",
         status: Int = 0,
         businessCode: String = "",
         errorCode: String = "",
@@ -89,11 +100,17 @@ public struct SourceDiagnosticEntry: Identifiable {
         count: Int? = nil,
         category: DiagnosticCategory = .unknown,
         errorDetail: String = "",
-        suggestion: String = ""
+        suggestion: String = "",
+        responseSnippet: String = "",
+        searchTabsSummary: String = "",
+        sessionStatus: String = ""
     ) {
         self.context = context
         self.stage = stage
         self.host = host
+        self.url = url
+        self.method = method
+        self.logId = logId
         self.status = status
         self.businessCode = businessCode
         self.errorCode = errorCode
@@ -102,6 +119,9 @@ public struct SourceDiagnosticEntry: Identifiable {
         self.category = category
         self.errorDetail = errorDetail
         self.suggestion = suggestion
+        self.responseSnippet = responseSnippet
+        self.searchTabsSummary = searchTabsSummary
+        self.sessionStatus = sessionStatus
     }
 }
 
@@ -295,16 +315,42 @@ public final class SourceDiagnostics: ObservableObject {
         return "\(category):\(networkError.code)"
     }
 
-    public func record(url: URL, context: String, elapsedMs: Int, status: Int, body: String, errorCode: String = "", error: Error? = nil) {
+    public func record(
+        url: URL,
+        context: String,
+        elapsedMs: Int,
+        status: Int,
+        body: String,
+        method: String = "GET",
+        headers: [String: String] = [:],
+        errorCode: String = "",
+        error: Error? = nil
+    ) {
         guard let stage = Self.stage(for: url) else { return }
+
+        let logId = headers["x-tt-logid"] ?? headers["x-tt-traceid"] ?? headers["x-ss-req-ticket"] ?? ""
+        var responseSnippet = ""
+        if !body.isEmpty {
+            let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.count > 1200 {
+                responseSnippet = String(trimmed.prefix(1197)) + "..."
+            } else {
+                responseSnippet = trimmed
+            }
+        }
+
         var entry = SourceDiagnosticEntry(
             context: context,
             stage: stage,
             host: url.host ?? "",
+            url: Self.desensitizeUrl(url.absoluteString),
+            method: method,
+            logId: logId,
             status: status,
             businessCode: "",
             errorCode: Self.safeCode(errorCode),
-            elapsedMs: elapsedMs
+            elapsedMs: elapsedMs,
+            responseSnippet: responseSnippet
         )
 
         // 智能分类与失败原因分析
@@ -326,7 +372,8 @@ public final class SourceDiagnostics: ObservableObject {
                 if !entry.businessCode.isEmpty && entry.businessCode != "0" {
                     entry.category = .businessRejected
                     entry.errorCode = "BUSINESS_REJECTED"
-                    entry.errorDetail = "平台业务拦截 (代码 \(entry.businessCode))"
+                    let msg = parsed["message"] as? String ?? parsed["msg"] as? String ?? "业务错误"
+                    entry.errorDetail = "平台业务拦截 (代码 \(entry.businessCode)): \(msg)"
                     entry.suggestion = "当前游客会话受限，请稍后重试或重新检测。"
                 } else if stage == "游客注册" {
                     let valid = [parsed["device_id_str"], parsed["install_id_str"]].allSatisfy { value in
@@ -339,21 +386,66 @@ public final class SourceDiagnostics: ObservableObject {
                         entry.errorDetail = "游客注册响应缺少有效 device_id 或 install_id"
                         entry.suggestion = "注册接口响应异常，可能遭遇设备级频控。"
                     }
-                } else if stage == "搜索" && !(parsed["search_tabs"] is [Any]) {
-                    entry.category = .invalidResponse
-                    entry.errorCode = "INVALID_RESPONSE"
-                    entry.errorDetail = "搜索响应数据缺失 search_tabs 列表"
-                    entry.suggestion = "接口返回了非标准短剧结构，可能需要更新 Spider 脚本。"
+                } else if stage == "搜索" {
+                    if let tabs = parsed["search_tabs"] as? [[String: Any]] {
+                        let tabDescs = tabs.map { tab -> String in
+                            let tType = tab["tab_type"] as? Int ?? -1
+                            let title = tab["title"] as? String ?? ""
+                            let tabName = tab["tab_name"] as? String ?? ""
+                            let label = title.isEmpty ? tabName : title
+                            let dataCount = (tab["data"] as? [Any])?.count ?? 0
+                            return "\(tType):\(label)(\(dataCount)条)"
+                        }
+                        let hasDrama = tabs.contains { tab in
+                            let t = tab["tab_type"] as? Int ?? -1
+                            let title = tab["title"] as? String ?? ""
+                            return t == 29 || title.contains("剧")
+                        }
+                        entry.searchTabsSummary = "分类列表[\(tabs.count)]: [" + tabDescs.joined(separator: ", ") + "]"
+                        if !hasDrama {
+                            entry.searchTabsSummary += " (缺少 29:剧集 分类)"
+                        }
+                    } else {
+                        entry.category = .invalidResponse
+                        entry.errorCode = "INVALID_RESPONSE"
+                        entry.errorDetail = "搜索响应数据缺失 search_tabs 列表"
+                        entry.suggestion = "接口返回了非标准短剧结构，可能需要更新 Spider 脚本。"
+                    }
                 }
             } else {
                 entry.category = .invalidResponse
                 entry.errorCode = "INVALID_RESPONSE"
-                entry.errorDetail = "响应体解析 JSON 失败或数据体积超限"
-                entry.suggestion = "目标接口返回非 JSON 内容，请检查是否被网页验证码拦截。"
+                let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if trimmedBody.isEmpty {
+                    entry.errorDetail = "响应体为空"
+                    entry.suggestion = "服务端未返回任何内容，请检查网络链路或稍后重试。"
+                } else if trimmedBody.contains("<html") || trimmedBody.contains("<!doctype") {
+                    entry.errorDetail = "接口返回了 HTML 网页而非 JSON 数据"
+                    entry.suggestion = "可能遭遇防爬验证码或网关拦截，请检查网络代理环境。"
+                } else {
+                    entry.errorDetail = "响应体解析 JSON 失败或数据格式不符合预期"
+                    entry.suggestion = "服务端返回了非标准数据，请查看报文详情进行排查。"
+                }
             }
         }
 
         add(entry)
+    }
+
+    public static func desensitizeUrl(_ raw: String) -> String {
+        guard var comp = URLComponents(string: raw) else { return raw }
+        if let queryItems = comp.queryItems {
+            comp.queryItems = queryItems.map { item in
+                let key = item.name.lowercased()
+                if ["token", "session", "device_id", "iid", "install_id", "openudid", "cdid"].contains(key) {
+                    let val = item.value ?? ""
+                    let masked = val.count > 6 ? "\(val.prefix(3))***\(val.suffix(3))" : "***"
+                    return URLQueryItem(name: item.name, value: masked)
+                }
+                return item
+            }
+        }
+        return comp.string ?? raw
     }
 
     public static var version: String {
@@ -427,15 +519,33 @@ public final class SourceDiagnostics: ObservableObject {
                 lines.append("[\(index + 1)] 阶段: \(entry.stage) | 上下文: \(entry.context)")
                 lines.append("    状态: \(entry.failed ? "❌ 失败" : "✅ 成功") | 耗时: \(entry.elapsedMs)ms")
                 if !entry.host.isEmpty { lines.append("    目标主机: \(entry.host)") }
+                if !entry.url.isEmpty { lines.append("    请求接口: \(entry.url)") }
                 if entry.status > 0 { lines.append("    HTTP状态: \(entry.status)") }
+                if !entry.businessCode.isEmpty { lines.append("    业务状态: \(entry.businessCode)") }
+                if !entry.logId.isEmpty { lines.append("    字节 LogID: \(entry.logId)") }
+                if !entry.searchTabsSummary.isEmpty { lines.append("    搜索分类详情: \(entry.searchTabsSummary)") }
                 if entry.category != .unknown { lines.append("    故障分类: 【\(entry.category.tag)】\(entry.category.name)") }
+                if !entry.errorCode.isEmpty && entry.errorCode != entry.category.tag { lines.append("    特征代码: \(entry.errorCode)") }
                 if !entry.errorDetail.isEmpty { lines.append("    失败原因: \(entry.errorDetail)") }
                 if !entry.suggestion.isEmpty { lines.append("    排查建议: \(entry.suggestion)") }
+                if !entry.responseSnippet.isEmpty {
+                    lines.append("    原始响应报文片段: \(entry.responseSnippet.replacingOccurrences(of: "\n", with: " "))")
+                }
             }
         }
         lines.append("==================================================")
         lines.append("声明：本报告为本地端侧闭环生成，绝不含鉴权Token、Cookie或敏感隐私数据。")
-        return lines.joined(separator: "\n")
+        let full = lines.joined(separator: "\n")
+        saveReportToSandbox(full)
+        return full
+    }
+
+    private func saveReportToSandbox(_ content: String) {
+        Task.detached(priority: .background) {
+            guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return }
+            let logFile = cacheDir.appendingPathComponent("diagnostics_latest.log")
+            try? content.write(to: logFile, atomically: true, encoding: .utf8)
+        }
     }
 
     public var qrText: String {
@@ -540,13 +650,24 @@ public final class SourceDiagnosticRunner: ObservableObject {
                 reason = classified.reason
                 advice = classified.suggestion
             }
+            let url = nsErr.userInfo["diagnosticUrl"] as? String ?? ""
+            let logId = nsErr.userInfo["diagnosticLogId"] as? String ?? ""
+            let snippet = nsErr.userInfo["diagnosticSnippet"] as? String ?? ""
+            let tabs = nsErr.userInfo["diagnosticTabs"] as? String ?? ""
+            let session = nsErr.userInfo["diagnosticSession"] as? String ?? ""
             recorder.add(SourceDiagnosticEntry(
                 context: context,
                 stage: stage,
+                host: URL(string: url)?.host ?? "",
+                url: url,
+                logId: logId,
                 errorCode: (nsErr.userInfo["diagnosticCode"] as? String) ?? cat.tag,
                 category: cat,
                 errorDetail: reason,
-                suggestion: advice
+                suggestion: advice,
+                responseSnippet: snippet,
+                searchTabsSummary: tabs,
+                sessionStatus: session
             ))
             result = "检测失败：【\(cat.tag)】\(stage) - \(reason)"
         }

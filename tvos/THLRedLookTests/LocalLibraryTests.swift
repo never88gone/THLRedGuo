@@ -194,6 +194,24 @@ final class LocalLibraryTests: XCTestCase {
             suggestion: "更新 Spider 脚本"
         ))
 
+        recorder.add(SourceDiagnosticEntry(
+            context: "单元测试",
+            stage: "搜索",
+            host: "reading.snssdk.com",
+            url: "https://reading.snssdk.com/reading/bookapi/search/tab/v?query=test&tab_type=29",
+            method: "GET",
+            logId: "20261026210000010000000000000000",
+            status: 200,
+            businessCode: "",
+            errorCode: "SEARCH_REJECTED",
+            elapsedMs: 85,
+            category: .businessRejected,
+            errorDetail: "官方搜索未返回剧集分类",
+            suggestion: "当前游客凭据可能已过期，系统已自动重置会话。",
+            responseSnippet: "{\"code\":0,\"search_tabs\":[{\"tab_type\":11,\"title\":\"综合\"}]}",
+            searchTabsSummary: "分类列表[1]: [11:综合(10条)] (缺少 29:剧集 分类)"
+        ))
+
         let report = recorder.report
         XCTAssertTrue(report.contains("糖葫芦Haw (THLRedLook) 核心技术诊断报告"))
         XCTAssertTrue(report.contains("应用版本:"))
@@ -202,11 +220,21 @@ final class LocalLibraryTests: XCTestCase {
         XCTAssertTrue(report.contains("【JS报错】"))
         XCTAssertTrue(report.contains("排查建议: 检查网络 DNS 配置"))
         XCTAssertTrue(report.contains("排查建议: 更新 Spider 脚本"))
+        XCTAssertTrue(report.contains("请求接口: https://reading.snssdk.com/reading/bookapi/search/tab/v"))
+        XCTAssertTrue(report.contains("字节 LogID: 20261026210000010000000000000000"))
+        XCTAssertTrue(report.contains("搜索分类详情: 分类列表[1]: [11:综合(10条)] (缺少 29:剧集 分类)"))
+        XCTAssertTrue(report.contains("原始响应报文片段:"))
+
+        // 验证沙盒日志文件自动写入
+        if let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            let logFile = cacheDir.appendingPathComponent("diagnostics_latest.log")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: logFile.path), "诊断报告应自动写入沙盒文件")
+        }
 
         let qr = recorder.qrText
         XCTAssertTrue(qr.contains("DNS解析错误"))
         XCTAssertTrue(qr.contains("JS报错"))
-        print("THL_TV_DIAGNOSTICS_CLASSIFICATION_AND_REPORT dns=true offline=true timeout=true tls=true js=true http403=true http429=true report=true qr=true")
+        print("THL_TV_DIAGNOSTICS_CLASSIFICATION_AND_REPORT dns=true offline=true timeout=true tls=true js=true http403=true http429=true report=true qr=true logTrace=true")
     }
 
     func testHongguoStripVipBadges() throws {

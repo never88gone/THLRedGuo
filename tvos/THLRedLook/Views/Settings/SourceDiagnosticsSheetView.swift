@@ -272,6 +272,17 @@ private struct SourceDiagnosticEntryCardView: View {
                 if !entry.suggestion.isEmpty {
                     suggestionRow
                 }
+
+                if !entry.logId.isEmpty {
+                    HStack(spacing: 6) {
+                        Text("LogID:")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.cyan)
+                        Text(entry.logId)
+                            .font(.system(size: 16, design: .monospaced))
+                            .foregroundColor(.cyan.opacity(0.85))
+                    }
+                }
             }
             .padding(22)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -518,6 +529,74 @@ private struct SourceDiagnosticEntryDetailSheet: View {
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(TVTheme.primary.opacity(0.35), lineWidth: 1))
                                 .cornerRadius(12)
                                 .accessibilityIdentifier("sourceDiagnostics.detailSuggestion")
+                        }
+                        .padding(24)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+                    }
+
+                    // 网络链路与请求追踪
+                    if !entry.url.isEmpty || !entry.logId.isEmpty || !entry.searchTabsSummary.isEmpty {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "network.badge.shield.half.filled")
+                                    .foregroundColor(.cyan)
+                                Text("网络链路与请求追踪")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.cyan)
+                            }
+
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                                if !entry.method.isEmpty {
+                                    infoRow(label: "HTTP 方法", value: entry.method)
+                                }
+                                if !entry.logId.isEmpty {
+                                    infoRow(label: "字节 LogID", value: entry.logId)
+                                }
+                                if !entry.sessionStatus.isEmpty {
+                                    infoRow(label: "会话状态", value: entry.sessionStatus)
+                                }
+                                if !entry.searchTabsSummary.isEmpty {
+                                    infoRow(label: "分类分布", value: entry.searchTabsSummary)
+                                }
+                            }
+
+                            if !entry.url.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("脱敏请求 URL:")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.6))
+                                    Text(entry.url)
+                                        .font(.system(size: 16, design: .monospaced))
+                                        .foregroundColor(.cyan)
+                                        .padding(12)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(Color.black.opacity(0.35))
+                                        .cornerRadius(8)
+                                }
+                            }
+                        }
+                        .padding(24)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+                    }
+
+                    // 原始响应报文片段
+                    if !entry.responseSnippet.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "curlybraces")
+                                    .foregroundColor(.yellow)
+                                Text("原始响应报文片段 (截取前 1200 字符)")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.yellow)
+                            }
+                            Text(entry.responseSnippet)
+                                .font(.system(size: 16, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.black.opacity(0.55))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.15), lineWidth: 1))
+                                .cornerRadius(12)
                         }
                         .padding(24)
                         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
