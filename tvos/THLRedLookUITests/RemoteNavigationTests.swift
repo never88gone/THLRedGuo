@@ -2746,3 +2746,47 @@ extension RemoteNavigationTests {
         app.terminate()
     }
 }
+
+extension RemoteNavigationTests {
+    func testLongSeriesEpisode101And127WithRemote() {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7673742740500270105", "-testDramaTitle", "觉醒伪神：神明弃我我自为神", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        defer { app.terminate() }
+        wait("long series detail ready", seconds: 60) { self.app.buttons["detail.play"].hasFocus }
+        focusChunk(2)
+        press(.select)
+        press(.down, focus: "detail.episode.101")
+        press(.select)
+        wait("episode 101 player", seconds: 30) { self.app.buttons["player.wake"].exists }
+        showControls()
+        wait("episode 101 playing", seconds: 60) {
+            self.app.staticTexts["player.episode"].label.contains("第 101 集") && self.seconds(self.app.staticTexts["player.position"].label) > 0
+        }
+        focusDrawer()
+        press(.right, focus: "player.nextEpisode")
+        press(.select)
+        wait("episode 102 playing", seconds: 60) {
+            self.showControls()
+            return self.app.staticTexts["player.episode"].label.contains("第 102 集") && self.seconds(self.app.staticTexts["player.position"].label) > 0
+        }
+        press(.menu, focus: "player.wake")
+        press(.menu)
+        wait("return to episode 102 focus") { self.app.buttons["detail.episode.102"].hasFocus }
+        press(.down, focus: "detail.episode.110")
+        press(.down, focus: "detail.episode.118")
+        press(.down, focus: "detail.episode.126")
+        press(.right, focus: "detail.episode.127")
+        press(.select)
+        wait("last episode player", seconds: 30) { self.app.buttons["player.wake"].exists }
+        showControls()
+        wait("episode 127 playing", seconds: 60) {
+            self.app.staticTexts["player.episode"].label.contains("第 127 集") && self.seconds(self.app.staticTexts["player.position"].label) > 0
+        }
+        press(.menu, focus: "player.wake")
+        press(.menu)
+        wait("return to final episode focus") { self.app.buttons["detail.episode.127"].hasFocus }
+        print("THL_LONG_SERIES_REMOTE episode101=true next102=true last127=true returnFocus=true")
+    }
+}

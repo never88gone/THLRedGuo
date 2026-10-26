@@ -148,4 +148,41 @@ final class StartupPerformanceTests: XCTestCase {
             clean(player)
         }
     }
+
+    func testLongSeriesPlaybackBeyondEpisode100() async throws {
+        guard ProcessInfo.processInfo.environment["LONG_SERIES_LIVE"] == "1" else { throw XCTSkip("Requires live official source") }
+        let repo = NativeRepository.shared
+        let drama = Drama(id: "hongguo:7673742740500270105", source: "hongguo", title: "觉醒伪神：神明弃我我自为神", episodes: 127)
+        let detail = try await repo.loadDetail(drama: drama)
+        XCTAssertEqual(detail.episodes.count, 127)
+        let name = "THLRedLook.QA.LongSeries." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let store = LocalStore(defaults: defaults, cloudUpload: { _ in })
+        for number in [99, 100, 101, 110, 127] {
+            let model = PlayerViewModel(drama: detail.drama, allEpisodes: detail.episodes, repository: repo, store: store)
+            model.danmakuEnabled = false
+            let started = Date()
+            await model.preparePlayback(episodeIndex: number)
+            let player = try XCTUnwrap(model.player)
+            try attach(player)
+            try await wait { self.layer?.isReadyForDisplay == true && model.currentTime > 0.2 && !model.isLoading }
+            XCTAssertNil(model.errorMessage)
+            XCTAssertFalse(model.plan!.headers.keys.contains { $0.lowercased() == "referer" })
+            let audio = try await player.currentItem!.asset.loadTracks(withMediaType: .audio)
+            XCTAssertFalse(audio.isEmpty)
+            print("THL_LONG_SERIES episode=\(number) frameMs=\(Int(Date().timeIntervalSince(started)*1000)) audio=\(audio.count)")
+            if number == 100 {
+                model.seekTo(target: max(0, model.duration - 1))
+                try await wait(seconds: 45) { model.currentEpisodeIndex == 101 && model.currentTime > 0.2 && !model.isLoading }
+                let next = try XCTUnwrap(model.player)
+                try attach(next)
+                try await wait { self.layer?.isReadyForDisplay == true }
+                print("THL_LONG_SERIES continuous=100-to-101 rendered=true")
+                model.onDisappear()
+                clean(next)
+            } else { model.onDisappear() }
+            clean(player)
+        }
+    }
 }
