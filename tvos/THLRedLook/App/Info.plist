@@ -47,7 +47,7 @@
 		<string>_zgj-link._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>糖葫芦Haw需要访问本地网络，以便在局域网内与手机端自动同步追剧记录并接收大屏推送播放。</string>
+	<string>糖葫芦Haw需要访问本地网络，以便与手机同步追剧记录、接收播放推送，以及由手机扫码下载脱敏诊断日志。</string>
 	<key>TVTopShelfImage</key>
 	<dict>
 		<key>TVTopShelfPrimaryImageWide</key>

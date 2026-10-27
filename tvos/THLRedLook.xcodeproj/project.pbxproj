@@ -76,6 +76,8 @@
 		BC32017434634EDB97D9747C /* EncryptedMediaStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5AC1048D4D429CBF09340E /* EncryptedMediaStream.swift */; };
 		C2CF716976FB47A0AF61ABA3 /* CENCStreamIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = D176E2EF155444349D7D7EAB /* CENCStreamIndex.swift */; };
 		7689C3C1BE0A477888B3828B /* StartupPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */; };
+		ABE3FEB2542D475BB3C6F7D7 /* DiagnosticsShareServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E5CF00A15647D68EF83727 /* DiagnosticsShareServer.swift */; };
+		12F647818F7F44998727220E /* OverseasSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -174,6 +176,8 @@
 		EE5AC1048D4D429CBF09340E /* EncryptedMediaStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../ios/Runner/EncryptedMediaStream.swift"; sourceTree = SOURCE_ROOT; };
 		D176E2EF155444349D7D7EAB /* CENCStreamIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../ios/Runner/CENCStreamIndex.swift"; sourceTree = SOURCE_ROOT; };
 		E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupPerformanceTests.swift; sourceTree = "<group>"; };
+		98E5CF00A15647D68EF83727 /* DiagnosticsShareServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsShareServer.swift; sourceTree = "<group>"; };
+		6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverseasSearchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -251,6 +255,7 @@
 				ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */,
 				8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */,
 				E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */,
+				6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */,
 			);
 			path = THLRedLookTests;
 			sourceTree = "<group>";
@@ -320,6 +325,7 @@
 			isa = PBXGroup;
 			children = (
 				E34571822EE6111100000022 /* SourceDiagnostics.swift */,
+				98E5CF00A15647D68EF83727 /* DiagnosticsShareServer.swift */,
 				E34571822EE6222200000022 /* VideoCacheManager.swift */,
 				B10000102C00000100000001 /* LocalStore.swift */,
 				ICLOUD001C00000100000001 /* ICloudSyncService.swift */,
@@ -675,6 +681,7 @@
 				90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */,
 				81C7FE1DA08787168F35C136 /* ICloudSyncTests.swift in Sources */,
 				7689C3C1BE0A477888B3828B /* StartupPerformanceTests.swift in Sources */,
+				12F647818F7F44998727220E /* OverseasSearchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -700,6 +707,7 @@
 				A10000082C00000100000001 /* RankingBoard.swift in Sources */,
 				A10000092C00000100000001 /* LanModels.swift in Sources */,
 				E34571822EE6111100000021 /* SourceDiagnostics.swift in Sources */,
+				ABE3FEB2542D475BB3C6F7D7 /* DiagnosticsShareServer.swift in Sources */,
 				E34571822EE6222200000021 /* VideoCacheManager.swift in Sources */,
 				A10000102C00000100000001 /* LocalStore.swift in Sources */,
 				ICLOUD002C00000100000001 /* ICloudSyncService.swift in Sources */,

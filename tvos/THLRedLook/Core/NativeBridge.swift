@@ -38,6 +38,7 @@ public actor NativeBridge {
     private let httpSession: URLSession
     private let diagnostics: SourceDiagnostics
     private let diagnosticContext: String
+    private let persistentDeviceSession: Bool
 
     // 沙盒路径
     private var baseDirURL: URL
@@ -51,7 +52,7 @@ public actor NativeBridge {
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
 
-    init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用") {
+    init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用", persistentDeviceSession: Bool = true) {
         if let httpSession {
             self.httpSession = httpSession
         } else {
@@ -66,6 +67,7 @@ public actor NativeBridge {
         }
         self.diagnostics = diagnostics
         self.diagnosticContext = diagnosticContext
+        self.persistentDeviceSession = persistentDeviceSession
         let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
         self.baseDirURL = baseDirectory ?? cachesDir.appendingPathComponent("THLRedLook_Data")
@@ -207,13 +209,14 @@ public actor NativeBridge {
         context.setObject(logBlock, forKeyedSubscript: "__console_log" as NSString)
 
         // 1.5 注入官方设备认证持久化桥接，避免每次冷启动/重新初始化产生额外的设备注册网络延迟
+        let persistentSession = persistentDeviceSession
         let saveDeviceBlock: @convention(block) (String) -> Void = { json in
-            guard !json.isEmpty else { return }
+            guard persistentSession, !json.isEmpty else { return }
             UserDefaults.standard.set(json, forKey: "thl_tv_hongguo_device_session")
         }
         context.setObject(saveDeviceBlock, forKeyedSubscript: "__native_save_device" as NSString)
 
-        if let cachedDevice = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session"), !cachedDevice.isEmpty {
+        if persistentDeviceSession, let cachedDevice = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session"), !cachedDevice.isEmpty {
             context.evaluateScript("""
             try {
                 var raw = \(cachedDevice.debugDescription);
@@ -267,7 +270,7 @@ public actor NativeBridge {
             var snippet = ""
             if !response.body.isEmpty {
                 let trimmed = response.body.trimmingCharacters(in: .whitespacesAndNewlines)
-                snippet = trimmed.count > 1200 ? String(trimmed.prefix(1197)) + "..." : trimmed
+                snippet = SourceDiagnostics.responseSummary(trimmed)
                 if url.path.contains("/search/tab/v"),
                    let data = response.body.data(using: .utf8),
                    let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
@@ -367,6 +370,7 @@ public actor NativeBridge {
             var respHeaders = res.headers || {};
             if (status === 0 && (res.error || res.errorDetail)) {
                 var netErr = new Error("网络请求失败: " + (res.errorDetail || res.error || "未知网络错误"));
+                netErr.code = res.error || "HTTP_0";
                 netErr.category = res.category || "network_timeout";
                 netErr.isNetworkError = true;
                 throw netErr;
@@ -739,19 +743,19 @@ public actor NativeBridge {
                         errCat = parsedCat
                     } else if errMsg.contains("网络") || errMsg.contains("DNS") {
                         errCat = .dnsError
+                    } else if ["SEARCH_TAB_MISSING", "INVALID_SEARCH_CURSOR", "INVALID_RESPONSE"].contains(rawCode) {
+                        errCat = .invalidResponse
                     } else if rawCode == "SEARCH_REJECTED" || rawCode == "BUSINESS_REJECTED" || rawCode == "GUEST_REGISTRATION_FAILED" || errMsg.contains("官方搜索") || errMsg.contains("官方会话") {
                         errCat = .businessRejected
-                        UserDefaults.standard.removeObject(forKey: "thl_tv_hongguo_device_session")
+                        if persistentDeviceSession { UserDefaults.standard.removeObject(forKey: "thl_tv_hongguo_device_session") }
                         ctx.evaluateScript("delete globalThis.__hongguoCachedDevice; if (typeof Ae !== 'undefined') Ae = null;")
-                    } else if rawCode == "INVALID_RESPONSE" {
-                        errCat = .invalidResponse
                     } else {
                         errCat = .jsError
                     }
                     let errDetail = "搜索执行失败: \(errMsg)"
-                    let advice = SourceDiagnostics.advice(SourceDiagnosticEntry(context: diagnosticContext, stage: "搜索执行", category: errCat, errorDetail: errDetail))
+                    let advice = SourceDiagnostics.advice(SourceDiagnosticEntry(context: diagnosticContext, stage: "搜索执行", errorCode: rawCode, category: errCat, errorDetail: errDetail))
                     let trace = HttpTraceHolder.shared.snapshot
-                    let hasCached = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session") != nil
+                    let hasCached = persistentDeviceSession && UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session") != nil
                     let sessionStatus = hasCached ? "使用本地缓存设备凭据" : "全新游客会话"
                     diagnostics.add(SourceDiagnosticEntry(
                         context: diagnosticContext,
