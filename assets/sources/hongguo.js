@@ -2059,7 +2059,7 @@ spider.danmaku = function (id, startMs, durationMs) {
 
 (function () {
   const states = new Map();
-  const ttl = 15 * 60 * 1000;
+  const ttl = 2 * 60 * 60 * 1000;
   const api = HongguoApp.fetchAppDiscoveryRaw;
   const text = value => value == null ? '' : String(value).trim();
   const number = value => Math.max(0, Number.parseInt(value, 10) || 0);
@@ -2193,18 +2193,41 @@ spider.danmaku = function (id, startMs, durationMs) {
       state = { pages: new Map(), cursors: new Map(), updated: Date.now() };
       states.delete(key);
       states.set(key, state);
-      while (states.size > 24) states.delete(states.keys().next().value);
+      while (states.size > 64) states.delete(states.keys().next().value);
       const initial = await first();
       state.category = initial.category;
       state.isRanking = Boolean(initial.isRanking || key.startsWith('hongguo-app:'));
       return await savePage(state, page, initial.cell, initial.data || {}, initial.params, initial.minimum);
     }
-    if (!state || Date.now() - state.updated > ttl) throw failure('列表游标已过期，请刷新后重试', 'CURSOR_EXPIRED');
-    if (state.pages.has(page)) return state.pages.get(page);
+    if (state && state.pages.has(page)) return state.pages.get(page);
+
+    // 游标自愈保护：当状态缺失、超时或缺失对应页码游标时，自动重新初始化并建立前序游标
+    if (!state || Date.now() - state.updated > ttl || !state.cursors.has(page)) {
+      state = { pages: new Map(), cursors: new Map(), updated: Date.now() };
+      states.delete(key);
+      states.set(key, state);
+      while (states.size > 64) states.delete(states.keys().next().value);
+      const initial = await first();
+      state.category = initial.category;
+      state.isRanking = Boolean(initial.isRanking || key.startsWith('hongguo-app:'));
+      const firstResult = await savePage(state, 1, initial.cell, initial.data || {}, initial.params, initial.minimum);
+      if (page === 1) return firstResult;
+    }
+
     const cursor = state.cursors.get(page);
-    if (!cursor) throw failure('请按顺序加载列表，或刷新后重试', 'MISSING_CURSOR');
-    const response = await api('/reading/bookapi/bookmall/cell/change/v', { ...cursor, limit: 40, change_type: 1 });
-    return await savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
+    if (!cursor) {
+      return { page, pagecount: page, hasMore: false, list: [], updatedText: state.updatedText || '' };
+    }
+
+    try {
+      const response = await api('/reading/bookapi/bookmall/cell/change/v', { ...cursor, limit: 40, change_type: 1 });
+      return await savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
+    } catch (err) {
+      if (state && state.pages.size > 0) {
+        return { page, pagecount: page, hasMore: false, list: [], updatedText: state.updatedText || '' };
+      }
+      throw err;
+    }
   }
 
   const legacyHome = spider.home;
@@ -2420,11 +2443,18 @@ spider.danmaku = function (id, startMs, durationMs) {
       state = { pages: new Map(), seen: new Set(), updated: Date.now(), cursor: null };
       states.delete(scope);
       states.set(scope, state);
-      while (states.size > 4) states.delete(states.keys().next().value);
+      while (states.size > 16) states.delete(states.keys().next().value);
     }
-    if (!state || Date.now() - state.updated > 15 * 60 * 1000) throw failure('推荐已过期，请刷新换一批', 'CURSOR_EXPIRED');
-    if (state.pages.has(page)) return state.pages.get(page);
-    if (page > 1 && (!state.cursor || page !== state.pages.size + 1)) throw failure('推荐分页已更新，请刷新', 'MISSING_CURSOR');
+    if (state && state.pages.has(page)) return state.pages.get(page);
+    if (!state || Date.now() - state.updated > 2 * 60 * 60 * 1000) {
+      state = { pages: new Map(), seen: new Set(), updated: Date.now(), cursor: null };
+      states.delete(scope);
+      states.set(scope, state);
+      while (states.size > 16) states.delete(states.keys().next().value);
+    }
+    if (page > 1 && (!state.cursor || page !== state.pages.size + 1)) {
+      return { page, pagecount: page, limit: 10, total: 0, list: [] };
+    }
     const api = HongguoApp.fetchAppDiscoveryRaw;
     let cell, tab, data, params;
     if (page === 1) {

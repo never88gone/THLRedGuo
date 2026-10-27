@@ -660,6 +660,14 @@ class _HomeScreenState extends State<HomeScreen> {
       accept(result);
     } catch (error) {
       if (!mounted || generation != _generation) return;
+      final errorStr = error.toString();
+      final isCursorExpired = errorStr.contains('CURSOR_EXPIRED') ||
+          errorStr.contains('MISSING_CURSOR') ||
+          errorStr.contains('游标');
+      if (isCursorExpired && more) {
+        unawaited(_load(more: false, force: true));
+        return;
+      }
       setState(() {
         _loading = false;
         _loadingMore = false;

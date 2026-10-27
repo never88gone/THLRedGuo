@@ -293,6 +293,34 @@ class CatalogBrowser {
         }
       } catch (error) {
         if (generation != session.generation) return;
+        final errorStr = error.toString();
+        final isCursorExpired = errorStr.contains('CURSOR_EXPIRED') ||
+            errorStr.contains('MISSING_CURSOR') ||
+            errorStr.contains('游标') ||
+            (error is AppFailure &&
+                {'CURSOR_EXPIRED', 'MISSING_CURSOR'}.contains(error.code));
+        if (isCursorExpired && more) {
+          entry.nextPage = 1;
+          entry.hasMore = true;
+          try {
+            final recovered = await repository.catalog(
+              source,
+              category: requests[source]!,
+              query: query,
+              page: 1,
+              force: true,
+            );
+            if (generation == session.generation) {
+              entry.items = recovered.items;
+              entry.page = recovered.page;
+              entry.nextPage = recovered.page + 1;
+              entry.hasMore = recovered.hasMore;
+              entry.fresh = recovered.fresh;
+              failures.remove(source);
+              return;
+            }
+          } catch (_) {}
+        }
         entry.nextPage = page;
         entry.hasMore = query.isEmpty || SourceSite.byId(source).pagedSearch;
         entry.fresh = false;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
@@ -166,6 +168,14 @@ class _RankingsScreenState extends State<RankingsScreen> {
       });
     } catch (error) {
       if (mounted && generation == _generation) {
+        final errorStr = error.toString();
+        final isCursorExpired = errorStr.contains('CURSOR_EXPIRED') ||
+            errorStr.contains('MISSING_CURSOR') ||
+            errorStr.contains('游标');
+        if (isCursorExpired && more) {
+          unawaited(_load(more: false, force: true));
+          return;
+        }
         setState(() {
           _error = error.toString();
           _failedMore = more;
@@ -306,7 +316,12 @@ class _RankingsScreenState extends State<RankingsScreen> {
                     TextButton(
                       onPressed: _loading || _more
                           ? null
-                          : () => _load(more: _failedMore, force: true),
+                          : () => _load(
+                              more: (_error?.contains('游标') == true
+                                  ? false
+                                  : _failedMore),
+                              force: true,
+                            ),
                       child: const Text('重试'),
                     ),
                   ],
