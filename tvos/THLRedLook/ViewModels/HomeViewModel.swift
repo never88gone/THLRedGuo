@@ -54,7 +54,7 @@ public final class HomeViewModel: ObservableObject {
         SourceSite.byId(activeSourceId)
     }
 
-    private func resetRequest(clearItems: Bool = true) {
+    private func resetRequest(clearItems: Bool = false) {
         generation += 1
         selectCategoryTask?.cancel()
         if clearItems {
@@ -117,34 +117,36 @@ public final class HomeViewModel: ObservableObject {
 
     public func selectCategory(_ category: CatalogCategory, immediate: Bool = false) {
         guard selectedCategory.id != category.id else { return }
-        resetRequest()
+        resetRequest(clearItems: false)
         selectedCategory = category
         isLoading = true
         selectCategoryTask = Task {
             if !immediate { try? await Task.sleep(nanoseconds: 180_000_000) }
             guard !Task.isCancelled else { return }
-            await loadFirstPage()
+            await loadFirstPage(clearOnStart: false)
         }
     }
 
     public func selectSort(_ sort: CatalogSort) async {
         guard selectedSort != sort else { return }
         selectedSort = sort
-        await loadFirstPage()
+        await loadFirstPage(clearOnStart: false)
     }
 
     public func selectReleaseFilter(_ filter: CatalogReleaseFilter) async {
         guard selectedRelease != filter else { return }
         selectedRelease = filter
-        await loadFirstPage()
+        await loadFirstPage(clearOnStart: false)
     }
 
-    public func loadFirstPage() async {
+    public func loadFirstPage(clearOnStart: Bool = false) async {
         generation += 1
         let ticket = generation
         let source = activeSourceId
         let category = selectedCategory.id
-        items = []
+        if clearOnStart {
+            items = []
+        }
         currentPage = 0
         hasMore = false
         isLoadingMore = false

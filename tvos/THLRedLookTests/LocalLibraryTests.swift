@@ -223,7 +223,7 @@ final class LocalLibraryTests: XCTestCase {
         XCTAssertTrue(report.contains("请求接口: https://reading.snssdk.com/reading/bookapi/search/tab/v"))
         XCTAssertTrue(report.contains("字节 LogID: 20261026210000010000000000000000"))
         XCTAssertTrue(report.contains("搜索分类详情: 分类列表[1]: [11:综合(10条)] (缺少 29:剧集 分类)"))
-        XCTAssertTrue(report.contains("原始响应报文片段:"))
+        XCTAssertTrue(report.contains("响应结构摘要:"))
 
         // 验证沙盒日志文件自动写入
         if let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {

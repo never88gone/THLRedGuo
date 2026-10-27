@@ -8,6 +8,8 @@ public struct CatalogView: View {
     @State private var selectedDrama: Drama?
     @State private var pendingNextRow: String?
     @State private var pendingCategoryFocus = false
+    @State private var pendingCardFocus = false
+    @State private var autoSelectCategoryTask: Task<Void, Never>?
 
     public enum FocusTarget: Hashable {
         case category(String)
@@ -76,6 +78,13 @@ public struct CatalogView: View {
                index >= viewModel.items.count - columns.count * 2 {
                 Task { await viewModel.loadNextPage() }
             }
+            if case .category(let id) = target {
+                if let cat = viewModel.categories.first(where: { focusID($0) == id }) {
+                    scheduleAutoSelectCategory(cat)
+                }
+            } else {
+                cancelAutoSelectCategory()
+            }
         }
         .onChange(of: focusCategoryTrigger) { _, _ in
             pendingCategoryFocus = true
@@ -87,6 +96,7 @@ public struct CatalogView: View {
         }
         .onExitCommand {
             if !showingFilterSheet && selectedDrama == nil {
+                cancelAutoSelectCategory()
                 focusedTarget = nil
                 onRequestFocusTopNav?()
             }
@@ -95,33 +105,48 @@ public struct CatalogView: View {
 
     private var categoryHeader: some View {
         HStack(spacing: 24) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 20) {
-                    ForEach(viewModel.categories) { category in
-                        TVCapsuleButton(
-                            title: category.name,
-                            isSelected: viewModel.selectedCategory.id == category.id,
-                            isFocused: focusedTarget == .category(focusID(category)),
-                            onUpCommand: {
-                                focusedTarget = nil
-                                onRequestFocusTopNav?()
-                            },
-                            onDownCommand: focusFirstCard,
-                            onLeftCommand: { moveCategory(from: category, offset: -1) },
-                            onRightCommand: { moveCategory(from: category, offset: 1) }
-                        ) {
-                            pendingNextRow = nil
-                            viewModel.selectCategory(category, immediate: true)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 20) {
+                        ForEach(viewModel.categories) { category in
+                            TVCapsuleButton(
+                                title: category.name,
+                                isSelected: viewModel.selectedCategory.id == category.id,
+                                isFocused: focusedTarget == .category(focusID(category)),
+                                onUpCommand: {
+                                    cancelAutoSelectCategory()
+                                    focusedTarget = nil
+                                    onRequestFocusTopNav?()
+                                },
+                                onDownCommand: {
+                                    cancelAutoSelectCategory()
+                                    focusFirstCard()
+                                },
+                                onLeftCommand: { moveCategory(from: category, offset: -1) },
+                                onRightCommand: { moveCategory(from: category, offset: 1) }
+                            ) {
+                                pendingNextRow = nil
+                                cancelAutoSelectCategory()
+                                viewModel.selectCategory(category, immediate: true)
+                            }
+                            .id("category_\(focusID(category))")
+                            .focused($focusedTarget, equals: .category(focusID(category)))
+                            .accessibilityIdentifier("catalog.category.\(focusID(category))")
                         }
-                        .focused($focusedTarget, equals: .category(focusID(category)))
-                        .accessibilityIdentifier("catalog.category.\(focusID(category))")
+                    }
+                    .padding(.vertical, 16)
+                    .padding(.leading, 12)
+                    .padding(.trailing, 24)
+                }
+                .clipShape(Rectangle().inset(by: -30))
+                .onChange(of: focusedTarget) { _, target in
+                    if case .category(let id) = target {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            proxy.scrollTo("category_\(id)", anchor: .center)
+                        }
                     }
                 }
-                .padding(.vertical, 16)
-                .padding(.leading, 12)
-                .padding(.trailing, 24)
             }
-            .clipShape(Rectangle().inset(by: -30))
             Spacer()
             HStack(spacing: 16) {
                 TVButton(
@@ -129,10 +154,14 @@ public struct CatalogView: View {
                     icon: "line.3.horizontal.decrease.circle",
                     isFocused: focusedTarget == .filter,
                     onUpCommand: {
+                        cancelAutoSelectCategory()
                         focusedTarget = nil
                         onRequestFocusTopNav?()
                     },
-                    onDownCommand: focusFirstCard
+                    onDownCommand: {
+                        cancelAutoSelectCategory()
+                        focusFirstCard()
+                    }
                 ) { showingFilterSheet = true }
                 .focused($focusedTarget, equals: .filter)
                 .accessibilityIdentifier("catalog.filter")
@@ -142,12 +171,17 @@ public struct CatalogView: View {
                     icon: "arrow.clockwise",
                     isFocused: focusedTarget == .refresh,
                     onUpCommand: {
+                        cancelAutoSelectCategory()
                         focusedTarget = nil
                         onRequestFocusTopNav?()
                     },
-                    onDownCommand: focusFirstCard
+                    onDownCommand: {
+                        cancelAutoSelectCategory()
+                        focusFirstCard()
+                    }
                 ) {
                     pendingNextRow = nil
+                    cancelAutoSelectCategory()
                     Task { await viewModel.reloadAll() }
                 }
                 .focused($focusedTarget, equals: .refresh)
@@ -157,57 +191,58 @@ public struct CatalogView: View {
             .padding(.trailing, 8)
         }
         .padding(.horizontal, 48)
-        .focusSection()
         .defaultFocus($focusedTarget, .category(selectedCategoryID))
     }
 
     private var catalogGrid: some View {
-        ScrollViewReader { scroll in
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 36) {
-                    ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, drama in
-                        DramaCardView(
-                            drama: drama,
-                            isFocused: focusedTarget == .card(drama.id),
-                            forceFocused: forceFocusFirstCard && index == 0,
-                            onUpCommand: {
-                                if index < columns.count { focusSelectedCategory() }
-                                else { focusCard(viewModel.items[index - columns.count].id, scroll: scroll) }
-                            },
-                            onDownCommand: {
-                                if viewModel.errorMessage != nil { focusedTarget = .reloadButton }
-                                else { focusNextRow(after: drama.id, scroll: scroll) }
-                            }
-                        ) { selectedDrama = drama }
-                        .id(drama.id)
-                        .focused($focusedTarget, equals: .card(drama.id))
-                        .accessibilityIdentifier("catalog.result.\(index)")
-                        .onAppear {
-                            if index >= viewModel.items.count - 4 {
-                                Task { await viewModel.loadNextPage() }
-                            }
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 36) {
+                ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, drama in
+                    DramaCardView(
+                        drama: drama,
+                        isFocused: focusedTarget == .card(drama.id),
+                        forceFocused: forceFocusFirstCard && index == 0,
+                        onUpCommand: (index < columns.count) ? {
+                            focusSelectedCategory()
+                        } : nil,
+                        onDownCommand: (index + columns.count >= viewModel.items.count && viewModel.hasMore) ? {
+                            focusNextRow(after: drama.id)
+                        } : nil
+                    ) { selectedDrama = drama }
+                    .id(drama.id)
+                    .focused($focusedTarget, equals: .card(drama.id))
+                    .accessibilityIdentifier("catalog.result.\(index)")
+                    .onAppear {
+                        if index >= viewModel.items.count - 4 {
+                            Task { await viewModel.loadNextPage() }
                         }
                     }
                 }
-                .padding(.horizontal, 48)
-                .padding(.vertical, 28)
-                if viewModel.isLoadingMore {
-                    ProgressView("正在加载更多短剧...").padding(.vertical, 28)
+            }
+            .padding(.horizontal, 48)
+            .padding(.vertical, 28)
+            if viewModel.isLoadingMore {
+                ProgressView("正在加载更多短剧...").padding(.vertical, 28)
+            }
+            if let message = viewModel.errorMessage {
+                Text(message).foregroundColor(.secondary)
+                retryButton.padding(.bottom, 28)
+            }
+        }
+        .defaultFocus($focusedTarget, viewModel.items.first.map { FocusTarget.card($0.id) })
+        .onChange(of: viewModel.items) { _, items in
+            finishPendingRowFocus()
+            if pendingCardFocus, let first = items.first {
+                pendingCardFocus = false
+                focusedTarget = .card(first.id)
+            } else if case .card(let currentId) = focusedTarget {
+                if !items.contains(where: { $0.id == currentId }), let first = items.first {
+                    focusedTarget = .card(first.id)
                 }
-                if let message = viewModel.errorMessage {
-                    Text(message).foregroundColor(.secondary)
-                    retryButton.padding(.bottom, 28)
-                }
             }
-            .focusSection()
-            .defaultFocus($focusedTarget, viewModel.items.first.map { FocusTarget.card($0.id) })
-            .onChange(of: viewModel.items) { _, _ in finishPendingRowFocus(scroll: scroll) }
-            .onChange(of: viewModel.isLoadingMore) { _, loading in
-                if !loading { finishPendingRowFocus(scroll: scroll) }
-            }
-            .onChange(of: focusedTarget) { _, target in
-                if case .card(let id) = target { scroll.scrollTo(id, anchor: .center) }
-            }
+        }
+        .onChange(of: viewModel.isLoadingMore) { _, loading in
+            if !loading { finishPendingRowFocus() }
         }
     }
 
@@ -232,55 +267,75 @@ public struct CatalogView: View {
     private func focusSelectedCategory() {
         guard !viewModel.categories.isEmpty else { return }
         pendingCategoryFocus = false
+        cancelAutoSelectCategory()
         focusedTarget = .category(selectedCategoryID)
     }
 
     private func focusFirstCard() {
-        if let first = viewModel.items.first { focusedTarget = .card(first.id) }
-        else if viewModel.errorMessage != nil { focusedTarget = .reloadButton }
+        cancelAutoSelectCategory()
+        if let first = viewModel.items.first {
+            focusedTarget = .card(first.id)
+        } else if viewModel.isLoading {
+            pendingCardFocus = true
+        } else if viewModel.errorMessage != nil {
+            focusedTarget = .reloadButton
+        }
     }
 
     private func moveCategory(from category: CatalogCategory, offset: Int) {
         guard let index = viewModel.categories.firstIndex(of: category) else { return }
         let next = index + offset
-        if next >= viewModel.categories.count { focusedTarget = .filter; return }
+        if next >= viewModel.categories.count {
+            cancelAutoSelectCategory()
+            focusedTarget = .filter
+            return
+        }
         if next < 0 {
+            cancelAutoSelectCategory()
             focusedTarget = nil
             onRequestFocusTopNav?()
             return
         }
         let target = viewModel.categories[next]
         pendingNextRow = nil
-        viewModel.selectCategory(target, immediate: true)
         focusedTarget = .category(focusID(target))
+        scheduleAutoSelectCategory(target)
     }
 
-    private func focusNextRow(after id: String, scroll: ScrollViewProxy) {
+    private func scheduleAutoSelectCategory(_ category: CatalogCategory) {
+        cancelAutoSelectCategory()
+        guard viewModel.selectedCategory.id != category.id else { return }
+        autoSelectCategoryTask = Task {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled else { return }
+            viewModel.selectCategory(category)
+        }
+    }
+
+    private func cancelAutoSelectCategory() {
+        autoSelectCategoryTask?.cancel()
+        autoSelectCategoryTask = nil
+    }
+
+    private func focusNextRow(after id: String) {
         pendingNextRow = id
-        finishPendingRowFocus(scroll: scroll)
+        finishPendingRowFocus()
     }
 
-    private func finishPendingRowFocus(scroll: ScrollViewProxy) {
+    private func finishPendingRowFocus() {
         guard let id = pendingNextRow, focusedTarget == .card(id),
               let index = viewModel.items.firstIndex(where: { $0.id == id }) else { return }
         let nextRow = (index / columns.count + 1) * columns.count
         guard nextRow < viewModel.items.count else {
-            if !viewModel.hasMore || viewModel.errorMessage != nil { pendingNextRow = nil }
-            else if !viewModel.isLoadingMore {
+            if !viewModel.hasMore || viewModel.errorMessage != nil {
+                pendingNextRow = nil
+            } else if !viewModel.isLoadingMore {
                 Task { await viewModel.loadNextPage() }
             }
             return
         }
         let nextID = viewModel.items[min(index + columns.count, viewModel.items.count - 1)].id
         pendingNextRow = nil
-        focusCard(nextID, scroll: scroll)
-    }
-
-    private func focusCard(_ id: String, scroll: ScrollViewProxy) {
-        scroll.scrollTo(id, anchor: .center)
-        DispatchQueue.main.async {
-            guard selectedDrama == nil else { return }
-            focusedTarget = .card(id)
-        }
+        focusedTarget = .card(nextID)
     }
 }
