@@ -37,7 +37,7 @@ Future<void> main(List<String> arguments) async {
   DiaryService.add(
     '[App] 应用启动，版本: $appVersion, 平台: ${Platform.operatingSystem}',
   );
-  if (Platform.isAndroid) {
+  if (Platform.isAndroid || Platform.isIOS) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(AppTheme.systemBars(Brightness.dark));
   }

@@ -1164,15 +1164,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (widget.feed) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _closed || (!_mobile && !_television)) return;
-      if (AppDevice.isPadDevice) {
-        if (_systemFullscreen != false) {
-          _systemFullscreen = false;
-          unawaited(
-            SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge),
-          );
-        }
-        return;
-      }
       final fullscreen = _showFullscreen;
       if (_systemFullscreen == fullscreen) return;
       _systemFullscreen = fullscreen;
@@ -2156,7 +2147,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       child: Builder(
         builder: (context) {
           final fullscreen = _showFullscreen;
-          final overlayBrightness = fullscreen
+          final overlayBrightness = (fullscreen || _mobile)
               ? Brightness.dark
               : Theme.of(context).brightness;
           return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -2203,7 +2194,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           canRequestFocus: !_television,
           skipTraversal: _television,
           child: Scaffold(
-            backgroundColor: fullscreen || pictureInPicture
+            backgroundColor: fullscreen || pictureInPicture || _mobile
                 ? AppColors.black
                 : theme.scaffoldBackgroundColor,
             appBar: pictureInPicture || fullscreen || _mobile
@@ -2225,8 +2216,10 @@ class _PlayerScreenState extends State<PlayerScreen>
             body: pictureInPicture
                 ? _videoPane(context)
                 : SafeArea(
-                    top: !_television && (fullscreen || _mobile),
+                    top: false,
                     bottom: !fullscreen,
+                    left: !fullscreen,
+                    right: !fullscreen,
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final desktop = constraints.maxWidth >= 840;
@@ -2247,13 +2240,17 @@ class _PlayerScreenState extends State<PlayerScreen>
                               ),
                               SizedBox(
                                 width: desktop ? 340 : 220,
-                                child: PlayerDesktopPanelView(
-                                  episodes: widget.detail.episodes,
-                                  currentIndex: _index,
-                                  seriesEntries: _currentSeriesEntries,
-                                  currentDramaId: widget.detail.drama.id,
-                                  onSeasonSelected: _switchSeason,
-                                  onSelectEpisode: (index) => _play(index),
+                                child: SafeArea(
+                                  top: true,
+                                  bottom: true,
+                                  child: PlayerDesktopPanelView(
+                                    episodes: widget.detail.episodes,
+                                    currentIndex: _index,
+                                    seriesEntries: _currentSeriesEntries,
+                                    currentDramaId: widget.detail.drama.id,
+                                    onSeasonSelected: _switchSeason,
+                                    onSelectEpisode: (index) => _play(index),
+                                  ),
                                 ),
                               ),
                             ],

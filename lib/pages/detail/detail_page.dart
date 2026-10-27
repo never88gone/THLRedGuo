@@ -440,18 +440,75 @@ class _DetailScreenState extends State<DetailScreen> {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           toolbarHeight: television ? 64 : null,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+          foregroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: Colors.white),
+          leading: Navigator.of(context).canPop()
+              ? Center(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0x66000000),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0x33FFFFFF),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: IconButton(
+                      tooltip: '返回',
+                      constraints: const BoxConstraints.tightFor(
+                        width: 40,
+                        height: 40,
+                      ),
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                  ),
+                )
+              : null,
           title: Text(
             drama.title,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              shadows: [
+                Shadow(
+                  color: Color(0xD9000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
           ),
           actions: [
             Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: RefreshAction(
-                loading: _loading,
-                tooltip: '更新剧集信息',
-                onPressed: allowed ? _load : null,
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0x66000000),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0x33FFFFFF),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: RefreshAction(
+                      loading: _loading,
+                      tooltip: '更新剧集信息',
+                      onPressed: allowed ? _load : null,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
