@@ -321,6 +321,62 @@ final class PlaybackTests: XCTestCase {
         print("THL_CONTINUOUS automaticTransitions=7 lastEpisode=8 error=false")
     }
 
+    func testLiveNaturalContinuousPlaybackWithoutSeeking() async throws {
+        try live()
+        await JSSourceService.shared.initialize()
+        let data = try await detail("7694896136963755032")
+        let suite = "THLRedLook.Natural." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = PlayerViewModel(drama: data.drama, allEpisodes: data.episodes, repository: repository, store: LocalStore(defaults: defaults))
+        model.danmakuEnabled = true
+        defer { model.onDisappear() }
+        let began = Date()
+        var events: [[String: Any]] = []
+        func record(_ event: [String: Any]) {
+            var value = event
+            value["elapsedSeconds"] = Int(Date().timeIntervalSince(began))
+            events.append(value)
+            if let bytes = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]), let text = String(data: bytes, encoding: .utf8) {
+                print("THL_NATURAL " + text)
+            }
+        }
+        record(["stage": "selected", "title": data.drama.title, "seriesId": data.drama.cleanSourceId, "rate": 1, "seek": false, "firstEpisode": 5, "completeEpisodes": 3])
+        await model.preparePlayback(episodeIndex: 5)
+        for episode in 5...8 {
+            try await ready(model)
+            XCTAssertEqual(model.currentEpisodeIndex, episode)
+            XCTAssertEqual(model.playbackRate, 1)
+            XCTAssertFalse(try XCTUnwrap(model.player).isMuted)
+            record(["stage": "ready", "episode": episode, "duration": model.duration, "position": model.currentTime, "video": true, "audio": true])
+            if episode == 8 { break }
+            let deadline = Date().addingTimeInterval(max(180, model.duration * 1.3 + 40))
+            var lastLogged = -1
+            while model.currentEpisodeIndex == episode && Date() < deadline {
+                guard model.errorMessage == nil else {
+                    XCTFail(model.errorMessage ?? "Playback failed")
+                    throw NSError(domain: "NaturalPlayback", code: 1)
+                }
+                let bucket = Int(model.currentTime) / 15
+                if bucket != lastLogged {
+                    lastLogged = bucket
+                    record(["stage": "playing", "episode": episode, "position": model.currentTime, "duration": model.duration, "buffering": model.isBuffering])
+                }
+                try await Task.sleep(nanoseconds: 500_000_000)
+            }
+            XCTAssertEqual(model.currentEpisodeIndex, episode + 1)
+            record(["stage": "autoNext", "from": episode, "to": model.currentEpisodeIndex])
+        }
+        XCTAssertNil(model.errorMessage)
+        record(["stage": "complete", "naturalCompleteEpisodes": 3, "currentEpisode": model.currentEpisodeIndex, "seek": false])
+        let bytes = try JSONSerialization.data(withJSONObject: events, options: [.prettyPrinted, .sortedKeys])
+        let attachment = XCTAttachment(string: String(decoding: bytes, as: UTF8.self))
+        attachment.name = "natural-playback.json"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        print("THL_NATURAL_RESULT " + String(decoding: try JSONSerialization.data(withJSONObject: events, options: .sortedKeys), as: UTF8.self))
+    }
+
     func testLiveRapidEpisodeChangeAndExitCancellation() async throws {
         try live()
         let detail = try await detail("7694896136963755032")
