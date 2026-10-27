@@ -12,6 +12,7 @@ import CoreMedia
   private var pipPlayer: AVPlayer?
   private var pipPlayerLayer: AVPlayerLayer?
   private var pipContainerView: UIView?
+  private var diagnosticsExportPending = false
   private var deviceChannel: FlutterMethodChannel?
   private var icloudChannel: FlutterMethodChannel?
   private var pipObservation: NSKeyValueObservation?
@@ -59,6 +60,10 @@ import CoreMedia
       self.deviceChannel = channel
       channel.setMethodCallHandler { [weak self] call, result in
         guard let self = self else { return }
+        if call.method == "exportDiagnostics" {
+          self.exportDiagnostics(call.arguments, result: result)
+          return
+        }
         if call.method == "isPad" {
           result(UIDevice.current.userInterfaceIdiom == .pad)
           return
@@ -241,6 +246,53 @@ import CoreMedia
       .replacingOccurrences(of: "{", with: "%7B")
       .replacingOccurrences(of: "}", with: "%7D")
     return URL(string: fixed)
+  }
+
+  private func exportDiagnostics(_ arguments: Any?, result: @escaping FlutterResult) {
+    guard !diagnosticsExportPending else {
+      result(FlutterError(code: "EXPORT_BUSY", message: "日志导出窗口已打开", details: nil))
+      return
+    }
+    guard let values = arguments as? [String: Any],
+          let report = values["report"] as? String,
+          !report.isEmpty, report.utf8.count <= 512 * 1024,
+          var presenter = activeRootViewController else {
+      result(FlutterError(code: "INVALID_REPORT", message: "诊断报告为空或无法打开导出窗口", details: nil))
+      return
+    }
+    while let presented = presenter.presentedViewController, !presented.isBeingDismissed {
+      presenter = presented
+    }
+    guard !presenter.isBeingDismissed, presenter.view.window != nil else {
+      result(FlutterError(code: "EXPORT_UNAVAILABLE", message: "请返回应用后重新导出日志", details: nil))
+      return
+    }
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("THL-diagnostics-" + UUID().uuidString, isDirectory: true)
+    do {
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let file = directory.appendingPathComponent("THL-diagnostics.txt")
+      try report.write(to: file, atomically: true, encoding: .utf8)
+      let activity = UIActivityViewController(activityItems: [file], applicationActivities: nil)
+      if let popover = activity.popoverPresentationController {
+        popover.sourceView = presenter.view
+        popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+        popover.permittedArrowDirections = []
+      }
+      diagnosticsExportPending = true
+      activity.completionWithItemsHandler = { [weak self] _, completed, _, error in
+        self?.diagnosticsExportPending = false
+        try? FileManager.default.removeItem(at: directory)
+        if error != nil {
+          result(FlutterError(code: "EXPORT_FAILED", message: "日志导出未完成，请重试", details: nil))
+        } else {
+          result(["completed": completed])
+        }
+      }
+      presenter.present(activity, animated: true)
+    } catch {
+      try? FileManager.default.removeItem(at: directory)
+      result(FlutterError(code: "EXPORT_FAILED", message: "无法生成诊断日志文件", details: nil))
+    }
   }
 
   private var activeRootViewController: UIViewController? {

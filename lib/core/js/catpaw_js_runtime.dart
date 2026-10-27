@@ -158,6 +158,8 @@ class CatPawJsRuntime {
   final bool _isOwnedClient;
   final SourceDiagnostics diagnostics;
   final String diagnosticContext;
+  final bool persistentDeviceSession;
+  SourceDiagnosticEntry? _lastSearchTrace;
   String? _injectedDeviceSession;
   bool _ready = false;
   bool _isDisposed = false;
@@ -172,6 +174,7 @@ class CatPawJsRuntime {
     http.Client? client,
     SourceDiagnostics? recorder,
     this.diagnosticContext = '日常使用',
+    this.persistentDeviceSession = true,
   ]) : _httpClient = client ?? http.Client(),
        _isOwnedClient = client == null,
        diagnostics = recorder ?? SourceDiagnostics.shared;
@@ -182,7 +185,7 @@ class CatPawJsRuntime {
 
   Future<void> init(String script) async {
     if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
-    if (_cachedDeviceSession == null) {
+    if (persistentDeviceSession && _cachedDeviceSession == null) {
       await preloadDeviceSession();
     }
     _rt = getJavascriptRuntime(xhr: false);
@@ -391,26 +394,35 @@ globalThis.__native_save_device = function(json) {
       if (_isDisposed) {
         return {'status': 0, 'headers': <String, String>{}, 'body': ''};
       }
-      diagnostics.record(
+      final entry = diagnostics.record(
         url: url,
         context: diagnosticContext,
         elapsedMs: clock.elapsedMilliseconds,
         status: resp.statusCode,
         body: resp.body,
+        headers: resp.headers,
+        method: method,
+        sessionStatus: persistentDeviceSession
+            ? (_injectedDeviceSession == null ? '全新游客会话' : '复用本地游客凭据')
+            : '独立游客会话',
       );
+      if (entry?.stage == '搜索') _lastSearchTrace = entry;
       return {
         'status': resp.statusCode,
         'headers': resp.headers,
         'body': resp.body,
       };
     } catch (e) {
-      diagnostics.record(
+      final entry = diagnostics.record(
         url: url,
         context: diagnosticContext,
         elapsedMs: clock.elapsedMilliseconds,
         errorCode: SourceDiagnostics.networkCode(e, timedOut: timedOut),
         error: e,
+        timedOut: timedOut,
+        method: (params['method']?.toString() ?? 'GET').toUpperCase(),
       );
+      if (entry?.stage == '搜索') _lastSearchTrace = entry;
       // ignore: avoid_print
       print(
         '【FETCH ERROR】host=${Uri.tryParse(url)?.host}, type=${e.runtimeType}',
@@ -422,7 +434,23 @@ globalThis.__native_save_device = function(json) {
         'status': 0,
         'headers': <String, String>{},
         'body': '',
-        'error': e.runtimeType.toString(),
+        'error': SourceDiagnostics.networkCode(e, timedOut: timedOut),
+        'errorDetail': SourceDiagnostics.analyzeError(
+          e,
+          url: url,
+          timedOut: timedOut,
+        ).message,
+        'category': switch (SourceDiagnostics.networkCode(
+          e,
+          timedOut: timedOut,
+        )) {
+          'DNS' => 'dns_error',
+          'TIMEOUT' => 'network_timeout',
+          'CONNECTION' => 'conn_refused',
+          'TLS' => 'tls_error',
+          'CANCELLED' => 'cancelled',
+          _ => 'unknown',
+        },
       };
     } finally {
       _activeRequests--;
@@ -644,6 +672,7 @@ globalThis.__native_save_device = function(json) {
   }) async {
     _assertReady();
     final dynamic res;
+    _lastSearchTrace = null;
     try {
       res = await _evalAsync(
         'typeof spider !== "undefined" && typeof spider.search === "function" ? spider.search(${jsonEncode(keyword)}, $quick, $page) : []',
@@ -654,12 +683,24 @@ globalThis.__native_save_device = function(json) {
       final code = error is CatPawSourceFailure
           ? SourceDiagnostics.safeCode(error.code)
           : 'SEARCH_EXECUTION';
+      final analysis = SourceDiagnostics.analyzeError(error);
       diagnostics.add(
         SourceDiagnosticEntry(
           at: DateTime.now().toUtc(),
           context: diagnosticContext,
           stage: '搜索执行',
+          url: _lastSearchTrace?.url ?? '',
+          host: _lastSearchTrace?.host ?? '',
+          status: _lastSearchTrace?.status ?? 0,
+          logId: _lastSearchTrace?.logId ?? '',
+          businessCode: _lastSearchTrace?.businessCode ?? '',
+          searchTabsSummary: _lastSearchTrace?.searchTabsSummary ?? '',
+          sessionStatus: _lastSearchTrace?.sessionStatus ?? '',
           errorCode: code.isEmpty ? 'SEARCH_EXECUTION' : code,
+          errorCategory: analysis.category,
+          errorTitle: analysis.title,
+          errorMessage: SourceDiagnostics.redact(analysis.message),
+          advice: analysis.advice,
         ),
       );
       rethrow;
@@ -848,6 +889,7 @@ globalThis.__native_save_device = function(json) {
   }
 
   void _syncDeviceSession() {
+    if (!persistentDeviceSession) return;
     final session = _cachedDeviceSession;
     if (_injectedDeviceSession == session) return;
     if (session == null) {
@@ -893,7 +935,7 @@ globalThis.__native_save_device = function(json) {
       final val = check.stringResult;
       if (val.isNotEmpty && val != 'null' && val != 'undefined') {
         _rt.evaluate('globalThis.__pendingSavedDevice = null;');
-        if (!_validDeviceSession(val)) return;
+        if (!persistentDeviceSession || !_validDeviceSession(val)) return;
         _cachedDeviceSession = val;
         _injectedDeviceSession = val;
         unawaited(() async {
@@ -1013,6 +1055,13 @@ globalThis.__resolveFetch = function(id, respObj) {
     var status = (respObj && typeof respObj.status === 'number') ? respObj.status : 200;
     var respBody = (respObj && respObj.body != null) ? String(respObj.body) : '';
     var respHeaders = (respObj && respObj.headers) ? respObj.headers : {};
+    if (status === 0 && respObj && respObj.error) {
+      var failure = new Error(respObj.errorDetail || '网络请求失败');
+      failure.code = respObj.error;
+      failure.category = respObj.category || 'unknown';
+      waiter.reject(failure);
+      return;
+    }
     waiter.resolve({
       status: status,
       ok: status >= 200 && status < 300,
@@ -1035,7 +1084,9 @@ globalThis.__rejectFetch = function(id, errMsg) {
   var waiter = globalThis.__fetchWaiters[id];
   if (waiter) {
     delete globalThis.__fetchWaiters[id];
-    waiter.reject(new Error(errMsg || 'Network request failed'));
+    var failure = new Error(errMsg || 'Network request failed');
+    failure.code = errMsg === 'CANCELLED' ? 'CANCELLED' : 'HTTP_0';
+    waiter.reject(failure);
   }
 };
 ''';

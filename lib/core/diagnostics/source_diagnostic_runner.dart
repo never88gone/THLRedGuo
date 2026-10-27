@@ -8,6 +8,14 @@ import 'source_diagnostics.dart';
 
 class SourceDiagnosticRunner extends ChangeNotifier {
   static final shared = SourceDiagnosticRunner();
+  SourceDiagnosticRunner({
+    this.diagnostics,
+    this.runtimeFactory,
+    this.scriptLoader,
+  });
+  final SourceDiagnostics? diagnostics;
+  final CatPawJsRuntime Function(SourceDiagnostics, String)? runtimeFactory;
+  final Future<String> Function()? scriptLoader;
   bool running = false;
   String result = '尚未检测';
   int successCount = 0;
@@ -21,9 +29,11 @@ class SourceDiagnosticRunner extends ChangeNotifier {
     result = '正在执行网络连接、JS引擎、搜索、详情与播放解析全链路诊断…';
     notifyListeners();
 
-    final recorder = SourceDiagnostics.shared;
+    final recorder = diagnostics ?? SourceDiagnostics.shared;
     final context = '主动检测 ${DateTime.now().toUtc().toIso8601String()}';
-    final runtime = CatPawJsRuntime(null, recorder, context);
+    final runtime =
+        runtimeFactory?.call(recorder, context) ??
+        CatPawJsRuntime(null, recorder, context, false);
 
     var currentStage = 'JS 脚本与引擎初始化';
     final stopwatch = Stopwatch()..start();
@@ -33,9 +43,11 @@ class SourceDiagnosticRunner extends ChangeNotifier {
       currentStage = 'JS 脚本与引擎初始化';
       stopwatch.reset();
       stopwatch.start();
-      final script = await kPresetJsSources
-          .firstWhere((s) => s.id == 'hongguo')
-          .loadScript();
+      final script =
+          await (scriptLoader?.call() ??
+              kPresetJsSources
+                  .firstWhere((s) => s.id == 'hongguo')
+                  .loadScript());
       await runtime.init(script);
       successCount++;
       recorder.add(
@@ -53,6 +65,12 @@ class SourceDiagnosticRunner extends ChangeNotifier {
       stopwatch.reset();
       stopwatch.start();
       final first = await runtime.search('短剧');
+      if (first.list.isEmpty) {
+        throw const CatPawSourceFailure(
+          '诊断搜索未取得短剧样本，尚未验证分页、详情与播放解析',
+          code: 'SEARCH_EMPTY',
+        );
+      }
       successCount++;
       recorder.add(
         SourceDiagnosticEntry(
@@ -179,7 +197,7 @@ class SourceDiagnosticRunner extends ChangeNotifier {
         }
       }
 
-      result = '检测完成：全链路（脚本、搜索、分页、详情、播放解析）检测通过，网络与数据源正常';
+      result = '检测完成：脚本、搜索${first.hasMore ? '、分页' : ''}、详情、播放解析通过';
     } catch (error) {
       failureCount++;
       final analysis = SourceDiagnostics.analyzeError(error);
@@ -196,7 +214,8 @@ class SourceDiagnosticRunner extends ChangeNotifier {
           errorCode: analysis.code,
         ),
       );
-      result = '检测失败：【$currentStage】阶段发生【${analysis.title}】\n失败原因：${analysis.message}';
+      result =
+          '检测失败：【$currentStage】阶段发生【${analysis.title}】\n失败原因：${analysis.message}';
     } finally {
       runtime.dispose();
       running = false;

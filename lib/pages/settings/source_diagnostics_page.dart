@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:THLRedLook/core/diagnostics/diagnostic_log_exporter.dart';
 import 'package:THLRedLook/core/diagnostics/source_diagnostic_runner.dart';
 import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
 import 'package:THLRedLook/core/js/js_source_presets.dart';
@@ -21,6 +22,8 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
   final recorder = SourceDiagnostics.shared;
   final runner = SourceDiagnosticRunner.shared;
   String version = '版本信息读取中';
+  late final Future<void> _metadata;
+  bool _exporting = false;
   late String sourceHash = () {
     try {
       final script = kPresetJsSources
@@ -35,7 +38,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
   @override
   void initState() {
     super.initState();
-    _loadMetadata();
+    _metadata = _loadMetadata();
   }
 
   Future<void> _loadMetadata() async {
@@ -56,13 +59,16 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
           .loadScript();
       if (mounted) {
         setState(() {
-          sourceHash = sha256.convert(utf8.encode(script.trimRight())).toString();
+          sourceHash = sha256
+              .convert(utf8.encode(script.trimRight()))
+              .toString();
         });
       }
     } catch (_) {}
   }
 
   Future<void> _copy() async {
+    await _metadata;
     await Clipboard.setData(
       ClipboardData(
         text: recorder.report(version: version, sourceHash: sourceHash),
@@ -72,6 +78,30 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('已复制详细脱敏诊断报告')));
+    }
+  }
+
+  Future<void> _export() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      await _metadata;
+      final completed = await DiagnosticLogExporter.export(
+        recorder.report(version: version, sourceHash: sourceHash),
+      );
+      if (mounted && completed) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已完成诊断日志导出')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('日志导出失败，请重试；也可复制报告')));
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
@@ -106,39 +136,73 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkSurfaceHighest : colors.surfaceContainer,
+                  color: isDark
+                      ? AppColors.darkSurfaceHighest
+                      : colors.surfaceContainer,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isDark ? AppColors.whiteWithAlpha(0.08) : colors.outlineVariant.withValues(alpha: 0.3),
+                    color: isDark
+                        ? AppColors.whiteWithAlpha(0.08)
+                        : colors.outlineVariant.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Icon(Icons.network_check_rounded, color: AppColors.hongguoRed, size: 22),
-                        const SizedBox(width: 8),
-                        Text('红果官方数据源', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                        const Spacer(),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.network_check_rounded,
+                              color: AppColors.hongguoRed,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '红果官方数据源',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.hongguoRed.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.hongguoRed.withValues(alpha: 0.3), width: 0.8),
+                            border: Border.all(
+                              color: AppColors.hongguoRed.withValues(
+                                alpha: 0.3,
+                              ),
+                              width: 0.8,
+                            ),
                           ),
                           child: Text(
                             'SHA256 ${sourceHash.length >= 8 ? sourceHash.substring(0, 8) : sourceHash}',
-                            style: const TextStyle(fontSize: 11, color: AppColors.hongguoRed, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.hongguoRed,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '应用版本 $version · 保留最近 80 条脱敏记录。通过独立会话全链路诊断脚本执行、网络连接、DNS、搜索、详情与播放解析。报告脱敏安全，可直接复制反馈。',
-                      style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+                      '应用版本 $version · 保留最近 60 条脱敏记录。使用独立游客会话检查搜索、分页、详情与播放解析，不影响日常游客凭据。可导出日志文件或复制报告后手动反馈，不会自动上传。',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -158,15 +222,23 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Icon(Icons.play_arrow_rounded),
                     label: Text(runner.running ? '检测中…' : '开始检测'),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.hongguoRed,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                   OutlinedButton.icon(
@@ -175,9 +247,26 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                     icon: const Icon(Icons.copy_rounded, size: 18),
                     label: const Text('复制报告'),
                     style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
+                  ),
+                  OutlinedButton.icon(
+                    key: const ValueKey('source-diagnostics-export'),
+                    onPressed: _exporting ? null : _export,
+                    icon: _exporting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.ios_share_rounded, size: 18),
+                    label: Text(_exporting ? '导出中…' : '导出日志'),
                   ),
                   TextButton.icon(
                     onPressed: runner.running ? null : recorder.clear,
@@ -197,34 +286,47 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                 key: const ValueKey('source-diagnostics-result'),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: runner.result.contains('失败') || runner.result.contains('未通过')
+                  color:
+                      runner.result.contains('失败') ||
+                          runner.result.contains('未通过')
                       ? colors.errorContainer.withValues(alpha: 0.35)
-                      : (runner.result.contains('完成') || runner.result.contains('通过')
-                          ? Colors.green.withValues(alpha: 0.12)
-                          : (isDark ? AppColors.darkSurfaceElevated : colors.surfaceContainerLow)),
+                      : (runner.result.contains('完成') ||
+                                runner.result.contains('通过')
+                            ? Colors.green.withValues(alpha: 0.12)
+                            : (isDark
+                                  ? AppColors.darkSurfaceElevated
+                                  : colors.surfaceContainerLow)),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: runner.result.contains('失败') || runner.result.contains('未通过')
+                    color:
+                        runner.result.contains('失败') ||
+                            runner.result.contains('未通过')
                         ? colors.error.withValues(alpha: 0.5)
-                        : (runner.result.contains('完成') || runner.result.contains('通过')
-                            ? Colors.green.withValues(alpha: 0.4)
-                            : colors.outlineVariant.withValues(alpha: 0.2)),
+                        : (runner.result.contains('完成') ||
+                                  runner.result.contains('通过')
+                              ? Colors.green.withValues(alpha: 0.4)
+                              : colors.outlineVariant.withValues(alpha: 0.2)),
                   ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      runner.result.contains('失败') || runner.result.contains('未通过')
+                      runner.result.contains('失败') ||
+                              runner.result.contains('未通过')
                           ? Icons.error_rounded
-                          : (runner.result.contains('完成') || runner.result.contains('通过')
-                              ? Icons.check_circle_rounded
-                              : Icons.info_outline_rounded),
-                      color: runner.result.contains('失败') || runner.result.contains('未通过')
+                          : (runner.result.contains('完成') ||
+                                    runner.result.contains('通过')
+                                ? Icons.check_circle_rounded
+                                : Icons.info_outline_rounded),
+                      color:
+                          runner.result.contains('失败') ||
+                              runner.result.contains('未通过')
                           ? colors.error
-                          : (runner.result.contains('完成') || runner.result.contains('通过')
-                              ? Colors.green
-                              : colors.primary),
+                          : (runner.result.contains('完成') ||
+                                    runner.result.contains('通过')
+                                ? Colors.green
+                                : colors.primary),
                       size: 22,
                     ),
                     const SizedBox(width: 10),
@@ -235,7 +337,9 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                           fontSize: 13,
                           height: 1.4,
                           fontWeight: FontWeight.w600,
-                          color: runner.result.contains('失败') || runner.result.contains('未通过')
+                          color:
+                              runner.result.contains('失败') ||
+                                  runner.result.contains('未通过')
                               ? colors.error
                               : colors.onSurface,
                         ),
@@ -254,7 +358,11 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                     const SizedBox(width: 8),
                     _buildStatPill('正常', '${successes.length}', Colors.green),
                     const SizedBox(width: 8),
-                    _buildStatPill('异常', '${failures.length}', failures.isNotEmpty ? colors.error : colors.outline),
+                    _buildStatPill(
+                      '异常',
+                      '${failures.length}',
+                      failures.isNotEmpty ? colors.error : colors.outline,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -264,12 +372,9 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
               if (entries.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 36),
-                  child: Center(
-                    child: Text('暂无记录，请先复现问题或开始检测。'),
-                  ),
+                  child: Center(child: Text('暂无记录，请先复现问题或开始检测。')),
                 ),
-              for (final entry in entries)
-                _buildDiagnosticCard(context, entry),
+              for (final entry in entries) _buildDiagnosticCard(context, entry),
             ],
           );
         },
@@ -288,16 +393,32 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
         ),
         child: Column(
           children: [
-            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(fontSize: 11, color: color.withValues(alpha: 0.8))),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: color.withValues(alpha: 0.8),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDiagnosticCard(BuildContext context, SourceDiagnosticEntry entry) {
+  Widget _buildDiagnosticCard(
+    BuildContext context,
+    SourceDiagnosticEntry entry,
+  ) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -311,12 +432,16 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
         side: BorderSide(
           color: isFailed
               ? colors.error.withValues(alpha: 0.4)
-              : (isDark ? AppColors.whiteWithAlpha(0.06) : colors.outlineVariant.withValues(alpha: 0.3)),
+              : (isDark
+                    ? AppColors.whiteWithAlpha(0.06)
+                    : colors.outlineVariant.withValues(alpha: 0.3)),
           width: isFailed ? 1.0 : 0.8,
         ),
       ),
       color: isFailed
-          ? (isDark ? const Color(0xFF281414) : colors.errorContainer.withValues(alpha: 0.2))
+          ? (isDark
+                ? const Color(0xFF281414)
+                : colors.errorContainer.withValues(alpha: 0.2))
           : (isDark ? AppColors.darkSurfaceElevated : colors.surface),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -335,27 +460,43 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                 Expanded(
                   child: Text(
                     entry.stage,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
                 if (isFailed && entry.displayTitle.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: colors.error.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: colors.error.withValues(alpha: 0.4), width: 0.8),
+                      border: Border.all(
+                        color: colors.error.withValues(alpha: 0.4),
+                        width: 0.8,
+                      ),
                     ),
                     child: Text(
                       entry.displayTitle,
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colors.error),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: colors.error,
+                      ),
                     ),
                   ),
                 if (entry.elapsedMs > 0)
                   Text(
                     '${entry.elapsedMs}ms',
-                    style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
               ],
             ),
@@ -367,9 +508,14 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E0E0E) : Colors.red.shade50.withValues(alpha: 0.7),
+                  color: isDark
+                      ? const Color(0xFF1E0E0E)
+                      : Colors.red.shade50.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: colors.error.withValues(alpha: 0.25), width: 0.8),
+                  border: Border.all(
+                    color: colors.error.withValues(alpha: 0.25),
+                    width: 0.8,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,7 +524,11 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.warning_amber_rounded, size: 16, color: colors.error),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: 16,
+                            color: colors.error,
+                          ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
@@ -399,14 +549,20 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.lightbulb_outline_rounded, size: 16, color: Colors.orange),
+                          const Icon(
+                            Icons.lightbulb_outline_rounded,
+                            size: 16,
+                            color: Colors.orange,
+                          ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               '排查建议：${entry.advice}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark ? Colors.orange.shade200 : Colors.brown.shade800,
+                                color: isDark
+                                    ? Colors.orange.shade200
+                                    : Colors.brown.shade800,
                                 height: 1.35,
                               ),
                             ),
@@ -419,6 +575,20 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
               ),
             ],
 
+            if (entry.searchTabsSummary.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                '分类: ${entry.searchTabsSummary}',
+                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+              ),
+            ],
+            if (entry.logId.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              SelectableText(
+                'LogID: ${entry.logId}',
+                style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
+              ),
+            ],
             // 底部元信息行（主机、状态码、时间戳等）
             const SizedBox(height: 8),
             Wrap(
@@ -426,14 +596,35 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
               runSpacing: 4,
               children: [
                 if (entry.host.isNotEmpty)
-                  Text('主机: ${entry.host}', style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant)),
+                  Text(
+                    '主机: ${entry.host}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
                 if (entry.status > 0)
-                  Text('HTTP: ${entry.status}', style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant)),
+                  Text(
+                    'HTTP: ${entry.status}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
                 if (entry.count != null)
-                  Text('${entry.count} 条数据', style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant)),
+                  Text(
+                    '${entry.count} 条数据',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
                 Text(
                   entry.at.toLocal().toString().split('.').first,
-                  style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant.withValues(alpha: 0.7)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colors.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
                 ),
               ],
             ),
