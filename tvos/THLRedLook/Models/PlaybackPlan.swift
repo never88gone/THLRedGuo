@@ -66,6 +66,10 @@ public struct PlaybackPlan: Hashable, Codable {
         self.local = try container.decodeIfPresent(Bool.self, forKey: .local) ?? false
     }
 
+    public func isReusable(at date: Date = Date(), minimumLifetime: TimeInterval = 5) -> Bool {
+        !url.isEmpty && (local || expiresAt <= 0 || Double(expiresAt) > date.addingTimeInterval(minimumLifetime).timeIntervalSince1970 * 1000)
+    }
+
     public var hasAlternative: Bool {
         !session.isEmpty && (routeIndex + 1 < routeCount)
     }

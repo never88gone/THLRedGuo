@@ -1965,14 +1965,17 @@ Public License instead of this License.  But first, please read
       return headers;
     }
     async function readable(value) {
-      if (globalThis.__hongguoCancelled || !value || !value.url || value.url === avoidedUrl || Date.now() >= deadline) return false;
+      if (globalThis.__hongguoCancelled || !value || !value.url || Date.now() >= deadline) return false;
       try {
         const response = await fetch(value.url, { method: 'HEAD', headers: mediaHeaders(value), timeoutMs: Math.min(5000, deadline - Date.now()) });
         const contentType = response.headers && (typeof response.headers.get === 'function' ? response.headers.get('content-type') : response.headers['content-type']);
-        return [200, 206].includes(response.status) && /^video\//i.test(contentType || '');
-      } catch (_) { return false; }
+        if (![200, 206].includes(response.status)) { mediaFailure = 'MEDIA_HTTP_' + response.status; return false; }
+        if (!/^video\//i.test(contentType || '')) { mediaFailure = 'MEDIA_TYPE_INVALID'; return false; }
+        return true;
+      } catch (error) { mediaFailure = error.code || 'MEDIA_NETWORK'; return false; }
     }
     let lastCode = 'NO_STREAM';
+    let mediaFailure = 'MEDIA_REJECTED';
     let refreshedSession = false;
     for (let attempt = 0; attempt < 5 && !globalThis.__hongguoCancelled && Date.now() < deadline; attempt++) {
       try {
@@ -1980,21 +1983,23 @@ Public License instead of this License.  But first, please read
         if (refreshSession) refreshedSession = true;
         const model = await HongguoApp.fetchAppPlayUrl(vid, { deadline, includeFallback: lastCode === 'MEDIA_REJECTED', refreshSession });
         const variants = model.variants || [model];
-        for (let index = 0; index < variants.length;) {
-          const group = [variants[index++]];
-          if (index < variants.length && String(variants[index].quality) === String(group[0].quality)) group.push(variants[index++]);
-          const candidate = await new Promise(resolve => {
-            let remaining = group.length;
-            for (const value of group) {
-              Promise.resolve(String(value.vid) === vid && readable(value)).then(ok => {
-                if (ok) resolve(value);
-                if (--remaining === 0) resolve(null);
-              }, () => { if (--remaining === 0) resolve(null); });
-            }
-          });
-          if (!candidate) continue;
-          const quality = Number(String(candidate.quality || '').match(/\d+/)?.[0] || 0);
-          return { parse: 0, url: candidate.url, header: mediaHeaders(candidate), decryptionKey: candidate.contentKey || '', mediaBytes: candidate.mediaBytes || 0, quality, qualities: [quality].filter(Boolean), expiresAt: Date.now() + 30000, episodeId: vid, danmakuId };
+        for (const candidates of [variants.filter(value => value.url !== avoidedUrl), variants.filter(value => value.url === avoidedUrl)]) {
+          for (let index = 0; index < candidates.length;) {
+            const group = [candidates[index++]];
+            if (index < candidates.length && String(candidates[index].quality) === String(group[0].quality)) group.push(candidates[index++]);
+            const candidate = await new Promise(resolve => {
+              let remaining = group.length;
+              for (const value of group) {
+                Promise.resolve(String(value.vid) === vid && readable(value)).then(ok => {
+                  if (ok) resolve(value);
+                  if (--remaining === 0) resolve(null);
+                }, () => { if (--remaining === 0) resolve(null); });
+              }
+            });
+            if (!candidate) continue;
+            const quality = Number(String(candidate.quality || '').match(/\d+/)?.[0] || 0);
+            return { parse: 0, url: candidate.url, header: mediaHeaders(candidate), decryptionKey: candidate.contentKey || '', mediaBytes: candidate.mediaBytes || 0, quality, qualities: [quality].filter(Boolean), expiresAt: Date.now() + 30000, episodeId: vid, danmakuId };
+          }
         }
         lastCode = 'MEDIA_REJECTED';
       } catch (error) {
@@ -2010,7 +2015,7 @@ Public License instead of this License.  But first, please read
         if ((publicId ? publicId[1] === vid : current.episodeId === vid) && await readable(current)) return { ...current, header: mediaHeaders(current), danmakuId };
       }
     }
-    return { parse: 0, url: '', header: {}, error: lastCode, episodeId: vid, danmakuId };
+    return { parse: 0, url: '', header: {}, error: globalThis.__hongguoCancelled ? 'CANCELLED' : lastCode === 'MEDIA_REJECTED' ? mediaFailure : lastCode, episodeId: vid, danmakuId };
   };
 })();
 

@@ -1685,6 +1685,8 @@ final class RemoteNavigationTests: XCTestCase {
         wait("detail play focused") { self.app.buttons["detail.play"].hasFocus }
 
         // 1. 直接按 Select 进入播放
+        let playLabel = app.buttons["detail.play"].label
+        let episode = playLabel.range(of: "[0-9]+", options: .regularExpression).map { String(playLabel[$0]) } ?? "1"
         press(.select)
 
         // 2. 验证默认不弹出控制栏：画面纯净，player.wake 处于等待或获得焦点状态
@@ -1710,7 +1712,9 @@ final class RemoteNavigationTests: XCTestCase {
         // 5. 再次按遥控器 Menu 键：此时正常退出播放页回到选集详情页！
         press(.menu)
         wait("second menu returns to episode detail") {
-            !self.app.buttons["player.wake"].exists && (self.app.buttons["detail.episode.76"].hasFocus || self.app.buttons["detail.play"].hasFocus || self.app.buttons["detail.play"].exists)
+            let selected = self.app.buttons["detail.episode.\(episode)"]
+            let play = self.app.buttons["detail.play"]
+            return !self.app.buttons["player.wake"].exists && ((selected.exists && selected.hasFocus) || (play.exists && play.hasFocus))
         }
 
         print("THL_TV_PLAYER_CONTROLS_VERIFICATION initialHidden=true tapScreenHide=true menuDismissControls=true menuExitToDetail=true")

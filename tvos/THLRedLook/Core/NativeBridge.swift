@@ -2,7 +2,6 @@ import Foundation
 import JavaScriptCore
 
 final class HttpTraceHolder: @unchecked Sendable {
-    static let shared = HttpTraceHolder()
     private let lock = NSLock()
     private var _url = ""
     private var _method = "GET"
@@ -39,6 +38,7 @@ public actor NativeBridge {
     private let diagnostics: SourceDiagnostics
     private let diagnosticContext: String
     private let persistentDeviceSession: Bool
+    private let httpTrace = HttpTraceHolder()
 
     // 沙盒路径
     private var baseDirURL: URL
@@ -229,6 +229,7 @@ public actor NativeBridge {
         let session = httpSession
         let recorder = diagnostics
         let diagnosticContext = diagnosticContext
+        let trace = httpTrace
         let fetchBlock: @convention(block) (String, [String: Any]?) -> [String: Any] = { urlStr, opts in
             guard let url = URL(string: urlStr) else {
                 return [
@@ -239,6 +240,9 @@ public actor NativeBridge {
                     "errorDetail": "无效目标地址: \(urlStr)",
                     "category": DiagnosticCategory.unknown.rawValue
                 ]
+            }
+            if Task.isCancelled {
+                return ["status": 0, "headers": [:], "body": "", "error": "CANCELLED", "category": "cancelled"]
             }
             var req = URLRequest(url: url)
             let timeout = min(12.0, max(0.001, (opts?["timeoutMs"] as? Double ?? 10000) / 1000))
@@ -281,7 +285,7 @@ public actor NativeBridge {
             }
 
             let logId = response.headers["x-tt-logid"] ?? response.headers["x-tt-traceid"] ?? response.headers["x-ss-req-ticket"] ?? ""
-            HttpTraceHolder.shared.record(
+            trace.record(
                 url: SourceDiagnostics.desensitizeUrl(url.absoluteString),
                 method: method,
                 status: response.status,
@@ -371,6 +375,7 @@ public actor NativeBridge {
             if (status === 0 && (res.error || res.errorDetail)) {
                 var netErr = new Error("网络请求失败: " + (res.errorDetail || res.error || "未知网络错误"));
                 netErr.code = res.error || "HTTP_0";
+                if (netErr.code === "CANCELLED") globalThis.__hongguoCancelled = true;
                 netErr.category = res.category || "network_timeout";
                 netErr.isNetworkError = true;
                 throw netErr;
@@ -473,6 +478,7 @@ public actor NativeBridge {
         context.setObject(onDone, forKeyedSubscript: doneKey as NSString)
 
         let wrapper = """
+        globalThis.__hongguoCancelled = false;
         (async function() {
             try {
                 var res = await (\(scriptExpr));
@@ -498,6 +504,23 @@ public actor NativeBridge {
         context.setObject(nil, forKeyedSubscript: doneKey as NSString)
 
         return resultData
+    }
+
+    private func playbackFailure(code: String, message: String, episode: Int) -> NSError {
+        let trace = httpTrace.snapshot
+        let category: DiagnosticCategory
+        let description: String
+        if code.hasPrefix("MEDIA_HTTP_") || code.hasPrefix("HTTP_") {
+            category = .httpError
+            description = "官方播放或媒体节点请求失败"
+        } else if code.hasPrefix("DNS") { category = .dnsError; description = "播放接口域名解析失败" }
+        else if code.hasPrefix("TIMEOUT") || code == "ETIMEDOUT" { category = .networkTimeout; description = "播放接口请求超时" }
+        else if ["BUSINESS_REJECTED", "SECURITY_BLOCKED"].contains(code) { category = .businessRejected; description = "官方播放接口暂时拒绝当前请求" }
+        else { category = .invalidResponse; description = "官方暂未返回可用的当前分集播放流" }
+        let detail = SourceDiagnostics.redact(message.isEmpty ? description : message)
+        let advice = "请保留当前剧集与集数，并在设置的数据源诊断中扫码导出报告。"
+        diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "播放取流 第\(episode)集", host: URL(string: trace.url)?.host ?? "", url: trace.url, method: trace.method, logId: trace.logId, status: trace.status, errorCode: code, category: category, errorDetail: detail, suggestion: advice, responseSnippet: trace.snippet))
+        return NSError(domain: "CatPawOpen.Playback", code: -2, userInfo: [NSLocalizedDescriptionKey: detail + "（" + code + "）", "diagnosticCode": code, "diagnosticCategory": category.rawValue, "diagnosticAdvice": advice])
     }
 
     /// 将 vod_* 数据结构转换为应用统一的 Drama 字典
@@ -550,6 +573,7 @@ public actor NativeBridge {
 
     /// 处理所有业务操作 Action 请求
     public func request(action: String, payload: [String: Any]) async throws -> [String: Any] {
+        try Task.checkCancellation()
         if action != "initialize" {
             try await ensureInitialized()
         }
@@ -754,7 +778,7 @@ public actor NativeBridge {
                     }
                     let errDetail = "搜索执行失败: \(errMsg)"
                     let advice = SourceDiagnostics.advice(SourceDiagnosticEntry(context: diagnosticContext, stage: "搜索执行", errorCode: rawCode, category: errCat, errorDetail: errDetail))
-                    let trace = HttpTraceHolder.shared.snapshot
+                    let trace = httpTrace.snapshot
                     let hasCached = persistentDeviceSession && UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session") != nil
                     let sessionStatus = hasCached ? "使用本地缓存设备凭据" : "全新游客会话"
                     diagnostics.add(SourceDiagnosticEntry(
@@ -977,23 +1001,26 @@ public actor NativeBridge {
                 ]]
                 let scriptExpr = try spiderExpression("play", ["", rawUrl, flags])
                 let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
-
-                if let data = res?["data"] as? [String: Any] {
-                    targetUrl = data["url"] as? String ?? ""
-                    danmakuId = data["danmakuId"] as? String ?? ""
-                    contentKey = data["decryptionKey"] as? String ?? ""
-                    expiresAt = (data["expiresAt"] as? NSNumber)?.int64Value ?? 0
-                    mediaBytes = (data["mediaBytes"] as? NSNumber)?.int64Value ?? 0
-                    reportedQuality = data["quality"] as? Int ?? 0
-                    reportedQualities = data["qualities"] as? [Int] ?? []
-                    if let hdr = (data["header"] as? [String: String]) ?? (data["headers"] as? [String: String]) {
-                        targetHeaders = hdr
-                    }
+                try Task.checkCancellation()
+                let data = res?["data"] as? [String: Any]
+                guard res?["ok"] as? Bool == true,
+                      let data, let url = data["url"] as? String,
+                      !url.isEmpty, !url.contains("example.com") else {
+                    let code = SourceDiagnostics.safeCode(res?["code"] ?? data?["error"])
+                    if code == "CANCELLED" { throw CancellationError() }
+                    throw playbackFailure(code: code.isEmpty ? "NO_STREAM_URL" : code, message: res?["error"] as? String ?? "", episode: epIndex)
                 }
+                targetUrl = url
+                danmakuId = data["danmakuId"] as? String ?? ""
+                contentKey = data["decryptionKey"] as? String ?? ""
+                expiresAt = (data["expiresAt"] as? NSNumber)?.int64Value ?? 0
+                mediaBytes = (data["mediaBytes"] as? NSNumber)?.int64Value ?? 0
+                reportedQuality = data["quality"] as? Int ?? 0
+                reportedQualities = data["qualities"] as? [Int] ?? []
+                targetHeaders = (data["header"] as? [String: String]) ?? (data["headers"] as? [String: String]) ?? [:]
             }
-
-            if targetUrl.isEmpty || targetUrl.contains("example.com") {
-                throw NSError(domain: "CatPawOpen", code: -2, userInfo: [NSLocalizedDescriptionKey: "无法从数据源获取当前分集的真实播放流，请重试"])
+            guard !targetUrl.isEmpty else {
+                throw playbackFailure(code: "SOURCE_UNAVAILABLE", message: "播放数据源尚未就绪", episode: epIndex)
             }
 
             if !contentKey.isEmpty && contentKey.range(of: "^[0-9a-fA-F]{32}$", options: .regularExpression) == nil {

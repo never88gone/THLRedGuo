@@ -2,13 +2,16 @@ import Foundation
 
 public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStreamProviderProtocol, DanmakuProviderProtocol {
     public static let shared = NativeRepository()
-    static let preloading = NativeRepository(bridge: NativeBridge())
+    static let preloading = NativeRepository(bridge: NativeBridge(), playbackBridge: NativeBridge(diagnosticContext: "下一集预加载"))
     private let bridge: NativeBridge
-    private let playbackBridge = NativeBridge()
+    private let playbackBridge: NativeBridge
     private let danmakuBridge = NativeBridge()
     private let feedBridge = NativeBridge()
 
-    public init(bridge: NativeBridge = .shared) { self.bridge = bridge }
+    public init(bridge: NativeBridge = .shared, playbackBridge: NativeBridge? = nil) {
+        self.bridge = bridge
+        self.playbackBridge = playbackBridge ?? NativeBridge(diagnosticContext: "播放取流")
+    }
 
     public func loadVideoFeed(page: Int, session: String) async throws -> VideoFeedPage {
         let result = try await feedBridge.request(action: "feed", payload: ["source": "hongguo", "page": page, "session": session])
