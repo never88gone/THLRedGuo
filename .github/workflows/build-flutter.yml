@@ -345,7 +345,11 @@ jobs:
           fi
       - name: 构建并打包 macOS DMG 安装包
         run: |
-          python scripts/build_macos.py
+          if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f macos/ExportOptions.plist ]; then
+            python scripts/build_macos.py --export-options macos/ExportOptions.plist
+          else
+            python scripts/build_macos.py
+          fi
       - name: 清理 macOS 钥匙串与临时凭证
         if: always()
         run: |
