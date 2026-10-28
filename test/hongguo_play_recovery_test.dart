@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -6,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 
 void main() {
+  setUp(CatPawJsRuntime.resetDeviceSessionForTesting);
   final source = File('assets/sources/hongguo.js').readAsStringSync();
   const id = '7345678901234567000';
   const url = 'https://v5-reading-video.qznovelvod.com/synthetic.mp4';
@@ -72,5 +74,72 @@ HongguoApp.fetchAppPlayUrl=async function(){return {variants:[${variants.map((v)
     expect(result.url, isEmpty);
     expect(result.errorCode, 'MEDIA_HTTP_403');
     expect(probes.length, lessThanOrEqualTo(5));
+  });
+
+  for (final body in ['', ' \n\t']) {
+    test(
+      'empty model body is bounded and does not churn guest sessions ($body)',
+      () async {
+        var registrations = 0;
+        var models = 0;
+        final client = MockClient((request) async {
+          if (request.url.path.contains('device_register')) {
+            registrations++;
+            return http.Response(
+              jsonEncode({
+                'device_id_str': '7345678901234567100',
+                'install_id_str': '7345678901234567200',
+              }),
+              200,
+            );
+          }
+          expect(request.url.path, '/novel/player/multi_video_model/v1/');
+          models++;
+          return http.Response(body, 200);
+        });
+        final runtime = CatPawJsRuntime(client, null, '合成空响应', false);
+        addTearDown(runtime.dispose);
+        addTearDown(client.close);
+        await runtime.init(
+          source.replaceFirst(
+            'const existingPlay = spider.play;',
+            "const existingPlay = async function(){return {url:''};};",
+          ),
+        );
+        final result = await runtime.play('', '7345678901234567100_$id');
+        expect(result.url, isEmpty);
+        expect(result.errorCode, 'EMPTY_RESPONSE');
+        expect(models, 1);
+        expect(registrations, 1);
+      },
+    );
+  }
+
+  test('a decoding failure stops repeated model and guest requests', () async {
+    final client = MockClient(
+      (request) async => throw StateError('Unexpected HTTP request'),
+    );
+    final runtime = CatPawJsRuntime(client);
+    addTearDown(runtime.dispose);
+    addTearDown(client.close);
+    await runtime.init('''
+${source.replaceFirst('const existingPlay = spider.play;', "const existingPlay = async function(){return {url:''};};")}
+let modelCalls=0;
+HongguoApp.fetchAppPlayUrl=async function(){modelCalls++;throw Object.assign(new Error('synthetic encoding'),{code:'RESPONSE_NOT_UTF8'});};
+const originalPlay=spider.play;
+spider.play=async function(...args){const result=await originalPlay(...args);if(modelCalls!==1)throw new Error('unbounded retry');return result;};
+''');
+    expect(
+      (await runtime.play('', '7345678901234567100_$id')).errorCode,
+      'RESPONSE_NOT_UTF8',
+    );
+    expect(
+      CatPawSourceFailure.playback('EMPTY_RESPONSE').message,
+      contains('没有返回播放数据'),
+    );
+    expect(
+      CatPawSourceFailure.playback('RESPONSE_NOT_UTF8').message,
+      contains('无法解码'),
+    );
   });
 }

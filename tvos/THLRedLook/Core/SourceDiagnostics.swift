@@ -66,6 +66,10 @@ public struct SourceDiagnosticEntry: Identifiable {
     public var responseSnippet: String = ""
     public var searchTabsSummary: String = ""
     public var sessionStatus: String = ""
+    public var bodyBytes: Int?
+    public var contentType = ""
+    public var contentEncoding = ""
+    public var declaredBodyBytes: Int?
 
     public var failed: Bool {
         !errorCode.isEmpty || category != .unknown && category != .invalidResponse
@@ -103,7 +107,11 @@ public struct SourceDiagnosticEntry: Identifiable {
         suggestion: String = "",
         responseSnippet: String = "",
         searchTabsSummary: String = "",
-        sessionStatus: String = ""
+        sessionStatus: String = "",
+        bodyBytes: Int? = nil,
+        contentType: String = "",
+        contentEncoding: String = "",
+        declaredBodyBytes: Int? = nil
     ) {
         self.context = context
         self.stage = stage
@@ -122,6 +130,10 @@ public struct SourceDiagnosticEntry: Identifiable {
         self.responseSnippet = responseSnippet
         self.searchTabsSummary = searchTabsSummary
         self.sessionStatus = sessionStatus
+        self.bodyBytes = bodyBytes
+        self.contentType = contentType
+        self.contentEncoding = contentEncoding
+        self.declaredBodyBytes = declaredBodyBytes
     }
 }
 
@@ -323,11 +335,13 @@ public final class SourceDiagnostics: ObservableObject {
         body: String,
         method: String = "GET",
         headers: [String: String] = [:],
+        bodyBytes: Int? = nil,
         errorCode: String = "",
         error: Error? = nil
     ) {
         guard let stage = Self.stage(for: url) else { return }
 
+        let headers = headers.reduce(into: [String: String]()) { $0[$1.key.lowercased()] = $1.value }
         let logId = headers["x-tt-logid"] ?? headers["x-tt-traceid"] ?? headers["x-ss-req-ticket"] ?? ""
         let responseSnippet = Self.responseSummary(body)
 
@@ -342,7 +356,11 @@ public final class SourceDiagnostics: ObservableObject {
             businessCode: "",
             errorCode: Self.safeCode(errorCode),
             elapsedMs: elapsedMs,
-            responseSnippet: responseSnippet
+            responseSnippet: responseSnippet,
+            bodyBytes: bodyBytes ?? body.utf8.count,
+            contentType: Self.responseContentType(headers["content-type"] ?? ""),
+            contentEncoding: Self.responseEncoding(headers["content-encoding"] ?? ""),
+            declaredBodyBytes: Int(headers["content-length"] ?? "").flatMap { $0 >= 0 ? $0 : nil }
         )
 
         // 智能分类与失败原因分析
@@ -354,6 +372,13 @@ public final class SourceDiagnostics: ObservableObject {
             if entry.errorCode.isEmpty {
                 entry.errorCode = classified.category.tag
             }
+        }
+
+        if entry.errorCode == "RESPONSE_NOT_UTF8" {
+            entry.category = .invalidResponse
+            entry.errorDetail = "收到 \(entry.bodyBytes ?? 0) 字节正文，但无法按 UTF-8 解码"
+            entry.suggestion = ""
+            entry.suggestion = Self.advice(entry)
         }
 
         if entry.errorCode.isEmpty && status == 200 {
@@ -418,8 +443,9 @@ public final class SourceDiagnostics: ObservableObject {
                 entry.errorCode = "INVALID_RESPONSE"
                 let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 if trimmedBody.isEmpty {
+                    entry.errorCode = "EMPTY_RESPONSE"
                     entry.errorDetail = "响应体为空"
-                    entry.suggestion = "服务端未返回任何内容，请检查网络链路或稍后重试。"
+                    entry.suggestion = Self.advice(entry)
                 } else if trimmedBody.contains("<html") || trimmedBody.contains("<!doctype") {
                     entry.errorDetail = "接口返回了 HTML 网页而非 JSON 数据"
                     entry.suggestion = "可能遭遇防爬验证码或网关拦截，请检查网络代理环境。"
@@ -431,6 +457,16 @@ public final class SourceDiagnostics: ObservableObject {
         }
 
         add(entry)
+    }
+
+    private static func responseContentType(_ raw: String) -> String {
+        let value = raw.split(separator: ";", maxSplits: 1).first.map(String.init)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        return value.count <= 100 && value.range(of: "^[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+$", options: .regularExpression) != nil ? value : ""
+    }
+
+    private static func responseEncoding(_ raw: String) -> String {
+        let values = raw.lowercased().split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return !values.isEmpty && values.count <= 4 && values.allSatisfy { ["gzip", "deflate", "br", "identity", "zstd"].contains($0) } ? values.joined(separator: ", ") : ""
     }
 
     public static func desensitizeUrl(_ raw: String) -> String {
@@ -514,6 +550,9 @@ public final class SourceDiagnostics: ObservableObject {
         if entry.errorCode == "SEARCH_TAB_MISSING" {
             return "官方连接成功但没有提供短剧分类，请导出日志并对照不同网络；不能据此确认地区限制。"
         }
+        if ["EMPTY_RESPONSE", "RESPONSE_NOT_UTF8"].contains(entry.errorCode) {
+            return "请在同一设备用原网络和手机热点作对照，注明实际地区及代理或分流设置，并导出报告；仅凭该响应无法确认地区限制。"
+        }
         if entry.category == .jsError {
             return "JS 脚本执行报错，请更新至最新数据源规范脚本。"
         }
@@ -563,7 +602,12 @@ public final class SourceDiagnostics: ObservableObject {
                 lines.append("    状态: \(entry.failed ? "❌ 失败" : "✅ 成功") | 耗时: \(entry.elapsedMs)ms")
                 if !entry.host.isEmpty { lines.append("    目标主机: \(entry.host)") }
                 if !entry.url.isEmpty { lines.append("    请求接口: \(entry.url)") }
+                if !entry.url.isEmpty { lines.append("    请求方法: \(entry.method)") }
                 if entry.status > 0 { lines.append("    HTTP状态: \(entry.status)") }
+                if let bytes = entry.bodyBytes { lines.append("    接收正文字节数: \(bytes)") }
+                if !entry.contentType.isEmpty { lines.append("    Content-Type: \(entry.contentType)") }
+                if !entry.contentEncoding.isEmpty { lines.append("    Content-Encoding: \(entry.contentEncoding)") }
+                if let bytes = entry.declaredBodyBytes { lines.append("    Content-Length: \(bytes)") }
                 if !entry.businessCode.isEmpty { lines.append("    业务状态: \(entry.businessCode)") }
                 if !entry.logId.isEmpty { lines.append("    字节 LogID: \(entry.logId)") }
                 if !entry.sessionStatus.isEmpty { lines.append("    会话状态: \(entry.sessionStatus)") }

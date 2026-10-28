@@ -83,6 +83,8 @@ class CatPawSourceFailure implements Exception {
       'MISSING_MODEL' => '官方接口暂未返回本集片源',
       'MEDIA_REJECTED' => '本集媒体地址暂不可用，请重试',
       'INVALID_RESPONSE' => '官方接口返回的播放数据无效',
+      'EMPTY_RESPONSE' => '官方播放接口连接成功，但没有返回播放数据',
+      'RESPONSE_NOT_UTF8' => '官方播放接口返回了无法解码的数据',
       'GUEST_REGISTRATION_FAILED' => '官方访客会话初始化失败，请重试',
       _ => '站源暂未返回本集可播放地址，请重试',
     };

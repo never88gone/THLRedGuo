@@ -241,10 +241,12 @@ class SourceDiagnostics extends ChangeNotifier {
         'INVALID_SEARCH_CURSOR',
         'SEARCH_EMPTY',
         'INVALID_RESPONSE',
+        'EMPTY_RESPONSE',
+        'RESPONSE_NOT_UTF8',
       ].contains(c)) {
         return DiagnosticAnalysisResult(
           category: 'DATA_PARSE',
-          title: c == 'SEARCH_TAB_MISSING' ? '官方未提供短剧分类' : '搜索数据异常',
+          title: c == 'SEARCH_TAB_MISSING' ? '官方未提供短剧分类' : '接口响应异常',
           message: msg,
           advice: adviceForCode(c),
           code: c,
@@ -677,7 +679,8 @@ class SourceDiagnostics extends ChangeNotifier {
       'BUSINESS_REJECTED' => '服务端拒绝了请求；请保留报告，稍后或换网络对照。',
       'INVALID_RESPONSE' ||
       'GUEST_REGISTRATION_FAILED' => '接口返回的数据不符合预期，请复制报告反馈。',
-      'EMPTY_RESPONSE' => '服务端返回了空响应 (0 字节)，可能该端点已下线或受网关限制。',
+      'EMPTY_RESPONSE' ||
+      'RESPONSE_NOT_UTF8' => '接口未返回可用正文，请在同一设备用原网络和手机热点作对照，并导出诊断日志。',
       'MISSING_EPISODE' => '该剧暂无可用分集或已在官方站源下线，建议更换剧目播放。',
       'NO_STREAM_URL' => '官方媒体播放地址提取失败，建议尝试其他分集或稍后重试。',
       'JS_EXECUTION' => 'JS 脚本执行异常，请复制脱敏报告协助排查。',

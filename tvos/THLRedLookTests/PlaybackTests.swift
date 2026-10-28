@@ -377,6 +377,29 @@ final class PlaybackTests: XCTestCase {
         print("THL_NATURAL_RESULT " + String(decoding: try JSONSerialization.data(withJSONObject: events, options: .sortedKeys), as: UTF8.self))
     }
 
+    func testLiveReportedOverseasEpisodeAndAutomaticNext() async throws {
+        try live()
+        let data = try await detail("7697541703539887129")
+        let episode = try XCTUnwrap(data.episodes.first { $0.number == 184 })
+        let raw = try JSONSerialization.jsonObject(with: XCTUnwrap(episode.raw)) as? [String: Any]
+        XCTAssertEqual(raw?["url"] as? String, "https://hongguoduanju.com/player/7697541703539887129/7701245171979029528")
+        let suite = "THLRedLook.OverseasLive." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = PlayerViewModel(drama: data.drama, allEpisodes: data.episodes, repository: repository, store: LocalStore(defaults: defaults))
+        model.danmakuEnabled = false
+        defer { model.onDisappear() }
+        await model.preparePlayback(episodeIndex: 184)
+        try await ready(model)
+        XCTAssertEqual(model.currentEpisodeIndex, 184)
+        print("THL_OVERSEAS_LIVE episode=184 firstFrame=true video=true audio=true")
+        model.seekBy(seconds: max(0, model.duration - model.currentTime - 3))
+        try await wait { model.currentEpisodeIndex == 185 && !model.isLoading && model.currentTime > 0.5 }
+        try await ready(model)
+        XCTAssertEqual(model.currentEpisodeIndex, 185)
+        print("THL_OVERSEAS_LIVE episode=185 automaticNext=true firstFrame=true video=true audio=true")
+    }
+
     func testLiveRapidEpisodeChangeAndExitCancellation() async throws {
         try live()
         let detail = try await detail("7694896136963755032")

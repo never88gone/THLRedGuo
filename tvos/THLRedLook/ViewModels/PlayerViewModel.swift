@@ -475,13 +475,14 @@ public final class PlayerViewModel: ObservableObject {
             updateActiveDanmakus()
         } catch {
             guard current(), !(error is CancellationError) else { return }
-            requestRecovery(reason: error.localizedDescription)
+            requestRecovery(reason: error.localizedDescription, code: (error as NSError).userInfo["diagnosticCode"] as? String ?? "")
         }
     }
 
-    func requestRecovery(reason: String) {
+    func requestRecovery(reason: String, code: String = "") {
         guard !closed, !reachedEnd, recoveryTask == nil else { return }
-        guard recoveryAttempts < 5 else {
+        let invalidBody = ["EMPTY_RESPONSE", "RESPONSE_NOT_UTF8"].contains(code)
+        guard recoveryAttempts < (invalidBody ? 2 : 5) else {
             initializationTimer?.invalidate()
             healthTimer?.invalidate()
             player?.pause()
@@ -498,9 +499,10 @@ public final class PlayerViewModel: ObservableObject {
         let position = max(currentTime, playerTime.isFinite ? playerTime : 0)
         isLoading = true
         errorMessage = nil
-        NSLog("[PlayerVM] recovering episode=%d attempt=%d", episode, recoveryAttempts)
+        let delay: UInt64 = invalidBody ? (recoveryAttempts == 1 ? 1_000_000_000 : 3_000_000_000) : 300_000_000
+        NSLog("[PlayerVM] recovering episode=%d attempt=%d delayMs=%llu code=%@", episode, recoveryAttempts, delay / 1_000_000, SourceDiagnostics.safeCode(code))
         recoveryTask = Task { [weak self] in
-            do { try await Task.sleep(nanoseconds: 300_000_000) } catch { return }
+            do { try await Task.sleep(nanoseconds: delay) } catch { return }
             guard let self, !closed, !Task.isCancelled else { return }
             recoveryTask = nil
             await beginPlayback(episodeIndex: episode, seekTo: position, recovering: true)

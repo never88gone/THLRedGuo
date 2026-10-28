@@ -302,6 +302,7 @@ public actor NativeBridge {
                 body: response.body,
                 method: method,
                 headers: response.headers,
+                bodyBytes: response.bodyBytes,
                 errorCode: response.error,
                 error: response.rawError
             )
@@ -372,7 +373,7 @@ public actor NativeBridge {
             var status = typeof res.status === "number" ? res.status : 0;
             var respBody = res.body || "";
             var respHeaders = res.headers || {};
-            if (status === 0 && (res.error || res.errorDetail)) {
+            if ((status === 0 || res.error === "RESPONSE_NOT_UTF8") && (res.error || res.errorDetail)) {
                 var netErr = new Error("网络请求失败: " + (res.errorDetail || res.error || "未知网络错误"));
                 netErr.code = res.error || "HTTP_0";
                 if (netErr.code === "CANCELLED") globalThis.__hongguoCancelled = true;
@@ -508,6 +509,9 @@ public actor NativeBridge {
 
     private func playbackFailure(code: String, message: String, episode: Int) -> NSError {
         let trace = httpTrace.snapshot
+        let upstream = ["EMPTY_RESPONSE", "RESPONSE_NOT_UTF8"].contains(code) ? diagnostics.entries.last {
+            $0.context == diagnosticContext && $0.errorCode == code && $0.stage == "播放解析"
+        } : nil
         let category: DiagnosticCategory
         let description: String
         if code.hasPrefix("MEDIA_HTTP_") || code.hasPrefix("HTTP_") {
@@ -516,10 +520,12 @@ public actor NativeBridge {
         } else if code.hasPrefix("DNS") { category = .dnsError; description = "播放接口域名解析失败" }
         else if code.hasPrefix("TIMEOUT") || code == "ETIMEDOUT" { category = .networkTimeout; description = "播放接口请求超时" }
         else if ["BUSINESS_REJECTED", "SECURITY_BLOCKED"].contains(code) { category = .businessRejected; description = "官方播放接口暂时拒绝当前请求" }
+        else if code == "EMPTY_RESPONSE" { category = .invalidResponse; description = "官方播放接口连接成功，但没有返回播放数据" }
+        else if code == "RESPONSE_NOT_UTF8" { category = .invalidResponse; description = "官方播放接口返回了无法解码的数据" }
         else { category = .invalidResponse; description = "官方暂未返回可用的当前分集播放流" }
         let detail = SourceDiagnostics.redact(message.isEmpty ? description : message)
-        let advice = "请保留当前剧集与集数，并在设置的数据源诊断中扫码导出报告。"
-        diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "播放取流 第\(episode)集", host: URL(string: trace.url)?.host ?? "", url: trace.url, method: trace.method, logId: trace.logId, status: trace.status, errorCode: code, category: category, errorDetail: detail, suggestion: advice, responseSnippet: trace.snippet))
+        let advice = upstream?.suggestion ?? "请保留当前剧集与集数，并在设置的数据源诊断中扫码导出报告。"
+        diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "播放取流 第\(episode)集", host: upstream?.host ?? URL(string: trace.url)?.host ?? "", url: upstream?.url ?? trace.url, method: upstream?.method ?? trace.method, logId: upstream?.logId ?? trace.logId, status: upstream?.status ?? trace.status, errorCode: code, category: category, errorDetail: detail, suggestion: advice, responseSnippet: upstream?.responseSnippet ?? trace.snippet, bodyBytes: upstream?.bodyBytes, contentType: upstream?.contentType ?? "", contentEncoding: upstream?.contentEncoding ?? "", declaredBodyBytes: upstream?.declaredBodyBytes))
         return NSError(domain: "CatPawOpen.Playback", code: -2, userInfo: [NSLocalizedDescriptionKey: detail + "（" + code + "）", "diagnosticCode": code, "diagnosticCategory": category.rawValue, "diagnosticAdvice": advice])
     }
 
@@ -1122,6 +1128,7 @@ private final class NativeHTTPResult: @unchecked Sendable {
     private var status = 0
     private var headers: [String: String] = [:]
     private var body = ""
+    private var bodyBytes = 0
     private var error = ""
     private var rawError: Error?
     private var category: DiagnosticCategory = .unknown
@@ -1137,19 +1144,26 @@ private final class NativeHTTPResult: @unchecked Sendable {
                 headers[String(describing: key).lowercased()] = String(describing: value)
             }
         }
+        bodyBytes = data?.count ?? 0
         if let data { body = String(data: data, encoding: .utf8) ?? "" }
         self.error = SourceDiagnostics.networkCode(error)
+        if error == nil, status == 200, bodyBytes > 0, body.isEmpty {
+            self.error = "RESPONSE_NOT_UTF8"
+            category = .invalidResponse
+            errorDetail = "收到 \(bodyBytes) 字节正文，但无法按 UTF-8 解码"
+            return
+        }
         let classified = SourceDiagnostics.classify(error: error, httpStatus: status, body: body)
         self.category = classified.category
         self.errorDetail = classified.reason
     }
 
-    func snapshot(timedOut: Bool) -> (status: Int, headers: [String: String], body: String, error: String, errorDetail: String, category: DiagnosticCategory, rawError: Error?) {
+    func snapshot(timedOut: Bool) -> (status: Int, headers: [String: String], body: String, bodyBytes: Int, error: String, errorDetail: String, category: DiagnosticCategory, rawError: Error?) {
         lock.lock()
         defer { lock.unlock() }
         if timedOut {
-            return (0, [:], "", "TIMEOUT:-1001", "网络请求超时 (12s)", .networkTimeout, NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
+            return (0, [:], "", 0, "TIMEOUT:-1001", "网络请求超时 (12s)", .networkTimeout, NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
         }
-        return (status, headers, body, error, errorDetail, category, rawError)
+        return (status, headers, body, bodyBytes, error, errorDetail, category, rawError)
     }
 }

@@ -149,3 +149,165 @@ final class OverseasSearchTests: XCTestCase {
         } catch {}
     }
 }
+
+private final class PlaybackResponseFixtureProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var nonUTF8 = false
+    private static var registrations = 0
+    private static var modelTimes: [Date] = []
+    private static var legacyModels = 0
+
+    static func configure(nonUTF8: Bool = false) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.nonUTF8 = nonUTF8
+        registrations = 0
+        modelTimes = []
+        legacyModels = 0
+    }
+
+    static var counts: (registrations: Int, modelTimes: [Date], legacyModels: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (registrations, modelTimes, legacyModels)
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func stopLoading() {}
+    override func startLoading() {
+        let url = request.url!
+        let registration = url.path.contains("device_register")
+        let multi = url.path.contains("multi_video_model")
+        let legacy = !multi && url.path.contains("video_model")
+        Self.lock.lock()
+        let nonUTF8 = Self.nonUTF8
+        if registration { Self.registrations += 1 }
+        if multi { Self.modelTimes.append(Date()) }
+        if legacy { Self.legacyModels += 1 }
+        Self.lock.unlock()
+        let bytes: Data
+        var headers = ["Content-Type": "application/json; charset=utf-8", "X-Tt-Logid": "synthetic-playback-log", "Set-Cookie": "private-cookie", "X-Untrusted": "private-header"]
+        let status: Int
+        if registration {
+            status = 200
+            bytes = Data(#"{"device_id_str":"7345678901234567100","install_id_str":"7345678901234567200"}"#.utf8)
+        } else if multi || legacy {
+            status = 200
+            bytes = nonUTF8 ? Data([0xff, 0xfe, 0x80, 0x00]) : Data()
+            headers["Content-Type"] = nonUTF8 ? "application/x-protobuf" : "application/json"
+            headers["Content-Encoding"] = "br"
+            headers["Content-Length"] = String(bytes.count)
+        } else {
+            status = 404
+            bytes = Data()
+        }
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: bytes)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+}
+
+@MainActor
+final class OverseasPlaybackTests: XCTestCase {
+    private let seriesId = "7345678901234567123"
+    private let videoId = "7345678901234568456"
+
+    private func bridge(_ recorder: SourceDiagnostics) throws -> NativeBridge {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [PlaybackResponseFixtureProtocol.self]
+        let session = URLSession(configuration: config)
+        addTeardownBlock { session.invalidateAndCancel() }
+        return NativeBridge(baseDirectory: root, httpSession: session, diagnostics: recorder, diagnosticContext: "合成海外取流", persistentDeviceSession: false)
+    }
+
+    private func model(_ core: NativeBridge) throws -> PlayerViewModel {
+        let suite = "THLRedLook.OverseasPlayback." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
+        let episode = Episode(id: videoId, title: "合成分集", number: 1, raw: try JSONSerialization.data(withJSONObject: ["url": "https://hongguoduanju.com/player/\(seriesId)/\(videoId)"]))
+        let repository = NativeRepository(bridge: core, playbackBridge: core)
+        let model = PlayerViewModel(drama: Drama(id: "hongguo:\(seriesId)", source: "hongguo", sourceId: seriesId, title: "合成海外取流"), allEpisodes: [episode], repository: repository, preloadingRepository: repository, store: LocalStore(defaults: defaults))
+        model.danmakuEnabled = false
+        return model
+    }
+
+    private func failure(nonUTF8: Bool, code: String, bytes: Int) async throws {
+        PlaybackResponseFixtureProtocol.configure(nonUTF8: nonUTF8)
+        let recorder = SourceDiagnostics()
+        let core = try bridge(recorder)
+        do {
+            _ = try await core.request(action: "resolve", payload: ["source": "hongguo", "drama": ["id": "hongguo:\(seriesId)"], "index": 184, "chapter": ["url": "https://hongguoduanju.com/player/\(seriesId)/\(videoId)"]])
+            XCTFail("Expected unusable playback response")
+        } catch {
+            XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, code)
+        }
+        let counts = PlaybackResponseFixtureProtocol.counts
+        XCTAssertEqual(counts.registrations, 1)
+        XCTAssertEqual(counts.modelTimes.count, 1)
+        XCTAssertLessThanOrEqual(counts.legacyModels, 1)
+        let entry = try XCTUnwrap(recorder.entries.last)
+        XCTAssertEqual(entry.stage, "播放取流 第184集")
+        XCTAssertEqual(entry.errorCode, code)
+        XCTAssertEqual(entry.status, 200)
+        XCTAssertEqual(entry.bodyBytes, bytes)
+        XCTAssertEqual(entry.contentType, nonUTF8 ? "application/x-protobuf" : "application/json")
+        XCTAssertEqual(entry.contentEncoding, "br")
+        XCTAssertEqual(entry.declaredBodyBytes, bytes)
+        XCTAssertEqual(entry.host, "api5-normal-sinfonlineb.fqnovel.com")
+        XCTAssertFalse(entry.url.contains("/player/\(seriesId)"))
+        XCTAssertTrue(entry.suggestion.contains("手机热点"))
+        let report = recorder.report
+        XCTAssertTrue(report.contains(code))
+        XCTAssertTrue(report.contains("接收正文字节数: \(bytes)"))
+        XCTAssertTrue(report.contains("synthetic-playback-log"))
+        XCTAssertFalse(report.contains("private-"))
+        print("THL_OVERSEAS_RESPONSE code=\(code) bytes=\(bytes) upstreamRetained=true registrations=\(counts.registrations) modelRequests=\(counts.modelTimes.count)")
+    }
+
+    func testHTTP200EmptyBodyRetainsUpstreamAndDoesNotRefreshGuest() async throws {
+        try await failure(nonUTF8: false, code: "EMPTY_RESPONSE", bytes: 0)
+    }
+
+    func testNonUTF8BodyKeepsHTTP200AndNonzeroByteCount() async throws {
+        try await failure(nonUTF8: true, code: "RESPONSE_NOT_UTF8", bytes: 4)
+    }
+
+    func testAutomaticRecoveryUsesBackoffAndStopsAfterTwoRetries() async throws {
+        PlaybackResponseFixtureProtocol.configure()
+        let core = try bridge(SourceDiagnostics())
+        let model = try model(core)
+        defer { model.onDisappear() }
+        await model.preparePlayback(episodeIndex: 1)
+        let deadline = Date().addingTimeInterval(15)
+        while model.errorMessage == nil, Date() < deadline { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertNotNil(model.errorMessage)
+        XCTAssertTrue(model.errorMessage?.contains("EMPTY_RESPONSE") == true)
+        let counts = PlaybackResponseFixtureProtocol.counts
+        XCTAssertEqual(counts.registrations, 1)
+        XCTAssertEqual(counts.modelTimes.count, 3)
+        XCTAssertLessThanOrEqual(counts.legacyModels, 3)
+        if counts.modelTimes.count == 3 {
+            XCTAssertGreaterThanOrEqual(counts.modelTimes[1].timeIntervalSince(counts.modelTimes[0]), 0.95)
+            XCTAssertGreaterThanOrEqual(counts.modelTimes[2].timeIntervalSince(counts.modelTimes[1]), 2.95)
+        }
+        XCTAssertNil(model.plan)
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertFalse(model.isLoading)
+        print("THL_OVERSEAS_BACKOFF automaticRetries=2 guestRegistrations=1 stopped=true")
+    }
+
+    func testLeavingPlayerCancelsPendingEmptyResponseRetry() async throws {
+        PlaybackResponseFixtureProtocol.configure()
+        let core = try bridge(SourceDiagnostics())
+        let model = try model(core)
+        await model.preparePlayback(episodeIndex: 1)
+        model.onDisappear()
+        try await Task.sleep(nanoseconds: 1_300_000_000)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelTimes.count, 1)
+        XCTAssertNil(model.player)
+    }
+}
