@@ -153,27 +153,31 @@ final class OverseasSearchTests: XCTestCase {
 private final class PlaybackResponseFixtureProtocol: URLProtocol {
     private static let lock = NSLock()
     private static var nonUTF8 = false
+    private static var savedGuestMode = ""
     private static var registrations = 0
     private static var modelTimes: [Date] = []
     private static var legacyModels = 0
     private static var modelRoutes: [String] = []
     private static var webRequests = 0
+    private static var implicitCookieRequests = 0
 
-    static func configure(nonUTF8: Bool = false) {
+    static func configure(nonUTF8: Bool = false, savedGuestMode: String = "") {
         lock.lock()
         defer { lock.unlock() }
         self.nonUTF8 = nonUTF8
+        self.savedGuestMode = savedGuestMode
         registrations = 0
         modelTimes = []
         legacyModels = 0
         modelRoutes = []
         webRequests = 0
+        implicitCookieRequests = 0
     }
 
-    static var counts: (registrations: Int, modelTimes: [Date], legacyModels: Int, modelRoutes: [String], webRequests: Int) {
+    static var counts: (registrations: Int, modelTimes: [Date], legacyModels: Int, modelRoutes: [String], webRequests: Int, implicitCookieRequests: Int) {
         lock.lock()
         defer { lock.unlock() }
-        return (registrations, modelTimes, legacyModels, modelRoutes, webRequests)
+        return (registrations, modelTimes, legacyModels, modelRoutes, webRequests, implicitCookieRequests)
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -186,6 +190,8 @@ private final class PlaybackResponseFixtureProtocol: URLProtocol {
         let legacy = !multi && url.path.contains("video_model")
         Self.lock.lock()
         let nonUTF8 = Self.nonUTF8
+        let mode = Self.savedGuestMode
+        if request.httpShouldHandleCookies || request.value(forHTTPHeaderField: "Cookie") != nil { Self.implicitCookieRequests += 1 }
         if registration { Self.registrations += 1 }
         if multi && url.host == "api5-normal-sinfonlineb.fqnovel.com" { Self.modelTimes.append(Date()) }
         if legacy { Self.legacyModels += 1 }
@@ -198,9 +204,18 @@ private final class PlaybackResponseFixtureProtocol: URLProtocol {
         if registration {
             status = 200
             bytes = Data(#"{"device_id_str":"7345678901234567100","install_id_str":"7345678901234567200"}"#.utf8)
-        } else if multi || legacy {
+        } else if request.httpMethod == "HEAD" {
             status = 200
-            bytes = nonUTF8 ? Data([0xff, 0xfe, 0x80, 0x00]) : Data()
+            bytes = Data()
+            headers["Content-Type"] = "video/mp4"
+        } else if multi || legacy {
+            let old = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains { $0.name == "device_id" && $0.value == "7335678901234567100" } == true
+            status = mode == "forbidden" ? 403 : 200
+            if mode == "recover", !old {
+                let media = Data("https://fixture.qznovelvod.com/full.mp4".utf8).base64EncodedString()
+                let entry: [String: Any] = ["video_model": ["video_list": ["main": ["codec_type": "h264", "vwidth": 1080, "vheight": 1920, "main_url": media]]]]
+                bytes = try! JSONSerialization.data(withJSONObject: ["code": 0, "data": ["7345678901234568456": entry]])
+            } else { bytes = nonUTF8 ? Data([0xff, 0xfe, 0x80, 0x00]) : Data() }
             headers["Content-Type"] = nonUTF8 ? "application/x-protobuf" : "application/json"
             headers["Content-Encoding"] = "br"
             headers["Content-Length"] = String(bytes.count)
@@ -313,6 +328,38 @@ final class OverseasPlaybackTests: XCTestCase {
         print("THL_OVERSEAS_BACKOFF automaticRetries=2 guestRegistrations=1 stopped=true")
     }
 
+    func testOfficialPlaybackDoesNotInjectSharedCookieState() async throws {
+        PlaybackResponseFixtureProtocol.configure()
+        let cookie = try XCTUnwrap(HTTPCookie(properties: [.domain: ".fqnovel.com", .path: "/", .name: "THLSyntheticUnrelated", .value: "synthetic-unrelated-session"]))
+        HTTPCookieStorage.shared.setCookie(cookie)
+        defer { HTTPCookieStorage.shared.deleteCookie(cookie) }
+        let config = URLSessionConfiguration.default
+        config.protocolClasses = [PlaybackResponseFixtureProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bridge = NativeBridge(baseDirectory: root, httpSession: session, diagnostics: SourceDiagnostics(), persistentDeviceSession: false)
+        do {
+            _ = try await bridge.request(action: "resolve", payload: ["source": "hongguo", "drama": ["id": "hongguo:\(seriesId)"], "index": 1, "chapter": ["url": "https://hongguoduanju.com/player/\(seriesId)/\(videoId)"]])
+            XCTFail("Synthetic empty result must remain a failure")
+        } catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "EMPTY_RESPONSE") }
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.implicitCookieRequests, 0)
+    }
+
+    func testDiagnosticPlaybackUsesBoundedRecoveryAndPreservesError() async throws {
+        PlaybackResponseFixtureProtocol.configure()
+        let core = try bridge(SourceDiagnostics())
+        let start = Date()
+        do {
+            _ = try await SourceDiagnosticRunner.resolvePlayback(bridge: core, payload: ["source": "hongguo", "drama": ["id": "hongguo:\(seriesId)"], "index": 1, "chapter": ["url": "https://hongguoduanju.com/player/\(seriesId)/\(videoId)"]])
+            XCTFail("Persistent empty responses must remain a diagnostic failure")
+        } catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "EMPTY_RESPONSE") }
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelTimes.count, 3)
+        XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(start), 4)
+    }
+
     func testLeavingPlayerCancelsPendingEmptyResponseRetry() async throws {
         PlaybackResponseFixtureProtocol.configure()
         let core = try bridge(SourceDiagnostics())
@@ -322,6 +369,60 @@ final class OverseasPlaybackTests: XCTestCase {
         try await Task.sleep(nanoseconds: 1_300_000_000)
         XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelTimes.count, 1)
         XCTAssertNil(model.player)
+    }
+}
+
+@MainActor
+final class SavedGuestPlaybackTests: XCTestCase {
+    private func environment(mode: String) throws -> (NativeBridge, URLSession, URL, SourceDiagnostics) {
+        let defaults = UserDefaults.standard
+        for key in ["thl_tv_hongguo_device_session", "thl_tv_hongguo_guest_recovered_at"] {
+            let old = defaults.object(forKey: key)
+            addTeardownBlock { if let old { defaults.set(old, forKey: key) } else { defaults.removeObject(forKey: key) } }
+        }
+        defaults.set(#"{"device_id":"7335678901234567100","iid":"7335678901234567200","cdid":"11111111-1111-4111-8111-111111111111"}"#, forKey: "thl_tv_hongguo_device_session")
+        defaults.removeObject(forKey: "thl_tv_hongguo_guest_recovered_at")
+        PlaybackResponseFixtureProtocol.configure(savedGuestMode: mode)
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [PlaybackResponseFixtureProtocol.self]
+        let session = URLSession(configuration: config)
+        addTeardownBlock { session.invalidateAndCancel() }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let recorder = SourceDiagnostics()
+        return (NativeBridge(baseDirectory: root, httpSession: session, diagnostics: recorder, diagnosticContext: "缓存会话恢复"), session, root, recorder)
+    }
+
+    private var payload: [String: Any] {
+        ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567123"], "index": 1, "chapter": ["url": "https://hongguoduanju.com/player/7345678901234567123/7345678901234568456"]]
+    }
+
+    func testExpiredSavedGuestRenewsOnceAfterFourEmptyOfficialResponses() async throws {
+        let (bridge, _, _, recorder) = try environment(mode: "recover")
+        let plan = try await bridge.request(action: "resolve", payload: payload)
+        XCTAssertEqual(plan["quality"] as? Int, 1080)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, 5)
+        XCTAssertTrue(recorder.entries.contains { $0.stage == "游客会话恢复" })
+    }
+
+    func testPersistentEmptyResponseCannotRepeatedlyReplaceGuest() async throws {
+        let (bridge, session, root, recorder) = try environment(mode: "empty")
+        let relaunched = NativeBridge(baseDirectory: root.appendingPathComponent("relaunch"), httpSession: session, diagnostics: recorder)
+        for target in [bridge, bridge, relaunched] {
+            do { _ = try await target.request(action: "resolve", payload: payload); XCTFail("Empty responses must remain errors") }
+            catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "EMPTY_RESPONSE") }
+        }
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
+        XCTAssertEqual(recorder.entries.filter { $0.stage == "游客会话恢复" }.count, 1)
+    }
+
+    func testExplicitForbiddenResponseDoesNotReplaceSavedGuest() async throws {
+        let (bridge, _, _, _) = try environment(mode: "forbidden")
+        do { _ = try await bridge.request(action: "resolve", payload: payload); XCTFail("Explicit denial must be retained") }
+        catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "HTTP_403") }
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 0)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, 1)
     }
 }
 

@@ -44,7 +44,11 @@ final class PlaybackTests: XCTestCase {
     }
 
     private func ready(_ model: PlayerViewModel) async throws {
-        try await wait { model.player != nil && !model.isLoading && model.duration > 1 && model.currentTime > 0.5 }
+        try await wait { model.errorMessage != nil || (model.player != nil && !model.isLoading && model.duration > 1 && model.currentTime > 0.5) }
+        if let error = model.errorMessage {
+            XCTFail(error)
+            throw NSError(domain: "PlaybackTests", code: 2, userInfo: [NSLocalizedDescriptionKey: error])
+        }
         let player = try XCTUnwrap(model.player)
         try attach(player)
         try await wait(seconds: 20) { self.videoLayer?.isReadyForDisplay == true }
@@ -400,6 +404,35 @@ final class PlaybackTests: XCTestCase {
         print("THL_OVERSEAS_LIVE episode=185 automaticNext=true firstFrame=true video=true audio=true")
     }
 
+    func testLiveSavedAndFreshSessionsResolveSameEpisode() async throws {
+        try live()
+        let recoveryKey = "thl_tv_hongguo_guest_recovered_at"
+        let oldRecovery = UserDefaults.standard.object(forKey: recoveryKey)
+        UserDefaults.standard.removeObject(forKey: recoveryKey)
+        defer { if let oldRecovery { UserDefaults.standard.set(oldRecovery, forKey: recoveryKey) } else { UserDefaults.standard.removeObject(forKey: recoveryKey) } }
+        let cookies = (HTTPCookieStorage.shared.cookies ?? []).filter { $0.domain.contains("fqnovel") || $0.domain.contains("snssdk") }
+        print("THL_SHARED_COOKIES count=\(cookies.count) names=\(cookies.map { $0.domain + ":" + $0.name }.sorted().joined(separator: ","))")
+        let data = try await detail("7694896136963755032")
+        let episode = try XCTUnwrap(data.episodes.first)
+        for persistent in [true, false] {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let recorder = SourceDiagnostics()
+            let bridge = NativeBridge(baseDirectory: root, diagnostics: recorder, diagnosticContext: "会话对比", persistentDeviceSession: persistent)
+            let source = NativeRepository(bridge: bridge, playbackBridge: bridge)
+            do {
+                let plan = try await source.resolvePlayback(drama: data.drama, episode: episode, episodeIndex: 1)
+                print("THL_SESSION_COMPARE saved=\(persistent) quality=\(plan.quality) success=true")
+                XCTAssertEqual(plan.quality, 1080)
+            } catch {
+                for entry in recorder.entries { print("THL_SESSION_TRACE saved=\(persistent) stage=\(entry.stage) host=\(entry.host) status=\(entry.status) bytes=\(entry.bodyBytes ?? -1) code=\(entry.errorCode)") }
+                print("THL_SESSION_COMPARE saved=\(persistent) success=false code=\((error as NSError).userInfo["diagnosticCode"] ?? "")")
+                XCTFail(error.localizedDescription)
+            }
+        }
+    }
+
     func testLive1080PrioritySwitchResolutionAndAutomaticNext() async throws {
         try live()
         let data = try await detail("7694896136963755032")
@@ -504,6 +537,60 @@ final class PlaybackTests: XCTestCase {
         }
         XCTAssertGreaterThanOrEqual(OfficialModelFailureProtocol.count, 1)
         XCTAssertEqual(OfficialModelFailureProtocol.webCount, 0)
+    }
+
+    func testEncryptedPlaybackRecoversLaterRangeFailures() async throws {
+        guard let base = ProcessInfo.processInfo.environment["THL_FAULT_SERVER"] else { throw XCTSkip("Requires synthetic range server") }
+        for mode in ["503", "403"] {
+            _ = try await URLSession.shared.data(from: URL(string: base + "/reset")!)
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let bridge = NativeBridge(baseDirectory: root, persistentDeviceSession: false)
+            let script = """
+            const meta={id:'synthetic',name:'Synthetic',version:'1.0.0'};
+            let calls=0;
+            const spider={play:async function(){calls++;return {url:'\(base)/video.mp4?attempt='+calls,decryptionKey:'00112233445566778899aabbccddeeff',quality:360,qualities:[360],expiresAt:Date.now()+60000};}};
+            """
+            _ = try await bridge.request(action: "jsSource.saveAndLoad", payload: ["fileName": "synthetic.js", "script": script])
+            let source = NativeRepository(bridge: bridge, playbackBridge: bridge)
+            let suite = "THLRedLook.Midstream." + UUID().uuidString
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let episode = Episode(id: "1", title: "合成分集", number: 1, raw: try JSONSerialization.data(withJSONObject: ["url": "1"]))
+            let recorder = SourceDiagnostics()
+            let model = PlayerViewModel(drama: Drama(id: "synthetic:stream", source: "synthetic", sourceId: "stream", title: "合成断流恢复"), allEpisodes: [episode], repository: source, preloadingRepository: source, store: LocalStore(defaults: defaults), diagnostics: recorder)
+            model.danmakuEnabled = false
+            defer { model.onDisappear() }
+            await model.preparePlayback(episodeIndex: 1)
+            try await ready(model)
+            let player = try XCTUnwrap(model.player)
+            let item = try XCTUnwrap(player.currentItem)
+            let url = try XCTUnwrap(model.plan?.url)
+            let position = model.currentTime
+            let interruptedAt = Date()
+            _ = try await URLSession.shared.data(from: URL(string: base + "/arm?mode=" + mode)!)
+            try await wait(seconds: 35) { model.currentTime > position + 5 && !model.isLoading && (mode == "503" || model.plan?.url != url) }
+            let (data, _) = try await URLSession.shared.data(from: URL(string: base + "/metrics")!)
+            let metrics = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+            XCTAssertGreaterThanOrEqual(metrics["failures"] as? Int ?? 0, mode == "503" ? 2 : 1)
+            XCTAssertNil(model.errorMessage)
+            XCTAssertEqual(model.currentEpisodeIndex, 1)
+            XCTAssertTrue(model.player === player)
+            XCTAssertFalse(player.isMuted)
+            if mode == "503" {
+                XCTAssertTrue(player.currentItem === item)
+                XCTAssertEqual(model.plan?.url, url)
+                XCTAssertTrue(recorder.entries.isEmpty)
+            } else {
+                XCTAssertFalse(player.currentItem === item)
+                XCTAssertLessThan(Date().timeIntervalSince(interruptedAt), 12)
+                XCTAssertTrue(recorder.entries.contains { $0.stage == "播放恢复 第1集" && $0.errorCode == "MEDIA_HTTP_403" })
+                try await ready(model)
+            }
+            print("THL_MIDSTREAM mode=\(mode) failures=\(metrics["failures"] ?? 0) positionBefore=\(position) positionAfter=\(model.currentTime) sameItem=\(player.currentItem === item) manualRetry=false")
+            model.onDisappear()
+        }
     }
 
     func testPublicPreviewCannotBeReusedOrPreparedAsFullEpisode() async throws {
@@ -735,8 +822,8 @@ final class ContinuousPlaybackTests: XCTestCase {
         super.tearDown()
     }
 
-    private func repository(mode: String, recorder: SourceDiagnostics = SourceDiagnostics()) async throws -> (NativeRepository, NativeBridge) {
-        guard let path = ProcessInfo.processInfo.environment["THL_SYNTHETIC_VIDEO"] else { throw XCTSkip("Requires generated video fixture") }
+    private func repository(mode: String, recorder: SourceDiagnostics = SourceDiagnostics(), long: Bool = false) async throws -> (NativeRepository, NativeBridge) {
+        guard let path = ProcessInfo.processInfo.environment[long ? "THL_SYNTHETIC_LONG_VIDEO" : "THL_SYNTHETIC_VIDEO"] else { throw XCTSkip("Requires generated video fixture") }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         roots.append(root)
@@ -747,6 +834,7 @@ final class ContinuousPlaybackTests: XCTestCase {
         switch mode {
         case "denied": behavior = "throw Object.assign(new Error('synthetic failure'),{code:'BUSINESS_REJECTED'});"
         case "slow": behavior = "const stop=Date.now()+4000;while(Date.now()<stop){};"
+        case "transientWindow": behavior = "if(!firstFailure)firstFailure=Date.now();if(Date.now()-firstFailure<3000)throw Object.assign(new Error('synthetic temporary outage'),{code:'HTTP_503'});"
         case "retry": behavior = "if(id==='2'&&calls[id]===1)throw Object.assign(new Error('synthetic transient failure'),{code:'HTTP_503'});"
         case "error": behavior = "return {url:'',error:'MEDIA_HTTP_403'};"
         default: behavior = ""
@@ -754,6 +842,7 @@ final class ContinuousPlaybackTests: XCTestCase {
         let script = """
         const meta={id:'synthetic',name:'Synthetic',version:'1.0.0'};
         const calls={};
+        let firstFailure=0;
         const spider={play:async function(flag,id){calls[id]=(calls[id]||0)+1;\(behavior)return {url:\(encoded),quality:\(mode == "normal" ? 360 : 480),expiresAt:Date.now()+\(mode == "expired" ? 500 : 60000)};},search:async function(){return {list:[{vod_id:'counts',vod_name:JSON.stringify(calls)}],page:1,pagecount:1};}};
         """
         let bridge = NativeBridge(baseDirectory: root, diagnostics: recorder, diagnosticContext: "合成 \(mode)", persistentDeviceSession: false)
@@ -768,14 +857,14 @@ final class ContinuousPlaybackTests: XCTestCase {
         return (try JSONSerialization.jsonObject(with: data) as? [String: Int])?[String(episode)] ?? 0
     }
 
-    private func model(foreground: NativeRepository, preloading: NativeRepository) throws -> PlayerViewModel {
+    private func model(foreground: NativeRepository, preloading: NativeRepository, diagnostics: SourceDiagnostics = SourceDiagnostics()) throws -> PlayerViewModel {
         let suite = "THLRedLook.Continuous." + UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
         let episodes = try (1...4).map { index in
             Episode(id: String(index), title: "合成第\(index)集", number: index, raw: try JSONSerialization.data(withJSONObject: ["url": String(index)]))
         }
-        let model = PlayerViewModel(drama: Drama(id: "synthetic:series", source: "synthetic", sourceId: "series", title: "合成连续播放"), allEpisodes: episodes, repository: foreground, preloadingRepository: preloading, store: LocalStore(defaults: defaults))
+        let model = PlayerViewModel(drama: Drama(id: "synthetic:series", source: "synthetic", sourceId: "series", title: "合成连续播放"), allEpisodes: episodes, repository: foreground, preloadingRepository: preloading, store: LocalStore(defaults: defaults), diagnostics: diagnostics)
         model.danmakuEnabled = false
         return model
     }
@@ -862,6 +951,50 @@ final class ContinuousPlaybackTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
         let requests = try await calls(foreground, episode: 2)
         XCTAssertEqual(requests, 2)
+    }
+
+    func testTransientOutageRecoversAfterServerHasTimeToRecover() async throws {
+        let (repository, _) = try await repository(mode: "transientWindow")
+        let recorder = SourceDiagnostics()
+        let model = try model(foreground: repository, preloading: repository, diagnostics: recorder)
+        defer { model.onDisappear() }
+        let start = Date()
+        await model.preparePlayback(episodeIndex: 1)
+        try await wait { !model.isLoading && model.currentTime > 0.5 }
+        XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(start), 3)
+        XCTAssertNil(model.errorMessage)
+        let count = try await calls(repository, episode: 1)
+        XCTAssertEqual(count, 4)
+        XCTAssertEqual(recorder.entries.filter { $0.stage == "播放恢复 第1集" }.count, 3)
+        print("THL_TRANSIENT_RECOVERY outageSeconds=3 automatic=true manualRetry=false")
+    }
+
+    func testStablePlaybackRestoresRecoveryBudgetAndPreservesPosition() async throws {
+        let (repository, _) = try await repository(mode: "normal", long: true)
+        let recorder = SourceDiagnostics()
+        let model = try model(foreground: repository, preloading: repository, diagnostics: recorder)
+        defer { model.onDisappear() }
+        await model.preparePlayback(episodeIndex: 1)
+        try await wait { !model.isLoading && model.currentTime > 0.5 }
+        for burst in 0..<2 {
+            for _ in 0..<3 {
+                let item = try XCTUnwrap(model.player?.currentItem)
+                let position = model.currentTime
+                NotificationCenter.default.post(name: .AVPlayerItemFailedToPlayToEndTime, object: item, userInfo: [AVPlayerItemFailedToPlayToEndTimeErrorKey: URLError(.networkConnectionLost)])
+                try await wait { model.player?.currentItem !== item && !model.isLoading && model.currentTime > position + 0.2 }
+                XCTAssertEqual(model.currentEpisodeIndex, 1)
+                XCTAssertNil(model.errorMessage)
+            }
+            if burst == 0 {
+                let position = model.currentTime
+                try await wait(seconds: 15) { model.currentTime > position + 10.5 }
+            }
+        }
+        let recoveries = recorder.entries.filter { $0.stage == "播放恢复 第1集" }
+        XCTAssertEqual(recoveries.count, 6)
+        XCTAssertTrue(recoveries[3].sessionStatus.contains("恢复=1，"))
+        XCTAssertTrue(recoveries.allSatisfy { $0.errorCode == "MEDIA_NETWORK_1005" })
+        print("THL_STABLE_RECOVERY interruptions=6 twoBursts=true progressPreserved=true automatic=true")
     }
 
     func testEmptyStreamRetainsMediaFailureCode() async throws {

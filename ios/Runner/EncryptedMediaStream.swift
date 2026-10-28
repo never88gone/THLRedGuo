@@ -31,11 +31,10 @@ private final class CENCRangeLoader: NSObject, URLSessionDataDelegate {
     private var fetched: Int64 = 0
     private var requests = 0
 
-    init(url: URL, headers: [String: String]) {
+    init(url: URL, headers: [String: String], configuration: URLSessionConfiguration) {
         self.url = url
         self.headers = headers
         super.init()
-        let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieAcceptPolicy = .never
         configuration.httpShouldSetCookies = false
         configuration.urlCache = nil
@@ -50,6 +49,33 @@ private final class CENCRangeLoader: NSObject, URLSessionDataDelegate {
 
     func fetch(offset: Int64, count: Int) async throws -> Response {
         guard offset >= 0, count > 0, count <= 8 * 1024 * 1024 else { throw CENCStreamIndex.invalid() }
+        for attempt in 0..<3 {
+            try checkOpen()
+            do {
+                return try await transfer(offset: offset, count: count)
+            } catch {
+                try checkOpen()
+                guard attempt < 2, Self.retryable(error) else { throw error }
+                let delay = attempt == 0 ? 500_000_000 : 1_500_000_000
+                NSLog("[Stream] range retry offset=%lld attempt=%d delayMs=%d domain=%@ code=%ld", offset, attempt + 1, delay / 1_000_000, (error as NSError).domain, (error as NSError).code)
+                try await Task.sleep(nanoseconds: UInt64(delay))
+            }
+        }
+        throw CENCStreamIndex.invalid()
+    }
+
+    private func checkOpen() throws {
+        try Task.checkCancellation()
+        if lock.withLock({ closed }) { throw CancellationError() }
+    }
+
+    private static func retryable(_ error: Error) -> Bool {
+        let value = error as NSError
+        if value.domain == "THLEncryptedStream" { return [-2, 408, 425, 429, 500, 502, 503, 504].contains(value.code) }
+        return value.domain == NSURLErrorDomain && [NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed, NSURLErrorNotConnectedToInternet].contains(value.code)
+    }
+
+    private func transfer(offset: Int64, count: Int) async throws -> Response {
         return try await withCheckedThrowingContinuation { continuation in
             lock.lock()
             guard !closed else {
@@ -92,7 +118,7 @@ private final class CENCRangeLoader: NSObject, URLSessionDataDelegate {
         }
         if let encoding = http.value(forHTTPHeaderField: "Content-Encoding"), encoding.lowercased() != "identity" { valid = false }
         if !valid {
-            transfer.failure = NSError(domain: "THLEncryptedStream", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "媒体服务器未返回有效的分段数据（HTTP \(http.statusCode)）"])
+            transfer.failure = NSError(domain: "THLEncryptedStream", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "媒体服务器未返回有效的分段数据（HTTP \(http.statusCode)）", "diagnosticCode": "MEDIA_HTTP_\(http.statusCode)"])
         }
         lock.unlock()
         completionHandler(valid ? .allow : .cancel)
@@ -122,7 +148,7 @@ private final class CENCRangeLoader: NSObject, URLSessionDataDelegate {
         } else if transfer.total > 0, transfer.data.count == min(transfer.count, Int(transfer.total - transfer.offset)) {
             transfer.continuation.resume(returning: Response(data: transfer.data, total: transfer.total))
         } else {
-            transfer.continuation.resume(throwing: CENCStreamIndex.invalid())
+            transfer.continuation.resume(throwing: NSError(domain: "THLEncryptedStream", code: -2, userInfo: [NSLocalizedDescriptionKey: "视频分段数据不完整", "diagnosticCode": "MEDIA_RANGE_INCOMPLETE"]))
         }
     }
 
@@ -153,8 +179,8 @@ actor CENCStreamSession {
     private var pending = [Int64: Task<Data, Error>]()
     private var hits: Int64 = 0
 
-    init(url: URL, headers: [String: String], key: [UInt8]) {
-        self.loader = CENCRangeLoader(url: url, headers: headers)
+    init(url: URL, headers: [String: String], key: [UInt8], configuration: URLSessionConfiguration = .ephemeral) {
+        self.loader = CENCRangeLoader(url: url, headers: headers, configuration: configuration)
         self.key = key
     }
 

@@ -170,6 +170,18 @@ final class LocalLibraryTests: XCTestCase {
         print("THL_TV_DIAGNOSTICS_CAPTURE registration=true search=true pagination=true detail=true privateDataExcluded=true libraryUnchanged=true")
     }
 
+    func testLiveRepeatedSourceDiagnostics() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["HONGGUO_LIVE"] == "1")
+        XCTAssertEqual(ProcessInfo.processInfo.environment["DISABLE_REMOTE_IMAGES"], "1")
+        for iteration in 1...6 {
+            await SourceDiagnosticRunner.shared.run()
+            let value = SourceDiagnosticRunner.shared.result
+            print("THL_REPEATED_DIAGNOSTIC iteration=\(iteration) result=\(value)")
+            XCTAssertTrue(value.contains("检测完成"), value)
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+    }
+
     func testSourceDiagnosticsCategoryClassificationAndDetailedReport() async throws {
         // 1. 验证各种常见故障的分类精准度
         // DNS 解析错误

@@ -2,6 +2,10 @@ import Foundation
 import AVFoundation
 import ObjectiveC
 
+extension Notification.Name {
+    static let encryptedPlaybackFailed = Notification.Name("THLRedLook.EncryptedPlaybackFailed")
+}
+
 struct PreparedPlaybackAsset {
     let asset: AVURLAsset
     let decryptedURL: URL?
@@ -31,6 +35,7 @@ enum PlaybackAssetFactory {
             try Task.checkCancellation()
             let loader = CENCAssetLoader(session: session, length: stats["mediaBytes"] ?? 0)
             let asset = AVURLAsset(url: URL(string: "thlcenc://\(UUID().uuidString)/video.mp4")!)
+            loader.asset = asset
             asset.resourceLoader.setDelegate(loader, queue: loader.queue)
             objc_setAssociatedObject(asset, &loaderKey, loader, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
             NSLog("[Stream] prepared bytes=%lld media=%lld requests=%lld", stats["bytesFetched"] ?? 0, stats["mediaBytes"] ?? 0, stats["requests"] ?? 0)
@@ -54,6 +59,8 @@ private final class CENCAssetLoader: NSObject, AVAssetResourceLoaderDelegate, @u
     let session: CENCStreamSession
     let queue = DispatchQueue(label: "THLRedLook.CENC.ResourceLoader")
     private let length: Int64
+    weak var asset: AVURLAsset?
+    private var reportedFailure = false
     private var tasks: [ObjectIdentifier: Task<Void, Never>] = [:]
 
     init(session: CENCStreamSession, length: Int64) {
@@ -100,7 +107,13 @@ private final class CENCAssetLoader: NSObject, AVAssetResourceLoaderDelegate, @u
                 }
             } catch {
                 queue.async { [weak self] in
-                    if !request.isCancelled, !request.isFinished { request.finishLoading(with: error) }
+                    if !request.isCancelled, !request.isFinished {
+                        request.finishLoading(with: error)
+                        if let self, !self.reportedFailure, !(error is CancellationError), (error as NSError).code != NSURLErrorCancelled {
+                            self.reportedFailure = true
+                            if let asset = self.asset { NotificationCenter.default.post(name: .encryptedPlaybackFailed, object: asset, userInfo: [NSUnderlyingErrorKey: error]) }
+                        }
+                    }
                     self?.tasks.removeValue(forKey: id)
                 }
             }

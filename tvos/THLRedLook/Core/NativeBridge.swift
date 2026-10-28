@@ -1,6 +1,22 @@
 import Foundation
 import JavaScriptCore
 
+private enum SavedGuestRecovery {
+    private static let lock = NSLock()
+
+    static func invalidate(_ cached: String) -> Bool {
+        lock.withLock {
+            let defaults = UserDefaults.standard
+            let last = defaults.double(forKey: "thl_tv_hongguo_guest_recovered_at")
+            let now = Date().timeIntervalSince1970
+            guard defaults.string(forKey: "thl_tv_hongguo_device_session") == cached, now - last >= 900 else { return false }
+            defaults.removeObject(forKey: "thl_tv_hongguo_device_session")
+            defaults.set(now, forKey: "thl_tv_hongguo_guest_recovered_at")
+            return true
+        }
+    }
+}
+
 final class HttpTraceHolder: @unchecked Sendable {
     private let lock = NSLock()
     private var _url = ""
@@ -51,6 +67,7 @@ public actor NativeBridge {
 
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
+    private var restoredGuestSessions: [String: String] = [:]
 
     init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用", persistentDeviceSession: Bool = true) {
         if let httpSession {
@@ -62,6 +79,9 @@ public actor NativeBridge {
             config.timeoutIntervalForResource = 15.0
             config.requestCachePolicy = .useProtocolCachePolicy
             config.httpShouldUsePipelining = true
+            config.httpCookieAcceptPolicy = .never
+            config.httpShouldSetCookies = false
+            config.httpCookieStorage = nil
             config.urlCache = URLCache(memoryCapacity: 20 * 1024 * 1024, diskCapacity: 100 * 1024 * 1024)
             self.httpSession = URLSession(configuration: config)
         }
@@ -209,6 +229,7 @@ public actor NativeBridge {
             return nil
         }
 
+        restoredGuestSessions.removeValue(forKey: sourceId)
         guard let context = JSContext() else {
             return nil
         }
@@ -231,6 +252,7 @@ public actor NativeBridge {
         context.setObject(saveDeviceBlock, forKeyedSubscript: "__native_save_device" as NSString)
 
         if persistentDeviceSession, let cachedDevice = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session"), !cachedDevice.isEmpty {
+            restoredGuestSessions[sourceId] = cachedDevice
             context.evaluateScript("""
             try {
                 var raw = \(cachedDevice.debugDescription);
@@ -263,6 +285,7 @@ public actor NativeBridge {
             req.timeoutInterval = timeout
             let method = (opts?["method"] as? String ?? "GET").uppercased()
             req.httpMethod = method
+            req.httpShouldHandleCookies = false
             if let headers = opts?["headers"] as? [String: Any] {
                 for (k, v) in headers {
                     req.setValue(String(describing: v), forHTTPHeaderField: k)
@@ -1032,6 +1055,7 @@ public actor NativeBridge {
                     "avoidUrl": payload["avoidUrl"] as? String ?? ""
                 ]]
                 let scriptExpr = try spiderExpression("play", ["", rawUrl, flags])
+                let started = Date()
                 let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
                 try Task.checkCancellation()
                 let data = res?["data"] as? [String: Any]
@@ -1040,6 +1064,22 @@ public actor NativeBridge {
                       !url.isEmpty, !url.contains("example.com") else {
                     let code = SourceDiagnostics.safeCode(res?["code"] ?? data?["error"])
                     if code == "CANCELLED" { throw CancellationError() }
+                    if targetSrc == "hongguo", code == "EMPTY_RESPONSE", payload["guestRecoveryAttempted"] as? Bool != true, let cached = restoredGuestSessions[targetSrc] {
+                        let failures = diagnostics.entries.filter { $0.context == diagnosticContext && $0.stage == "播放解析" && $0.at >= started }
+                        if failures.count == 4, failures.allSatisfy({ $0.status == 200 && $0.bodyBytes == 0 && $0.errorCode == "EMPTY_RESPONSE" }) {
+                            let latest = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session")
+                            let updated = latest != nil && latest != cached
+                            if updated || SavedGuestRecovery.invalidate(cached) {
+                                jsContexts.removeValue(forKey: targetSrc)
+                                restoredGuestSessions.removeValue(forKey: targetSrc)
+                                let status = updated ? "已载入其他请求更新的游客会话" : "缓存会话在四个官方接口均返回空正文，已允许一次正常游客注册，冷却15分钟"
+                                diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "游客会话恢复", sessionStatus: status))
+                                var retry = payload
+                                retry["guestRecoveryAttempted"] = true
+                                return try await request(action: "resolve", payload: retry)
+                            }
+                        }
+                    }
                     throw playbackFailure(code: code.isEmpty ? "NO_STREAM_URL" : code, message: res?["error"] as? String ?? "", episode: epIndex)
                 }
                 targetUrl = url

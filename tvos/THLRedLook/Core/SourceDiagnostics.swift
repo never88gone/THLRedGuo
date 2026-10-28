@@ -802,7 +802,9 @@ public final class SourceDiagnosticRunner: ObservableObject {
                     throw err
                 }
                 stage = "播放流解析"
-                let plan = try await bridge.request(action: "resolve", payload: ["source": "hongguo", "drama": detail["drama"] as? [String: Any] ?? drama, "chapter": chapter, "index": 1])
+                recorder.add(SourceDiagnosticEntry(context: context, stage: "检测分集", sessionStatus: "剧=\(drama["sourceId"] as? String ?? "")，集=1"))
+                result = "搜索与详情已通过，正在检查所选分集的播放解析…"
+                let plan = try await Self.resolvePlayback(bridge: bridge, payload: ["source": "hongguo", "drama": detail["drama"] as? [String: Any] ?? drama, "chapter": chapter, "index": 1])
                 guard let url = plan["url"] as? String, !url.isEmpty else {
                     throw NSError(domain: "SourceDiagnostic", code: 4, userInfo: [NSLocalizedDescriptionKey: "播放接口未返回可用地址", "diagnosticCode": "NO_STREAM_URL"])
                 }
@@ -848,8 +850,25 @@ public final class SourceDiagnosticRunner: ObservableObject {
                 searchTabsSummary: tabs,
                 sessionStatus: session
             ))
-            result = "检测失败：【\(cat.tag)】\(stage) - \(reason)"
+            let passed = stage == "播放流解析" ? "搜索与详情已通过；所选分集" : ""
+            result = "检测失败：" + passed + "【\(cat.tag)】\(stage) - \(reason)"
         }
         await network
     }
+
+    static func resolvePlayback(bridge: NativeBridge, payload: [String: Any]) async throws -> [String: Any] {
+        var attempt = 0
+        while true {
+            try Task.checkCancellation()
+            do { return try await bridge.request(action: "resolve", payload: payload) }
+            catch {
+                if error is CancellationError { throw error }
+                attempt += 1
+                let code = (error as NSError).userInfo["diagnosticCode"] as? String ?? ""
+                guard let delay = PlaybackRetryPolicy.delay(code: code, attempt: attempt) else { throw error }
+                try await Task.sleep(nanoseconds: delay)
+            }
+        }
+    }
+
 }
