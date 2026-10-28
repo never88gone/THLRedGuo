@@ -2216,7 +2216,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             body: pictureInPicture
                 ? _videoPane(context)
                 : SafeArea(
-                    top: !fullscreen,
+                    top: false,
                     bottom: !fullscreen,
                     left: !fullscreen,
                     right: !fullscreen,
@@ -2253,14 +2253,20 @@ class _PlayerScreenState extends State<PlayerScreen>
                           );
                         }
                         if (_mobile) {
+                          final topPadding = fullscreen
+                              ? 0.0
+                              : MediaQuery.paddingOf(context).top;
                           final height = (constraints.maxWidth / _aspectRatio)
                               .clamp(0.0, constraints.maxHeight * .56);
                           return Column(
                             children: [
                               SizedBox(
-                                height: height,
+                                height: height + topPadding,
                                 width: double.infinity,
-                                child: _videoPane(context),
+                                child: _videoPane(
+                                  context,
+                                  topPadding: topPadding,
+                                ),
                               ),
                               Expanded(
                                 child: PlayerMobilePanelView(
@@ -2348,8 +2354,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     ),
   );
 
-  Widget _videoPane(BuildContext context) {
+  Widget _videoPane(BuildContext context, {double topPadding = 0.0}) {
     return PlayerViewportView(
+      topPadding: topPadding,
       television: _television,
       fullscreen: _showFullscreen,
       pictureInPictureVisible: _pictureInPictureVisible,
