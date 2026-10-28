@@ -39,7 +39,7 @@ public struct SourceDiagnosticsSheetView: View {
             Text(SourceDiagnostics.sourceRevision + " · " + recorder.sourceRuntimeStatus)
                 .font(.system(size: 25)).foregroundStyle(.secondary)
                 .accessibilityIdentifier("sourceDiagnostics.sourceRuntime")
-            Text("检测使用独立游客会话，不影响收藏、历史和当前数据源。包含网络DNS、JS引擎、游客会话与剧集解析全链路检测。")
+            Text("检测使用当前游客会话，不影响收藏、历史和当前数据源。包含网络DNS、JS引擎、游客会话与剧集解析全链路检测。")
                 .font(.system(size: 24)).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 4) {
                 Text(recorder.networkEgress?.summary ?? "出口 IP：正在检测…")

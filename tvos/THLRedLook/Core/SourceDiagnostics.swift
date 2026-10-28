@@ -169,7 +169,7 @@ public final class SourceDiagnostics: ObservableObject {
     }
 
     public static var sourceRevision: String {
-        "JS " + String(sourceHash.prefix(12)) + " · 源提交 " + (sourceManifest["sourceCommit"] ?? "未记录")
+        "应用提交 " + String((sourceManifest["appCommit"] ?? "未记录").prefix(7)) + " · JS " + String(sourceHash.prefix(12)) + " · 源提交 " + (sourceManifest["sourceCommit"] ?? "未记录")
     }
 
     public static var sourceBundleStatus: String {
@@ -753,13 +753,13 @@ public final class SourceDiagnosticRunner: ObservableObject {
     public func run() async {
         guard !running else { return }
         running = true
-        result = "正在检查：网络与DNS、JS脚本引擎、游客注册、短剧搜索、选集详情…"
+        result = "正在检查：网络与DNS、JS脚本引擎、游客会话、短剧搜索、选集详情…"
         let recorder = SourceDiagnostics.shared
         let context = "主动检测 " + ISO8601DateFormatter().string(from: Date())
         async let network: Void = recorder.refreshNetworkEgress(force: true)
         defer { running = false }
 
-        let bridge = NativeBridge(diagnostics: recorder, diagnosticContext: context, persistentDeviceSession: false)
+        let bridge = NativeBridge(diagnostics: recorder, diagnosticContext: context)
         var stage = "搜索第一页"
         do {
             let first = try await bridge.request(
@@ -811,7 +811,7 @@ public final class SourceDiagnosticRunner: ObservableObject {
                 recorder.add(SourceDiagnosticEntry(context: context, stage: stage, count: 1))
             }
 
-            result = "检测完成：JS引擎、游客注册、搜索\(more ? "、分页" : "")、详情与播放解析通过"
+            result = "检测完成：JS引擎、游客会话、搜索\(more ? "、分页" : "")、详情与播放解析通过"
         } catch {
             let nsErr = error as NSError
             let errorMsg = error.localizedDescription

@@ -309,7 +309,11 @@ final class PlaybackTests: XCTestCase {
         try live()
         await JSSourceService.shared.initialize()
         let data = try await detail("7694896136963755032")
-        let model = model(data)
+        let suite = "THLRedLook.Automatic." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = PlayerViewModel(drama: data.drama, allEpisodes: data.episodes, repository: repository, store: LocalStore(defaults: defaults, cloudUpload: { _ in }))
+        model.danmakuEnabled = false
         defer { model.onDisappear() }
         await model.preparePlayback(episodeIndex: 1)
         for episode in 1...8 {
@@ -332,7 +336,7 @@ final class PlaybackTests: XCTestCase {
         let suite = "THLRedLook.Natural." + UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let model = PlayerViewModel(drama: data.drama, allEpisodes: data.episodes, repository: repository, store: LocalStore(defaults: defaults))
+        let model = PlayerViewModel(drama: data.drama, allEpisodes: data.episodes, repository: repository, store: LocalStore(defaults: defaults, cloudUpload: { _ in }))
         model.danmakuEnabled = true
         defer { model.onDisappear() }
         let began = Date()
@@ -404,9 +408,199 @@ final class PlaybackTests: XCTestCase {
         print("THL_OVERSEAS_LIVE episode=185 automaticNext=true firstFrame=true video=true audio=true")
     }
 
+    func testLiveDiagnosticsRepeatedWithSavedSession() async throws {
+        try live()
+        guard let directory = ProcessInfo.processInfo.environment["THL_MATRIX_OUTPUT"] else { throw XCTSkip("Requires output directory") }
+        var rows: [[String: Any]] = []
+        for number in 1...5 {
+            let started = Date()
+            await SourceDiagnosticRunner.shared.run()
+            let entries = SourceDiagnostics.shared.entries.filter { $0.at >= started && $0.context.hasPrefix("主动检测 ") }
+            let row: [String: Any] = ["number": number, "result": SourceDiagnosticRunner.shared.result, "entries": entries.map { ["stage": $0.stage, "host": $0.host, "status": $0.status, "bytes": $0.bodyBytes ?? -1, "code": $0.errorCode, "sessionStatus": $0.sessionStatus] as [String: Any] }]
+            rows.append(row)
+            try JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys]).write(to: URL(fileURLWithPath: directory).appendingPathComponent("diagnostic-repeat.json"), options: .atomic)
+            print("THL_DIAGNOSTIC_REPEAT round=\(number) result=\(SourceDiagnosticRunner.shared.result)")
+            XCTAssertTrue(SourceDiagnosticRunner.shared.result.hasPrefix("检测完成"))
+        }
+    }
+
+    func testLiveExpandedCatalogPlaybackMatrix() async throws {
+        try live()
+        guard let directory = ProcessInfo.processInfo.environment["THL_MATRIX_OUTPUT"] else { throw XCTSkip("Requires output directory") }
+        let output = URL(fileURLWithPath: directory)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        var candidates: [(Drama, String)] = []
+        var seen = Set<String>()
+        var discovery: [[String: Any]] = []
+        var results: [[String: Any]] = []
+        func save() throws {
+            let selected = candidates.map { ["id": $0.0.id, "seriesId": $0.0.cleanSourceId, "title": $0.0.title, "origin": $0.1] }
+            let report: [String: Any] = ["appManifest": SourceDiagnostics.sourceManifest, "discovery": discovery, "candidates": selected, "results": results]
+            try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("matrix.json"), options: .atomic)
+        }
+        func append(_ items: [Drama], origin: String, limit: Int) -> Int {
+            var added = 0
+            for drama in items where candidates.count < 30 && added < limit {
+                if seen.insert(drama.id).inserted { candidates.append((drama, origin)); added += 1 }
+            }
+            return added
+        }
+        if let path = ProcessInfo.processInfo.environment["THL_MATRIX_SELECTION"] {
+            let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as? [[String: String]] ?? []
+            for item in raw {
+                let id = try XCTUnwrap(item["id"])
+                candidates.append((Drama(id: id, source: "hongguo", sourceId: item["seriesId"] ?? "", title: item["title"] ?? id), item["origin"] ?? "固定复验"))
+            }
+        } else {
+            let categories = try await repository.loadCategories(source: "hongguo")
+            for category in categories.prefix(4) {
+                var remaining = 5
+                for page in 1...2 where remaining > 0 {
+                    do {
+                        let data = try await repository.loadCatalog(source: "hongguo", category: category.id, page: page)
+                        discovery.append(["origin": "找剧-" + category.name, "page": page, "count": data.items.count])
+                        remaining -= append(data.items, origin: "找剧-" + category.name, limit: remaining)
+                        if !data.hasMore { break }
+                    } catch { discovery.append(["origin": "找剧-" + category.name, "error": SourceDiagnostics.redact(error.localizedDescription)]) }
+                }
+            }
+            let session = UUID().uuidString
+            for page in 1...2 {
+                do {
+                    let feed = try await repository.loadVideoFeed(page: page, session: session)
+                    discovery.append(["origin": "推荐", "page": page, "count": feed.items.count])
+                    _ = append(feed.items.map(\.drama), origin: "推荐", limit: 4)
+                    if !feed.hasMore { break }
+                } catch { discovery.append(["origin": "推荐", "error": SourceDiagnostics.redact(error.localizedDescription)]) }
+            }
+            for query in ["重生", "修仙", "千金", "萌宝", "觉醒", "悬疑", "亲戚", "系统"] where candidates.count < 30 {
+                do {
+                    let data = try await repository.loadCatalog(source: "hongguo", query: query)
+                    discovery.append(["origin": "搜索-" + query, "count": data.items.count])
+                    _ = append(data.items, origin: "搜索-" + query, limit: 2)
+                } catch { discovery.append(["origin": "搜索-" + query, "error": SourceDiagnostics.redact(error.localizedDescription)]) }
+            }
+        }
+        try save()
+        XCTAssertGreaterThanOrEqual(candidates.count, 25)
+        let history = LocalStore.shared.history
+        let favorites = LocalStore.shared.followedDramas
+        let audio = AVAudioSession.sharedInstance()
+        try audio.setCategory(.playback, mode: .moviePlayback)
+        try audio.setActive(true)
+        for (index, candidate) in candidates.enumerated() {
+            do {
+                let data = try await repository.loadDetail(drama: candidate.0)
+                let episodes = data.episodes.sorted { $0.number < $1.number }
+                guard let first = episodes.first else { throw NSError(domain: "ExpandedPlayback", code: 1, userInfo: [NSLocalizedDescriptionKey: "No episode metadata"]) }
+                var samples = [first]
+                if index % 5 == 0, episodes.count > 2 { samples += [episodes[episodes.count / 2], episodes[episodes.count - 1]] }
+                for episode in samples {
+                    var row: [String: Any] = ["title": data.drama.title, "seriesId": data.drama.cleanSourceId, "origin": candidate.1, "episode": episode.number, "episodes": episodes.count, "chapterTarget": episode.rawChapter?["url"] as? String ?? ""]
+                    try save()
+                    print("THL_MATRIX_BEGIN series=\(data.drama.cleanSourceId) title=\(data.drama.title) episode=\(episode.number) origin=\(candidate.1)")
+                    let started = Date()
+                    var phase = "resolve"
+                    do {
+                        let plan = try await repository.resolvePlayback(drama: data.drama, episode: episode, episodeIndex: episode.number)
+                        row["firstResolveSucceeded"] = true
+                        row["quality"] = plan.quality
+                        row["host"] = URL(string: plan.url)?.host ?? ""
+                        row["encrypted"] = !plan.decryptionKey.isEmpty
+                        row["preview"] = PlaybackPlan.isPublicPreviewURL(plan.url)
+                        phase = "prepare"
+                        let prepared = try await PlaybackAssetFactory.prepare(plan)
+                        phase = "play"
+                        let measured = try await measureExpandedPlayback(prepared, seconds: index % 6 == 0 ? 35 : 15)
+                        row.merge(measured) { _, new in new }
+                        row["firstPlaybackSucceeded"] = true
+                        row["autoRecoveryNeeded"] = false
+                        XCTAssertFalse(PlaybackPlan.isPublicPreviewURL(plan.url))
+                    } catch {
+                        row["firstPlaybackSucceeded"] = false
+                        if phase == "resolve" { row["firstResolveSucceeded"] = false }
+                        row["failedPhase"] = phase
+                        row["firstError"] = SourceDiagnostics.redact(error.localizedDescription)
+                        row["firstCode"] = (error as NSError).userInfo["diagnosticCode"] as? String ?? String((error as NSError).code)
+                        row["requests"] = SourceDiagnostics.shared.entries.filter { $0.at >= started && $0.stage.contains("播放") }.map { ["stage": $0.stage, "host": $0.host, "status": $0.status, "bytes": $0.bodyBytes ?? -1, "code": $0.errorCode] as [String: Any] }
+                        row["autoRecoveryNeeded"] = true
+                        let suite = "THLRedLook.Expanded." + UUID().uuidString
+                        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+                        let model = PlayerViewModel(drama: data.drama, allEpisodes: data.episodes, initialEpisodeIndex: episode.number, repository: repository, store: LocalStore(defaults: defaults, cloudUpload: { _ in }))
+                        model.danmakuEnabled = false
+                        await model.preparePlayback(episodeIndex: episode.number)
+                        let deadline = Date().addingTimeInterval(75)
+                        while model.errorMessage == nil, (model.isLoading || model.currentTime < 3), Date() < deadline { try await Task.sleep(nanoseconds: 100_000_000) }
+                        row["recovered"] = model.errorMessage == nil && !model.isLoading && model.currentTime >= 3
+                        row["recoveryError"] = SourceDiagnostics.redact(model.errorMessage ?? "")
+                        row["recoveredPosition"] = model.currentTime
+                        model.onDisappear()
+                        defaults.removePersistentDomain(forName: suite)
+                    }
+                    row["sessionRecoveries"] = SourceDiagnostics.shared.entries.filter { $0.at >= started && $0.stage == "游客会话恢复" }.map(\.sessionStatus)
+                    row["elapsedSeconds"] = Date().timeIntervalSince(started)
+                    results.append(row)
+                    try save()
+                    print("THL_MATRIX " + String(decoding: try JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]), as: UTF8.self))
+                }
+            } catch {
+                results.append(["title": candidate.0.title, "seriesId": candidate.0.cleanSourceId, "origin": candidate.1, "failedPhase": "detail", "firstPlaybackSucceeded": false, "firstError": SourceDiagnostics.redact(error.localizedDescription)])
+                try save()
+            }
+        }
+        XCTAssertEqual(LocalStore.shared.history, history)
+        XCTAssertEqual(LocalStore.shared.followedDramas, favorites)
+        let failed = results.filter { $0["firstPlaybackSucceeded"] as? Bool != true }
+        print("THL_MATRIX_SUMMARY dramas=\(candidates.count) episodes=\(results.count) firstFailures=\(failed.count)")
+        XCTAssertTrue(failed.isEmpty, failed.map { ($0["title"] as? String ?? "") + " 第\($0["episode"] ?? 0)集 " + ($0["firstCode"] as? String ?? "") }.joined(separator: "; "))
+    }
+
+    private func measureExpandedPlayback(_ prepared: PreparedPlaybackAsset, seconds: Double) async throws -> [String: Any] {
+        let item = AVPlayerItem(asset: prepared.asset)
+        item.preferredForwardBufferDuration = 3
+        let player = AVPlayer(playerItem: item)
+        player.isMuted = false
+        player.volume = 1
+        var streamError: Error?
+        let observer = NotificationCenter.default.addObserver(forName: .encryptedPlaybackFailed, object: prepared.asset, queue: .main) { notification in
+            streamError = notification.userInfo?[NSUnderlyingErrorKey] as? Error
+        }
+        defer {
+            NotificationCenter.default.removeObserver(observer)
+            player.pause()
+            player.replaceCurrentItem(with: nil)
+            videoLayer?.player = nil
+            if let file = prepared.decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: file) }
+        }
+        try attach(player)
+        player.play()
+        let readyDeadline = Date().addingTimeInterval(25)
+        while item.status != .readyToPlay || videoLayer?.isReadyForDisplay != true {
+            if let error = streamError ?? item.error { throw error }
+            if Date() > readyDeadline { throw NSError(domain: "ExpandedPlayback", code: 2, userInfo: [NSLocalizedDescriptionKey: "Video first frame timeout"]) }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let videos = try await item.asset.loadTracks(withMediaType: .video)
+        let audios = try await item.asset.loadTracks(withMediaType: .audio)
+        guard let video = videos.first, !audios.isEmpty else { throw NSError(domain: "ExpandedPlayback", code: 3, userInfo: [NSLocalizedDescriptionKey: "Missing video/audio track"]) }
+        let size = try await video.load(.naturalSize)
+        let duration = item.duration.seconds
+        guard duration.isFinite, duration > 0 else { throw NSError(domain: "ExpandedPlayback", code: 4) }
+        let target = min(seconds, max(0.5, duration - 0.5))
+        let deadline = Date().addingTimeInterval(target + 20)
+        while player.currentTime().seconds < target {
+            if let error = streamError ?? item.error { throw error }
+            if Date() > deadline { throw NSError(domain: "ExpandedPlayback", code: 5, userInfo: [NSLocalizedDescriptionKey: "Playback progress stalled"]) }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        var result: [String: Any] = ["duration": duration, "position": player.currentTime().seconds, "actualResolution": Int(min(abs(size.width), abs(size.height))), "video": true, "audioTrack": true, "muted": player.isMuted]
+        if let statistics = await PlaybackAssetFactory.statistics(for: prepared.asset) { result["streamStatistics"] = statistics }
+        return result
+    }
+
     func testLiveSavedAndFreshSessionsResolveSameEpisode() async throws {
         try live()
-        let recoveryKey = "thl_tv_hongguo_guest_recovered_at"
+        let recoveryKey = "thl_tv_hongguo_guest_recovery_v2_at"
         let oldRecovery = UserDefaults.standard.object(forKey: recoveryKey)
         UserDefaults.standard.removeObject(forKey: recoveryKey)
         defer { if let oldRecovery { UserDefaults.standard.set(oldRecovery, forKey: recoveryKey) } else { UserDefaults.standard.removeObject(forKey: recoveryKey) } }
