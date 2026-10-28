@@ -993,6 +993,12 @@ class DartCoreEngine {
       detailId: sourceId,
     );
     if (rt != null) {
+      final flags = <Map<String, dynamic>>[
+        {'quality': (input['quality'] as num?)?.toInt() ?? 0},
+        if (input['avoidUrl'] is String &&
+            (input['avoidUrl'] as String).isNotEmpty)
+          {'avoidUrl': input['avoidUrl'] as String},
+      ];
       try {
         var playTarget =
             (chapter is Map
@@ -1008,12 +1014,6 @@ class DartCoreEngine {
             sourceId.isNotEmpty) {
           playTarget = '${sourceId}_$playTarget';
         }
-        final flags = <Map<String, dynamic>>[
-          {'quality': (input['quality'] as num?)?.toInt() ?? 0},
-          if (input['avoidUrl'] is String &&
-              (input['avoidUrl'] as String).isNotEmpty)
-            {'avoidUrl': input['avoidUrl'] as String},
-        ];
         var playRes = await rt.play('flag', playTarget, flags: flags);
         if (playRes.url.isEmpty && sourceId.isNotEmpty) {
           final fallbackTarget = '${sourceId}_$episodeIndex';
@@ -1078,11 +1078,6 @@ class DartCoreEngine {
               final newTarget = parsedChapters[episodeIndex - 1]['raw']
                   ?.toString();
               if (newTarget != null && newTarget.isNotEmpty) {
-                final flags = <Map<String, String>>[
-                  if (input['avoidUrl'] is String &&
-                      (input['avoidUrl'] as String).isNotEmpty)
-                    {'avoidUrl': input['avoidUrl'] as String},
-                ];
                 final retryRes = await rt.play('flag', newTarget, flags: flags);
                 if (retryRes.url.isNotEmpty) {
                   final streamUrl = retryRes.url;

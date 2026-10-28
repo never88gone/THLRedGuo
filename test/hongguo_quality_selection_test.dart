@@ -199,4 +199,51 @@ const spider={play:async function(flag,id,flags){const quality=Number(flags.find
       await engine.dispatch({'action': 'cancelPlayback'});
     },
   );
+  test(
+    'Flutter detail recovery retains quality and failed CDN flags',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'thl_quality_recovery_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final engine = DartCoreEngine.instance;
+      await engine.dispatch({
+        'action': 'initialize',
+        'directory': directory.path,
+      });
+      final loaded = await engine.dispatch({
+        'action': 'jsSource.load',
+        'fileName': 'hongguo.js',
+        'script': r"""
+const meta={id:'hongguo',name:'Synthetic',version:'1.0.0'};
+const spider={
+ play:async function(flag,id,flags){
+  if(String(id).endsWith('8456'))throw Object.assign(new Error('stale synthetic episode'),{code:'MISSING_EPISODE'});
+  const quality=Number(flags.find(value=>'quality' in value)?.quality||0);
+  const avoided=flags.find(value=>'avoidUrl' in value)?.avoidUrl;
+  if(avoided!=='https://failed.example.test/old.mp4')throw new Error('missing failed CDN');
+  return {url:'https://media.example.test/'+quality+'.mp4',quality,qualities:[1080,720,360]};
+ },
+ detail:async function(){return {list:[{vod_play_url:'第1集$7345678901234567123_7345678901234568002'}]};}
+};
+""",
+      });
+      expect(loaded['ok'], true);
+      for (final action in ['resolve', 'preload']) {
+        final result = await engine.dispatch({
+          'action': action,
+          'source': 'hongguo',
+          'drama': {'id': 'hongguo:7345678901234567123', 'source': 'hongguo'},
+          'chapter': {'url': '7345678901234567123_7345678901234568456'},
+          'index': 1,
+          'quality': 720,
+          'avoidUrl': 'https://failed.example.test/old.mp4',
+        });
+        expect(result['ok'], true, reason: jsonEncode(result));
+        expect(result['data']['quality'], 720);
+        expect(result['data']['url'], 'https://media.example.test/720.mp4');
+      }
+      await engine.dispatch({'action': 'cancelPlayback'});
+    },
+  );
 }
