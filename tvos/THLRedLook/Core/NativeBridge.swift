@@ -1028,6 +1028,7 @@ public actor NativeBridge {
 
                 let flags: [[String: Any]] = [[
                     "quality": payload["quality"] as? Int ?? 0,
+                    "seriesId": dramaDict["sourceId"] as? String ?? dramaId.components(separatedBy: ":").last ?? "",
                     "avoidUrl": payload["avoidUrl"] as? String ?? ""
                 ]]
                 let scriptExpr = try spiderExpression("play", ["", rawUrl, flags])
@@ -1054,6 +1055,9 @@ public actor NativeBridge {
                 throw playbackFailure(code: "SOURCE_UNAVAILABLE", message: "播放数据源尚未就绪", episode: epIndex)
             }
 
+            if PlaybackPlan.isPublicPreviewURL(targetUrl) {
+                throw playbackFailure(code: "PREVIEW_STREAM_REJECTED", message: "公共试看地址不能用于完整分集播放，请重新获取官方片源", episode: epIndex)
+            }
             if !contentKey.isEmpty && contentKey.range(of: "^[0-9a-fA-F]{32}$", options: .regularExpression) == nil {
                 throw NSError(domain: "CatPawOpen", code: -3, userInfo: [NSLocalizedDescriptionKey: "站源内容密钥无效"])
             }

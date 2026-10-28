@@ -7,7 +7,7 @@
 const meta = {
   id: "hongguo",
   name: "官方免费短剧",
-  version: "1.1.0-dev.6",
+  version: "1.1.0-dev.7",
   description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
   author: "社区开发者",
   type: "video",
@@ -780,211 +780,11 @@ async function detail(id) {
 }
 
 async function play(flag, id, flags) {
-  let playTarget = (id || "").toString().trim();
-  playTarget = playTarget.replace(/^hongguo:/, "");
-
-  // 若已经是完整的 mp4 / m3u8 网络媒体直链，直接返回
-  if (playTarget.startsWith("http") && (playTarget.includes(".mp4") || playTarget.includes(".m3u8"))) {
-    return {
-      parse: 0,
-      url: playTarget,
-      header: {
-        "User-Agent": USER_AGENT,
-        "Referer": BASE_URL + "/"
-      }
-    };
+  const target = String(id || '').replace(/^hongguo:/, '');
+  if (/^https?:\/\/.+\.(?:mp4|m3u8)(?:[?#]|$)/i.test(target) && !/\/video\/public\//i.test(target)) {
+    return { parse: 0, url: target, header: { 'User-Agent': USER_AGENT } };
   }
-
-  let seriesId = "";
-  let itemId = "";
-  let episodeIndex = 1;
-  let playerPageUrl = "";
-
-  const isCorruptedId = function(s) {
-    return !s;
-  };
-
-  // 1. 优先从 /player/ 路由中精确提取 seriesId 与 itemId
-  const playerMatch = playTarget.match(/\/player\/([^\/\?#]+)(?:\/([^\/\?#]+))?/);
-  if (playerMatch) {
-    seriesId = playerMatch[1];
-    itemId = playerMatch[2] || "";
-    playerPageUrl = playTarget.startsWith("http") ? playTarget : (BASE_URL + (playTarget.startsWith("/") ? "" : "/") + playTarget);
-  } else {
-    const segments = playTarget.split(/[\/_]/).filter(Boolean);
-    const longDigits = [];
-    let shortDigit = 0;
-
-    for (const seg of segments) {
-      const m = seg.match(/\d+/);
-      if (!m) continue;
-      const numStr = m[0];
-      if (numStr.length >= 10) {
-        longDigits.push(numStr);
-      } else if (numStr.length >= 1 && shortDigit === 0) {
-        shortDigit = parseInt(numStr, 10);
-      }
-    }
-
-    if (longDigits.length >= 2) {
-      seriesId = longDigits[0];
-      itemId = longDigits[1];
-      if (isCorruptedId(itemId)) itemId = "";
-    } else if (longDigits.length === 1) {
-      seriesId = longDigits[0];
-      if (shortDigit > 0) {
-        episodeIndex = shortDigit;
-      }
-    }
-  }
-
-  // 2. 若未能获得有效的单集 vid（即 itemId 为空），尝试通过 App 官方 API 或 Web 详情解析该集真实的 vid
-  if (!itemId && seriesId && !isCorruptedId(seriesId)) {
-    const appDetail = await fetchAppDetail(seriesId);
-    if (appDetail && Array.isArray(appDetail.video_list) && appDetail.video_list.length > 0) {
-      const idx = episodeIndex - 1;
-      const targetEp = appDetail.video_list[idx];
-      if (targetEp && (targetEp.vid || targetEp.video_id)) {
-        itemId = String(targetEp.vid || targetEp.video_id);
-      }
-    }
-    if (!itemId && episodeIndex > 0) {
-      try {
-        const fullDetail = await spider.detail(seriesId);
-        const vod = fullDetail && Array.isArray(fullDetail.list) && fullDetail.list[0];
-        const playUrl = (vod && vod.vod_play_url) || "";
-        if (playUrl) {
-          const entries = playUrl.split("#");
-          for (let i = 0; i < entries.length; i++) {
-            const parts = entries[i].split("$");
-            if (parts.length >= 2) {
-              const numMatch = parts[0].match(/(\d+)/);
-              if (numMatch && Number(numMatch[1]) === episodeIndex) {
-                const vidM = /\/player\/[^/?#]+\/(\d+)/.exec(parts[1]) || /^(\d{10,})$/.exec(parts[1]);
-                if (vidM) {
-                  itemId = vidM[1];
-                  break;
-                }
-              }
-            }
-          }
-          if (!itemId && entries.length >= episodeIndex) {
-            const parts = entries[episodeIndex - 1].split("$");
-            if (parts.length >= 2) {
-              const vidM = /\/player\/[^/?#]+\/(\d+)/.exec(parts[1]) || /^(\d{10,})$/.exec(parts[1]);
-              if (vidM) itemId = vidM[1];
-            }
-          }
-        }
-      } catch (_) {}
-    }
-  }
-
-  let realStreamUrl = "";
-
-  // 3. 官方 App 专有播放模型 (video_model)：优先尝试，失败时继续解析网页
-  if (itemId && !isCorruptedId(itemId)) {
-    const model = await fetchAppVideoModel(itemId);
-    if (model && !model.isError) {
-      const appStream = extractStreamFromVideoModel(model);
-      if (appStream && !/"(?:spade_a|key_seed|encrypt_info)"\s*:/.test(JSON.stringify(model))) {
-        return {
-          parse: 0,
-          url: appStream,
-          episodeId: itemId,
-          header: {
-            "User-Agent": USER_AGENT,
-            "Referer": "https://novel.snssdk.com/"
-          }
-        };
-      }
-    }
-  }
-
-  // 4. 若 App 专用接口未取到流，回退走网页播放页解析官方原生真实流（含 Base64 地址自动解码）
-  if (playerPageUrl || (itemId && !isCorruptedId(itemId))) {
-    const targetUrl = playerPageUrl || (BASE_URL + "/player/" + (seriesId || itemId) + "/" + itemId);
-    try {
-      const resp = await fetch(targetUrl, {
-        headers: {
-          "User-Agent": USER_AGENT,
-          "Referer": BASE_URL + "/"
-        }
-      });
-      const body = resp && (typeof resp.text === "function" ? await resp.text() : resp.body);
-      if (body) {
-        // A. 匹配 main_url / backup_url 并尝试 Base64 解码
-        const mUrls = body.match(/"(?:main_url|backup_url|url_list)"\s*:\s*"([^"]+)"/g);
-        if (mUrls) {
-          for (let i = 0; i < mUrls.length; i++) {
-            const valMatch = mUrls[i].match(/:\s*"([^"]+)"/);
-            if (valMatch && valMatch[1]) {
-              let candidate = valMatch[1].replace(/\\u0026/g, "&").replace(/\\u002F/g, "/").replace(/\\\//g, "/");
-              if (!candidate.startsWith("http://") && !candidate.startsWith("https://")) {
-                const decoded = safeBase64Decode(candidate);
-                if (decoded && (decoded.startsWith("http://") || decoded.startsWith("https://"))) {
-                  candidate = decoded;
-                }
-              }
-              if (candidate.startsWith("http://") || candidate.startsWith("https://")) {
-                realStreamUrl = candidate;
-                break;
-              }
-            }
-          }
-        }
-
-        // B. 匹配 contentUrl
-        if (!realStreamUrl) {
-          const mContent = body.match(/"contentUrl"\s*:\s*"([^"]+)"/);
-          if (mContent && mContent[1]) {
-            realStreamUrl = mContent[1].replace(/\\u0026/g, "&").replace(/\\u002F/g, "/").replace(/\\\//g, "/");
-          }
-        }
-
-        // C. 匹配明文媒体地址
-        if (!realStreamUrl) {
-          const m3u8Match = body.match(/https?:\/\/[^"'\s<>\\]+\.(?:m3u8|mp4)(?:\?[^"'\s<>\\]*)?/);
-          if (m3u8Match) realStreamUrl = m3u8Match[0];
-        }
-      }
-    } catch (_) {}
-
-    // D. 网页未提取到流时，回退到官方公共媒体地址（注意：必须基于真实分集 vid，绝不使用 seriesId）
-    if (!realStreamUrl && itemId && /^\d+$/.test(itemId)) {
-      const candidate = BASE_URL + "/video/public/" + itemId + "/360p.mp4";
-      try {
-        const check = await fetch(candidate, { method: "HEAD", headers: { "User-Agent": USER_AGENT } });
-        const contentType = check && check.headers && (typeof check.headers.get === "function"
-          ? check.headers.get("content-type") : check.headers["content-type"]);
-        if (check && (check.status === 200 || check.status === 206) && /^video\//i.test(contentType || "")) {
-          realStreamUrl = candidate;
-        }
-      } catch (_) {}
-    }
-  }
-
-  // 严禁将 seriesId 当作 vid 拼接为 360p.mp4，避免生成 404 伪链接
-  if (!realStreamUrl) {
-    return {
-      parse: 0,
-      url: "",
-      header: {}
-    };
-  }
-
-  const exactReferer = playerPageUrl || (BASE_URL + "/player/" + (seriesId || itemId) + "/" + (itemId || seriesId));
-
-  return {
-    parse: 0,
-    url: realStreamUrl,
-    header: {
-      "User-Agent": USER_AGENT,
-      "Referer": exactReferer
-    },
-    quality: /\/360p\.mp4(?:\?|$)/.test(realStreamUrl) ? 360 : 0,
-    qualities: /\/360p\.mp4(?:\?|$)/.test(realStreamUrl) ? [360] : []
-  };
+  return { parse: 0, url: '', header: {}, error: 'MISSING_EPISODE' };
 }
 
 var spider = {
@@ -1041,7 +841,7 @@ async function requestAppVideoModel(videoId, device, deadline) {
       return model;
     } catch (error) {
       lastError = error;
-      const recoverable = ['EMPTY_RESPONSE', 'RESPONSE_NOT_UTF8', 'INVALID_RESPONSE', 'HTTP_0', 'HTTP_404', 'HTTP_405', 'HTTP_408', 'HTTP_500', 'HTTP_502', 'HTTP_503', 'HTTP_504', 'ETIMEDOUT', 'DNS', 'TIMEOUT', 'CONNECTION'].includes(error.code)
+      const recoverable = ['MISSING_MODEL', 'EMPTY_RESPONSE', 'RESPONSE_NOT_UTF8', 'INVALID_RESPONSE', 'HTTP_0', 'HTTP_404', 'HTTP_405', 'HTTP_408', 'HTTP_500', 'HTTP_502', 'HTTP_503', 'HTTP_504', 'ETIMEDOUT', 'DNS', 'TIMEOUT', 'CONNECTION'].includes(error.code)
         || ['dns_error', 'network_timeout', 'conn_refused'].includes(error.category);
       if (!recoverable || globalThis.__hongguoCancelled) throw error;
       if (route === preferredAppModelRoute) { preferredAppModelRoute = null; preferredAppModelUntil = 0; }
@@ -1966,7 +1766,11 @@ Public License instead of this License.  But first, please read
   const existingPlay = spider.play;
   spider.play = async function (flag, id, flags) {
     const target = String(id || '').replace(/^hongguo:/, '');
-    const match = /\/player\/([^/?#]+)\/(\d+)(?:[/?#]|$)/.exec(target) || /^(\d+)_(\d{10,})$/.exec(target);
+    const flagValues = Array.isArray(flags) ? flags : [];
+    const seriesId = String(flagValues.find(value => value && typeof value === 'object' && value.seriesId)?.seriesId || '');
+    const publicMatch = /\/video\/public\/(\d{10,})\//.exec(target);
+    const match = /\/player\/([^/?#]+)\/(\d+)(?:[/?#]|$)/.exec(target) || /^(\d+)_(\d{10,})$/.exec(target)
+      || (publicMatch ? ['', /^\d{10,}$/.test(seriesId) ? seriesId : '', publicMatch[1]] : null);
     if (!match) {
       const indexed = /^(\d+)[/_](\d{1,5})$/.exec(target);
       if (!indexed) return existingPlay(flag, id, flags);
@@ -2016,7 +1820,7 @@ Public License instead of this License.  But first, please read
       return spider.play(flag, BASE_URL + "/player/" + indexed[1] + "/" + exactId, flags);
     }
     const vid = match[2];
-    const danmakuId = 'hongguo:' + match[1] + ':' + vid;
+    const danmakuId = match[1] ? 'hongguo:' + match[1] + ':' + vid : '';
     const avoidedUrl = Array.isArray(flags) ? String(flags.find(value => value && typeof value === 'object' && value.avoidUrl)?.avoidUrl || '') : '';
     const qualityValue = Array.isArray(flags) ? Number(flags.find(value => value && typeof value === 'object' && 'quality' in value)?.quality || 0) : 0;
     const requestedQuality = Number.isFinite(qualityValue) && qualityValue > 0 ? Math.round(qualityValue) : 0;
@@ -2085,14 +1889,6 @@ Public License instead of this License.  But first, please read
       } catch (error) {
         lastCode = error.code || 'MODEL_FAILED';
         if (error.routesExhausted || ['BUSINESS_REJECTED', 'SECURITY_BLOCKED', 'MISSING_MODEL', 'EMPTY_RESPONSE', 'RESPONSE_NOT_UTF8', 'HTTP_403', 'HTTP_429'].includes(lastCode)) break;
-      }
-    }
-    if (!globalThis.__hongguoCancelled) {
-      deadline = Date.now() + 15000;
-      const current = await existingPlay(flag, id, flags);
-      if (current && current.url) {
-        const publicId = /\/video\/public\/(\d+)\//.exec(current.url);
-        if ((publicId ? publicId[1] === vid : current.episodeId === vid) && await readable(current)) return { ...current, header: mediaHeaders(current), danmakuId };
       }
     }
     return { parse: 0, url: '', header: {}, error: globalThis.__hongguoCancelled ? 'CANCELLED' : lastCode === 'MEDIA_REJECTED' ? mediaFailure : lastCode, episodeId: vid, danmakuId };

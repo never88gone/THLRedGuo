@@ -11,6 +11,9 @@ enum PlaybackAssetFactory {
     private static var loaderKey: UInt8 = 0
 
     static func prepare(_ plan: PlaybackPlan) async throws -> PreparedPlaybackAsset {
+        guard !PlaybackPlan.isPublicPreviewURL(plan.url) else {
+            throw NSError(domain: "THLRedLook.Playback", code: -1, userInfo: [NSLocalizedDescriptionKey: "已拒绝公共试看流，请重新获取完整分集", "diagnosticCode": "PREVIEW_STREAM_REJECTED"])
+        }
         guard let url = URL(string: plan.url) else { throw CENCStreamIndex.invalid() }
         guard !plan.decryptionKey.isEmpty else {
             let options: [String: Any] = plan.headers.isEmpty ? [:] : ["AVURLAssetHTTPHeaderFieldsKey": plan.headers]

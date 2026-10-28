@@ -66,8 +66,14 @@ public struct PlaybackPlan: Hashable, Codable {
         self.local = try container.decodeIfPresent(Bool.self, forKey: .local) ?? false
     }
 
+    public static func isPublicPreviewURL(_ value: String) -> Bool {
+        guard let url = URL(string: value), let host = url.host?.lowercased(),
+              host == "hongguoduanju.com" || host.hasSuffix(".hongguoduanju.com") else { return false }
+        return url.path.hasPrefix("/video/public/")
+    }
+
     public func isReusable(at date: Date = Date(), minimumLifetime: TimeInterval = 5) -> Bool {
-        !url.isEmpty && (local || expiresAt <= 0 || Double(expiresAt) > date.addingTimeInterval(minimumLifetime).timeIntervalSince1970 * 1000)
+        !url.isEmpty && !Self.isPublicPreviewURL(url) && (local || expiresAt <= 0 || Double(expiresAt) > date.addingTimeInterval(minimumLifetime).timeIntervalSince1970 * 1000)
     }
 
     public var hasAlternative: Bool {

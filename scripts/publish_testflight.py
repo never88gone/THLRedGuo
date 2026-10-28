@@ -65,7 +65,7 @@ def group_contains_build(request, group_id, build_id):
 
 
 def distribute_build(request, build_id, group, number, version, metadata, sleep=time.sleep):
-    notes = '新增数据源版本、实际运行 JS 指纹与一致性检查；优化播放稳定性、1080P 优先和清晰度切换。保留收藏与观看进度。\nJS ' + metadata['sha256'][:12]
+    notes = '修复部分分集误播360P、10秒试看流的问题；优先播放1080P完整片源，完善官方备用取流与旧缓存恢复。保留收藏与观看进度。\nJS ' + metadata['sha256'][:12]
     localizations = request(f'/builds/{build_id}/betaBuildLocalizations')['data']
     chinese = next((row for row in localizations if row['attributes']['locale'] == 'zh-Hans'), None)
     if chinese:

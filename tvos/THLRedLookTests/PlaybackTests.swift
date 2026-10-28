@@ -453,6 +453,71 @@ final class PlaybackTests: XCTestCase {
         print("THL_QUALITY_RESULT default1080=true switch720=true autoNext1080Fallback=true requested720Preserved=true switch1080=true automatic1080=true pauseAndProgressPreserved=true")
     }
 
+    func testLiveFullEpisodesPastThirtySecondsAndLegacyPreviewRecovery() async throws {
+        try live()
+        OfficialModelFailureProtocol.configure(blockReadingBatch: false, missingModel: true)
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [OfficialModelFailureProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bridge = NativeBridge(baseDirectory: root, httpSession: session, diagnostics: SourceDiagnostics(), diagnosticContext: "完整分集验证", persistentDeviceSession: false)
+        let source = NativeRepository(bridge: bridge, playbackBridge: bridge)
+        for (series, number, minimumDuration) in [("7694896136963755032", 1, 150.0), ("7688558312157088793", 1, 120.0), ("7697541703539887129", 184, 60.0)] {
+            let detail = try await source.loadDetail(drama: Drama(id: "hongguo:" + series, source: "hongguo", sourceId: series, title: "完整播放验证"))
+            let original = try XCTUnwrap(detail.episodes.first { $0.number == number })
+            let raw = try XCTUnwrap(original.rawChapter)
+            let target = try XCTUnwrap(raw["url"] as? String)
+            let vid = try XCTUnwrap(URL(string: target)?.pathComponents.last)
+            let preview = "https://hongguoduanju.com/video/public/" + vid + "/360p.mp4"
+            let legacy = Episode(id: original.id, title: original.title, number: original.number, raw: try JSONSerialization.data(withJSONObject: ["url": preview]))
+            let episodes = detail.episodes.map { $0.number == number ? legacy : $0 }
+            let suite = "THLRedLook.FullEpisode." + UUID().uuidString
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let model = PlayerViewModel(drama: detail.drama, allEpisodes: episodes, repository: source, preloadingRepository: source, store: LocalStore(defaults: defaults))
+            model.danmakuEnabled = false
+            defer { model.onDisappear() }
+            await model.preparePlayback(episodeIndex: number)
+            try await ready(model)
+            XCTAssertGreaterThan(model.duration, minimumDuration)
+            XCTAssertEqual(model.plan?.quality, 1080)
+            XCTAssertEqual(model.selectedQuality, 1080)
+            XCTAssertFalse(PlaybackPlan.isPublicPreviewURL(model.plan?.url ?? ""))
+            XCTAssertFalse(model.plan?.decryptionKey.isEmpty ?? true)
+            try await wait(seconds: 55) { model.currentTime > 32 && !model.isBuffering }
+            XCTAssertEqual(model.currentEpisodeIndex, number)
+            XCTAssertTrue(try XCTUnwrap(model.player).rate > 0)
+            XCTAssertFalse(try XCTUnwrap(model.player).isMuted)
+            XCTAssertNil(model.errorMessage)
+            print("THL_FULL_EPISODE series=\(series) episode=\(number) quality=\(model.selectedQuality) duration=\(model.duration) naturalPosition=\(model.currentTime) legacyPreviewRecovered=true")
+            if number == 184 {
+                model.seekBy(seconds: max(0, model.duration - model.currentTime - 3))
+                try await wait { model.currentEpisodeIndex == 185 && !model.isLoading && model.currentTime > 0.5 }
+                try await ready(model)
+                XCTAssertGreaterThan(model.duration, 30)
+                XCTAssertEqual(model.selectedQuality, 1080)
+            }
+            model.onDisappear()
+        }
+        XCTAssertGreaterThanOrEqual(OfficialModelFailureProtocol.count, 1)
+        XCTAssertEqual(OfficialModelFailureProtocol.webCount, 0)
+    }
+
+    func testPublicPreviewCannotBeReusedOrPreparedAsFullEpisode() async throws {
+        let plan = PlaybackPlan(url: "https://hongguoduanju.com/video/public/7694898085759028248/360p.mp4", quality: 360)
+        XCTAssertFalse(plan.isReusable())
+        do {
+            _ = try await PlaybackAssetFactory.prepare(plan)
+            XCTFail("Preview must be rejected before AVPlayer setup")
+        } catch {
+            XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "PREVIEW_STREAM_REJECTED")
+        }
+        XCTAssertTrue(PlaybackPlan(url: "https://fixture.qznovelvod.com/full360.mp4", quality: 360).isReusable())
+    }
+
     private func verifyOfficialFallback(single: Bool) async throws {
         try live()
         OfficialModelFailureProtocol.configure(blockReadingBatch: single)
@@ -818,18 +883,33 @@ private final class OfficialModelFailureProtocol: URLProtocol {
     private static let lock = NSLock()
     private static var blockReadingBatch = false
     private static var blocked = 0
-    static func configure(blockReadingBatch: Bool) { lock.lock();defer { lock.unlock() };self.blockReadingBatch = blockReadingBatch;blocked = 0 }
+    private static var missingModel = false
+    private static var blockedWeb = 0
+    static func configure(blockReadingBatch: Bool, missingModel: Bool = false) { lock.lock();defer { lock.unlock() };self.blockReadingBatch = blockReadingBatch;self.missingModel = missingModel;blocked = 0;blockedWeb = 0 }
+    static var webCount: Int { lock.lock();defer { lock.unlock() };return blockedWeb }
     static var count: Int { lock.lock();defer { lock.unlock() };return blocked }
     override class func canInit(with request: URLRequest) -> Bool {
         lock.lock();defer { lock.unlock() }
+        if request.url?.host == "hongguoduanju.com" { return true }
         guard request.url?.path.contains("/novel/player/multi_video_model/v1") == true else { return false }
         return request.url?.host == "api5-normal-sinfonlineb.fqnovel.com" || blockReadingBatch && request.url?.host == "reading.snssdk.com"
     }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func stopLoading() {}
     override func startLoading() {
-        Self.lock.lock();Self.blocked += 1;Self.lock.unlock()
-        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json", "Content-Length": "0", "x-tt-logid": "synthetic-primary-empty"])!, cacheStoragePolicy: .notAllowed)
+        Self.lock.lock()
+        let web = request.url?.host == "hongguoduanju.com"
+        if web { Self.blockedWeb += 1 } else { Self.blocked += 1 }
+        let missing = Self.missingModel
+        Self.lock.unlock()
+        let body = missing ? Data("{\"code\":0,\"data\":{}}".utf8) : Data()
+        if web {
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: [:])!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json", "Content-Length": String(body.count), "x-tt-logid": "synthetic-primary-empty"])!, cacheStoragePolicy: .notAllowed)
+        if !body.isEmpty { client?.urlProtocol(self, didLoad: body) }
         client?.urlProtocolDidFinishLoading(self)
     }
 }

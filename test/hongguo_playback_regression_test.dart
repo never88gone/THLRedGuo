@@ -145,60 +145,76 @@ var spider = { play: async function() {
     });
   }
 
-  test('公共媒体经 HEAD 确认为视频后只报告实际的 360P', () async {
+  test('官方取流失败时不回退到十秒公共360P试看', () async {
     final requested = <http.Request>[];
     final runtime = await createRuntime(
       MockClient((request) async {
         requested.add(request);
-        if (request.method == 'HEAD') {
-          return http.Response('', 206, headers: {'content-type': 'video/mp4'});
-        }
-        return http.Response('', 404);
-      }),
-    );
-    final play = await runtime.play('', playerUrl);
-    expect(
-      play.url,
-      'https://hongguoduanju.com/video/public/$videoId/360p.mp4',
-    );
-    expect(play.quality, 360);
-    expect(play.qualities, [360]);
-    expect(
-      play.header.keys.map((key) => key.toLowerCase()),
-      isNot(contains('referer')),
-    );
-    expect(
-      requested.where((request) => request.method == 'HEAD'),
-      hasLength(2),
-    );
-  });
-
-  test('网络失败后允许重试当前分集，保留原始 HTTPS 播放页', () async {
-    var attempts = 0;
-    final runtime = await createRuntime(
-      MockClient((request) async {
-        if (request.method == 'HEAD' &&
-            request.url.path.contains('/video/public/') &&
-            attempts > 1) {
-          return http.Response('', 200, headers: {'content-type': 'video/mp4'});
-        }
-        if (request.url.path.startsWith('/player/')) {
-          expect(request.url.toString(), playerUrl);
-          attempts++;
-          if (attempts == 1) return http.Response('', 503);
+        if (request.url.path.contains('device_register')) {
           return http.Response(
-            '{"main_url":"https://hongguoduanju.com/video/public/$videoId/360p.mp4"}',
+            '{"device_id_str":"7345678901234567100","install_id_str":"7345678901234567200"}',
             200,
           );
         }
-        return http.Response('', 404);
+        if (request.method == 'HEAD') {
+          return http.Response('', 206, headers: {'content-type': 'video/mp4'});
+        }
+        return http.Response('', 200);
+      }),
+    );
+    final play = await runtime.play('', playerUrl);
+    expect(play.url, isEmpty);
+    expect(play.errorCode, 'EMPTY_RESPONSE');
+    expect(requested.where((r) => r.url.host == 'hongguoduanju.com'), isEmpty);
+    expect(requested.where((r) => r.method == 'HEAD'), isEmpty);
+  });
+
+  test('完整片源暂时失败后再次重试仍只使用官方App接口', () async {
+    var healthy = false;
+    final requests = <http.Request>[];
+    final runtime = await createRuntime(
+      MockClient((request) async {
+        requests.add(request);
+        if (request.url.path.contains('device_register')) {
+          return http.Response(
+            '{"device_id_str":"7345678901234567100","install_id_str":"7345678901234567200"}',
+            200,
+          );
+        }
+        if (request.method == 'HEAD') {
+          return http.Response('', 200, headers: {'content-type': 'video/mp4'});
+        }
+        if (!healthy) return http.Response('', 200);
+        final entry = {
+          'video_model': jsonEncode({
+            'video_list': {
+              'main': {
+                'codec_type': 'h264',
+                'definition': '1080p',
+                'vwidth': 1080,
+                'vheight': 1920,
+                'main_url': base64Encode(
+                  utf8.encode('https://fixture.qznovelvod.com/full.mp4'),
+                ),
+              },
+            },
+          }),
+        };
+        return http.Response(
+          jsonEncode({
+            'code': 0,
+            'data': {videoId: entry},
+          }),
+          200,
+        );
       }),
     );
     expect((await runtime.play('', playerUrl)).url, isEmpty);
-    expect(
-      (await runtime.play('', playerUrl)).url,
-      'https://hongguoduanju.com/video/public/$videoId/360p.mp4',
-    );
+    healthy = true;
+    final plan = await runtime.play('', playerUrl);
+    expect(plan.url, 'https://fixture.qznovelvod.com/full.mp4');
+    expect(plan.quality, 1080);
+    expect(requests.where((r) => r.url.host == 'hongguoduanju.com'), isEmpty);
   });
 
   test('搜索保留末尾为 000 的合法 ID，且不下载封面', () async {
@@ -513,24 +529,37 @@ HongguoApp.fetchAppPlayUrl = async function() { const error = new Error("synthet
     expect((await runtime.play('', playerUrl)).url, isEmpty);
   });
 
-  test('没有 Buffer 和 atob 的端侧沙箱也能解析 Base64 播放模型', () async {
+  test('没有 Buffer 和 atob 的端侧沙箱也能解析完整 App Base64 播放模型', () async {
     final runtime = await createRuntime(
       MockClient((request) async {
+        if (request.url.path.contains('device_register')) {
+          return http.Response(
+            '{"device_id_str":"7345678901234567100","install_id_str":"7345678901234567200"}',
+            200,
+          );
+        }
         if (request.method == 'HEAD' &&
-            request.url.host == 'media.example.test') {
+            request.url.host == 'fixture.qznovelvod.com') {
           return http.Response('', 200, headers: {'content-type': 'video/mp4'});
         }
-        expect(request.url.path, '/novel/player/video_model/v1/');
+        expect(request.url.path, '/novel/player/multi_video_model/v1/');
         return http.Response(
           jsonEncode({
+            'code': 0,
             'data': {
-              'video_model': {
-                'video_list': {
-                  'video_1': {
-                    'main_url': base64Encode(
-                      utf8.encode('https://media.example.test/current.mp4'),
-                    ),
-                    'video_meta': {'codec_type': 'h264'},
+              videoId: {
+                'video_model': {
+                  'video_list': {
+                    'video_1': {
+                      'main_url': base64Encode(
+                        utf8.encode(
+                          'https://fixture.qznovelvod.com/current.mp4',
+                        ),
+                      ),
+                      'vwidth': 1080,
+                      'vheight': 1920,
+                      'video_meta': {'codec_type': 'h264'},
+                    },
                   },
                 },
               },
@@ -543,7 +572,7 @@ HongguoApp.fetchAppPlayUrl = async function() { const error = new Error("synthet
     );
     expect(
       (await runtime.play('', playerUrl)).url,
-      'https://media.example.test/current.mp4',
+      'https://fixture.qznovelvod.com/current.mp4',
     );
   });
 

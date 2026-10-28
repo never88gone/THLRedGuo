@@ -246,4 +246,35 @@ const spider={
       await engine.dispatch({'action': 'cancelPlayback'});
     },
   );
+  test(
+    'Flutter engine does not pass an old public preview through after source failure',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'thl_preview_rejection_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final engine = DartCoreEngine.instance;
+      await engine.dispatch({
+        'action': 'initialize',
+        'directory': directory.path,
+      });
+      await engine.dispatch({
+        'action': 'jsSource.load',
+        'fileName': 'hongguo.js',
+        'script':
+            "const meta={id:'hongguo',name:'Synthetic',version:'1'};const spider={play:async function(){return {url:'',error:'EMPTY_RESPONSE'};},detail:async function(){return {list:[]};}};",
+      });
+      final result = await engine.dispatch({
+        'action': 'resolve',
+        'drama': {'id': 'hongguo:7345678901234567123', 'source': 'hongguo'},
+        'chapter': {
+          'url':
+              'https://hongguoduanju.com/video/public/7345678901234568456/360p.mp4',
+        },
+        'index': 1,
+      });
+      expect(result['ok'], false);
+      await engine.dispatch({'action': 'cancelPlayback'});
+    },
+  );
 }

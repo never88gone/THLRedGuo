@@ -156,6 +156,8 @@ private final class PlaybackResponseFixtureProtocol: URLProtocol {
     private static var registrations = 0
     private static var modelTimes: [Date] = []
     private static var legacyModels = 0
+    private static var modelRoutes: [String] = []
+    private static var webRequests = 0
 
     static func configure(nonUTF8: Bool = false) {
         lock.lock()
@@ -164,12 +166,14 @@ private final class PlaybackResponseFixtureProtocol: URLProtocol {
         registrations = 0
         modelTimes = []
         legacyModels = 0
+        modelRoutes = []
+        webRequests = 0
     }
 
-    static var counts: (registrations: Int, modelTimes: [Date], legacyModels: Int) {
+    static var counts: (registrations: Int, modelTimes: [Date], legacyModels: Int, modelRoutes: [String], webRequests: Int) {
         lock.lock()
         defer { lock.unlock() }
-        return (registrations, modelTimes, legacyModels)
+        return (registrations, modelTimes, legacyModels, modelRoutes, webRequests)
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -185,6 +189,8 @@ private final class PlaybackResponseFixtureProtocol: URLProtocol {
         if registration { Self.registrations += 1 }
         if multi && url.host == "api5-normal-sinfonlineb.fqnovel.com" { Self.modelTimes.append(Date()) }
         if legacy { Self.legacyModels += 1 }
+        if multi || legacy { Self.modelRoutes.append((url.host ?? "") + url.path) }
+        if url.host == "hongguoduanju.com" { Self.webRequests += 1 }
         Self.lock.unlock()
         let bytes: Data
         var headers = ["Content-Type": "application/json; charset=utf-8", "X-Tt-Logid": "synthetic-playback-log", "Set-Cookie": "private-cookie", "X-Untrusted": "private-header"]
@@ -248,7 +254,14 @@ final class OverseasPlaybackTests: XCTestCase {
         let counts = PlaybackResponseFixtureProtocol.counts
         XCTAssertEqual(counts.registrations, 1)
         XCTAssertEqual(counts.modelTimes.count, 1)
-        XCTAssertLessThanOrEqual(counts.legacyModels, 2)
+        XCTAssertEqual(counts.legacyModels, 1)
+        XCTAssertEqual(counts.modelRoutes, [
+            "api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1",
+            "reading.snssdk.com/novel/player/multi_video_model/v1",
+            "reading.snssdk.com/novel/player/video_model/v1",
+            "api5-normal.fqnovel.com/novel/player/multi_video_model/v1"
+        ])
+        XCTAssertEqual(counts.webRequests, 0)
         let entry = try XCTUnwrap(recorder.entries.last)
         XCTAssertEqual(entry.stage, "播放取流 第184集")
         XCTAssertEqual(entry.errorCode, code)
@@ -257,7 +270,7 @@ final class OverseasPlaybackTests: XCTestCase {
         XCTAssertEqual(entry.contentType, nonUTF8 ? "application/x-protobuf" : "application/json")
         XCTAssertEqual(entry.contentEncoding, "br")
         XCTAssertEqual(entry.declaredBodyBytes, bytes)
-        XCTAssertEqual(entry.host, "api5-normal-sinfonlineb.fqnovel.com")
+        XCTAssertEqual(entry.host, "api5-normal.fqnovel.com")
         XCTAssertFalse(entry.url.contains("/player/\(seriesId)"))
         XCTAssertTrue(entry.suggestion.contains("手机热点"))
         let report = recorder.report

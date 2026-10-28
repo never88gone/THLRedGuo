@@ -92,6 +92,65 @@ void main() {
     },
   );
   test(
+    'missing primary episode model switches to official reading endpoint',
+    () async {
+      final calls = <String>[];
+      final registrations = [0];
+      final r = await runtime(
+        (q) async => q.url.host == primary
+            ? http.Response('{"code":0,"data":{}}', 200)
+            : model(q),
+        calls,
+        registrations,
+      );
+      final result = await r.play('', '7345678901234567123_$id');
+      expect(result.url, media);
+      expect(calls, [
+        '$primary/novel/player/multi_video_model/v1/',
+        '$reading/novel/player/multi_video_model/v1/',
+      ]);
+      expect(registrations.single, 1);
+    },
+  );
+
+  test(
+    'old public preview target is resolved through App video model',
+    () async {
+      final calls = <String>[];
+      final registrations = [0];
+      final r = await runtime((q) async => model(q), calls, registrations);
+      final result = await r.play(
+        '',
+        'https://hongguoduanju.com/video/public/$id/360p.mp4',
+        flags: [
+          {'seriesId': '7345678901234567123'},
+        ],
+      );
+      expect(result.url, media);
+      expect(result.danmakuId, 'hongguo:7345678901234567123:$id');
+      expect(calls, ['$primary/novel/player/multi_video_model/v1/']);
+    },
+  );
+
+  test(
+    'missing episode on every official route never enables preview fallback',
+    () async {
+      final calls = <String>[];
+      final registrations = [0];
+      final r = await runtime(
+        (q) async => http.Response('{"code":0,"data":{}}', 200),
+        calls,
+        registrations,
+      );
+      final result = await r.play('', '7345678901234567123_$id');
+      expect(result.url, isEmpty);
+      expect(result.errorCode, 'MISSING_MODEL');
+      expect(calls, hasLength(4));
+      expect(registrations.single, 1);
+    },
+  );
+
+  test(
     'signed single-video endpoint recovers when both batch endpoints return empty',
     () async {
       final calls = <String>[];
@@ -216,7 +275,7 @@ void main() {
         (await r.play('', '7345678901234567123_$id')).errorCode,
         'MISSING_MODEL',
       );
-      expect(calls, hasLength(1));
+      expect(calls, hasLength(4));
     },
   );
 }
