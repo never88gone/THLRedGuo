@@ -9,7 +9,7 @@ from zipfile import ZipFile
 
 import source_manifest as manifest
 from publish_testflight import distribute_build, public_status, request_with_retry, select_build, select_public_group
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 
 class SourceReleaseTests(unittest.TestCase):
@@ -103,6 +103,42 @@ class SourceReleaseTests(unittest.TestCase):
         with self.assertRaises(HTTPError):
             request_with_retry(operation, '/build', method='POST', sleep=lambda _: None)
         self.assertEqual(calls, ['POST'])
+
+    def test_get_recovers_transport_timeouts_and_disconnects(self):
+        for error in [TimeoutError('read timed out'), URLError('connection closed'), ConnectionResetError('reset')]:
+            calls = []
+            delays = []
+            def operation(path, method, body):
+                calls.append(method)
+                if len(calls) < 3:
+                    raise error
+                return {'data': []}
+            self.assertEqual(request_with_retry(operation, '/build', sleep=delays.append), {'data': []})
+            self.assertEqual(calls, ['GET', 'GET', 'GET'])
+            self.assertEqual(delays, [2, 4])
+
+    def test_persistent_transport_timeout_stops_after_four_reads(self):
+        calls = []
+        def operation(path, method, body):
+            calls.append(method)
+            raise TimeoutError('read timed out')
+        with self.assertRaises(TimeoutError):
+            request_with_retry(operation, '/build', sleep=lambda _: None)
+        self.assertEqual(len(calls), 4)
+        for method in ['POST', 'PATCH']:
+            calls.clear()
+            with self.assertRaises(TimeoutError):
+                request_with_retry(operation, '/build', method=method, sleep=lambda _: None)
+            self.assertEqual(calls, [method])
+
+    def test_authorization_error_is_not_retried(self):
+        calls = []
+        def operation(path, method, body):
+            calls.append(method)
+            raise HTTPError(path, 401, 'unauthorized', {}, None)
+        with self.assertRaises(HTTPError):
+            request_with_retry(operation, '/build', sleep=lambda _: None)
+        self.assertEqual(calls, ['GET'])
 
     def test_review_pending_is_not_reported_as_published(self):
         self.assertEqual(public_status('IN_BETA_TESTING', True), 'published')

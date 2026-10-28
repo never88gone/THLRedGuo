@@ -4,7 +4,7 @@ import socket
 import time
 from pathlib import Path
 from urllib.parse import urlencode
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 from set_testflight_notes import api_request, get_credentials, make_jwt
 from source_manifest import SOURCE, inspect_ipa, verify_bytes
@@ -45,8 +45,9 @@ def request_with_retry(operation, path, method='GET', body=None, sleep=time.slee
     for attempt in range(4):
         try:
             return operation(path, method, body)
-        except HTTPError as error:
-            if method != 'GET' or error.code not in [429, 500, 502, 503, 504] or attempt == 3:
+        except (HTTPError, URLError, TimeoutError, ConnectionError) as error:
+            temporary = not isinstance(error, HTTPError) or error.code in [429, 500, 502, 503, 504]
+            if method != 'GET' or not temporary or attempt == 3:
                 raise
             sleep(2 ** (attempt + 1))
 
