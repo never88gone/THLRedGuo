@@ -2216,7 +2216,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             body: pictureInPicture
                 ? _videoPane(context)
                 : SafeArea(
-                    top: false,
+                    top: !fullscreen,
                     bottom: !fullscreen,
                     left: !fullscreen,
                     right: !fullscreen,
@@ -2240,17 +2240,13 @@ class _PlayerScreenState extends State<PlayerScreen>
                               ),
                               SizedBox(
                                 width: desktop ? 340 : 220,
-                                child: SafeArea(
-                                  top: true,
-                                  bottom: true,
-                                  child: PlayerDesktopPanelView(
-                                    episodes: widget.detail.episodes,
-                                    currentIndex: _index,
-                                    seriesEntries: _currentSeriesEntries,
-                                    currentDramaId: widget.detail.drama.id,
-                                    onSeasonSelected: _switchSeason,
-                                    onSelectEpisode: (index) => _play(index),
-                                  ),
+                                child: PlayerDesktopPanelView(
+                                  episodes: widget.detail.episodes,
+                                  currentIndex: _index,
+                                  seriesEntries: _currentSeriesEntries,
+                                  currentDramaId: widget.detail.drama.id,
+                                  onSeasonSelected: _switchSeason,
+                                  onSelectEpisode: (index) => _play(index),
                                 ),
                               ),
                             ],
