@@ -93,7 +93,10 @@ HongguoApp.fetchAppPlayUrl=async function(){return {variants:[${variants.map((v)
               200,
             );
           }
-          expect(request.url.path, '/novel/player/multi_video_model/v1/');
+          expect([
+            '/novel/player/multi_video_model/v1/',
+            '/novel/player/video_model/v1/',
+          ], contains(request.url.path));
           models++;
           return http.Response(body, 200);
         });
@@ -109,7 +112,7 @@ HongguoApp.fetchAppPlayUrl=async function(){return {variants:[${variants.map((v)
         final result = await runtime.play('', '7345678901234567100_$id');
         expect(result.url, isEmpty);
         expect(result.errorCode, 'EMPTY_RESPONSE');
-        expect(models, 1);
+        expect(models, 4);
         expect(registrations, 1);
       },
     );

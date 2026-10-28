@@ -8,18 +8,20 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:THLRedLook/core/diagnostics/diagnostic_log_exporter.dart';
 import 'package:THLRedLook/core/diagnostics/source_diagnostic_runner.dart';
 import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
+import 'package:THLRedLook/core/diagnostics/network_egress_lookup.dart';
 import 'package:THLRedLook/core/js/js_source_presets.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 class SourceDiagnosticsPage extends StatefulWidget {
-  const SourceDiagnosticsPage({super.key});
+  const SourceDiagnosticsPage({super.key, this.diagnostics});
+  final SourceDiagnostics? diagnostics;
 
   @override
   State<SourceDiagnosticsPage> createState() => _SourceDiagnosticsPageState();
 }
 
 class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
-  final recorder = SourceDiagnostics.shared;
+  late final recorder = widget.diagnostics ?? SourceDiagnostics.shared;
   final runner = SourceDiagnosticRunner.shared;
   String version = '版本信息读取中';
   late final Future<void> _metadata;
@@ -38,7 +40,10 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
   @override
   void initState() {
     super.initState();
-    _metadata = _loadMetadata();
+    _metadata = Future.wait<void>([
+      _loadMetadata(),
+      recorder.refreshNetworkEgress(),
+    ]).then((_) {});
   }
 
   Future<void> _loadMetadata() async {
@@ -203,6 +208,16 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colors.onSurfaceVariant,
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      recorder.networkEgress?.summary ?? '出口 IP：正在检测…',
+                      key: const ValueKey('source-diagnostics-egress'),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${NetworkEgressResult.notice} 来源：${recorder.networkEgress?.provider ?? 'IP.SB / IPWho.is'}',
+                      style: theme.textTheme.bodySmall,
                     ),
                   ],
                 ),

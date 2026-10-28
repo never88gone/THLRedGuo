@@ -400,6 +400,48 @@ final class PlaybackTests: XCTestCase {
         print("THL_OVERSEAS_LIVE episode=185 automaticNext=true firstFrame=true video=true audio=true")
     }
 
+    private func verifyOfficialFallback(single: Bool) async throws {
+        try live()
+        OfficialModelFailureProtocol.configure(blockReadingBatch: single)
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [OfficialModelFailureProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let recorder = SourceDiagnostics()
+        let bridge = NativeBridge(baseDirectory: root, httpSession: session, diagnostics: recorder, diagnosticContext: "官方备用实播", persistentDeviceSession: false)
+        let repository = NativeRepository(bridge: bridge, playbackBridge: bridge)
+        let data = try await repository.loadDetail(drama: Drama(id: "hongguo:7697541703539887129", source: "hongguo", sourceId: "7697541703539887129", title: "用户反馈分集"))
+        let suite = "THLRedLook.OfficialFallback." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = PlayerViewModel(drama: data.drama, allEpisodes: data.episodes, repository: repository, preloadingRepository: repository, store: LocalStore(defaults: defaults))
+        model.danmakuEnabled = false
+        defer { model.onDisappear() }
+        await model.preparePlayback(episodeIndex: 184)
+        try await ready(model)
+        XCTAssertEqual(model.currentEpisodeIndex, 184)
+        XCTAssertFalse(try XCTUnwrap(model.plan).decryptionKey.isEmpty)
+        XCTAssertEqual(OfficialModelFailureProtocol.count, single ? 2 : 1)
+        model.seekBy(seconds: max(0, model.duration - model.currentTime - 3))
+        try await wait { model.currentEpisodeIndex == 185 && !model.isLoading && model.currentTime > 0.5 }
+        try await ready(model)
+        XCTAssertEqual(OfficialModelFailureProtocol.count, single ? 2 : 1)
+        let path = single ? "/novel/player/video_model/v1/" : "/novel/player/multi_video_model/v1/"
+        XCTAssertGreaterThanOrEqual(recorder.entries.filter { $0.stage == "播放解析" && $0.host == "reading.snssdk.com" && $0.url.contains(path) && !$0.failed }.count, 2)
+        print("THL_OFFICIAL_FALLBACK single=\(single) episodes=184,185 video=true audio=true autoNext=true failedRouteNotRepeated=true")
+    }
+
+    func testLiveOfficialReadingBatchRecoversPrimaryEmptyResponse() async throws {
+        try await verifyOfficialFallback(single: false)
+    }
+
+    func testLiveOfficialSingleEndpointRecoversBatchEmptyResponses() async throws {
+        try await verifyOfficialFallback(single: true)
+    }
+
     func testLiveRapidEpisodeChangeAndExitCancellation() async throws {
         try live()
         let detail = try await detail("7694896136963755032")
@@ -716,5 +758,25 @@ final class ContinuousPlaybackTests: XCTestCase {
         }
         XCTAssertEqual(recorder.entries.last?.errorCode, "MEDIA_HTTP_403")
         XCTAssertEqual(recorder.entries.last?.stage, "播放取流 第5集")
+    }
+}
+
+private final class OfficialModelFailureProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var blockReadingBatch = false
+    private static var blocked = 0
+    static func configure(blockReadingBatch: Bool) { lock.lock();defer { lock.unlock() };self.blockReadingBatch = blockReadingBatch;blocked = 0 }
+    static var count: Int { lock.lock();defer { lock.unlock() };return blocked }
+    override class func canInit(with request: URLRequest) -> Bool {
+        lock.lock();defer { lock.unlock() }
+        guard request.url?.path.contains("/novel/player/multi_video_model/v1") == true else { return false }
+        return request.url?.host == "api5-normal-sinfonlineb.fqnovel.com" || blockReadingBatch && request.url?.host == "reading.snssdk.com"
+    }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func stopLoading() {}
+    override func startLoading() {
+        Self.lock.lock();Self.blocked += 1;Self.lock.unlock()
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json", "Content-Length": "0", "x-tt-logid": "synthetic-primary-empty"])!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocolDidFinishLoading(self)
     }
 }

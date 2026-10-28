@@ -657,7 +657,7 @@ final class RemoteNavigationTests: XCTestCase {
         wait("diagnostics live result", seconds: 120) { self.app.staticTexts["sourceDiagnostics.result"].label.contains("检测完成") || self.app.staticTexts["sourceDiagnostics.result"].label.contains("检测失败") }
         print("THL_TV_DIAGNOSTICS_LIVE \(app.staticTexts["sourceDiagnostics.result"].label)")
         let shot = XCUIScreen.main.screenshot()
-        try? shot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-search-20261027/tvos_source_diagnostics_modal.png"))
+        try? shot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-routing-20261028/tvos_source_diagnostics_modal.png"))
         let visible = app.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator:" ")
         XCTAssertTrue(visible.contains("检索") || visible.contains("搜索") || visible.contains("DNS") || visible.contains("网络"))
         XCTAssertFalse(visible.contains("device_id="))
@@ -671,8 +671,13 @@ final class RemoteNavigationTests: XCTestCase {
         press(.select)
         wait("full diagnostics report sheet opens", seconds: 15) { self.app.staticTexts["sourceDiagnostics.reportContent"].exists }
         let reportShot = XCUIScreen.main.screenshot()
-        try? reportShot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-search-20261027/tvos_source_diagnostics_report.png"))
+        try? reportShot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-routing-20261028/tvos_source_diagnostics_report.png"))
         let reportText = app.staticTexts["sourceDiagnostics.reportContent"].label
+        XCTAssertTrue(app.staticTexts["sourceDiagnostics.egress"].exists || reportText.contains("出口 IP"))
+        XCTAssertTrue(reportText.contains("IP 归属地区"))
+        XCTAssertTrue(reportText.contains("IP 查询来源"))
+        XCTAssertFalse(reportText.contains("出口 IP: 尚未检测"))
+        XCTAssertFalse(reportText.contains("出口 IP: 未取得"))
         XCTAssertTrue(reportText.contains("核心技术诊断报告") || reportText.contains("应用版本"))
         XCTAssertTrue(reportText.contains("hongguo"))
 
@@ -694,10 +699,12 @@ final class RemoteNavigationTests: XCTestCase {
         let (phoneLog, logResponse) = try await URLSession.shared.data(from: shareURL.appendingPathComponent("report.txt"))
         XCTAssertEqual((logResponse as? HTTPURLResponse)?.statusCode, 200)
         XCTAssertTrue(String(decoding: phoneLog, as: UTF8.self).contains("hongguo"))
+        XCTAssertTrue(String(decoding: phoneLog, as: UTF8.self).contains("IP 归属地区"))
+        XCTAssertTrue(String(decoding: phoneLog, as: UTF8.self).contains("代理分流"))
         XCTAssertTrue((logResponse as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition")?.contains("attachment") == true)
-        try phonePage.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-search-20261027/phone-report.html"))
-        try phoneLog.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-search-20261027/phone-report.txt"))
-        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-search-20261027/tvos_phone_share.png"))
+        try phonePage.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-routing-20261028/phone-report.html"))
+        try phoneLog.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-routing-20261028/phone-report.txt"))
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-routing-20261028/tvos_phone_share.png"))
         press(.menu, focus: "sourceDiagnostics.qr")
         wait("diagnostics return modal after qr", seconds: 10) { self.app.buttons["sourceDiagnostics.qr"].hasFocus }
 
@@ -719,7 +726,7 @@ final class RemoteNavigationTests: XCTestCase {
 
         // 截取焦点下移到列表卡片的高亮图
         let listFocusShot = XCUIScreen.main.screenshot()
-        try? listFocusShot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-search-20261027/tvos_source_diagnostics_entry_focus.png"))
+        try? listFocusShot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-routing-20261028/tvos_source_diagnostics_entry_focus.png"))
 
         // 继续按 down 键下移到第 1 项（如果存在）
         if app.buttons["sourceDiagnostics.entry.1"].exists {
@@ -742,7 +749,7 @@ final class RemoteNavigationTests: XCTestCase {
             self.app.buttons["sourceDiagnostics.detailClose"].hasFocus
         }
         let detailShot = XCUIScreen.main.screenshot()
-        try? detailShot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-search-20261027/tvos_source_diagnostics_entry_detail.png"))
+        try? detailShot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-routing-20261028/tvos_source_diagnostics_entry_detail.png"))
 
         // 关闭详细信息弹窗
         press(.select) // 点击“关闭详情”按钮

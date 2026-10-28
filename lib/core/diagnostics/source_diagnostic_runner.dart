@@ -30,6 +30,7 @@ class SourceDiagnosticRunner extends ChangeNotifier {
     notifyListeners();
 
     final recorder = diagnostics ?? SourceDiagnostics.shared;
+    final network = recorder.refreshNetworkEgress(force: true);
     final context = '主动检测 ${DateTime.now().toUtc().toIso8601String()}';
     final runtime =
         runtimeFactory?.call(recorder, context) ??
@@ -217,6 +218,7 @@ class SourceDiagnosticRunner extends ChangeNotifier {
       result =
           '检测失败：【$currentStage】阶段发生【${analysis.title}】\n失败原因：${analysis.message}';
     } finally {
+      await network;
       runtime.dispose();
       running = false;
       notifyListeners();

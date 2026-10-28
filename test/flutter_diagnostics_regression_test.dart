@@ -9,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
 import 'package:THLRedLook/core/diagnostics/source_diagnostic_runner.dart';
+import 'package:THLRedLook/core/diagnostics/network_egress_lookup.dart';
 import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 import 'package:THLRedLook/pages/settings/source_diagnostics_page.dart';
 
@@ -229,7 +230,19 @@ void main() {
     );
     SourceDiagnostics.shared.clear();
     addTearDown(SourceDiagnostics.shared.clear);
-    SourceDiagnostics.shared.record(
+    final egressClient = MockClient(
+      (request) async => http.Response(
+        '{"ip":"203.0.113.23","country":"Synthetic Region","country_code":"TW"}',
+        200,
+      ),
+    );
+    addTearDown(egressClient.close);
+    final recorder = SourceDiagnostics(
+      networkLookup: NetworkEgressLookup(client: egressClient),
+    );
+    addTearDown(recorder.dispose);
+    await t.runAsync(() => recorder.refreshNetworkEgress());
+    recorder.record(
       url: 'https://reading.snssdk.com/reading/bookapi/search/tab/v',
       context: '合成界面',
       elapsedMs: 3,
@@ -237,7 +250,9 @@ void main() {
       body: emptyTabs,
       headers: {'x-tt-logid': 'synthetic-log-001'},
     );
-    await t.pumpWidget(const MaterialApp(home: SourceDiagnosticsPage()));
+    await t.pumpWidget(
+      MaterialApp(home: SourceDiagnosticsPage(diagnostics: recorder)),
+    );
     await t.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('source-diagnostics-export')),

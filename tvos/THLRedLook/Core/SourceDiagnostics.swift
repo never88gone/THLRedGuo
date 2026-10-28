@@ -142,8 +142,32 @@ public final class SourceDiagnostics: ObservableObject {
     public let objectWillChange = ObservableObjectPublisher()
     private let lock = NSLock()
     private var records: [SourceDiagnosticEntry] = []
+    private var networkResult: NetworkEgressResult?
+    @MainActor private var networkTask: Task<Void, Never>?
 
     public init() {}
+
+    public var networkEgress: NetworkEgressResult? {
+        lock.lock()
+        defer { lock.unlock() }
+        return networkResult
+    }
+
+    private func saveNetworkEgress(_ value: NetworkEgressResult) {
+        lock.lock()
+        networkResult = value
+        lock.unlock()
+        DispatchQueue.main.async { self.objectWillChange.send() }
+    }
+
+    @MainActor public func refreshNetworkEgress(force: Bool = false, using lookup: NetworkEgressLookup? = nil) async {
+        if let networkTask { await networkTask.value; return }
+        if !force, let value = networkEgress, Date().timeIntervalSince(value.at) < (value.ip.isEmpty ? 30 : 300) { return }
+        let task = Task { self.saveNetworkEgress(await (lookup ?? NetworkEgressLookup()).lookup()) }
+        networkTask = task
+        await task.value
+        networkTask = nil
+    }
 
     public var entries: [SourceDiagnosticEntry] {
         lock.lock()
@@ -571,6 +595,8 @@ public final class SourceDiagnostics: ObservableObject {
         lines.append("· 数据源名称: hongguo (官方内置规范源)")
         lines.append("· 源指纹 SHA256: \(Self.sourceHash)")
         lines.append("· 系统地区: \(Locale.current.identifier) · 时区: \(TimeZone.current.identifier)")
+        if let networkEgress { lines.append(contentsOf: networkEgress.reportLines) }
+        else { lines.append("· 出口 IP: 尚未检测，请打开数据源诊断或点击开始检测") }
         lines.append("· 诊断时间: \(ISO8601DateFormatter().string(from: Date()))")
         lines.append("")
 
@@ -679,6 +705,7 @@ public final class SourceDiagnosticRunner: ObservableObject {
         result = "正在检查：网络与DNS、JS脚本引擎、游客注册、短剧搜索、选集详情…"
         let recorder = SourceDiagnostics.shared
         let context = "主动检测 " + ISO8601DateFormatter().string(from: Date())
+        async let network: Void = recorder.refreshNetworkEgress(force: true)
         defer { running = false }
 
         let bridge = NativeBridge(diagnostics: recorder, diagnosticContext: context, persistentDeviceSession: false)
@@ -719,13 +746,19 @@ public final class SourceDiagnosticRunner: ObservableObject {
             if let drama = items.first {
                 stage = "详情解析"
                 let detail = try await bridge.request(action: "detail", payload: ["drama": drama])
-                guard let chapters = detail["chapters"] as? [Any], !chapters.isEmpty else {
+                guard let chapters = detail["chapters"] as? [[String: Any]], let chapter = chapters.first else {
                     let err = NSError(domain: "SourceDiagnostic", code: 2, userInfo: [NSLocalizedDescriptionKey: "详情接口未返回剧集章节列表"])
                     throw err
                 }
+                stage = "播放流解析"
+                let plan = try await bridge.request(action: "resolve", payload: ["source": "hongguo", "drama": detail["drama"] as? [String: Any] ?? drama, "chapter": chapter, "index": 1])
+                guard let url = plan["url"] as? String, !url.isEmpty else {
+                    throw NSError(domain: "SourceDiagnostic", code: 4, userInfo: [NSLocalizedDescriptionKey: "播放接口未返回可用地址", "diagnosticCode": "NO_STREAM_URL"])
+                }
+                recorder.add(SourceDiagnosticEntry(context: context, stage: stage, count: 1))
             }
 
-            result = "检测完成：DNS网络、JS引擎、游客注册、搜索\(more ? "、分页" : "")\(items.isEmpty ? "（空结果）" : "、详情解析")全部通过"
+            result = "检测完成：JS引擎、游客注册、搜索\(more ? "、分页" : "")、详情与播放解析通过"
         } catch {
             let nsErr = error as NSError
             let errorMsg = error.localizedDescription
@@ -766,5 +799,6 @@ public final class SourceDiagnosticRunner: ObservableObject {
             ))
             result = "检测失败：【\(cat.tag)】\(stage) - \(reason)"
         }
+        await network
     }
 }

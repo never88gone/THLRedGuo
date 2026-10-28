@@ -183,7 +183,7 @@ private final class PlaybackResponseFixtureProtocol: URLProtocol {
         Self.lock.lock()
         let nonUTF8 = Self.nonUTF8
         if registration { Self.registrations += 1 }
-        if multi { Self.modelTimes.append(Date()) }
+        if multi && url.host == "api5-normal-sinfonlineb.fqnovel.com" { Self.modelTimes.append(Date()) }
         if legacy { Self.legacyModels += 1 }
         Self.lock.unlock()
         let bytes: Data
@@ -248,7 +248,7 @@ final class OverseasPlaybackTests: XCTestCase {
         let counts = PlaybackResponseFixtureProtocol.counts
         XCTAssertEqual(counts.registrations, 1)
         XCTAssertEqual(counts.modelTimes.count, 1)
-        XCTAssertLessThanOrEqual(counts.legacyModels, 1)
+        XCTAssertLessThanOrEqual(counts.legacyModels, 2)
         let entry = try XCTUnwrap(recorder.entries.last)
         XCTAssertEqual(entry.stage, "播放取流 第184集")
         XCTAssertEqual(entry.errorCode, code)
@@ -289,7 +289,7 @@ final class OverseasPlaybackTests: XCTestCase {
         let counts = PlaybackResponseFixtureProtocol.counts
         XCTAssertEqual(counts.registrations, 1)
         XCTAssertEqual(counts.modelTimes.count, 3)
-        XCTAssertLessThanOrEqual(counts.legacyModels, 3)
+        XCTAssertLessThanOrEqual(counts.legacyModels, 6)
         if counts.modelTimes.count == 3 {
             XCTAssertGreaterThanOrEqual(counts.modelTimes[1].timeIntervalSince(counts.modelTimes[0]), 0.95)
             XCTAssertGreaterThanOrEqual(counts.modelTimes[2].timeIntervalSince(counts.modelTimes[1]), 2.95)
@@ -309,5 +309,81 @@ final class OverseasPlaybackTests: XCTestCase {
         try await Task.sleep(nanoseconds: 1_300_000_000)
         XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelTimes.count, 1)
         XCTAssertNil(model.player)
+    }
+}
+
+private final class NetworkEgressFixtureProtocol: URLProtocol {
+    static let lock = NSLock()
+    private static var calls = 0
+    private static var failPrimary = false
+    static func configure(failPrimary: Bool) {
+        lock.lock();defer { lock.unlock() }
+        self.failPrimary = failPrimary; calls = 0
+    }
+    static var count: Int { lock.lock();defer { lock.unlock() };return calls }
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func stopLoading() {}
+    override func startLoading() {
+        Self.lock.lock();Self.calls += 1;let fail = Self.failPrimary && request.url?.host == "api.ip.sb";Self.lock.unlock()
+        let body = Data(#"{"ip":"203.0.113.23","country":"Synthetic Region","country_code":"TW","region":"Synthetic State","city":"Synthetic City","latitude":1,"cookie":"private-cookie"}"#.utf8)
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: fail ? 503 : 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+}
+
+@MainActor
+final class NetworkEgressTests: XCTestCase {
+    private func lookup() -> NetworkEgressLookup {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [NetworkEgressFixtureProtocol.self]
+        let session = URLSession(configuration: config)
+        addTeardownBlock { session.invalidateAndCancel() }
+        return NetworkEgressLookup(session: session)
+    }
+    func testParsesIPv4AndIPv6WithoutUnrelatedResponseFields() throws {
+        for ip in ["203.0.113.23", "2001:db8::23"] {
+            let body = Data("{\"ip\":\"\(ip)\",\"country\":\"Synthetic Region\",\"country_code\":\"TW\",\"cookie\":\"private-cookie\"}".utf8)
+            let value = try XCTUnwrap(NetworkEgressLookup.parse(body, provider: "IP.SB"))
+            XCTAssertEqual(value.ip, ip)
+            XCTAssertEqual(value.countryCode, "TW")
+            XCTAssertTrue(value.reportLines.joined().contains("IP.SB"))
+            XCTAssertFalse(value.reportLines.joined().contains("private-cookie"))
+            XCTAssertTrue(value.reportLines.joined().contains("代理分流"))
+        }
+        XCTAssertNil(NetworkEgressLookup.parse(Data(#"{"ip":"invalid-address"}"#.utf8), provider: "Synthetic"))
+        XCTAssertNil(NetworkEgressLookup.parse(Data(#"{"ip":"203.0.113.23","success":false}"#.utf8), provider: "Synthetic"))
+    }
+    func testProviderFallbackRetainsMatchingIPAndLocation() async {
+        NetworkEgressFixtureProtocol.configure(failPrimary: true)
+        let value = await lookup().lookup()
+        XCTAssertEqual(value.ip, "203.0.113.23")
+        XCTAssertEqual(value.countryCode, "TW")
+        XCTAssertEqual(value.provider, "IPWho.is")
+        XCTAssertEqual(NetworkEgressFixtureProtocol.count, 2)
+    }
+    func testReportIncludesIPProvenanceAndCoalescesRefresh() async {
+        NetworkEgressFixtureProtocol.configure(failPrimary: false)
+        let recorder = SourceDiagnostics()
+        let lookup = lookup()
+        async let first: Void = recorder.refreshNetworkEgress(using: lookup)
+        async let second: Void = recorder.refreshNetworkEgress(using: lookup)
+        _ = await (first, second)
+        await recorder.refreshNetworkEgress(using: lookup)
+        XCTAssertEqual(NetworkEgressFixtureProtocol.count, 1)
+        let report = recorder.report
+        XCTAssertTrue(report.contains("203.0.113.23"))
+        XCTAssertTrue(report.contains("Synthetic Region"))
+        XCTAssertTrue(report.contains("IP 检测时间"))
+        XCTAssertFalse(report.contains("private-cookie"))
+        XCTAssertTrue(recorder.entries.isEmpty)
+    }
+    func testLiveNetworkEgressLookup() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["HONGGUO_LIVE"] == "1")
+        let result = await NetworkEgressLookup().lookup()
+        XCTAssertFalse(result.ip.isEmpty, result.error)
+        XCTAssertFalse(result.countryCode.isEmpty)
+        print("THL_EGRESS_LIVE validIP=\(!result.ip.isEmpty) countryCode=\(result.countryCode) provider=\(result.provider)")
     }
 }

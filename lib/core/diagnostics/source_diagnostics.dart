@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'network_egress_lookup.dart';
 
 /// 诊断分析结果对象，包含清晰分类、具体失败原因与针对性排查建议
 class DiagnosticAnalysisResult {
@@ -122,6 +123,33 @@ class SourceDiagnosticEntry {
 
 class SourceDiagnostics extends ChangeNotifier {
   static final shared = SourceDiagnostics();
+  SourceDiagnostics({this.networkLookup = const NetworkEgressLookup()});
+  final NetworkEgressLookup networkLookup;
+  NetworkEgressResult? networkEgress;
+  Future<void>? _networkTask;
+
+  Future<void> refreshNetworkEgress({bool force = false}) async {
+    final pending = _networkTask;
+    if (pending != null) return pending;
+    final previous = networkEgress;
+    if (!force &&
+        previous != null &&
+        DateTime.now().toUtc().difference(previous.at).inSeconds <
+            (previous.ip.isEmpty ? 30 : 300)) {
+      return;
+    }
+    final task = () async {
+      networkEgress = await networkLookup.lookup();
+      notifyListeners();
+    }();
+    _networkTask = task;
+    try {
+      await task;
+    } finally {
+      _networkTask = null;
+    }
+  }
+
   final List<SourceDiagnosticEntry> _entries = [];
   List<SourceDiagnosticEntry> get entries => List.unmodifiable(_entries);
 
@@ -827,6 +855,10 @@ class SourceDiagnostics extends ChangeNotifier {
       '  - 系统地区: ${Platform.localeName} · 时区: ${DateTime.now().timeZoneName}',
     );
     buffer.writeln('  - 诊断时间: ${DateTime.now().toUtc().toIso8601String()}');
+    for (final line
+        in networkEgress?.reportLines ?? ['  - 出口 IP: 尚未检测，请打开数据源诊断或点击开始检测']) {
+      buffer.writeln(line);
+    }
     buffer.writeln('  - 数据安全说明: 报告仅含脱敏诊断记录，不含设备唯一标识、Token、Cookie 及响应原文');
     buffer.writeln();
 
