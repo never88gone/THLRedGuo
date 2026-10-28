@@ -1008,7 +1008,8 @@ class DartCoreEngine {
             sourceId.isNotEmpty) {
           playTarget = '${sourceId}_$playTarget';
         }
-        final flags = <Map<String, String>>[
+        final flags = <Map<String, dynamic>>[
+          {'quality': (input['quality'] as num?)?.toInt() ?? 0},
           if (input['avoidUrl'] is String &&
               (input['avoidUrl'] as String).isNotEmpty)
             {'avoidUrl': input['avoidUrl'] as String},

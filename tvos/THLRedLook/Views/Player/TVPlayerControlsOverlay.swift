@@ -356,11 +356,8 @@ public struct TVPlayerControlsOverlay: View {
                                 icon: "sparkles.tv",
                                 target: .quality
                             ) {
-                                let qs = plan.qualities
-                                if let idx = qs.firstIndex(of: viewModel.selectedQuality) {
-                                    let next = qs[(idx + 1) % qs.count]
-                                    Task { await viewModel.changeQuality(next) }
-                                }
+                                viewModel.restoreFocusTarget = .quality
+                                viewModel.isQualitySheetVisible = true
                             }
                             .onMoveCommand { dir in
                                 switch dir {

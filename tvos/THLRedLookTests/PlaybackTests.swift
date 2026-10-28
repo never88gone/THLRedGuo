@@ -400,6 +400,59 @@ final class PlaybackTests: XCTestCase {
         print("THL_OVERSEAS_LIVE episode=185 automaticNext=true firstFrame=true video=true audio=true")
     }
 
+    func testLive1080PrioritySwitchResolutionAndAutomaticNext() async throws {
+        try live()
+        let data = try await detail("7694896136963755032")
+        let suite = "THLRedLook.Quality." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = PlayerViewModel(drama: data.drama, allEpisodes: data.episodes, repository: repository, preloadingRepository: repository, store: LocalStore(defaults: defaults))
+        model.danmakuEnabled = false
+        defer { model.onDisappear() }
+        func verifyResolution(_ expected: Int) async throws {
+            try await ready(model)
+            let item = try XCTUnwrap(model.player?.currentItem)
+            let tracks = try await item.asset.loadTracks(withMediaType: .video)
+            let track = try XCTUnwrap(tracks.first)
+            let size = try await track.load(.naturalSize)
+            XCTAssertEqual(Int(min(size.width, size.height)), expected)
+            XCTAssertEqual(model.selectedQuality, expected)
+            XCTAssertEqual(model.plan?.quality, expected)
+            XCTAssertFalse(try XCTUnwrap(model.player).isMuted)
+            print("THL_QUALITY actual=\(Int(min(size.width, size.height))) requested=\(model.requestedQuality) width=\(Int(size.width)) height=\(Int(size.height)) position=\(model.currentTime)")
+        }
+        XCTAssertEqual(model.requestedQuality, 0)
+        await model.preparePlayback(episodeIndex: 1)
+        try await verifyResolution(1080)
+        XCTAssertTrue(model.qualityOptions.contains(720))
+        XCTAssertTrue(model.qualityOptions.contains(360))
+        model.seekBy(seconds: 12 - model.currentTime)
+        try await wait(seconds: 15) { model.currentTime > 11 }
+        model.togglePlayPause()
+        let paused = model.currentTime
+        await model.changeQuality(720)
+        try await verifyResolution(720)
+        XCTAssertEqual(model.requestedQuality, 720)
+        XCTAssertFalse(model.wantsPlayback)
+        XCTAssertEqual(model.currentTime, paused, accuracy: 0.8)
+        model.togglePlayPause()
+        model.seekBy(seconds: max(0, model.duration - model.currentTime - 3))
+        try await wait { model.currentEpisodeIndex == 2 && !model.isLoading && model.currentTime > 0.5 }
+        try await verifyResolution(1080)
+        XCTAssertFalse(model.qualityOptions.contains(720))
+        XCTAssertEqual(model.requestedQuality, 720)
+        model.togglePlayPause()
+        let nextPaused = model.currentTime
+        await model.changeQuality(1080)
+        try await verifyResolution(1080)
+        XCTAssertFalse(model.wantsPlayback)
+        XCTAssertEqual(model.currentTime, nextPaused, accuracy: 0.8)
+        await model.changeQuality(0)
+        try await verifyResolution(1080)
+        XCTAssertEqual(model.requestedQuality, 0)
+        print("THL_QUALITY_RESULT default1080=true switch720=true autoNext1080Fallback=true requested720Preserved=true switch1080=true automatic1080=true pauseAndProgressPreserved=true")
+    }
+
     private func verifyOfficialFallback(single: Bool) async throws {
         try live()
         OfficialModelFailureProtocol.configure(blockReadingBatch: single)

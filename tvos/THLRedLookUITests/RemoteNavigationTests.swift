@@ -1001,6 +1001,31 @@ final class RemoteNavigationTests: XCTestCase {
         print("THL_REMOTE_RESULT danmakuSettings=true speedSelection=true focus=true")
     }
 
+    func testQualitySelectionDrawerAndReturnFocus() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "controls", "-testEpisode", "5", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        wait("quality controls ready") { self.app.buttons["player.playPause"].hasFocus }
+        for target in ["seekForward", "prevEpisode", "episodeDrawer", "nextEpisode", "speed", "quality"] {
+            press(.right, focus: "player." + target)
+        }
+        press(.select)
+        wait("automatic quality focus") { self.app.buttons["player.quality.option.0"].hasFocus }
+        press(.down, focus: "player.quality.option.1080")
+        press(.down, focus: "player.quality.option.720")
+        press(.select)
+        wait("720 chosen and control restored") {
+            self.app.buttons["player.quality"].hasFocus && self.app.buttons["player.quality"].label.contains("720")
+        }
+        press(.select)
+        wait("remembered quality row focus") { self.app.buttons["player.quality.option.720"].hasFocus }
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/tvos-quality-20261028/quality-drawer.png"))
+        press(.menu)
+        wait("menu returns to quality control") { self.app.buttons["player.quality"].hasFocus }
+        print("THL_QUALITY_REMOTE options=true chosen720=true rowFocusRestored=true menuReturn=true")
+    }
+
     func testAllPlayerControlButtonsFocusAndAction() throws {
         continueAfterFailure = false
         app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
@@ -1089,6 +1114,9 @@ final class RemoteNavigationTests: XCTestCase {
         press(.right, focus: "player.quality")
         XCTAssertTrue(app.buttons["player.quality"].hasFocus)
         press(.select)
+        wait("quality choices open") { self.app.buttons["player.quality.option.0"].exists }
+        press(.menu)
+        wait("quality control focus restored") { self.app.buttons["player.quality"].hasFocus }
 
         // 11. 测试向右导航至弹幕开关并点击切换
         press(.right, focus: "player.danmaku")

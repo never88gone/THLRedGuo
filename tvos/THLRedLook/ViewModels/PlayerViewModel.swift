@@ -13,7 +13,8 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var duration: Double = 0
     @Published public var currentEpisodeIndex: Int
     @Published public var plan: PlaybackPlan?
-    @Published public var selectedQuality: Int = 360
+    @Published public var selectedQuality: Int = 0
+    @Published public private(set) var requestedQuality: Int = 0
     @Published public var playbackRate: Float = 1.0
     @Published public var danmakuEnabled: Bool = true
     @Published public var danmakuStyle: TVDanmakuStyle = TVDanmakuStyle()
@@ -22,6 +23,7 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var isEpisodeDrawerVisible: Bool = false
     @Published public var isDanmakuSettingsVisible: Bool = false
     @Published public var isSpeedSheetVisible: Bool = false
+    @Published public var isQualitySheetVisible: Bool = false
     @Published public var isLoading: Bool = true
     @Published public var isSeamlessTransitioning: Bool = false
     @Published public var errorMessage: String?
@@ -30,6 +32,10 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var relatedSeasons: [Drama] = []
     @Published public var switchSeasonDrama: Drama?
     public var restoreFocusTarget: PlayerOverlayFocusTarget?
+
+    public var qualityOptions: [Int] {
+        [0] + Set(plan?.qualities.filter { $0 > 0 } ?? []).sorted(by: >)
+    }
 
     @Published public private(set) var drama: Drama
     @Published public var allEpisodes: [Episode]
@@ -428,7 +434,7 @@ public final class PlayerViewModel: ObservableObject {
             isPlaying = true
             duration = 180
             currentTime = 35
-            let testQuality = selectedQuality > 0 ? selectedQuality : 1080
+            let testQuality = requestedQuality > 0 ? requestedQuality : 1080
             selectedQuality = testQuality
             plan = PlaybackPlan(
                 url: "http://localhost/test.mp4",
@@ -456,7 +462,7 @@ public final class PlayerViewModel: ObservableObject {
                 startPlaybackWithItem(item: AVPlayerItem(url: localURL), seekTo: seekTo)
                 return
             }
-            let resolved = try await repository.resolvePlayback(drama: drama, episode: episode, episodeIndex: episodeIndex, quality: selectedQuality, avoidURL: failedURL)
+            let resolved = try await repository.resolvePlayback(drama: drama, episode: episode, episodeIndex: episodeIndex, quality: requestedQuality, avoidURL: failedURL)
             guard current() else { return }
             plan = resolved
             selectedQuality = resolved.quality
@@ -714,7 +720,7 @@ public final class PlayerViewModel: ObservableObject {
         let sequence = prefetchSequence
         let targetEpisode = allEpisodes.indices.contains(nextIndex - 1) ? allEpisodes[nextIndex - 1] : nil
         let targetDrama = self.drama
-        let targetQuality = self.selectedQuality
+        let targetQuality = self.requestedQuality
         let currentGen = self.playbackGeneration
         let preloadRepository = preloadingRepository
 
@@ -856,12 +862,12 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     public func changeQuality(_ q: Int) async {
-        guard q != selectedQuality else { return }
+        guard qualityOptions.contains(q), q != requestedQuality else { return }
         samplePlaybackClock()
         let currentPos = currentTime
-        selectedQuality = q
+        requestedQuality = q
         await beginPlayback(episodeIndex: currentEpisodeIndex, seekTo: currentPos, recovering: false, preservePlayIntent: true)
-        if selectedQuality < q {
+        if q > 0 && selectedQuality != q {
             showToast("当前分集使用 " + PlaybackPlan.qualityLabel(selectedQuality))
         }
     }

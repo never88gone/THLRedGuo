@@ -27,22 +27,18 @@ class PlayerQualitySheetView extends StatelessWidget {
   }
 
   static String qualitySubtitle(int quality) {
-    if (quality == 0) return '智能选择最匹配当前网络的最高画质与超分增强';
-    if (quality >= 1080) return '影院级细腻画质与超分辨率重构，画面细节更丰富';
+    if (quality == 0) return '优先 1080P，按片源实际可用清晰度播放';
+    if (quality >= 1080) return '高清片源，画面细节更丰富';
     if (quality >= 720) return '高清画质，边缘清晰锐利，平衡效果与流畅度';
     return '低带宽省流首选，极速起播不卡顿';
   }
 
   @override
   Widget build(BuildContext context) {
-    final available = qualities.isNotEmpty ? qualities : const [1080, 720, 360];
-    final options = {
-      0,
-      1080,
-      720,
-      360,
-      ...available.where((q) => q > 0),
-    }.toList();
+    final available = qualities.isNotEmpty
+        ? qualities
+        : [if (actualQuality > 0) actualQuality];
+    final options = {0, ...available.where((q) => q > 0)}.toList();
 
     // 按画质降序排列（1080P 在上，自动在最前）
     options.sort((a, b) {
@@ -88,8 +84,8 @@ class PlayerQualitySheetView extends StatelessWidget {
                         isLocal
                             ? '正在播放离线原画，画质偏好将在在线播放时生效'
                             : actualQuality > 0
-                            ? '当前正在播放 ${qualityTitle(actualQuality)}（已开启超分增强）'
-                            : '已优选源站最高可用画质',
+                            ? '当前正在播放 ${qualityTitle(actualQuality)}'
+                            : '默认优先 1080P，等待片源信息',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondaryDark,

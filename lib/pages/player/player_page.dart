@@ -184,12 +184,9 @@ class _PlayerScreenState extends State<PlayerScreen>
   );
   String get _qualityLabel {
     if (_plan?.offline == true) return '本地原画';
-    final q = _requestedQuality > 0
-        ? _requestedQuality
-        : (_plan?.quality ?? 720);
-    if (q >= 1080) return '1080P';
-    if (q >= 720) return '720P';
-    return '${q}P';
+    final q = _plan?.quality ?? 0;
+    if (q > 0) return '${q}P';
+    return _requestedQuality > 0 ? '${_requestedQuality}P' : '自动';
   }
 
   String get _session => _plan?.session ?? '';
@@ -627,10 +624,9 @@ class _PlayerScreenState extends State<PlayerScreen>
               unawaited(
                 _play(
                   _index,
-                  position:
-                      position != null && position > 0
-                          ? position / 1000.0
-                          : 0.0,
+                  position: position != null && position > 0
+                      ? position / 1000.0
+                      : 0.0,
                 ),
               );
             } else {
@@ -1764,7 +1760,8 @@ class _PlayerScreenState extends State<PlayerScreen>
       return;
     }
     final qualityChanged = nextPreferences.quality != _requestedQuality;
-    final decoderChanged = nextPreferences.decoderMode != _preferences.decoderMode;
+    final decoderChanged =
+        nextPreferences.decoderMode != _preferences.decoderMode;
     if (_player is LunaExoPlayer) {
       _player.setDecoderMode(nextPreferences.decoderMode);
     }
@@ -1786,7 +1783,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (qualityChanged && _plan?.offline != true) {
       await _retry(quality: nextPreferences.quality);
     } else if (decoderChanged && _plan != null) {
-      DiaryService.add('[Player] 解码模式改变为 ${nextPreferences.decoderMode.label}，重新挂载播放器');
+      DiaryService.add(
+        '[Player] 解码模式改变为 ${nextPreferences.decoderMode.label}，重新挂载播放器',
+      );
       await _retry();
     }
   }
@@ -1863,13 +1862,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (_mobile && section == PlayerMenuSection.quality) {
         final chosenQuality = await PlayerDialogHelper.openQualitySheet(
           context: context,
-          qualities: (_plan?.qualities != null && _plan!.qualities.isNotEmpty)
-              ? _plan!.qualities
-              : const [1080, 720, 360],
+          qualities: _plan?.qualities ?? const [],
           selectedQuality: _requestedQuality,
-          actualQuality:
-              _plan?.quality ??
-              (_requestedQuality > 0 ? _requestedQuality : 720),
+          actualQuality: _plan?.quality ?? 0,
           isLocal: _plan?.offline == true,
         );
         if (chosenQuality != null && chosenQuality != _requestedQuality) {
