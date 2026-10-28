@@ -90,6 +90,7 @@ def main():
         if not app_dir.exists():
             raise SystemExit(f"tvOS 归档产物不存在: {app_dir}")
 
+        run([sys.executable, str(root / "scripts/source_manifest.py"), "verify", "--bundle", str(app_dir)])
         version = "1.0.0"
 
         output_dir = root / "dist" / "tvos"

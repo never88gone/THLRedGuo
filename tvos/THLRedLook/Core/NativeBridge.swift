@@ -111,6 +111,7 @@ public actor NativeBridge {
         }
 
         isInitialized = true
+        NSLog("[Source] app=%@ %@ %@", SourceDiagnostics.version, SourceDiagnostics.sourceRevision, SourceDiagnostics.sourceBundleStatus)
         NSLog("🎬 [NativeBridge] CatPawOpen Swift 原生核心初始化成功，已装载 %ld 个插件，当前激活源: '%@'", installedSources.count, activeSourceId)
     }
 
@@ -126,24 +127,32 @@ public actor NativeBridge {
         installedSources.removeAll()
         sourceScripts.removeAll()
 
-        guard let files = try? FileManager.default.contentsOfDirectory(at: sourcesDirURL, includingPropertiesForKeys: nil) else {
-            return
-        }
+        let files = (try? FileManager.default.contentsOfDirectory(at: sourcesDirURL, includingPropertiesForKeys: nil)) ?? []
 
         for file in files where file.pathExtension.lowercased() == "js" {
             guard var script = try? String(contentsOf: file, encoding: .utf8), !script.isEmpty else {
                 continue
             }
-            if let meta = extractScriptMeta(script: script, fallbackId: file.deletingPathExtension().lastPathComponent) {
+            if var meta = extractScriptMeta(script: script, fallbackId: file.deletingPathExtension().lastPathComponent) {
                 let sid = meta["id"] as? String ?? file.deletingPathExtension().lastPathComponent
                 if sid == "hongguo" && script != BuiltInHongguoJSContent {
                     script = BuiltInHongguoJSContent
+                    meta = extractScriptMeta(script: script, fallbackId: "hongguo") ?? meta
                     try? BuiltInHongguoJSContent.write(to: file, atomically: true, encoding: .utf8)
                     NSLog("🎬 [NativeBridge] 扫描时已将旧版沙盒数据源自动热升级为最新内置官方源")
                 }
                 installedSources[sid] = meta
                 sourceScripts[sid] = script
             }
+        }
+
+        let official = BuiltInHongguoJSContent
+        if !official.isEmpty {
+            var meta = extractScriptMeta(script: official, fallbackId: "hongguo") ?? [:]
+            meta["sha256"] = SourceDiagnostics.fingerprint(official)
+            meta["sourceCommit"] = SourceDiagnostics.sourceManifest["sourceCommit"] ?? ""
+            installedSources["hongguo"] = meta
+            sourceScripts["hongguo"] = official
         }
 
         // 如果存在活跃源但不在已安装列表中，清空或重置
@@ -169,10 +178,15 @@ public actor NativeBridge {
             let id = idSubstring.components(separatedBy: CharacterSet(charactersIn: "\"'"))[1]
             let nameMatch = script.range(of: "name\\s*:\\s*[\"']([^\"']+)[\"']", options: .regularExpression)
             let name = nameMatch != nil ? script[nameMatch!].components(separatedBy: CharacterSet(charactersIn: "\"'"))[1] : id
+            let versionMatch = script.range(of: "version\\s*:\\s*[\"']([^\"']+)[\"']", options: .regularExpression)
+            let version = versionMatch.map { String(script[$0]).components(separatedBy: CharacterSet(charactersIn: "\"'"))[1] } ?? ""
+            let authorMatch = script.range(of: "author\\s*:\\s*[\"']([^\"']+)[\"']", options: .regularExpression)
+            let author = authorMatch.map { String(script[$0]).components(separatedBy: CharacterSet(charactersIn: "\"'"))[1] } ?? ""
             return [
                 "id": id,
                 "name": name,
-                "version": "1.0.0",
+                "version": version,
+                "author": author,
                 "description": "自定义 JS 插件"
             ]
         }
@@ -452,6 +466,10 @@ public actor NativeBridge {
 
         // 4. 执行 Spider 脚本代码
         context.evaluateScript(script)
+        if sourceId == "hongguo" {
+            let ready = context.exception == nil && context.evaluateScript("typeof spider !== 'undefined' && typeof spider.play === 'function'")?.toBool() == true
+            diagnostics.registerSourceRuntime(context: diagnosticContext, script: script, ready: ready)
+        }
         context.evaluateScript("if (typeof spider !== 'undefined' && typeof spider.init === 'function') { spider.init({}); }")
 
         jsContexts[sourceId] = context
@@ -595,6 +613,13 @@ public actor NativeBridge {
                     "allSources": true
                 ]
             ]
+
+        case "jsSource.identity":
+            let script = sourceScripts["hongguo"] ?? ""
+            let ready = getOrCreateContext(sourceId: "hongguo") != nil
+            return ["id": "hongguo", "sha256": SourceDiagnostics.fingerprint(script),
+                    "bundleSha256": SourceDiagnostics.sourceHash, "runtimeReady": ready,
+                    "sourceCommit": SourceDiagnostics.sourceManifest["sourceCommit"] ?? ""]
 
         case "jsSource.list":
             return [

@@ -637,6 +637,8 @@ final class RemoteNavigationTests: XCTestCase {
         }
 
         let diagId = app.buttons["settings.sourceDiagnostics"].exists ? "settings.sourceDiagnostics" : "settings.source.diagnose.hongguo"
+        XCTAssertTrue(app.staticTexts["settings.sourceRevision"].label.contains("JS "))
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/tvos-source-release-20261028/source-settings.png"))
         // 导航至诊断按钮
         for _ in 0..<8 {
             if app.buttons[diagId].hasFocus { break }
@@ -653,8 +655,12 @@ final class RemoteNavigationTests: XCTestCase {
         }
         wait("diagnostics entry focus") { self.app.buttons[diagId].hasFocus }
         press(.select, focus: "sourceDiagnostics.run")
+        wait("actual runtime source identity visible") { self.app.staticTexts["sourceDiagnostics.sourceRuntime"].exists }
+        XCTAssertTrue(app.staticTexts["sourceDiagnostics.sourceRuntime"].label.contains("JS "))
         press(.select)
         wait("diagnostics live result", seconds: 120) { self.app.staticTexts["sourceDiagnostics.result"].label.contains("检测完成") || self.app.staticTexts["sourceDiagnostics.result"].label.contains("检测失败") }
+        XCTAssertTrue(app.staticTexts["sourceDiagnostics.sourceRuntime"].label.contains("运行 JS 与本包一致"))
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/tvos-source-release-20261028/source-diagnostics.png"))
         print("THL_TV_DIAGNOSTICS_LIVE \(app.staticTexts["sourceDiagnostics.result"].label)")
         let shot = XCUIScreen.main.screenshot()
         try? shot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/overseas-routing-20261028/tvos_source_diagnostics_modal.png"))

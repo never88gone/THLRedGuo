@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - 站源管理与导入面板
 public struct SettingsSourcesPanel: View {
     @EnvironmentObject private var jsService: JSSourceService
+    @ObservedObject private var sourceDiagnostics = SourceDiagnostics.shared
     @Binding public var showingSourceDiagnostics: Bool
     @Binding public var saveNotice: String?
 
@@ -37,6 +38,14 @@ public struct SettingsSourcesPanel: View {
                 Text("配置并选择当前要使用的影视数据源。内置支持官方标准短剧源，也可导入自定义 JS 插件。")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.65))
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("应用 " + SourceDiagnostics.version + " · " + SourceDiagnostics.sourceRevision)
+                    .font(.system(size: 29)).accessibilityIdentifier("settings.sourceRevision")
+                Text(SourceDiagnostics.sourceBundleStatus + " · " + sourceDiagnostics.sourceRuntimeStatus)
+                    .font(.system(size: 25)).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("settings.sourceRuntime")
             }
 
             // 顶部操作栏
@@ -157,7 +166,7 @@ public struct SettingsSourcesPanel: View {
                         let src = jsService.sources[index]
                         let id = src["id"] as? String ?? ""
                         let name = src["name"] as? String ?? "Unknown"
-                        let version = src["version"] as? String ?? "1.0.0"
+                        let version = id == "hongguo" ? (SourceDiagnostics.sourceManifest["sourceVersion"] ?? (src["version"] as? String ?? "")) : (src["version"] as? String ?? "")
                         let author = src["author"] as? String ?? "Unknown"
                         let isActive = jsService.activeSourceId == id
                         

@@ -6,11 +6,13 @@ on:
     tags: ['v*']
     paths:
       - 'tvos/**'
+      - 'assets/sources/hongguo.js'
       - 'scripts/**'
       - '.github/workflows/build-tvos.yml'
   pull_request:
     paths:
       - 'tvos/**'
+      - 'assets/sources/hongguo.js'
       - 'scripts/**'
       - '.github/workflows/build-tvos.yml'
   workflow_dispatch:
@@ -113,9 +115,10 @@ jobs:
           signed_ipa=$(find dist/tvos -type f -name "*tvos-signed.ipa" | head -n1)
           if [ -n "$signed_ipa" ] && [ -f "$signed_ipa" ]; then
             echo "正在上传 tvOS 签名包到 App Store Connect: $signed_ipa"
+            python scripts/source_manifest.py verify --ipa "$signed_ipa"
             xcrun altool --upload-app -f "$signed_ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
             echo "✅ tvOS 版本成功上传到 App Store Connect！"
-            python scripts/set_testflight_notes.py || true
+            python scripts/publish_testflight.py --ipa "$signed_ipa" --report dist/tvos/testflight-release.json
           else
             echo "::error::未发现签名的 tvOS IPA 产物，无法上传。"
             exit 1

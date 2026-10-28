@@ -142,10 +142,58 @@ public final class SourceDiagnostics: ObservableObject {
     public let objectWillChange = ObservableObjectPublisher()
     private let lock = NSLock()
     private var records: [SourceDiagnosticEntry] = []
+    private var sourceRuntimes: [String: (hash: String, ready: Bool)] = [:]
     private var networkResult: NetworkEgressResult?
     @MainActor private var networkTask: Task<Void, Never>?
 
     public init() {}
+
+    public func registerSourceRuntime(context: String, script: String, ready: Bool) {
+        let hash = Self.fingerprint(script)
+        lock.lock()
+        sourceRuntimes[context] = (hash, ready)
+        lock.unlock()
+        NSLog("[Source] app=%@ context=%@ sha256=%@ ready=%d bundleMatch=%d", Self.version, context, hash, ready ? 1 : 0, hash == Self.sourceHash ? 1 : 0)
+        DispatchQueue.main.async { self.objectWillChange.send() }
+    }
+
+    public static func fingerprint(_ script: String) -> String {
+        SHA256.hash(data: Data(script.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    public static var sourceManifest: [String: String] {
+        guard let url = Bundle.main.url(forResource: "hongguo-source", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let value = try? JSONSerialization.jsonObject(with: data) as? [String: String] else { return [:] }
+        return value
+    }
+
+    public static var sourceRevision: String {
+        "JS " + String(sourceHash.prefix(12)) + " · 源提交 " + (sourceManifest["sourceCommit"] ?? "未记录")
+    }
+
+    public static var sourceBundleStatus: String {
+        sourceManifest["sha256"] == sourceHash ? "本包 JS 校验通过" : "本包 JS 版本信息缺失或校验异常"
+    }
+
+    public var sourceRuntimeLines: [String] {
+        lock.lock()
+        let values = sourceRuntimes
+        lock.unlock()
+        return values.keys.sorted().map { key in
+            let value = values[key]!
+            return key + " · SHA256 " + value.hash + " · " + (value.ready ? "已加载" : "加载失败")
+        }
+    }
+
+    public var sourceRuntimeStatus: String {
+        lock.lock()
+        let values = Array(sourceRuntimes.values)
+        lock.unlock()
+        if values.isEmpty { return "运行 JS 尚未加载" }
+        return values.allSatisfy { $0.ready && $0.hash == Self.sourceHash }
+            ? "运行 JS 与本包一致" : "运行 JS 加载或版本校验异常，请导出诊断"
+    }
 
     public var networkEgress: NetworkEgressResult? {
         lock.lock()
@@ -512,7 +560,7 @@ public final class SourceDiagnostics: ObservableObject {
               let value = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             return "非 JSON 响应，\(body.utf8.count) 字节"
         }
-        var summary: [String: Any] = ["bytes": body.utf8.count, "keys": Array(value.keys.sorted().prefix(40))]
+        var summary: [String: Any] = ["bytes": body.utf8.count, "keys": Array(value.keys.filter { $0.range(of: "token|cookie|authorization|password|device_id|install_id|openudid|cdid", options: [.regularExpression, .caseInsensitive]) == nil }.sorted().prefix(40))]
         summary["code"] = safeCode(value["code"] ?? value["Code"] ?? value["status_code"])
         if let tabs = value["search_tabs"] as? [[String: Any]] {
             summary["search_tabs"] = tabs.map { tab -> [String: Any] in
@@ -540,7 +588,7 @@ public final class SourceDiagnostics: ObservableObject {
                 value.replaceSubrange(range, with: desensitizeUrl(String(value[range])))
             }
         }
-        if let pattern = try? NSRegularExpression(pattern: #"(?i)(\"?(?:device_id(?:_str)?|install_id(?:_str)?|iid|openudid|cdid|cookie|authorization|access_token|refresh_token|session_id|token|password|query|keyword|search_word)\"?\s*[:=]\s*)(\"[^\"]*\"|[^\s,;]+)"#) {
+        if let pattern = try? NSRegularExpression(pattern: #"(?i)(\"?(?:device_id(?:_str)?|install_id(?:_str)?|iid|openudid|cdid|cookie|authorization|access_token|refresh_token|device_token|session_id|token|password|query|keyword|search_word)\"?\s*[:=]\s*)(\"[^\"]*\"|[^\s,;]+)"#) {
             value = pattern.stringByReplacingMatches(in: value, range: NSRange(value.startIndex..., in: value), withTemplate: "$1[已隐藏]")
         }
         return value
@@ -552,9 +600,7 @@ public final class SourceDiagnostics: ObservableObject {
     }
 
     public static var sourceHash: String {
-        SHA256.hash(data: Data(BuiltInHongguoJSContent.trimmingCharacters(in: .whitespacesAndNewlines).utf8)).map {
-            String(format: "%02x", $0)
-        }.joined()
+        fingerprint(BuiltInHongguoJSContent)
     }
 
     public static func advice(_ entry: SourceDiagnosticEntry) -> String {
@@ -594,6 +640,11 @@ public final class SourceDiagnostics: ObservableObject {
         lines.append("· 操作系统: tvOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
         lines.append("· 数据源名称: hongguo (官方内置规范源)")
         lines.append("· 源指纹 SHA256: \(Self.sourceHash)")
+        lines.append("· 数据源版本: \(Self.sourceRevision)")
+        lines.append("· 打包校验: \(Self.sourceBundleStatus)")
+        lines.append("· 应用提交: \(Self.sourceManifest["appCommit"] ?? "未记录")")
+        lines.append("· 运行源状态: \(sourceRuntimeStatus)")
+        lines.append(contentsOf: sourceRuntimeLines.map { "  - " + $0 })
         lines.append("· 系统地区: \(Locale.current.identifier) · 时区: \(TimeZone.current.identifier)")
         if let networkEgress { lines.append(contentsOf: networkEgress.reportLines) }
         else { lines.append("· 出口 IP: 尚未检测，请打开数据源诊断或点击开始检测") }
