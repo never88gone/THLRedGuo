@@ -127,7 +127,6 @@ public struct RankingsView: View {
                             .padding(.horizontal, 48)
                             .padding(.vertical, 24)
                         }
-                        .defaultFocus($focusedTarget, viewModel.items.first.map { FocusTarget.card($0.id) })
                     }
                 }
                 .task(id: currentActiveSource) {
@@ -186,6 +185,10 @@ public struct RankingsView: View {
         }
     }
 
+    private var selectedBoardID: String {
+        viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id ?? ""
+    }
+
     private var boardsHeader: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
@@ -204,12 +207,8 @@ public struct RankingsView: View {
                                 cancelAutoSelectBoard()
                                 focusFirstCard()
                             },
-                            onLeftCommand: {
-                                moveBoardFocus(from: board, offset: -1)
-                            },
-                            onRightCommand: {
-                                moveBoardFocus(from: board, offset: 1)
-                            }
+                            onLeftCommand: nil,
+                            onRightCommand: nil
                         ) {
                             pendingNextRow = nil
                             cancelAutoSelectBoard()
@@ -225,10 +224,10 @@ public struct RankingsView: View {
                 .padding(.bottom, 12)
             }
             .clipShape(Rectangle().inset(by: -30))
-            .defaultFocus($focusedTarget, .board(viewModel.selectedBoard?.id ?? viewModel.boards.first(where: \.isAllowedOnTV)?.id ?? ""))
+            .defaultFocus($focusedTarget, .board(selectedBoardID))
             .onChange(of: focusedTarget) { target in
                 if case .board(let id) = target {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
                         proxy.scrollTo("board_\(id)", anchor: .center)
                     }
                 }
@@ -255,23 +254,6 @@ public struct RankingsView: View {
         }
     }
 
-    private func moveBoardFocus(from board: RankingBoard, offset: Int) {
-        let boards = viewModel.boards.filter(\.isAllowedOnTV)
-        guard let index = boards.firstIndex(where: { $0.id == board.id }) else { return }
-        let nextIndex = index + offset
-        if nextIndex < 0 {
-            cancelAutoSelectBoard()
-            focusedTarget = nil
-            onRequestFocusTopNav?()
-            return
-        }
-        guard nextIndex < boards.count else { return }
-        let target = boards[nextIndex]
-        pendingNextRow = nil
-        focusedTarget = .board(target.id)
-        scheduleAutoSelectBoard(target)
-    }
-
     private func scheduleAutoSelectBoard(_ board: RankingBoard) {
         guard viewModel.selectedBoard?.id != board.id else { return }
         autoSelectBoardTask?.cancel()
@@ -294,24 +276,24 @@ public struct RankingsView: View {
 
     private func focusNextRow(after id: String) {
         pendingNextRow = id
-        Task {
-            await viewModel.loadMore()
-            finishPendingRowFocus()
-        }
+        finishPendingRowFocus()
     }
 
     private func finishPendingRowFocus() {
         guard let id = pendingNextRow, focusedTarget == .card(id),
               let index = viewModel.items.firstIndex(where: { $0.id == id }) else { return }
-        guard index + columns.count < viewModel.items.count else {
-            if !viewModel.hasMore || viewModel.errorMessage != nil { pendingNextRow = nil }
+        let nextRow = (index / columns.count + 1) * columns.count
+        guard nextRow < viewModel.items.count else {
+            if !viewModel.hasMore || viewModel.errorMessage != nil {
+                pendingNextRow = nil
+            } else if !viewModel.isLoadingMore {
+                Task { await viewModel.loadMore() }
+            }
             return
         }
-        let nextID = viewModel.items[index + columns.count].id
+        let nextID = viewModel.items[min(index + columns.count, viewModel.items.count - 1)].id
         pendingNextRow = nil
-        DispatchQueue.main.async {
-            guard focusedTarget == .card(id), selectedDrama == nil else { return }
-            focusedTarget = .card(nextID)
-        }
+        guard selectedDrama == nil else { return }
+        focusedTarget = .card(nextID)
     }
 }
