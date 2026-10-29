@@ -770,14 +770,8 @@ globalThis.__native_save_device = function(json) {
       }
       if (!_emptyModelFailure(data)) return data;
       final session = _injectedDeviceSession;
-      final created = _injectedDeviceCreatedAt;
-      final oldEnough =
-          created != null &&
-          guestSessions.now().difference(created) >=
-              HongguoGuestSession.recoveryInterval;
       if (session == null ||
-          !(_restoredDeviceSession ||
-              oldEnough && _successfulPlaybackResolves > 0)) {
+          !(_restoredDeviceSession || _successfulPlaybackResolves > 0)) {
         return data;
       }
       final activeRecovery = guestSessions.recovery;
@@ -993,6 +987,8 @@ globalThis.__native_save_device = function(json) {
     if (!persistentDeviceSession) return;
     final session = guestSessions.value;
     if (_injectedDeviceSession == session) return;
+    _successfulPlaybackResolves = 0;
+    _lastSuccessfulPlayback = null;
     _rt.evaluate(
       'if (typeof HongguoApp !== "undefined" && typeof HongguoApp.resetGuestSession === "function") HongguoApp.resetGuestSession();',
     );
@@ -1042,6 +1038,11 @@ globalThis.__native_save_device = function(json) {
         _rt.evaluate('globalThis.__pendingSavedDevice = null;');
         if (!persistentDeviceSession || !HongguoGuestSession.valid(val)) return;
         guestSessions.accept(val);
+        if (_injectedDeviceSession != val) {
+          _successfulPlaybackResolves = 0;
+          _lastSuccessfulPlayback = null;
+          _restoredDeviceSession = false;
+        }
         _injectedDeviceSession = val;
         _injectedDeviceCreatedAt = guestSessions.createdAt;
       }

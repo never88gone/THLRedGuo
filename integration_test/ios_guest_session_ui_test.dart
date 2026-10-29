@@ -63,6 +63,7 @@ void main() {
           return;
         }
         final clock = Stopwatch()..start();
+        final began = DateTime.now();
         debugPrint('IOS_GUEST_BEGIN $name');
         try {
           await run();
@@ -83,6 +84,23 @@ void main() {
           });
           t.takeException();
         }
+        final traces = SourceDiagnostics.shared.entries
+            .where((e) => !e.at.isBefore(began))
+            .map(
+              (e) => {
+                'at': e.at.toIso8601String(),
+                'context': e.context,
+                'stage': e.stage,
+                'host': e.host,
+                'path': Uri.tryParse(e.url)?.path ?? '',
+                'status': e.status,
+                'code': e.errorCode,
+                'elapsedMs': e.elapsedMs,
+                'session': e.sessionStatus,
+              },
+            )
+            .toList();
+        steps.last['traces'] = traces;
         report();
         debugPrint('IOS_GUEST_STEP ${jsonEncode(steps.last)}');
       }

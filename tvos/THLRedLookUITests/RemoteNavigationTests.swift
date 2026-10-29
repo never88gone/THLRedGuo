@@ -86,6 +86,25 @@ final class RemoteNavigationTests: XCTestCase {
         value.split(separator: ":").reduce(0) { $0 * 60 + (Int($1) ?? 0) }
     }
 
+    func testSearchResultInputAndSidebarFocus() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "search", "-testQuery", "都市"]
+        app.launch()
+        wait("search card available", seconds: 45) { self.app.buttons["search.result.0"].exists }
+        if app.buttons["nav.search"].hasFocus {
+            press(.right, focus: "search.result.0")
+        } else if !app.buttons["search.result.0"].hasFocus {
+            press(.down, focus: "search.result.0")
+        }
+        press(.up, focus: "search.clear")
+        press(.left, focus: "search.clear_icon")
+        press(.left, focus: "search.query")
+        XCTAssertEqual(app.textFields["search.query"].value as? String, "都市")
+        press(.left, focus: "nav.search")
+        press(.right, focus: "search.result.0")
+    }
+
     func testSearchDetailRemotePlayback() throws {
         continueAfterFailure = false
         app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
@@ -147,8 +166,10 @@ final class RemoteNavigationTests: XCTestCase {
         wait("restore original search card") { self.app.buttons["search.result.0"].hasFocus }
         XCTAssertEqual(app.buttons["search.result.0"].label, selectedTitle)
         XCTAssertEqual(app.textFields["search.query"].value as? String, "都市")
-        press(.up, focus: "search.query")
-        press(.up)
+        press(.up, focus: "search.clear")
+        press(.left, focus: "search.clear_icon")
+        press(.left, focus: "search.query")
+        press(.left)
         wait("return to search navigation") { self.app.buttons["nav.search"].hasFocus }
         print("THL_REMOTE_RESULT search=true detail=true episode=true drawer=true next=true previous=true autoNext=true back=true focus=true")
     }

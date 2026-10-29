@@ -488,31 +488,66 @@ final class SavedGuestPlaybackTests: XCTestCase {
         _ = try await bridge.request(action: "resolve", payload: payload)
         clock.advance(660)
         PlaybackResponseFixtureProtocol.expireRegisteredGuest()
-        let plan = try await bridge.request(action: "resolve", payload: payload)
+        var refresh = payload
+        refresh["avoidUrl"] = "https://fixture.qznovelvod.com/expired.mp4"
+        let plan = try await bridge.request(action: "resolve", payload: refresh)
         XCTAssertEqual(plan["quality"] as? Int, 1080)
         XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 2)
         XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, 6)
         XCTAssertEqual(recorder.entries.filter { $0.stage == "游客会话恢复" }.count, 1)
     }
 
-    func testYoungActiveGuestIsNotReplacedAfterEmptyResponses() async throws {
+    func testPreviouslyWorkingGuestCanRecoverBeforeTenMinutes() async throws {
         let clock = GuestTestClock()
         let (bridge, _, _, recorder) = try environment(mode: "expiry", timeProvider: { clock.now() })
         guestDefaults.set("", forKey: "thl_tv_hongguo_device_session")
         _ = try await bridge.request(action: "resolve", payload: payload)
         clock.advance(30)
         PlaybackResponseFixtureProtocol.expireRegisteredGuest()
-        do { _ = try await bridge.request(action: "resolve", payload: payload); XCTFail("Young session failure must remain visible") }
+        var refresh = payload
+        refresh["avoidUrl"] = "https://fixture.qznovelvod.com/expired.mp4"
+        let plan = try await bridge.request(action: "resolve", payload: refresh)
+        XCTAssertEqual(plan["quality"] as? Int, 1080)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 2)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, 6)
+        XCTAssertEqual(recorder.entries.filter { $0.stage == "游客会话恢复" }.count, 1)
+    }
+
+    func testFreshGuestThatNeverPlayedDoesNotRepeatedlyRegister() async throws {
+        let (bridge, _, _, recorder) = try environment(mode: "empty")
+        guestDefaults.set("", forKey: "thl_tv_hongguo_device_session")
+        do { _ = try await bridge.request(action: "resolve", payload: payload); XCTFail("Empty response must remain visible") }
         catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "EMPTY_RESPONSE") }
         XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, 4)
         XCTAssertFalse(recorder.entries.contains { $0.stage == "游客会话恢复" })
+    }
+
+    func testValidModelIsReusedUntilPlayerRequestsFreshMedia() async throws {
+        let (bridge, _, _, _) = try environment(mode: "recover")
+        let first = try await bridge.request(action: "resolve", payload: payload)
+        let initialCount = PlaybackResponseFixtureProtocol.counts.modelRoutes.count
+        XCTAssertEqual(initialCount, 5)
+        var quality = payload
+        quality["quality"] = 720
+        let reused = try await bridge.request(action: "resolve", payload: quality)
+        XCTAssertEqual(reused["quality"] as? Int, 1080)
+        XCTAssertEqual(reused["url"] as? String, first["url"] as? String)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, initialCount)
+        var refresh = payload
+        refresh["avoidUrl"] = first["url"]
+        _ = try await bridge.request(action: "resolve", payload: refresh)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, initialCount + 1)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
     }
 
     func testFailureReportsSessionAgeAndPriorSuccessfulPlayback() async throws {
         let (bridge, _, _, recorder) = try environment(mode: "recover")
         _ = try await bridge.request(action: "resolve", payload: payload)
         PlaybackResponseFixtureProtocol.configure(savedGuestMode: "empty")
-        do { _ = try await bridge.request(action: "resolve", payload: payload); XCTFail("Empty responses must remain errors") }
+        var refresh = payload
+        refresh["avoidUrl"] = "https://fixture.qznovelvod.com/expired.mp4"
+        do { _ = try await bridge.request(action: "resolve", payload: refresh); XCTFail("Empty responses must remain errors") }
         catch {
             let session = (error as NSError).userInfo["diagnosticSession"] as? String ?? ""
             XCTAssertTrue(session.contains("成功取流：1次"))

@@ -247,6 +247,10 @@ public actor NativeBridge {
         }
 
         restoredGuestSessions.removeValue(forKey: sourceId)
+        if sourceId == "hongguo" {
+            successfulPlaybackResolves = 0
+            lastSuccessfulPlaybackAt = nil
+        }
         guard let context = JSContext() else {
             return nil
         }
@@ -1102,8 +1106,8 @@ public actor NativeBridge {
                     let code = SourceDiagnostics.safeCode(res?["code"] ?? data?["error"])
                     if code == "CANCELLED" { throw CancellationError() }
                     let guest = httpTrace.guestSnapshot
-                    let activeSessionExpired = guest.createdAt > 0 && timeProvider() - guest.createdAt >= 600 && successfulPlaybackResolves > 0
-                    let recoveryGuest = restoredGuestSessions[targetSrc] ?? (activeSessionExpired && !guest.json.isEmpty ? guest.json : nil)
+                    let activeSessionFailed = successfulPlaybackResolves > 0 && !guest.json.isEmpty
+                    let recoveryGuest = restoredGuestSessions[targetSrc] ?? (activeSessionFailed ? guest.json : nil)
                     if targetSrc == "hongguo", persistentDeviceSession, code == "EMPTY_RESPONSE", payload["guestRecoveryAttempted"] as? Bool != true, let cached = recoveryGuest {
                         let failures = diagnostics.entries.filter { $0.context == diagnosticContext && $0.stage == "播放解析" && $0.at >= started }
                         if failures.count == 4, failures.allSatisfy({ $0.status == 200 && $0.bodyBytes == 0 && $0.errorCode == "EMPTY_RESPONSE" }) {

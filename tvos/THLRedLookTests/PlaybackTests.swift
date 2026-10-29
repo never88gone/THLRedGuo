@@ -8,8 +8,30 @@ final class PlaybackTests: XCTestCase {
     private let repository = NativeRepository.shared
     private var videoView: UIView?
     private var videoLayer: AVPlayerLayer?
+    private var testStarted = Date()
+
+    override func setUp() {
+        super.setUp()
+        testStarted = Date()
+    }
 
     override func tearDown() {
+        if ProcessInfo.processInfo.environment["HONGGUO_LIVE"] == "1" {
+            let traces = SourceDiagnostics.shared.entries.filter { $0.at >= testStarted }.map { entry -> [String: Any] in
+                ["at": entry.at.timeIntervalSince1970, "context": entry.context, "stage": entry.stage,
+                 "host": entry.host, "path": URL(string: entry.url)?.path ?? "", "status": entry.status,
+                 "code": entry.errorCode, "bodyBytes": entry.bodyBytes ?? -1, "elapsedMs": entry.elapsedMs,
+                 "session": entry.sessionStatus]
+            }
+            if let bytes = try? JSONSerialization.data(withJSONObject: traces, options: [.sortedKeys]) {
+                let text = String(decoding: bytes, as: UTF8.self)
+                print("THL_LIVE_TRACES " + text)
+                let attachment = XCTAttachment(string: text)
+                attachment.name = "playback-traces.json"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+        }
         videoLayer?.player = nil
         videoLayer?.removeFromSuperlayer()
         videoView?.removeFromSuperview()

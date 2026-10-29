@@ -150,6 +150,14 @@ class Fixture {
   Future<CatPawPlayResult> play(CatPawJsRuntime runtime, [String id = video]) =>
       runtime.play('', 'https://hongguoduanju.com/player/$series/$id');
 
+  Future<CatPawPlayResult> refresh(CatPawJsRuntime runtime) => runtime.play(
+    '',
+    'https://hongguoduanju.com/player/$series/$video',
+    flags: [
+      {'avoidUrl': 'https://fixture.qznovelvod.com/$video.mp4'},
+    ],
+  );
+
   Future<void> close() async {
     for (final rt in runtimes) {
       rt.dispose();
@@ -200,7 +208,7 @@ void main() {
       expect((await f.play(rt)).url, isNotEmpty);
       f.time = f.time.add(const Duration(minutes: 11));
       f.expireFirst = true;
-      final result = await f.play(rt);
+      final result = await f.refresh(rt);
       expect(
         result.url,
         contains(video),
@@ -266,19 +274,35 @@ void main() {
   );
 
   test(
-    'young active guest remains an error without registration churn',
+    'previously working guest can recover before ten minutes without churn',
     () async {
       f.sessions.resetForTesting();
       final rt = await f.runtime();
       await f.play(rt);
       f.time = f.time.add(const Duration(seconds: 30));
       f.expireFirst = true;
-      expect((await f.play(rt)).errorCode, 'EMPTY_RESPONSE');
-      expect(f.registrations, 1);
+      expect((await f.refresh(rt)).url, isNotEmpty);
+      expect(f.registrations, 2);
+      f.empty = true;
+      expect((await f.refresh(rt)).errorCode, 'EMPTY_RESPONSE');
+      expect(f.registrations, 2);
       expect(
         f.recorder.report(version: '1.0.0', sourceHash: 'synthetic'),
         contains('成功取流：1次'),
       );
+    },
+  );
+
+  test(
+    'a fresh guest that never played is not repeatedly registered',
+    () async {
+      f.sessions.resetForTesting();
+      f.empty = true;
+      final rt = await f.runtime();
+      expect((await f.play(rt)).errorCode, 'EMPTY_RESPONSE');
+      expect(f.registrations, 1);
+      expect(f.models, 4);
+      expect(f.recorder.entries.where((e) => e.stage == '游客会话恢复'), isEmpty);
     },
   );
 
