@@ -27,6 +27,9 @@ class Fixture {
   int registrations = 0;
   int models = 0;
   int denial = 200;
+  int mediaStatus = 200;
+  int mediaProbes = 0;
+  int? modelExpiresAt;
   bool empty = false;
   bool expireFirst = false;
   Future<void> Function()? onFourthEmpty;
@@ -55,7 +58,12 @@ class Fixture {
       });
     }
     if (r.method == 'HEAD') {
-      return http.Response('', 200, headers: {'content-type': 'video/mp4'});
+      mediaProbes++;
+      return http.Response(
+        '',
+        mediaStatus,
+        headers: {'content-type': 'video/mp4'},
+      );
     }
     if (r.url.path.contains('search/tab/v')) {
       final offset = r.url.queryParameters['offset']!;
@@ -107,6 +115,7 @@ class Fixture {
     final entries = {
       for (final id in ids)
         '$id': {
+          if (modelExpiresAt != null) 'expire_time': modelExpiresAt,
           'video_model': {
             'video_list': {
               'main': {
@@ -212,6 +221,47 @@ void main() {
       );
       expect(f.registrations, 2);
       expect(f.models, 6);
+    },
+  );
+
+  test(
+    'official six-hour model expiry produces a bounded five-minute plan',
+    () async {
+      f.sessions.resetForTesting();
+      final began = DateTime.now().millisecondsSinceEpoch;
+      f.modelExpiresAt = began ~/ 1000 + 21600;
+      final result = await f.play(await f.runtime());
+      expect(result.url, isNotEmpty);
+      expect(
+        result.expiresAt,
+        inInclusiveRange(began + 295000, began + 310000),
+      );
+    },
+  );
+
+  test(
+    'near-expired official media is not prolonged or treated as a new guest',
+    () async {
+      f.sessions.resetForTesting();
+      f.modelExpiresAt = DateTime.now().millisecondsSinceEpoch ~/ 1000 - 1;
+      final result = await f.play(await f.runtime());
+      expect(result.errorCode, 'MEDIA_URL_EXPIRED');
+      expect(f.registrations, 1);
+      expect(f.mediaProbes, 0);
+      expect(f.models, lessThanOrEqualTo(2));
+    },
+  );
+
+  test(
+    'CDN rejection preserves the guest and bounds model refreshes',
+    () async {
+      f.sessions.resetForTesting();
+      f.mediaStatus = 403;
+      final result = await f.play(await f.runtime());
+      expect(result.errorCode, 'MEDIA_HTTP_403');
+      expect(f.registrations, 1);
+      expect(f.models, lessThanOrEqualTo(2));
+      expect(f.mediaProbes, lessThanOrEqualTo(2));
     },
   );
 

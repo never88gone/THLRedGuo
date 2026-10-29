@@ -579,9 +579,18 @@ public actor NativeBridge {
         } : nil
         let category: DiagnosticCategory
         let description: String
-        if code.hasPrefix("MEDIA_HTTP_") || code.hasPrefix("HTTP_") {
+        if code == "MEDIA_URL_EXPIRED" {
+            category = .invalidResponse
+            description = "本集媒体地址已经过期，请重新获取"
+        } else if code.hasPrefix("MEDIA_HTTP_") {
             category = .httpError
-            description = "官方播放或媒体节点请求失败"
+            description = "本集媒体节点拒绝当前地址或暂不可用"
+        } else if code == "HTTP_429" {
+            category = .httpError
+            description = "官方播放接口请求过于频繁，请稍后再试"
+        } else if code.hasPrefix("HTTP_") {
+            category = .httpError
+            description = "官方播放接口请求失败"
         } else if code.hasPrefix("DNS") { category = .dnsError; description = "播放接口域名解析失败" }
         else if code.hasPrefix("TIMEOUT") || code == "ETIMEDOUT" { category = .networkTimeout; description = "播放接口请求超时" }
         else if ["BUSINESS_REJECTED", "SECURITY_BLOCKED"].contains(code) { category = .businessRejected; description = "官方播放接口暂时拒绝当前请求" }

@@ -505,13 +505,33 @@ void main() {
                     SourceDiagnosticRunner.shared.result.startsWith('检测'),
                 'diagnosis round $i',
               );
-              expect(SourceDiagnosticRunner.shared.failureCount, 0);
               diagnosticRounds.add({
                 'round': i + 1,
                 'success': SourceDiagnosticRunner.shared.successCount,
                 'failures': SourceDiagnosticRunner.shared.failureCount,
                 'result': SourceDiagnosticRunner.shared.result,
+                'traces': SourceDiagnostics.shared.entries
+                    .where(
+                      (e) =>
+                          e.context.startsWith('主动检测') &&
+                          e.errorCode.isNotEmpty,
+                    )
+                    .map(
+                      (e) => {
+                        'stage': e.stage,
+                        'code': e.errorCode,
+                        'status': e.status,
+                        'host': e.host,
+                      },
+                    )
+                    .toList(),
               });
+              debugPrint('IOS_DIAGNOSIS ${jsonEncode(diagnosticRounds.last)}');
+              expect(
+                SourceDiagnosticRunner.shared.failureCount,
+                0,
+                reason: SourceDiagnosticRunner.shared.result,
+              );
             }
             await snapshot('08-diagnostics');
           },

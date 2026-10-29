@@ -10,6 +10,21 @@ class PlaybackPreloader extends ChangeNotifier {
   PlaybackPreloader(this.repository, {DateTime Function()? now})
     : _now = now ?? DateTime.now;
 
+  static bool shouldPrepare({
+    required Duration duration,
+    required Duration position,
+    double rate = 1,
+  }) {
+    if (duration <= Duration.zero ||
+        position < const Duration(milliseconds: 500)) {
+      return false;
+    }
+    final remaining = duration - position;
+    final speed = rate.isFinite && rate > 0 ? rate.clamp(0.25, 4) : 1;
+    return remaining > Duration.zero &&
+        remaining.inMilliseconds / speed <= 20000;
+  }
+
   final AppRepository repository;
   final DateTime Function() _now;
   PlaybackPlan? _ready;

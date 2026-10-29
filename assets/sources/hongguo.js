@@ -7,7 +7,7 @@
 const meta = {
   id: "hongguo",
   name: "官方免费短剧",
-  version: "1.1.0-dev.8",
+  version: "1.1.0-dev.9",
   description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
   author: "社区开发者",
   type: "video",
@@ -819,6 +819,14 @@ const appModelRoutes = [
   { url: 'https://reading.snssdk.com/novel/player/video_model/v1/', single: true },
   { url: 'https://api5-normal.fqnovel.com/novel/player/multi_video_model/v1/', single: false }
 ];
+function appModelExpiry(model, entry = {}) {
+  const times = [entry.expire_time, model.__hongguoExpiresAt, model.url_expire].map(value => {
+    const number = Number(value);
+    if (!Number.isSafeInteger(number) || number < 1000000000) return 0;
+    return number < 1000000000000 ? number * 1000 : number;
+  }).filter(value => value > 0 && value <= 8640000000000000);
+  return times.length ? Math.min(...times) : 0;
+}
 async function requestAppVideoModel(videoId, device, deadline) {
   const preferred = preferredAppModelUntil > Date.now() ? preferredAppModelRoute : null;
   const routes = preferred ? [preferred, ...appModelRoutes.filter(route => route !== preferred)] : appModelRoutes;
@@ -836,6 +844,7 @@ async function requestAppVideoModel(videoId, device, deadline) {
       const entry = route.single ? response.data : response.data[videoId];
       const model = typeof entry?.video_model === 'string' ? Lt(entry.video_model) : entry?.video_model;
       if (!model) throw Object.assign(new Error('官方接口未返回所选分集'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
+      model.__hongguoExpiresAt = appModelExpiry(model, entry);
       preferredAppModelRoute = route;
       preferredAppModelUntil = Date.now() + 5 * 60 * 1000;
       return model;
@@ -854,7 +863,6 @@ async function oo(r, e = {}) {
   r = String(r || '');
   if (!/^\d{1,30}$/.test(r)) throw new Error('分集编号无效');
   const n = Math.min(Date.now() + 12000, e.deadline || Infinity);
-  if (e.refreshSession) { Ae = null; delete globalThis.__hongguoCachedDevice; }
   const device = await Ot(n);
   const u = await requestAppVideoModel(r, device, n);
 let f=[],h;try{f=ln(u,r,t)}catch(y){h=y}if(f.length&&!e.includeFallback)return{...f[0],variants:f};let d=ro(u.fallback_api);if(d&&u.dynamic_video&&!Object.keys(u.video_list||{}).length&&(d=lt(d,["fqnovel.com","snssdk.com"]),d=d.replace(/([?&])force_fids=[^&]*(&?)/,(y,I,F)=>F?I:""),d=/[?&]format_type=/.test(d)?d.replace(/([?&]format_type=)[^&]*/,"$1mp4"):d+(d.includes("?")?"&":"?")+"format_type=mp4"),d)try{let y=await Pe(d,{headers:{"User-Agent":dt}},n);if([y,y.video_info].some(F=>Number(F?.Code||F?.code||0)!==0))throw Object.assign(new Error("App \u63A5\u53E3\u6682\u672A\u63D0\u4F9B\u672C\u96C6\u64AD\u653E\u4FE1\u606F"),{code:"BUSINESS_REJECTED"});let I=y?.video_info?.data;if(!I)throw Object.assign(new Error("App \u63A5\u53E3\u672A\u8FD4\u56DE\u672C\u96C6\u7247\u6E90\u6A21\u578B"),{code:"MISSING_MODEL"});f.push(...ln(I,r,t))}catch(y){h=y}let x=new Set;if(f=f.filter(y=>{let I=y.url+":"+(y.contentKey||"");return x.has(I)?!1:(x.add(I),!0)}),f.length)return{...f[0],variants:f};throw h||Object.assign(new Error("App \u63A5\u53E3\u672A\u8FD4\u56DE\u672C\u96C6\u7247\u6E90\u5730\u5740"),{code:"MISSING_MODEL"})}
@@ -870,7 +878,7 @@ function ln(model, videoId, downloadQuality) {
   }).filter(value => value.codecRank < 3 && Di(value, downloadQuality)).sort((left, right) => downloadQuality === 'auto' ? right.pixels - left.pixels || left.codecRank - right.codecRank : Math.min(left.width, left.height) - Math.min(right.width, right.height) || left.codecRank - right.codecRank);
   if (!entries.length) throw new Error(downloadQuality === 'auto' ? '本集暂未提供兼容的 H.264/HEVC 片源' : '本集暂未提供满足下载清晰度的片源');
   const r = model, e = videoId, t = downloadQuality, n = entries;
-let i,o=[],a=new Set;for(let c of n)try{let s=c.item.spade_a||c.item.encrypt_info?.spade_a,u=s?no(s):null;for(let f of[c.item.main_url,c.item.backup_url,c.item.backup_url_1,c.item.backup_url_2,c.item.backup_url_3,...Array.isArray(c.item.backup_url_list)?c.item.backup_url_list:[]])if(!(typeof f!="string"||!f))try{let h=r.key_seed?io(f,S.from(r.key_seed,"base64")):/^https:\/\//i.test(cn(f))?cn(f):S.from(f,"base64").toString("utf8"),d=lt(h,["qznovelvod.com","fqnovelvod.com","douyinvod.com"]),x=u?u.toString("hex"):null,y=`${d}:${x||""}`;if(a.has(y))continue;a.add(y),o.push({url:d,contentKey:x,codec:c.codec==="bytevc1"?"hevc":c.codec||"auto",source:"app",vid:e,userAgent:dt,referer:"https://novelquickapp.com/",mediaBytes:Math.max(0,Number(c.item.size||c.item.video_meta?.size||0)),quality:c.quality,width:c.width,height:c.height})}catch(h){i=h}}catch(s){i=s}if(o.length)return o;throw i?.code==="SECURITY_BLOCKED"?i:Object.assign(new Error("\u672C\u96C6\u7247\u6E90\u5730\u5740\u6216\u5BC6\u94A5\u65E0\u6CD5\u89E3\u6790"),{code:"INVALID_RESPONSE"})}
+let i,o=[],a=new Set;for(let c of n)try{let s=c.item.spade_a||c.item.encrypt_info?.spade_a,u=s?no(s):null;for(let f of[c.item.main_url,c.item.backup_url,c.item.backup_url_1,c.item.backup_url_2,c.item.backup_url_3,...Array.isArray(c.item.backup_url_list)?c.item.backup_url_list:[]])if(!(typeof f!="string"||!f))try{let h=r.key_seed?io(f,S.from(r.key_seed,"base64")):/^https:\/\//i.test(cn(f))?cn(f):S.from(f,"base64").toString("utf8"),d=lt(h,["qznovelvod.com","fqnovelvod.com","douyinvod.com"]),x=u?u.toString("hex"):null,y=`${d}:${x||""}`;if(a.has(y))continue;a.add(y),o.push({url:d,contentKey:x,codec:c.codec==="bytevc1"?"hevc":c.codec||"auto",source:"app",vid:e,expiresAt:appModelExpiry(r),userAgent:dt,referer:"https://novelquickapp.com/",mediaBytes:Math.max(0,Number(c.item.size||c.item.video_meta?.size||0)),quality:c.quality,width:c.width,height:c.height})}catch(h){i=h}}catch(s){i=s}if(o.length)return o;throw i?.code==="SECURITY_BLOCKED"?i:Object.assign(new Error("\u672C\u96C6\u7247\u6E90\u5730\u5740\u6216\u5BC6\u94A5\u65E0\u6CD5\u89E3\u6790"),{code:"INVALID_RESPONSE"})}
 var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code:"73932",update_version_code:"73932",pv_player:"73932"},Ae;function ao(){let r=K.randomBytes(16);r[6]=r[6]&15|64,r[8]=r[8]&63|128;let e=r.toString("hex");return[e.slice(0,8),e.slice(8,12),e.slice(12,16),e.slice(16,20),e.slice(20)].join("-")}async function Ot(r=1/0){if(globalThis.__hongguoCachedDevice&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.iid))&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.device_id))){globalThis.__hongguoCachedDevice={...globalThis.__hongguoCachedDevice,...he,iid:fe(globalThis.__hongguoCachedDevice.iid),device_id:fe(globalThis.__hongguoCachedDevice.device_id),cdid:fe(globalThis.__hongguoCachedDevice.cdid)||ao()};return globalThis.__hongguoCachedDevice;}return Ae||(Ae=(async()=>{let e=ao(),t={aid:8662,app_name:"novelread",package:"com.phoenix.read",app_version:he.version_name,version_code:73932,update_version_code:73932,manifest_version_code:73932,sdk_version:"6.18.0",device_platform:"android",os:"Android",os_version:he.os_version,os_api:Number(he.os_api),device_model:he.device_type,device_brand:he.device_brand,device_manufacturer:"Xiaomi",density_dpi:Number(he.dpi),display_density:"mdpi",resolution:he.resolution.replace("*","x"),language:"zh",timezone:8,access:"wifi",channel:he.channel,cdid:e,openudid:K.randomBytes(8).toString("hex")},n=await Pe("https://log.snssdk.com/service/2/device_register/?aid=8662&app_name=novelread",{method:"POST",headers:{"Content-Type":"application/json; charset=utf-8","User-Agent":dt},data:JSON.stringify({magic_tag:"ss_app_log",header:t,_gen_time:Date.now()})},Math.min(Date.now()+12e3,r)),i=fe(n.install_id_str),o=fe(n.device_id_str);if(!/^\d{10,24}$/.test(i)||!/^\d{10,24}$/.test(o))throw Object.assign(new Error("\u65E0\u6CD5\u521D\u59CB\u5316\u5B98\u65B9\u4F1A\u8BDD"),{code:"GUEST_REGISTRATION_FAILED"});let dev={...he,iid:i,device_id:o,cdid:e};globalThis.__hongguoCachedDevice=dev;if(typeof __native_save_device==="function"){try{__native_save_device(JSON.stringify(dev));}catch(_){}}return dev;})().catch(e=>{throw Ae=null,e})),Ae}async function co(r,e={},t=!1){t&&(Ae=null,delete globalThis.__hongguoCachedDevice);let deadline=Math.min(Date.now()+12e3,e.deadline||1/0),n=await Ot(deadline),i={query:r,count:0,offset:e.offset||0,tab_type:e.fallbackToGeneral?11:29,tab_name:e.fallbackToGeneral?"":"feed",search_source:1,use_correct:!1,use_lynx:!1,user_is_login:0,bookshelf_search_plan:4,bookstore_tab:16,is_first_enter_search:!e.offset};e.passback&&(i.passback=e.passback),e.searchId&&(i.search_id=e.searchId);let o=Ht(null,"https://reading.snssdk.com/reading/bookapi/search/tab/v",i,n),a=await Pe(o.url,{headers:{...o.headers,lc:"101"}},deadline);if(Number(a.code)!==0||!Array.isArray(a.search_tabs))throw Object.assign(new Error("\u5B98\u65B9\u641C\u7D22\u672A\u8FD4\u56DE\u6709\u6548\u7ED3\u679C"),{code:"SEARCH_REJECTED",category:"business_reject"});return a}async function so({seriesId:r,videoId:e,startMs:t=0,durationMs:n,cursor:i=""}){if(!/^\d{10,30}$/.test(String(r))||!/^\d{10,30}$/.test(String(e)))throw new Error("\u5F39\u5E55\u5206\u96C6\u7F16\u53F7\u65E0\u6548");let o={comment_source:601,server_channel:1e3,group_id:String(e),group_type:30,comment_type:20,sort:1,business_param:{book_id:String(r),start_offset_time:t,playlet_item_duration:n},count:90,cursor:String(i),aid:8662,compliance_status:0},a=await Ot(),c=Ht(JSON.stringify(o),"https://reading.snssdk.com/novel/commentapi/comment/list/"+e+"/v1/",{},a);return Pe(c.url,{method:"POST",headers:{...c.headers,lc:"101"},data:c.body},Date.now()+5e3)}mn.exports={resetGuestSession:function(){Ae=null;delete globalThis.__hongguoCachedDevice;},fetchAppDetailRaw:async function(id){const dev=await Ot();const signed=Ht(JSON.stringify({series_id:String(id)}),"https://reading.snssdk.com/novel/player/video_detail/v1/",{},dev);const result=await Pe(signed.url,{method:"POST",headers:{...signed.headers,lc:"101"},data:signed.body},Date.now()+12000);if(Number(result.code||0)!==0)throw Object.assign(new Error("官方详情接口暂不可用，请重试"),{code:"DETAIL_REJECTED"});return result.data?.video_data},fetchAppPlayUrl:oo,fetchAppSearchRaw:co,fetchAppDanmakuRaw:so,fetchAppDiscoveryRaw:async function(path,params){if(!["/reading/bookapi/search/cue/v","/reading/bookapi/search/suggest/v","/reading/bookapi/plan/v","/reading/bookapi/bookmall/tab/v","/reading/bookapi/bookmall/cell/change/v"].includes(path))throw Object.assign(new Error("不支持的官方接口"),{code:"SECURITY_BLOCKED"});const device=await Ot();const signed=Ht(null,"https://reading.snssdk.com"+path,params,device);const result=await Pe(signed.url,{headers:{...signed.headers,lc:"101"}},Date.now()+12000);if(!result||String(result.code??result.status_code)!=="0")throw Object.assign(new Error("官方发现接口暂不可用，请重试"),{code:"DISCOVERY_REJECTED"});return result}}});var wn=z((Do,vn)=>{var{fetchAppSearchRaw:bn}=pt();function fo(r){let e=[],t=new Set;let tabs=Array.isArray(r)?r:(r?[r]:[]);for(let m of tabs){for(let n of m.data||[]){let i=Array.isArray(n.video_data)?n.video_data:[];for(let o of i){let a=o.video_detail||{},c=String(a.series_id_str||o.series_id||a.series_id||"");if(!/^\d{10,30}$/.test(c)||t.has(c))continue;let s=String(a.series_title||o.title||"").trim();if(!s)continue;t.add(c);let u=Number(a.episode_cnt||o.episode_cnt||0);e.push({vod_id:c,vod_name:s,vod_pic:cleanCoverUrl(String(a.series_cover||o.cover||"")),vod_remarks:u>0?"全"+u+"集":"",vod_content:String(a.series_intro||""),vod_total:u,content_type:Number(a.content_type||o.content_type||0)})}}}return e}function pickTab(response, general) {
   const tabs = response.search_tabs || [];
   const type = general ? 11 : 29;
@@ -1845,6 +1853,8 @@ Public License instead of this License.  But first, please read
     }
     async function readable(value) {
       if (globalThis.__hongguoCancelled || !value || !value.url || Date.now() >= deadline) return false;
+      const expiresAt = Number(value.expiresAt);
+      if (Number.isSafeInteger(expiresAt) && expiresAt > 0 && expiresAt <= Date.now() + 5000) { mediaFailure = 'MEDIA_URL_EXPIRED'; return false; }
       try {
         const response = await fetch(value.url, { method: 'HEAD', headers: mediaHeaders(value), timeoutMs: Math.min(5000, deadline - Date.now()) });
         const contentType = response.headers && (typeof response.headers.get === 'function' ? response.headers.get('content-type') : response.headers['content-type']);
@@ -1855,12 +1865,9 @@ Public License instead of this License.  But first, please read
     }
     let lastCode = 'NO_STREAM';
     let mediaFailure = 'MEDIA_REJECTED';
-    let refreshedSession = false;
-    for (let attempt = 0; attempt < 5 && !globalThis.__hongguoCancelled && Date.now() < deadline; attempt++) {
+    for (let attempt = 0; attempt < 2 && !globalThis.__hongguoCancelled && Date.now() < deadline; attempt++) {
       try {
-        const refreshSession = !refreshedSession && attempt > 0 && (lastCode === 'INVALID_RESPONSE' || attempt >= 2 && lastCode === 'MEDIA_REJECTED');
-        if (refreshSession) refreshedSession = true;
-        const model = await HongguoApp.fetchAppPlayUrl(vid, { deadline, includeFallback: lastCode === 'MEDIA_REJECTED', refreshSession });
+        const model = await HongguoApp.fetchAppPlayUrl(vid, { deadline, includeFallback: lastCode === 'MEDIA_REJECTED' });
         const variants = model.variants || [model];
         const qualities = [...new Set(variants.map(streamQuality).filter(value => value > 0))].sort((a, b) => b - a);
         const ordered = [...variants].sort((a, b) => {
@@ -1882,7 +1889,7 @@ Public License instead of this License.  But first, please read
             });
             if (!candidate) continue;
             const quality = streamQuality(candidate);
-            return { parse: 0, url: candidate.url, header: mediaHeaders(candidate), decryptionKey: candidate.contentKey || '', mediaBytes: candidate.mediaBytes || 0, quality, qualities, expiresAt: Date.now() + 30000, episodeId: vid, danmakuId };
+            return { parse: 0, url: candidate.url, header: mediaHeaders(candidate), decryptionKey: candidate.contentKey || '', mediaBytes: candidate.mediaBytes || 0, quality, qualities, expiresAt: Number.isSafeInteger(candidate.expiresAt) && candidate.expiresAt > 0 ? Math.min(candidate.expiresAt, Date.now() + 300000) : Date.now() + 30000, episodeId: vid, danmakuId };
           }
         }
         lastCode = 'MEDIA_REJECTED';

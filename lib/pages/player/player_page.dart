@@ -1103,9 +1103,12 @@ class _PlayerScreenState extends State<PlayerScreen>
       _preloader.pause();
       return;
     }
-    final duration = state.duration.inMilliseconds;
-    final position = state.position.inMilliseconds;
-    if (duration <= 0 || position < 500) {
+    if (!PlaybackPreloader.shouldPrepare(
+      duration: state.duration,
+      position: state.position,
+      rate: _speed,
+    )) {
+      _preloader.pause();
       return;
     }
     _preloader.prepare(
