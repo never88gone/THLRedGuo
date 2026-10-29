@@ -16,6 +16,12 @@ on:
       - 'scripts/**'
       - '.github/workflows/build-tvos.yml'
   workflow_dispatch:
+    inputs:
+      publish_public:
+        description: '将本次上传的 tvOS 构建发布到 TestFlight 公开组'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -120,11 +126,19 @@ jobs:
             python scripts/source_manifest.py verify --ipa "$signed_ipa"
             xcrun altool --upload-app -f "$signed_ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
             echo "✅ tvOS 版本成功上传到 App Store Connect！"
-            python scripts/publish_testflight.py --ipa "$signed_ipa" --report dist/tvos/testflight-release.json
           else
             echo "::error::未发现签名的 tvOS IPA 产物，无法上传。"
             exit 1
           fi
+      - name: 发布 tvOS 至 TestFlight 公开组
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_public == true
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID || vars.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID || vars.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY || vars.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          signed_ipa=$(find dist/tvos -type f -name "*tvos-signed.ipa" | head -n1)
+          python scripts/publish_testflight.py --ipa "$signed_ipa" --report dist/tvos/testflight-release.json
       - name: 清理 tvOS 钥匙串与临时凭证
         if: always()
         run: |
