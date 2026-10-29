@@ -104,6 +104,41 @@ class HongguoGuestSession {
     );
   }
 
+  Future<bool> refresh() async {
+    await preload();
+    return _serialize(() async {
+      final generation = _generation;
+      final prefs = await _preferences();
+      try {
+        await prefs?.reload();
+      } catch (_) {
+        return false;
+      }
+      if (_generation != generation) return false;
+      final stored = prefs?.getString(sessionKey);
+      if (!valid(stored)) return false;
+      final storedCreated = _date(prefs?.getInt(createdKey));
+      final currentCreated = createdAt;
+      if (stored == value) {
+        if (storedCreated != null &&
+            (currentCreated == null || storedCreated.isAfter(currentCreated))) {
+          createdAt = storedCreated;
+        }
+        return false;
+      }
+      if (storedCreated != null &&
+          currentCreated != null &&
+          storedCreated.isBefore(currentCreated)) {
+        return false;
+      }
+      value = stored;
+      createdAt = storedCreated;
+      _recoveredAt = _date(prefs?.getInt(recoveryKey)) ?? _recoveredAt;
+      _generation++;
+      return true;
+    });
+  }
+
   Future<GuestRecoveryDecision> invalidate(String expected) async {
     await preload();
     return _serialize(() async {
@@ -117,8 +152,15 @@ class HongguoGuestSession {
       }
       final stored = prefs?.getString(sessionKey);
       if (valid(stored) && stored != expected) {
+        final storedCreated = _date(prefs?.getInt(createdKey));
+        final currentCreated = createdAt;
+        if (storedCreated != null &&
+            currentCreated != null &&
+            storedCreated.isBefore(currentCreated)) {
+          return GuestRecoveryDecision.none;
+        }
         value = stored;
-        createdAt = _date(prefs?.getInt(createdKey));
+        createdAt = storedCreated;
         _generation++;
         return GuestRecoveryDecision.reload;
       }

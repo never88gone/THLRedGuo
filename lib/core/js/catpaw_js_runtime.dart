@@ -764,6 +764,21 @@ globalThis.__native_save_device = function(json) {
       if (cancellation != _cancellation || _isDisposed) {
         throw CatPawSourceFailure.playback('cancelled');
       }
+      if (_officialSource && persistentDeviceSession) {
+        if (await guestSessions.refresh()) {
+          diagnostics.add(
+            SourceDiagnosticEntry(
+              at: DateTime.now().toUtc(),
+              context: diagnosticContext,
+              stage: '游客会话同步',
+              sessionStatus: '请求前载入其他运行环境更新的游客会话，保留搜索和详情缓存',
+            ),
+          );
+        }
+        if (cancellation != _cancellation || _isDisposed) {
+          throw CatPawSourceFailure.playback('cancelled');
+        }
+      }
       final data = await _runEval(jsCode, timeout, stopwatch, cancellation);
       if (!recoverGuest || !_officialSource || !persistentDeviceSession) {
         return data;
@@ -986,7 +1001,10 @@ globalThis.__native_save_device = function(json) {
   void _syncDeviceSession() {
     if (!persistentDeviceSession) return;
     final session = guestSessions.value;
-    if (_injectedDeviceSession == session) return;
+    if (_injectedDeviceSession == session) {
+      _injectedDeviceCreatedAt = guestSessions.createdAt;
+      return;
+    }
     _successfulPlaybackResolves = 0;
     _lastSuccessfulPlayback = null;
     _rt.evaluate(

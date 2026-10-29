@@ -4,6 +4,15 @@ import JavaScriptCore
 private enum SavedGuestRecovery {
     private static let lock = NSLock()
 
+    static func valid(_ json: String) -> Bool {
+        guard let data = json.data(using: .utf8),
+              let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        return ["iid", "device_id"].allSatisfy { key in
+            guard let id = value[key] as? String else { return false }
+            return id.range(of: "^[1-9][0-9]{9,23}$", options: .regularExpression) != nil
+        }
+    }
+
     static func invalidate(_ cached: String, defaults: UserDefaults, now: TimeInterval) -> Bool {
         lock.withLock {
             let last = defaults.double(forKey: "thl_tv_hongguo_guest_recovery_v2_at")
@@ -239,6 +248,7 @@ public actor NativeBridge {
     /// 获取或构建指定数据源的 CatPawOpen JS 运行时上下文
     private func getOrCreateContext(sourceId: String) -> JSContext? {
         if let existing = jsContexts[sourceId] {
+            synchronizeGuestSession(existing, sourceId: sourceId)
             return existing
         }
 
@@ -279,7 +289,7 @@ public actor NativeBridge {
         }
         context.setObject(saveDeviceBlock, forKeyedSubscript: "__native_save_device" as NSString)
 
-        if persistentDeviceSession, let cachedDevice = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"), !cachedDevice.isEmpty {
+        if persistentDeviceSession, let cachedDevice = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"), SavedGuestRecovery.valid(cachedDevice) {
             restoredGuestSessions[sourceId] = cachedDevice
             trace.recordGuest(json: cachedDevice, createdAt: deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at"))
             context.evaluateScript("""
@@ -525,6 +535,34 @@ public actor NativeBridge {
 
         jsContexts[sourceId] = context
         return context
+    }
+
+    private func synchronizeGuestSession(_ context: JSContext, sourceId: String) {
+        guard persistentDeviceSession, sourceId == "hongguo",
+              let latest = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"),
+              SavedGuestRecovery.valid(latest) else { return }
+        let created = deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at")
+        let current = httpTrace.guestSnapshot
+        let currentCreated = current.createdAt
+        if latest == current.json {
+            if created > currentCreated { httpTrace.recordGuest(json: latest, createdAt: created) }
+            return
+        }
+        guard created <= 0 || currentCreated <= 0 || created >= currentCreated else { return }
+        let applied = context.evaluateScript("""
+        (function() {
+            if (typeof HongguoApp === 'undefined' || typeof HongguoApp.resetGuestSession !== 'function') return false;
+            HongguoApp.resetGuestSession();
+            globalThis.__hongguoCachedDevice = JSON.parse(\(latest.debugDescription));
+            return true;
+        })()
+        """)?.toBool() == true
+        guard applied else { return }
+        httpTrace.recordGuest(json: latest, createdAt: created)
+        restoredGuestSessions[sourceId] = latest
+        successfulPlaybackResolves = 0
+        lastSuccessfulPlaybackAt = nil
+        diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "游客会话同步", sessionStatus: "请求前载入其他运行环境更新的游客会话，保留搜索和详情缓存"))
     }
 
     private func spiderExpression(_ method: String, _ arguments: [Any]) throws -> String {
@@ -1112,7 +1150,11 @@ public actor NativeBridge {
                         let failures = diagnostics.entries.filter { $0.context == diagnosticContext && $0.stage == "播放解析" && $0.at >= started }
                         if failures.count == 4, failures.allSatisfy({ $0.status == 200 && $0.bodyBytes == 0 && $0.errorCode == "EMPTY_RESPONSE" }) {
                             let latest = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session")
-                            let updated = latest != nil && latest != cached
+                            let latestCreated = deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at")
+                            let updated = latest.map {
+                                SavedGuestRecovery.valid($0) && $0 != cached &&
+                                    (latestCreated <= 0 || guest.createdAt <= 0 || latestCreated >= guest.createdAt)
+                            } ?? false
                             if updated || SavedGuestRecovery.invalidate(cached, defaults: deviceDefaults, now: timeProvider()) {
                                 jsContexts.removeValue(forKey: targetSrc)
                                 restoredGuestSessions.removeValue(forKey: targetSrc)

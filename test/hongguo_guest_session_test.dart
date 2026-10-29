@@ -37,6 +37,7 @@ class Fixture {
   Completer<void>? releaseRegistration;
   final modelIds = <String>[];
   final searchOffsets = <String>[];
+  final searchDevices = <String>[];
   final runtimes = <CatPawJsRuntime>[];
 
   http.Response json(Object body) => http.Response(
@@ -68,6 +69,7 @@ class Fixture {
     if (r.url.path.contains('search/tab/v')) {
       final offset = r.url.queryParameters['offset']!;
       searchOffsets.add(offset);
+      searchDevices.add(r.url.queryParameters['device_id'] ?? '');
       if (offset != '0') {
         expect(r.url.queryParameters['passback'], 'sticky-cursor');
       }
@@ -354,6 +356,117 @@ void main() {
       expect((await f.play(rt)).url, isNotEmpty);
       expect((await rt.search('合成剧', page: 2)).list, isNotEmpty);
       expect(f.searchOffsets, ['0', '6']);
+    },
+  );
+
+  test(
+    'new persisted guest is adopted before the first model request and preserves search cursor',
+    () async {
+      f.sessions.resetForTesting();
+      final rt = await f.runtime();
+      expect((await rt.search('合成剧')).hasMore, true);
+      await f.sessions.pendingWrites;
+      f.expireFirst = true;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        HongguoGuestSession.sessionKey,
+        guest('7345678901234567109'),
+      );
+      await prefs.setInt(
+        HongguoGuestSession.createdKey,
+        f.time.add(const Duration(seconds: 1)).millisecondsSinceEpoch,
+      );
+      expect((await f.play(rt)).url, isNotEmpty);
+      expect(f.modelIds, ['7345678901234567109']);
+      expect(f.registrations, 1);
+      expect((await rt.search('合成剧', page: 2)).list, isNotEmpty);
+      expect(f.searchOffsets, ['0', '6']);
+    },
+  );
+
+  test(
+    'search adopts an externally updated guest without restarting pagination',
+    () async {
+      f.sessions.resetForTesting();
+      final rt = await f.runtime();
+      expect((await rt.search('合成剧')).hasMore, true);
+      await f.sessions.pendingWrites;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        HongguoGuestSession.sessionKey,
+        guest('7345678901234567109'),
+      );
+      await prefs.setInt(
+        HongguoGuestSession.createdKey,
+        f.time.add(const Duration(seconds: 1)).millisecondsSinceEpoch,
+      );
+      expect((await rt.search('合成剧', page: 2)).list, isNotEmpty);
+      expect(f.searchDevices, ['7345678901234567101', '7345678901234567109']);
+      expect(f.searchOffsets, ['0', '6']);
+      expect(f.models, 0);
+      expect(f.registrations, 1);
+    },
+  );
+
+  test('older persisted guest cannot roll back a current session', () async {
+    final current = guest('7345678901234567109');
+    f.sessions.resetForTesting(current, f.time);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(HongguoGuestSession.sessionKey, guest(oldDevice));
+    await prefs.setInt(
+      HongguoGuestSession.createdKey,
+      f.time.subtract(const Duration(minutes: 1)).millisecondsSinceEpoch,
+    );
+    expect(await f.sessions.refresh(), false);
+    expect(f.sessions.value, current);
+  });
+
+  test(
+    'a completed timestamp write updates current runtime diagnostics',
+    () async {
+      f.sessions.resetForTesting();
+      final rt = await f.runtime();
+      await rt.search('合成剧');
+      await f.sessions.pendingWrites;
+      final initial = f.time;
+      f.time = initial.add(const Duration(seconds: 10));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+        HongguoGuestSession.createdKey,
+        initial.add(const Duration(seconds: 5)).millisecondsSinceEpoch,
+      );
+      expect((await f.play(rt)).url, isNotEmpty);
+      expect(f.recorder.entries.last.sessionStatus, contains('创建距今：5秒'));
+      expect(f.registrations, 1);
+    },
+  );
+
+  test('failed model recovery cannot adopt an older persisted guest', () async {
+    final current = guest('7345678901234567109');
+    f.sessions.resetForTesting(current, f.time);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(HongguoGuestSession.sessionKey, guest(oldDevice));
+    await prefs.setInt(
+      HongguoGuestSession.createdKey,
+      f.time.subtract(const Duration(minutes: 1)).millisecondsSinceEpoch,
+    );
+    f.empty = true;
+    expect((await f.play(await f.runtime())).errorCode, 'EMPTY_RESPONSE');
+    expect(f.sessions.value, current);
+    expect(f.models, 4);
+    expect(f.registrations, 0);
+  });
+
+  test(
+    'refresh waits for a pending session write before reading storage',
+    () async {
+      final current = guest('7345678901234567109');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(HongguoGuestSession.sessionKey, guest(oldDevice));
+      f.sessions.accept(current);
+      expect(await f.sessions.refresh(), false);
+      expect(f.sessions.value, current);
+      expect(prefs.getString(HongguoGuestSession.sessionKey), current);
     },
   );
 
