@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:flutter/services.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -145,7 +146,9 @@ class Fixture {
       guestSessions: sessions,
     );
     runtimes.add(runtime);
-    await runtime.init(File('assets/sources/hongguo.js').readAsStringSync());
+    await runtime.init(
+      await rootBundle.loadString('assets/sources/hongguo.js'),
+    );
     return runtime;
   }
 
@@ -181,56 +184,35 @@ void main() {
   });
   tearDown(() async => f.close());
 
-  test(
-    'restored rejected guest renews once and preserves library storage',
-    () async {
-      f.sessions.resetForTesting(guest(oldDevice));
-      expect((await f.play(await f.runtime())).url, contains(video));
-      expect(f.registrations, 1);
-      expect(f.models, 5);
-      expect(
-        f.recorder.entries.where((e) => e.stage == '游客会话恢复'),
-        hasLength(1),
-      );
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('saved_favorites'), 'keep-favorites');
-      expect(prefs.getString('saved_history'), 'keep-history');
-      expect(
-        prefs.getString(HongguoGuestSession.sessionKey),
-        isNot(guest(oldDevice)),
-      );
-    },
-  );
+  test('empty response preserves restored guest and library storage', () async {
+    final saved = guest(oldDevice);
+    f.sessions.resetForTesting(saved, f.time);
+    expect((await f.play(await f.runtime())).errorCode, 'EMPTY_RESPONSE');
+    expect(f.registrations, 0);
+    expect(f.models, 4);
+    expect(f.sessions.value, saved);
+    expect(f.sessions.createdAt, f.time);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('saved_favorites'), 'keep-favorites');
+    expect(prefs.getString('saved_history'), 'keep-history');
+  });
 
   test(
-    'new active guest expires after successful playback and renews',
+    'empty response after eleven minutes retains the active identity',
     () async {
       f.sessions.resetForTesting();
       final rt = await f.runtime();
       expect((await f.play(rt)).url, isNotEmpty);
+      final saved = f.sessions.value;
       f.time = f.time.add(const Duration(minutes: 11));
       f.expireFirst = true;
-      final result = await f.refresh(rt);
-      expect(
-        result.url,
-        contains(video),
-        reason: jsonEncode({
-          'registrations': f.registrations,
-          'models': f.models,
-          'created': f.sessions.createdAt?.toIso8601String(),
-          'trace': f.recorder.entries
-              .map(
-                (e) => {
-                  'stage': e.stage,
-                  'code': e.errorCode,
-                  'session': e.sessionStatus,
-                },
-              )
-              .toList(),
-        }),
-      );
-      expect(f.registrations, 2);
-      expect(f.models, 6);
+      expect((await f.refresh(rt)).errorCode, 'EMPTY_RESPONSE');
+      expect(f.registrations, 1);
+      expect(f.sessions.value, saved);
+      f.expireFirst = false;
+      expect((await f.refresh(rt)).url, isNotEmpty);
+      expect(f.registrations, 1);
+      expect(f.modelIds.toSet(), {'7345678901234567101'});
     },
   );
 
@@ -275,25 +257,20 @@ void main() {
     },
   );
 
-  test(
-    'previously working guest can recover before ten minutes without churn',
-    () async {
-      f.sessions.resetForTesting();
-      final rt = await f.runtime();
-      await f.play(rt);
-      f.time = f.time.add(const Duration(seconds: 30));
-      f.expireFirst = true;
-      expect((await f.refresh(rt)).url, isNotEmpty);
-      expect(f.registrations, 2);
-      f.empty = true;
-      expect((await f.refresh(rt)).errorCode, 'EMPTY_RESPONSE');
-      expect(f.registrations, 2);
-      expect(
-        f.recorder.report(version: '1.0.0', sourceHash: 'synthetic'),
-        contains('成功取流：1次'),
-      );
-    },
-  );
+  test('temporary rejection recovers using the same active guest', () async {
+    f.sessions.resetForTesting();
+    final rt = await f.runtime();
+    await f.play(rt);
+    final saved = f.sessions.value;
+    f.time = f.time.add(const Duration(seconds: 30));
+    f.empty = true;
+    expect((await f.refresh(rt)).errorCode, 'EMPTY_RESPONSE');
+    f.empty = false;
+    expect((await f.refresh(rt)).url, isNotEmpty);
+    expect(f.registrations, 1);
+    expect(f.sessions.value, saved);
+    expect(f.modelIds.toSet(), {'7345678901234567101'});
+  });
 
   test(
     'a fresh guest that never played is not repeatedly registered',
@@ -317,8 +294,8 @@ void main() {
       for (final target in [rt, rt, await f.runtime()]) {
         expect((await f.play(target)).errorCode, 'EMPTY_RESPONSE');
       }
-      expect(f.registrations, 1);
-      expect(f.models, 16);
+      expect(f.registrations, 0);
+      expect(f.models, 12);
     },
   );
 
@@ -333,9 +310,9 @@ void main() {
   }
 
   test(
-    'parallel playback and preload share one renewal and retain episode IDs',
+    'parallel playback and preload share one registration and retain episode IDs',
     () async {
-      f.sessions.resetForTesting(guest(oldDevice));
+      f.sessions.resetForTesting();
       final a = await f.runtime(), b = await f.runtime();
       final plans = await Future.wait([
         f.play(a),
@@ -347,17 +324,18 @@ void main() {
     },
   );
 
-  test(
-    'search cursor survives guest recovery in the same JS context',
-    () async {
-      f.sessions.resetForTesting(guest(oldDevice));
-      final rt = await f.runtime();
-      expect((await rt.search('合成剧')).hasMore, true);
-      expect((await f.play(rt)).url, isNotEmpty);
-      expect((await rt.search('合成剧', page: 2)).list, isNotEmpty);
-      expect(f.searchOffsets, ['0', '6']);
-    },
-  );
+  test('search cursor survives a temporary model failure', () async {
+    f.sessions.resetForTesting(guest('7345678901234567109'));
+    final rt = await f.runtime();
+    expect((await rt.search('合成剧')).hasMore, true);
+    f.empty = true;
+    expect((await f.play(rt)).errorCode, 'EMPTY_RESPONSE');
+    f.empty = false;
+    expect((await f.play(rt)).url, isNotEmpty);
+    expect((await rt.search('合成剧', page: 2)).list, isNotEmpty);
+    expect(f.searchOffsets, ['0', '6']);
+    expect(f.registrations, 0);
+  });
 
   test(
     'new persisted guest is adopted before the first model request and preserves search cursor',
@@ -492,9 +470,9 @@ void main() {
   );
 
   test(
-    'cancelling a waiting runtime does not block on another renewal',
+    'cancelling a waiting runtime does not interrupt shared initialization',
     () async {
-      f.sessions.resetForTesting(guest(oldDevice));
+      f.sessions.resetForTesting();
       f.registrationStarted = Completer<void>();
       f.releaseRegistration = Completer<void>();
       final a = await f.runtime(), b = await f.runtime();
@@ -511,6 +489,25 @@ void main() {
       f.releaseRegistration!.complete();
       expect((await first).url, isNotEmpty);
       expect(f.registrations, 1);
+    },
+  );
+  test(
+    'cold parallel runtimes share one registration before playback',
+    () async {
+      f.sessions.resetForTesting();
+      f.registrationStarted = Completer<void>();
+      f.releaseRegistration = Completer<void>();
+      final a = await f.runtime(), b = await f.runtime();
+      final first = f.play(a);
+      await f.registrationStarted!.future;
+      final second = f.play(b, '7345678901234568457');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(f.registrations, 1);
+      f.releaseRegistration!.complete();
+      final results = await Future.wait([first, second]);
+      expect(results.every((r) => r.url.isNotEmpty), true);
+      expect(f.registrations, 1);
+      expect(f.modelIds.toSet(), {'7345678901234567101'});
     },
   );
 }

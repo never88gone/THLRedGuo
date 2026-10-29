@@ -111,6 +111,22 @@ final class OverseasSearchTests: XCTestCase {
         XCTAssertFalse(SourceDiagnostics.redact(#"{"device_id_str":"private-device","query":"private-query"}"#).contains("private-"))
     }
 
+    func testBusinessFailureExportsCodeWithoutRawMessageOrExpiryClaim() {
+        let body = #"{"code":1001,"message":"private-message-secret"}"#
+        let recorder = SourceDiagnostics()
+        recorder.record(url: URL(string: "https://reading.snssdk.com/reading/bookapi/search/tab/v")!, context: "合成诊断", elapsedMs: 10, status: 200, body: body)
+        XCTAssertEqual(recorder.entries.last?.businessCode, "1001")
+        XCTAssertEqual(recorder.entries.last?.errorCode, "BUSINESS_REJECTED")
+        for text in [recorder.report, recorder.qrText] {
+            XCTAssertFalse(text.contains("private-message-secret"))
+            XCTAssertFalse(text.contains("已自动重置"))
+            XCTAssertTrue(text.contains("1001"))
+        }
+        let classified = SourceDiagnostics.classify(error: nil, httpStatus: 200, body: body)
+        XCTAssertFalse(classified.reason.contains("private-message-secret"))
+        XCTAssertFalse(classified.suggestion.contains("已自动重置"))
+    }
+
     func testPhoneDownloadsSanitizedReportAndClosingRevokesLink() async throws {
         let server = DiagnosticsShareServer()
         server.start(report: "合成诊断\nCookie=private-cookie\n<script>alert(1)</script>")
@@ -197,6 +213,8 @@ private final class PlaybackResponseFixtureProtocol: URLProtocol {
         lock.withLock { onFourthModel = action }
     }
 
+    static func acceptSavedGuest() { lock.withLock { savedGuestMode = "restored" } }
+
     static func rejectAllModels() { lock.withLock { savedGuestMode = "empty" } }
 
     static var counts: (registrations: Int, modelTimes: [Date], legacyModels: Int, modelRoutes: [String], webRequests: Int, implicitCookieRequests: Int) {
@@ -252,7 +270,7 @@ private final class PlaybackResponseFixtureProtocol: URLProtocol {
             let old = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains { $0.name == "device_id" && $0.value == "7335678901234567100" } == true
             status = mode == "forbidden" ? 403 : 200
             let renewed = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains { $0.name == "device_id" && $0.value == "7355678901234567100" } == true
-            if (mode == "recover" && !old) || (mode == "expiry" && !old && (!registeredExpired || renewed)) {
+            if (mode == "restored" && old) || (mode == "recover" && !old) || (mode == "expiry" && !old && (!registeredExpired || renewed)) {
                 let media = Data("https://fixture.qznovelvod.com/full.mp4".utf8).base64EncodedString()
                 let entry: [String: Any] = ["video_model": ["video_list": ["main": ["codec_type": "h264", "vwidth": 1080, "vheight": 1920, "main_url": media]]]]
                 bytes = try! JSONSerialization.data(withJSONObject: ["code": 0, "data": ["7345678901234568456": entry]])
@@ -431,6 +449,7 @@ final class SavedGuestPlaybackTests: XCTestCase {
         guestDefaults = defaults
         addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
         defaults.set(#"{"device_id":"7335678901234567100","iid":"7335678901234567200","cdid":"11111111-1111-4111-8111-111111111111"}"#, forKey: "thl_tv_hongguo_device_session")
+        defaults.set(timeProvider(), forKey: "thl_tv_hongguo_guest_created_at")
         defaults.removeObject(forKey: "thl_tv_hongguo_guest_recovery_v2_at")
         PlaybackResponseFixtureProtocol.configure(savedGuestMode: mode)
         let config = URLSessionConfiguration.ephemeral
@@ -447,13 +466,22 @@ final class SavedGuestPlaybackTests: XCTestCase {
         ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567123"], "index": 1, "chapter": ["url": "https://hongguoduanju.com/player/7345678901234567123/7345678901234568456"]]
     }
 
-    func testExpiredSavedGuestRenewsOnceAfterFourEmptyOfficialResponses() async throws {
-        let (bridge, _, _, recorder) = try environment(mode: "recover")
+    func testEmptyResponsePreservesSavedGuestAndCanRecoverUnchanged() async throws {
+        let (bridge, _, _, recorder) = try environment(mode: "empty")
+        let saved = guestDefaults.string(forKey: "thl_tv_hongguo_device_session")
+        guestDefaults.set(Data("history".utf8), forKey: "zgj_tv_history")
+        guestDefaults.set(Data("favorites".utf8), forKey: "zgj_tv_followed_dramas")
+        do { _ = try await bridge.request(action: "resolve", payload: payload); XCTFail("Empty response must stay visible") }
+        catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "EMPTY_RESPONSE") }
+        XCTAssertEqual(guestDefaults.string(forKey: "thl_tv_hongguo_device_session"), saved)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 0)
+        PlaybackResponseFixtureProtocol.acceptSavedGuest()
         let plan = try await bridge.request(action: "resolve", payload: payload)
         XCTAssertEqual(plan["quality"] as? Int, 1080)
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, 5)
-        XCTAssertTrue(recorder.entries.contains { $0.stage == "游客会话恢复" })
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 0)
+        XCTAssertEqual(guestDefaults.data(forKey: "zgj_tv_history"), Data("history".utf8))
+        XCTAssertEqual(guestDefaults.data(forKey: "zgj_tv_followed_dramas"), Data("favorites".utf8))
+        XCTAssertFalse(recorder.entries.contains { $0.stage == "游客会话恢复" })
     }
 
     func testPersistentEmptyResponseCannotRepeatedlyReplaceGuest() async throws {
@@ -463,34 +491,34 @@ final class SavedGuestPlaybackTests: XCTestCase {
             do { _ = try await target.request(action: "resolve", payload: payload); XCTFail("Empty responses must remain errors") }
             catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "EMPTY_RESPONSE") }
         }
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
-        XCTAssertEqual(recorder.entries.filter { $0.stage == "游客会话恢复" }.count, 1)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 0)
+        XCTAssertFalse(recorder.entries.contains { $0.stage == "游客会话恢复" })
     }
 
-    func testLegacyRecoveryCooldownDoesNotBlockCorrectedRecovery() async throws {
-        let (bridge, _, _, recorder) = try environment(mode: "recover")
-        guestDefaults.set(Date().timeIntervalSince1970, forKey: "thl_tv_hongguo_guest_recovered_at")
-        let plan = try await bridge.request(action: "resolve", payload: payload)
-        XCTAssertEqual(plan["quality"] as? Int, 1080)
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
-        XCTAssertEqual(recorder.entries.filter { $0.stage == "游客会话恢复" }.count, 1)
+    func testLegacyRecoveryTimestampDoesNotCauseGuestReplacement() async throws {
+        let (bridge, _, _, _) = try environment(mode: "empty")
+        let saved = guestDefaults.string(forKey: "thl_tv_hongguo_device_session")
+        guestDefaults.set(Date().timeIntervalSince1970 - 3600, forKey: "thl_tv_hongguo_guest_recovery_v2_at")
+        do { _ = try await bridge.request(action: "resolve", payload: payload); XCTFail("Fixture must fail") }
+        catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "EMPTY_RESPONSE") }
+        XCTAssertEqual(guestDefaults.string(forKey: "thl_tv_hongguo_device_session"), saved)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 0)
     }
 
-    func testInheritedExpiredGuestDoesNotReturnAfterAutomaticRecovery() async throws {
-        let (bridge, session, root, recorder) = try environment(mode: "recover")
+    func testInheritedSavedGuestSurvivesTemporaryEmptyResponse() async throws {
+        let (bridge, session, root, _) = try environment(mode: "empty")
         let defaults = try XCTUnwrap(guestDefaults)
         let registration = defaults.volatileDomain(forName: UserDefaults.registrationDomain)
         addTeardownBlock { defaults.setVolatileDomain(registration, forName: UserDefaults.registrationDomain) }
-        let stale = try XCTUnwrap(defaults.string(forKey: "thl_tv_hongguo_device_session"))
-        defaults.register(defaults: ["thl_tv_hongguo_device_session": stale])
+        let saved = try XCTUnwrap(defaults.string(forKey: "thl_tv_hongguo_device_session"))
+        defaults.register(defaults: ["thl_tv_hongguo_device_session": saved])
         defaults.removeObject(forKey: "thl_tv_hongguo_device_session")
-        XCTAssertEqual(defaults.string(forKey: "thl_tv_hongguo_device_session"), stale)
-        _ = try await bridge.request(action: "resolve", payload: payload)
-        let relaunched = NativeBridge(baseDirectory: root.appendingPathComponent("relaunch"), httpSession: session, diagnostics: recorder, deviceDefaults: guestDefaults)
+        do { _ = try await bridge.request(action: "resolve", payload: payload); XCTFail("Fixture must fail") } catch {}
+        PlaybackResponseFixtureProtocol.acceptSavedGuest()
+        let relaunched = NativeBridge(baseDirectory: root.appendingPathComponent("relaunch"), httpSession: session, deviceDefaults: defaults)
         _ = try await relaunched.request(action: "resolve", payload: payload)
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
-        XCTAssertEqual(recorder.entries.filter { $0.stage == "游客会话恢复" }.count, 1)
-        XCTAssertNotEqual(defaults.string(forKey: "thl_tv_hongguo_device_session"), stale)
+        XCTAssertEqual(defaults.string(forKey: "thl_tv_hongguo_device_session"), saved)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 0)
     }
 
     func testOfficialResetMasksInheritedGuestAndPreservesLibrary() async throws {
@@ -512,36 +540,38 @@ final class SavedGuestPlaybackTests: XCTestCase {
         XCTAssertEqual(defaults.data(forKey: "zgj_tv_followed_dramas"), follows)
     }
 
-    func testActiveRegisteredGuestRecoversAfterTenMinutes() async throws {
+    func testActiveRegisteredGuestSurvivesEmptyAfterTenMinutes() async throws {
         let clock = GuestTestClock()
         let (bridge, _, _, recorder) = try environment(mode: "expiry", timeProvider: { clock.now() })
         guestDefaults.set("", forKey: "thl_tv_hongguo_device_session")
         _ = try await bridge.request(action: "resolve", payload: payload)
+        let saved = guestDefaults.string(forKey: "thl_tv_hongguo_device_session")
         clock.advance(660)
         PlaybackResponseFixtureProtocol.expireRegisteredGuest()
         var refresh = payload
         refresh["avoidUrl"] = "https://fixture.qznovelvod.com/expired.mp4"
-        let plan = try await bridge.request(action: "resolve", payload: refresh)
-        XCTAssertEqual(plan["quality"] as? Int, 1080)
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 2)
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, 6)
-        XCTAssertEqual(recorder.entries.filter { $0.stage == "游客会话恢复" }.count, 1)
+        do { _ = try await bridge.request(action: "resolve", payload: refresh); XCTFail("Fixture must fail") }
+        catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "EMPTY_RESPONSE") }
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
+        XCTAssertEqual(guestDefaults.string(forKey: "thl_tv_hongguo_device_session"), saved)
+        XCTAssertFalse(recorder.entries.contains { $0.stage == "游客会话恢复" })
     }
 
-    func testPreviouslyWorkingGuestCanRecoverBeforeTenMinutes() async throws {
+    func testPreviouslyWorkingGuestSurvivesTransientRejection() async throws {
         let clock = GuestTestClock()
         let (bridge, _, _, recorder) = try environment(mode: "expiry", timeProvider: { clock.now() })
         guestDefaults.set("", forKey: "thl_tv_hongguo_device_session")
         _ = try await bridge.request(action: "resolve", payload: payload)
+        let saved = guestDefaults.string(forKey: "thl_tv_hongguo_device_session")
         clock.advance(30)
         PlaybackResponseFixtureProtocol.expireRegisteredGuest()
         var refresh = payload
         refresh["avoidUrl"] = "https://fixture.qznovelvod.com/expired.mp4"
-        let plan = try await bridge.request(action: "resolve", payload: refresh)
-        XCTAssertEqual(plan["quality"] as? Int, 1080)
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 2)
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, 6)
-        XCTAssertEqual(recorder.entries.filter { $0.stage == "游客会话恢复" }.count, 1)
+        do { _ = try await bridge.request(action: "resolve", payload: refresh); XCTFail("Fixture must fail") }
+        catch { XCTAssertEqual((error as NSError).userInfo["diagnosticCode"] as? String, "EMPTY_RESPONSE") }
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
+        XCTAssertEqual(guestDefaults.string(forKey: "thl_tv_hongguo_device_session"), saved)
+        XCTAssertFalse(recorder.entries.contains { $0.stage == "游客会话恢复" })
     }
 
     func testFreshGuestThatNeverPlayedDoesNotRepeatedlyRegister() async throws {
@@ -642,10 +672,10 @@ final class SavedGuestPlaybackTests: XCTestCase {
     }
 
     func testValidModelIsReusedUntilPlayerRequestsFreshMedia() async throws {
-        let (bridge, _, _, _) = try environment(mode: "recover")
+        let (bridge, _, _, _) = try environment(mode: "restored")
         let first = try await bridge.request(action: "resolve", payload: payload)
         let initialCount = PlaybackResponseFixtureProtocol.counts.modelRoutes.count
-        XCTAssertEqual(initialCount, 5)
+        XCTAssertEqual(initialCount, 1)
         var quality = payload
         quality["quality"] = 720
         let reused = try await bridge.request(action: "resolve", payload: quality)
@@ -656,11 +686,11 @@ final class SavedGuestPlaybackTests: XCTestCase {
         refresh["avoidUrl"] = first["url"]
         _ = try await bridge.request(action: "resolve", payload: refresh)
         XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.modelRoutes.count, initialCount + 1)
-        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 1)
+        XCTAssertEqual(PlaybackResponseFixtureProtocol.counts.registrations, 0)
     }
 
     func testFailureReportsSessionAgeAndPriorSuccessfulPlayback() async throws {
-        let (bridge, _, _, recorder) = try environment(mode: "recover")
+        let (bridge, _, _, recorder) = try environment(mode: "restored")
         _ = try await bridge.request(action: "resolve", payload: payload)
         PlaybackResponseFixtureProtocol.configure(savedGuestMode: "empty")
         var refresh = payload

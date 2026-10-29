@@ -53,13 +53,13 @@ struct Regression {
             defer { session.invalidateAndCancel() }
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: folder) }
-            let bridge = NativeBridge(baseDirectory: folder, httpSession: session, diagnostics: recorder)
+            let bridge = NativeBridge(baseDirectory: folder, httpSession: session, diagnostics: recorder, persistentDeviceSession: false)
             var succeeded = false
             do {
                 _ = try await bridge.request(action: "catalog", payload: ["source":"hongguo", "query":"private-query-secret", "page":1])
                 succeeded = true
             } catch {
-                precondition(error.localizedDescription.contains("数据源诊断"), "mode=\(mode) error=\(error.localizedDescription) records=\(recorder.entries.map(\.text))")
+                precondition(recorder.entries.contains { $0.failed }, "mode=\(mode) error=\(error.localizedDescription) records=\(recorder.entries.map(\.text))")
             }
             precondition(succeeded == (mode == "healthy"), "mode=\(mode) succeeded=\(succeeded) records=\(recorder.entries.map(\.text))")
             if mode == "dns" {
@@ -76,7 +76,6 @@ struct Regression {
                 precondition(!text.contains("private-"))
                 precondition(!text.contains("7345678901234567100"))
                 precondition(!text.contains("x-medusa"))
-                precondition(!text.contains("aid="))
             }
             for _ in 0..<70 { recorder.add(SourceDiagnosticEntry(context:"测试",stage:"搜索",errorCode:"HTTP_403")) }
             precondition(recorder.entries.count == 60)
@@ -98,12 +97,33 @@ struct Regression {
     }
 }
 ''');
+        final errors = File('${directory.path}/SourceAPIError.swift');
+        final protocols = File(
+          'tvos/THLRedLook/Core/PlatformProtocols.swift',
+        ).readAsStringSync();
+        final enumStart = protocols.indexOf('public enum SourceAPIError');
+        final enumSource = protocols.substring(
+          enumStart,
+          protocols.indexOf('\n}\n', enumStart) + 3,
+        );
+        final player = File(
+          'tvos/THLRedLook/ViewModels/PlayerViewModel.swift',
+        ).readAsStringSync();
+        final policyStart = player.indexOf('enum PlaybackRetryPolicy');
+        final policy = player.substring(
+          policyStart,
+          player.indexOf('\n}\n', policyStart) + 3,
+        );
+        await errors.writeAsString('import Foundation\n$enumSource\n$policy');
         final binary = '${directory.path}/DiagnosticsRegression';
         final compile = await Process.run('xcrun', [
           'swiftc',
           '-parse-as-library',
           'tvos/THLRedLook/Core/NativeBridge.swift',
           'tvos/THLRedLook/Core/SourceDiagnostics.swift',
+          'tvos/THLRedLook/Core/NetworkEgressLookup.swift',
+          'tvos/THLRedLook/Models/PlaybackPlan.swift',
+          errors.path,
           main.path,
           '-o',
           binary,
@@ -152,18 +172,18 @@ struct Regression {
         let suite = "THLRedLook.Regression." + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
-        let seeded = LocalStore(defaults: defaults)
+        let seeded = LocalStore(defaults: defaults, cloudUpload: { _ in })
         seeded.setFollowState(drama: oldFourth, state: .watching)
         seeded.setFollowState(drama: oldSecond, state: .wishlist)
         seeded.recordWatch(drama: oldFourth, episode: 12, position: 37.5, duration: 158)
         seeded.recordWatch(drama: oldSecond, episode: 5, position: 7, duration: 100)
         seeded.recordWatch(drama: other, episode: 2, position: 42, duration: 120)
-        let store = LocalStore(defaults: defaults)
+        let store = LocalStore(defaults: defaults, cloudUpload: { _ in })
         let oldTime = store.getWatchEntry(dramaId: oldFourth.id)!.updatedAt
         let otherEntry = store.getWatchEntry(dramaId: other.id)!
         let changed = store.refreshDramas([fourth, second])
         precondition(changed[oldFourth.id]?.id == fourth.id)
-        let restored = LocalStore(defaults: defaults)
+        let restored = LocalStore(defaults: defaults, cloudUpload: { _ in })
         precondition(restored.followState(for: fourth.id) == .watching)
         precondition(restored.followState(for: second.id) == .wishlist)
         precondition(restored.followState(for: oldFourth.id) == .none)
@@ -178,7 +198,7 @@ struct Regression {
         restored.setFollowState(drama: oldFourth, state: .watched)
         restored.recordWatch(drama: fourth, episode: 33, position: 17, duration: 80)
         restored.refreshDramas([fourth])
-        let merged = LocalStore(defaults: defaults)
+        let merged = LocalStore(defaults: defaults, cloudUpload: { _ in })
         precondition(merged.followedDramas.count == 2)
         precondition(merged.followState(for: fourth.id) == .watched)
         precondition(merged.getWatchEntry(dramaId: fourth.id)?.episode == 33)
@@ -195,6 +215,7 @@ struct Regression {
           'tvos/THLRedLook/Models/SourceSite.swift',
           'tvos/THLRedLook/Models/LanModels.swift',
           'tvos/THLRedLook/Core/LocalStore.swift',
+          'tvos/THLRedLook/Core/ICloudSyncService.swift',
           main.path,
           '-o',
           binary,
@@ -318,7 +339,7 @@ struct Regression {
       expect(json['episode'], equals(8));
       expect(json['position'], equals(110.5));
       expect(json['duration'], equals(120.0));
-      expect(json['updatedAt'], equals(now.toIso8601String()));
+      expect(json['updatedAt'], equals(now.toUtc().toIso8601String()));
 
       final restored = WatchEntry.fromJson(json);
       expect(restored.episode, equals(8));

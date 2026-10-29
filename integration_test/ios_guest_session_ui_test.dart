@@ -8,7 +8,6 @@ import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:THLRedLook/main.dart' as app;
 import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
-import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 import 'package:THLRedLook/core/js/hongguo_guest_session.dart';
 import 'package:THLRedLook/core/player/luna_exo_player.dart';
 import 'package:THLRedLook/pages/detail/detail_page.dart';
@@ -28,12 +27,23 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.onlyPumps;
   testWidgets(
-    'iOS 27 guest recovery and production UI automation',
+    'iOS 27 persistent anonymous session and production UI automation',
     (t) async {
       expect(Platform.isIOS, true);
       expect(DramaCover.imagesDisabled, true);
-      SharedPreferences.setMockInitialValues({});
-      CatPawJsRuntime.resetDeviceSessionForTesting();
+      await HongguoGuestSession.shared.preload();
+      final savedGuest = HongguoGuestSession.shared.value;
+      final savedCreated = HongguoGuestSession.shared.createdAt;
+      final initialPreferences = <String, Object>{};
+      if (savedGuest != null) {
+        initialPreferences[HongguoGuestSession.sessionKey] = savedGuest;
+      }
+      if (savedCreated != null) {
+        initialPreferences[HongguoGuestSession.createdKey] =
+            savedCreated.millisecondsSinceEpoch;
+      }
+      SharedPreferences.setMockInitialValues(initialPreferences);
+      HongguoGuestSession.shared.resetForTesting(savedGuest, savedCreated);
       final semantics = t.ensureSemantics();
       final steps = <Map<String, Object?>>[];
       final videos = <Map<String, Object?>>[];
@@ -435,12 +445,13 @@ void main() {
           await home();
         });
         await step(
-          '07 real session lifetime, natural continuous playback and renewal',
+          '07 real session lifetime and natural continuous playback',
           () async {
             await detail('雾锁情迷');
             await play();
             final created =
                 HongguoGuestSession.shared.createdAt ?? DateTime.now();
+            final retainedGuest = HongguoGuestSession.shared.value;
             final startedEpisode = h.viewport(t).index;
             final end = created.add(const Duration(minutes: 12));
             var lastBucket = -1;
@@ -469,6 +480,7 @@ void main() {
               );
             }
             expect(h.viewport(t).index, greaterThan(startedEpisode));
+            expect(HongguoGuestSession.shared.value, retainedGuest);
             await recordVideo('natural session lifetime');
             await home();
             await detail('雾锁情迷');
@@ -480,7 +492,7 @@ void main() {
           },
         );
         await step(
-          '08 search and diagnosis after renewal preserve favorites and history',
+          '08 search and diagnosis preserve favorites and history',
           () async {
             await home();
             expect(store.isFavorite(favorite!), true);

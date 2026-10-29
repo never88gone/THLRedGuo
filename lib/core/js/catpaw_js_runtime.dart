@@ -127,7 +127,6 @@ class CatPawJsRuntime {
   SourceDiagnosticEntry? _lastSearchTrace;
   String? _injectedDeviceSession;
   DateTime? _injectedDeviceCreatedAt;
-  bool _restoredDeviceSession = false;
   bool _officialSource = false;
   int _successfulPlaybackResolves = 0;
   DateTime? _lastSuccessfulPlayback;
@@ -174,8 +173,6 @@ class CatPawJsRuntime {
   Future<void> init(String script) async {
     if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
     if (persistentDeviceSession) await guestSessions.preload();
-    _restoredDeviceSession =
-        persistentDeviceSession && guestSessions.value != null;
     _rt = getJavascriptRuntime(xhr: false);
     _injectGlobals();
     final result = _rt.evaluate(script);
@@ -745,6 +742,7 @@ globalThis.__native_save_device = function(json) {
     final stopwatch = Stopwatch()..start();
     var queueMs = 0;
     Object? failure;
+    Completer<void>? initializationOwner;
     final prevQueue = _evalQueue;
     final queueCompleter = Completer<void>();
     _evalQueue = queueCompleter.future;
@@ -757,9 +755,13 @@ globalThis.__native_save_device = function(json) {
       if (cancellation != _cancellation || _isDisposed) {
         throw CatPawSourceFailure.playback('cancelled');
       }
-      final pendingRecovery = guestSessions.recovery;
-      if (persistentDeviceSession && pendingRecovery != null) {
-        await Future.any([pendingRecovery, cancelled]);
+      while (_officialSource &&
+          persistentDeviceSession &&
+          guestSessions.initialization != null) {
+        await Future.any([guestSessions.initialization!, cancelled]);
+        if (cancellation != _cancellation || _isDisposed) {
+          throw CatPawSourceFailure.playback('cancelled');
+        }
       }
       if (cancellation != _cancellation || _isDisposed) {
         throw CatPawSourceFailure.playback('cancelled');
@@ -779,55 +781,49 @@ globalThis.__native_save_device = function(json) {
           throw CatPawSourceFailure.playback('cancelled');
         }
       }
+      while (_officialSource &&
+          persistentDeviceSession &&
+          guestSessions.value == null &&
+          guestSessions.initialization != null) {
+        await Future.any([guestSessions.initialization!, cancelled]);
+        if (cancellation != _cancellation || _isDisposed) {
+          throw CatPawSourceFailure.playback('cancelled');
+        }
+      }
+      if (_officialSource &&
+          persistentDeviceSession &&
+          guestSessions.value == null) {
+        initializationOwner = guestSessions.beginInitialization();
+      }
       final data = await _runEval(jsCode, timeout, stopwatch, cancellation);
       if (!recoverGuest || !_officialSource || !persistentDeviceSession) {
         return data;
       }
       if (!_emptyModelFailure(data)) return data;
       final session = _injectedDeviceSession;
-      if (session == null ||
-          !(_restoredDeviceSession || _successfulPlaybackResolves > 0)) {
+      await guestSessions.refresh();
+      if (cancellation != _cancellation || _isDisposed) {
+        throw CatPawSourceFailure.playback('cancelled');
+      }
+      if (guestSessions.value == null || guestSessions.value == session) {
         return data;
       }
-      final activeRecovery = guestSessions.recovery;
-      if (activeRecovery != null) {
-        await Future.any([activeRecovery, cancelled]);
-        if (cancellation != _cancellation || _isDisposed) {
-          throw CatPawSourceFailure.playback('cancelled');
-        }
-        if (guestSessions.value == null || guestSessions.value == session) {
-          return data;
-        }
-        return _runEval(jsCode, timeout, stopwatch, cancellation);
-      }
-      final complete = Completer<void>();
-      guestSessions.recovery = complete.future;
-      try {
-        final decision = await guestSessions.invalidate(session);
-        if (decision == GuestRecoveryDecision.none) return data;
-        if (cancellation != _cancellation || _isDisposed) {
-          throw CatPawSourceFailure.playback('cancelled');
-        }
-        _restoredDeviceSession = false;
-        diagnostics.add(
-          SourceDiagnosticEntry(
-            at: DateTime.now().toUtc(),
-            context: diagnosticContext,
-            stage: '游客会话恢复',
-            sessionStatus: decision == GuestRecoveryDecision.reload
-                ? '载入其他请求已更新的游客会话'
-                : '四个官方接口均返回空正文，重新初始化游客会话；每十分钟最多恢复一次',
-          ),
-        );
-        return await _runEval(jsCode, timeout, stopwatch, cancellation);
-      } finally {
-        complete.complete();
-        guestSessions.recovery = null;
-      }
+      diagnostics.add(
+        SourceDiagnosticEntry(
+          at: DateTime.now().toUtc(),
+          context: diagnosticContext,
+          stage: '游客会话同步',
+          sessionStatus: '载入其他请求已更新的游客会话，保留本地资料和搜索游标',
+        ),
+      );
+      return await _runEval(jsCode, timeout, stopwatch, cancellation);
     } catch (error) {
       failure = error;
       rethrow;
     } finally {
+      if (initializationOwner != null) {
+        guestSessions.completeInitialization(initializationOwner);
+      }
       if (operation.isNotEmpty) {
         diagnostics.add(
           SourceDiagnosticEntry(
@@ -1059,7 +1055,6 @@ globalThis.__native_save_device = function(json) {
         if (_injectedDeviceSession != val) {
           _successfulPlaybackResolves = 0;
           _lastSuccessfulPlayback = null;
-          _restoredDeviceSession = false;
         }
         _injectedDeviceSession = val;
         _injectedDeviceCreatedAt = guestSessions.createdAt;

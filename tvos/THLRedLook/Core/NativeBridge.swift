@@ -1,9 +1,7 @@
 import Foundation
 import JavaScriptCore
 
-private enum SavedGuestRecovery {
-    private static let lock = NSLock()
-
+private enum SavedGuestSession {
     static func valid(_ json: String) -> Bool {
         guard let data = json.data(using: .utf8),
               let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
@@ -13,15 +11,6 @@ private enum SavedGuestRecovery {
         }
     }
 
-    static func invalidate(_ cached: String, defaults: UserDefaults, now: TimeInterval) -> Bool {
-        lock.withLock {
-            let last = defaults.double(forKey: "thl_tv_hongguo_guest_recovery_v2_at")
-            guard defaults.string(forKey: "thl_tv_hongguo_device_session") == cached, now - last >= 600 else { return false }
-            defaults.set("", forKey: "thl_tv_hongguo_device_session")
-            defaults.set(now, forKey: "thl_tv_hongguo_guest_recovery_v2_at")
-            return true
-        }
-    }
 }
 
 final class HttpTraceHolder: @unchecked Sendable {
@@ -91,7 +80,6 @@ public actor NativeBridge {
 
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
-    private var restoredGuestSessions: [String: String] = [:]
 
     init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用", persistentDeviceSession: Bool = true, deviceDefaults: UserDefaults = .standard, timeProvider: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 }) {
         if let httpSession {
@@ -256,7 +244,6 @@ public actor NativeBridge {
             return nil
         }
 
-        restoredGuestSessions.removeValue(forKey: sourceId)
         if sourceId == "hongguo" {
             successfulPlaybackResolves = 0
             lastSuccessfulPlaybackAt = nil
@@ -289,8 +276,7 @@ public actor NativeBridge {
         }
         context.setObject(saveDeviceBlock, forKeyedSubscript: "__native_save_device" as NSString)
 
-        if persistentDeviceSession, let cachedDevice = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"), SavedGuestRecovery.valid(cachedDevice) {
-            restoredGuestSessions[sourceId] = cachedDevice
+        if persistentDeviceSession, let cachedDevice = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"), SavedGuestSession.valid(cachedDevice) {
             trace.recordGuest(json: cachedDevice, createdAt: deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at"))
             context.evaluateScript("""
             try {
@@ -540,7 +526,7 @@ public actor NativeBridge {
     private func synchronizeGuestSession(_ context: JSContext, sourceId: String) {
         guard persistentDeviceSession, sourceId == "hongguo",
               let latest = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"),
-              SavedGuestRecovery.valid(latest) else { return }
+              SavedGuestSession.valid(latest) else { return }
         let created = deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at")
         let current = httpTrace.guestSnapshot
         let currentCreated = current.createdAt
@@ -559,7 +545,6 @@ public actor NativeBridge {
         """)?.toBool() == true
         guard applied else { return }
         httpTrace.recordGuest(json: latest, createdAt: created)
-        restoredGuestSessions[sourceId] = latest
         successfulPlaybackResolves = 0
         lastSuccessfulPlaybackAt = nil
         diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "游客会话同步", sessionStatus: "请求前载入其他运行环境更新的游客会话，保留搜索和详情缓存"))
@@ -1144,24 +1129,19 @@ public actor NativeBridge {
                     let code = SourceDiagnostics.safeCode(res?["code"] ?? data?["error"])
                     if code == "CANCELLED" { throw CancellationError() }
                     let guest = httpTrace.guestSnapshot
-                    let activeSessionFailed = successfulPlaybackResolves > 0 && !guest.json.isEmpty
-                    let recoveryGuest = restoredGuestSessions[targetSrc] ?? (activeSessionFailed ? guest.json : nil)
-                    if targetSrc == "hongguo", persistentDeviceSession, code == "EMPTY_RESPONSE", payload["guestRecoveryAttempted"] as? Bool != true, let cached = recoveryGuest {
+                    if targetSrc == "hongguo", persistentDeviceSession, code == "EMPTY_RESPONSE", payload["guestSynchronizationAttempted"] as? Bool != true, !guest.json.isEmpty {
                         let failures = diagnostics.entries.filter { $0.context == diagnosticContext && $0.stage == "播放解析" && $0.at >= started }
                         if failures.count == 4, failures.allSatisfy({ $0.status == 200 && $0.bodyBytes == 0 && $0.errorCode == "EMPTY_RESPONSE" }) {
                             let latest = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session")
                             let latestCreated = deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at")
                             let updated = latest.map {
-                                SavedGuestRecovery.valid($0) && $0 != cached &&
+                                SavedGuestSession.valid($0) && $0 != guest.json &&
                                     (latestCreated <= 0 || guest.createdAt <= 0 || latestCreated >= guest.createdAt)
                             } ?? false
-                            if updated || SavedGuestRecovery.invalidate(cached, defaults: deviceDefaults, now: timeProvider()) {
-                                jsContexts.removeValue(forKey: targetSrc)
-                                restoredGuestSessions.removeValue(forKey: targetSrc)
-                                let status = updated ? "已载入其他请求更新的游客会话" : "游客会话在四个官方接口均返回空正文，已重新初始化；每10分钟最多恢复一次"
-                                diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "游客会话恢复", sessionStatus: status))
+                            if updated {
+                                diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "游客会话同步", sessionStatus: "已载入其他请求更新的游客会话"))
                                 var retry = payload
-                                retry["guestRecoveryAttempted"] = true
+                                retry["guestSynchronizationAttempted"] = true
                                 return try await request(action: "resolve", payload: retry)
                             }
                         }

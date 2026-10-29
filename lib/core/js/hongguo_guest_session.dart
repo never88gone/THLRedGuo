@@ -3,26 +3,30 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum GuestRecoveryDecision { none, reload, renew }
-
 class HongguoGuestSession {
   static final shared = HongguoGuestSession();
   static const sessionKey = 'thl_hongguo_device_session';
   static const createdKey = 'thl_hongguo_guest_created_at';
-  static const recoveryKey = 'thl_hongguo_guest_recovery_at';
-  static const recoveryInterval = Duration(minutes: 10);
 
   HongguoGuestSession({DateTime Function()? now}) : now = now ?? DateTime.now;
 
   final DateTime Function() now;
   String? value;
   DateTime? createdAt;
-  DateTime? _recoveredAt;
   bool _loaded = false;
   int _generation = 0;
   Future<void>? _loading;
   Future<void> _writes = Future.value();
-  Future<void>? recovery;
+  Completer<void>? _initializing;
+
+  Future<void>? get initialization => _initializing?.future;
+
+  Completer<void> beginInitialization() => _initializing ??= Completer<void>();
+
+  void completeInitialization(Completer<void> owner) {
+    if (identical(_initializing, owner)) _initializing = null;
+    if (!owner.isCompleted) owner.complete();
+  }
 
   static bool valid(String? value) {
     if (value == null || value.isEmpty) return false;
@@ -63,7 +67,6 @@ class HongguoGuestSession {
         final stored = prefs?.getString(sessionKey);
         value = valid(stored) ? stored : null;
         createdAt = _date(prefs?.getInt(createdKey));
-        _recoveredAt = _date(prefs?.getInt(recoveryKey));
       } finally {
         _loaded = true;
         _loading = null;
@@ -90,6 +93,8 @@ class HongguoGuestSession {
     if (!valid(json)) return;
     if (value != json) createdAt = now();
     value = json;
+    final initializing = _initializing;
+    if (initializing != null) completeInitialization(initializing);
     _loaded = true;
     _generation++;
     final created = createdAt;
@@ -133,59 +138,8 @@ class HongguoGuestSession {
       }
       value = stored;
       createdAt = storedCreated;
-      _recoveredAt = _date(prefs?.getInt(recoveryKey)) ?? _recoveredAt;
       _generation++;
       return true;
-    });
-  }
-
-  Future<GuestRecoveryDecision> invalidate(String expected) async {
-    await preload();
-    return _serialize(() async {
-      final generation = _generation;
-      final prefs = await _preferences();
-      await prefs?.reload();
-      if (_generation != generation || value != expected) {
-        return value != null && value != expected
-            ? GuestRecoveryDecision.reload
-            : GuestRecoveryDecision.none;
-      }
-      final stored = prefs?.getString(sessionKey);
-      if (valid(stored) && stored != expected) {
-        final storedCreated = _date(prefs?.getInt(createdKey));
-        final currentCreated = createdAt;
-        if (storedCreated != null &&
-            currentCreated != null &&
-            storedCreated.isBefore(currentCreated)) {
-          return GuestRecoveryDecision.none;
-        }
-        value = stored;
-        createdAt = storedCreated;
-        _generation++;
-        return GuestRecoveryDecision.reload;
-      }
-      final recovered = _date(prefs?.getInt(recoveryKey)) ?? _recoveredAt;
-      final time = now();
-      if (recovered != null && time.difference(recovered) < recoveryInterval) {
-        return GuestRecoveryDecision.none;
-      }
-      try {
-        await prefs?.setInt(recoveryKey, time.millisecondsSinceEpoch);
-        await prefs?.setString(sessionKey, '');
-        await prefs?.setInt(createdKey, 0);
-      } catch (_) {
-        return GuestRecoveryDecision.none;
-      }
-      if (_generation != generation) {
-        return value != null && value != expected
-            ? GuestRecoveryDecision.reload
-            : GuestRecoveryDecision.none;
-      }
-      value = null;
-      createdAt = null;
-      _recoveredAt = time;
-      _generation++;
-      return GuestRecoveryDecision.renew;
     });
   }
 
@@ -194,10 +148,10 @@ class HongguoGuestSession {
   void resetForTesting([String? session, DateTime? created]) {
     value = valid(session) ? session : null;
     createdAt = created;
-    _recoveredAt = null;
     _loaded = true;
     _loading = null;
     _generation++;
-    recovery = null;
+    final initializing = _initializing;
+    if (initializing != null) completeInitialization(initializing);
   }
 }

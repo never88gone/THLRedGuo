@@ -370,11 +370,10 @@ public final class SourceDiagnostics: ObservableObject {
                let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
                 let code = Self.safeCode(parsed["code"] ?? parsed["Code"] ?? parsed["status_code"])
                 if !code.isEmpty && code != "0" {
-                    let msg = parsed["message"] as? String ?? parsed["msg"] as? String ?? "平台业务拒绝"
                     return (
                         .businessRejected,
-                        "业务拦截 (代码 \(code)): \(msg)",
-                        "接口返回业务受限代码，当前游客凭据可能已过期，系统已自动重置会话。"
+                        "业务拦截 (代码 \(code))",
+                        "接口返回业务受限代码，请稍后重试并导出诊断；仅凭业务码不能确认游客会话过期。"
                     )
                 }
             }
@@ -461,9 +460,8 @@ public final class SourceDiagnostics: ObservableObject {
                 if !entry.businessCode.isEmpty && entry.businessCode != "0" {
                     entry.category = .businessRejected
                     entry.errorCode = "BUSINESS_REJECTED"
-                    let msg = parsed["message"] as? String ?? parsed["msg"] as? String ?? "业务错误"
-                    entry.errorDetail = "平台业务拦截 (代码 \(entry.businessCode)): \(msg)"
-                    entry.suggestion = "当前游客会话受限，请稍后重试或重新检测。"
+                    entry.errorDetail = "平台业务拦截 (代码 \(entry.businessCode))"
+                    entry.suggestion = "接口返回业务受限代码，请稍后重试或重新检测；仅凭业务码不能确认游客会话过期。"
                 } else if stage == "游客注册" {
                     let valid = [parsed["device_id_str"], parsed["install_id_str"]].allSatisfy { value in
                         guard let string = value as? String else { return false }
