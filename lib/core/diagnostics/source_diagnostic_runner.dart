@@ -34,7 +34,7 @@ class SourceDiagnosticRunner extends ChangeNotifier {
     final context = '主动检测 ${DateTime.now().toUtc().toIso8601String()}';
     final runtime =
         runtimeFactory?.call(recorder, context) ??
-        CatPawJsRuntime(null, recorder, context, false);
+        CatPawJsRuntime(null, recorder, context);
 
     var currentStage = 'JS 脚本与引擎初始化';
     final stopwatch = Stopwatch()..start();
@@ -179,9 +179,10 @@ class SourceDiagnosticRunner extends ChangeNotifier {
             stopwatch.start();
             final playResult = await runtime.play('play', episodeId);
             if (playResult.url.isEmpty) {
-              throw const CatPawSourceFailure(
-                '站源播放接口未能成功解析出有效媒体流播放地址',
-                code: 'NO_STREAM_URL',
+              throw CatPawSourceFailure.playback(
+                playResult.errorCode.isEmpty
+                    ? 'NO_STREAM_URL'
+                    : playResult.errorCode,
               );
             }
             successCount++;

@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_js/flutter_js.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'hongguo_guest_session.dart';
 
 import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
 
@@ -108,52 +108,11 @@ class CatPawSearchResult {
 }
 
 class CatPawJsRuntime {
-  static String? _cachedDeviceSession;
-  static const String _deviceSessionKey = 'thl_hongguo_device_session';
-  static bool _deviceSessionLoaded = false;
-  static Future<void>? _deviceSessionLoading;
-
-  static bool _validDeviceSession(String? value) {
-    if (value == null) return false;
-    try {
-      final data = jsonDecode(value);
-      return data is Map &&
-          ['iid', 'device_id'].every(
-            (key) =>
-                data[key] is String &&
-                RegExp(r'^[1-9]\d{9,23}$').hasMatch(data[key] as String),
-          );
-    } catch (_) {
-      return false;
-    }
-  }
-
-  static Future<void> preloadDeviceSession() async {
-    if (_deviceSessionLoaded) return;
-    if (_deviceSessionLoading != null) return _deviceSessionLoading;
-    _deviceSessionLoading = () async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final stored = prefs.getString(_deviceSessionKey);
-        if (_cachedDeviceSession == null && _validDeviceSession(stored)) {
-          _cachedDeviceSession = stored;
-        }
-      } catch (_) {
-      } finally {
-        _deviceSessionLoaded = true;
-        _deviceSessionLoading = null;
-      }
-    }();
-    await _deviceSessionLoading;
-  }
-
-  static String? get cachedDeviceSession => _cachedDeviceSession;
-
-  static void resetDeviceSessionForTesting([String? session]) {
-    _cachedDeviceSession = _validDeviceSession(session) ? session : null;
-    _deviceSessionLoaded = true;
-    _deviceSessionLoading = null;
-  }
+  static Future<void> preloadDeviceSession() =>
+      HongguoGuestSession.shared.preload();
+  static String? get cachedDeviceSession => HongguoGuestSession.shared.value;
+  static void resetDeviceSessionForTesting([String? session]) =>
+      HongguoGuestSession.shared.resetForTesting(session);
 
   late final JavascriptRuntime _rt;
   final http.Client _httpClient;
@@ -163,23 +122,46 @@ class CatPawJsRuntime {
   final bool persistentDeviceSession;
   SourceDiagnosticEntry? _lastSearchTrace;
   String? _injectedDeviceSession;
+  DateTime? _injectedDeviceCreatedAt;
+  bool _restoredDeviceSession = false;
+  bool _officialSource = false;
+  int _successfulPlaybackResolves = 0;
+  DateTime? _lastSuccessfulPlayback;
+  int _evaluationSequence = 0;
+  List<SourceDiagnosticEntry> _modelResponses = [];
+  final HongguoGuestSession guestSessions;
   bool _ready = false;
   bool _isDisposed = false;
   final Set<Completer<void>> _requestAborts = {};
   int _activeRequests = 0;
   int _activeEvals = 0;
   int _cancellation = 0;
+  Completer<void> _cancelSignal = Completer<void>();
   Completer<void>? _drainCompleter;
   Completer<void>? _evalDrainCompleter;
 
   CatPawJsRuntime([
     http.Client? client,
     SourceDiagnostics? recorder,
+    String diagnosticContext = '日常使用',
+    bool persistentDeviceSession = true,
+  ]) : this.configured(
+         client: client,
+         recorder: recorder,
+         diagnosticContext: diagnosticContext,
+         persistentDeviceSession: persistentDeviceSession,
+       );
+
+  CatPawJsRuntime.configured({
+    http.Client? client,
+    SourceDiagnostics? recorder,
     this.diagnosticContext = '日常使用',
     this.persistentDeviceSession = true,
-  ]) : _httpClient = client ?? http.Client(),
+    HongguoGuestSession? guestSessions,
+  }) : _httpClient = client ?? http.Client(),
        _isOwnedClient = client == null,
-       diagnostics = recorder ?? SourceDiagnostics.shared;
+       diagnostics = recorder ?? SourceDiagnostics.shared,
+       guestSessions = guestSessions ?? HongguoGuestSession.shared;
 
   bool get isReady => _ready;
   bool get isDisposed => _isDisposed;
@@ -187,15 +169,22 @@ class CatPawJsRuntime {
 
   Future<void> init(String script) async {
     if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
-    if (persistentDeviceSession && _cachedDeviceSession == null) {
-      await preloadDeviceSession();
-    }
+    if (persistentDeviceSession) await guestSessions.preload();
+    _restoredDeviceSession =
+        persistentDeviceSession && guestSessions.value != null;
     _rt = getJavascriptRuntime(xhr: false);
     _injectGlobals();
     final result = _rt.evaluate(script);
     if (result.isError) {
       throw Exception('JS 脚本加载失败: ${result.rawResult}');
     }
+    _officialSource =
+        _rt
+            .evaluate(
+              'typeof spider !== "undefined" && spider.meta ? String(spider.meta.id) : ""',
+            )
+            .stringResult ==
+        'hongguo';
     _ready = true;
   }
 
@@ -226,6 +215,8 @@ class CatPawJsRuntime {
   void cancelPending() {
     if (_isDisposed || !_ready) return;
     _cancellation++;
+    _cancelSignal.complete();
+    _cancelSignal = Completer<void>();
     _rt.evaluate(r'''
 globalThis.__hongguoCancelled = true;
 Object.keys(globalThis.__fetchWaiters || {}).forEach(function(id) { __rejectFetch(id, 'CANCELLED'); });
@@ -404,11 +395,13 @@ globalThis.__native_save_device = function(json) {
         body: resp.body,
         headers: resp.headers,
         method: method,
-        sessionStatus: persistentDeviceSession
-            ? (_injectedDeviceSession == null ? '全新游客会话' : '复用本地游客凭据')
-            : '独立游客会话',
+        sessionStatus: _guestStatus,
       );
       if (entry?.stage == '搜索') _lastSearchTrace = entry;
+      if (entry?.stage == '播放解析' &&
+          params['evaluation'] == _evaluationSequence) {
+        _modelResponses.add(entry!);
+      }
       return {
         'status': resp.statusCode,
         'headers': resp.headers,
@@ -614,6 +607,7 @@ globalThis.__native_save_device = function(json) {
         'typeof spider !== "undefined" && typeof spider.play === "function" ? spider.play(${jsonEncode(flag)}, ${jsonEncode(id)}, $flagsJson) : { parse: 0, url: "" }',
         timeout: const Duration(seconds: 60),
         operation: '播放取流',
+        recoverGuest: true,
       );
     } on CatPawSourceFailure {
       rethrow;
@@ -626,6 +620,10 @@ globalThis.__native_save_device = function(json) {
     if (contentKey.isNotEmpty &&
         !RegExp(r'^[0-9a-f]{32}$').hasMatch(contentKey)) {
       throw const FormatException('站源内容密钥无效');
+    }
+    if (url.isNotEmpty) {
+      _successfulPlaybackResolves++;
+      _lastSuccessfulPlayback = guestSessions.now();
     }
     final header = <String, String>{};
     final rawHeader = map['header'] ?? map['headers'];
@@ -735,9 +733,11 @@ globalThis.__native_save_device = function(json) {
     String jsCode, {
     Duration timeout = const Duration(seconds: 30),
     String operation = '',
+    bool recoverGuest = false,
   }) async {
     _assertReady();
     final cancellation = _cancellation;
+    final cancelled = _cancelSignal.future;
     final stopwatch = Stopwatch()..start();
     var queueMs = 0;
     Object? failure;
@@ -753,113 +753,64 @@ globalThis.__native_save_device = function(json) {
       if (cancellation != _cancellation || _isDisposed) {
         throw CatPawSourceFailure.playback('cancelled');
       }
-      _assertReady();
-      _syncDeviceSession();
-      _rt.evaluate('globalThis.__hongguoCancelled = false;');
-      final evalStart = _rt.evaluate(
-        '__startEval(function() { return ($jsCode); })',
-      );
-      if (evalStart.isError) {
-        throw Exception('JS 表达式启动失败: ${evalStart.rawResult}');
+      final pendingRecovery = guestSessions.recovery;
+      if (persistentDeviceSession && pendingRecovery != null) {
+        await Future.any([pendingRecovery, cancelled]);
       }
-
-      final taskId = int.tryParse(evalStart.stringResult) ?? 0;
-      if (taskId == 0) {
-        throw Exception('JS 任务初始化失败: ${evalStart.rawResult}');
+      if (cancellation != _cancellation || _isDisposed) {
+        throw CatPawSourceFailure.playback('cancelled');
       }
-
-      dynamic rawResult;
-
-      while (true) {
-        if (cancellation != _cancellation) {
+      final data = await _runEval(jsCode, timeout, stopwatch, cancellation);
+      if (!recoverGuest || !_officialSource || !persistentDeviceSession) {
+        return data;
+      }
+      if (!_emptyModelFailure(data)) return data;
+      final session = _injectedDeviceSession;
+      final created = _injectedDeviceCreatedAt;
+      final oldEnough =
+          created != null &&
+          guestSessions.now().difference(created) >=
+              HongguoGuestSession.recoveryInterval;
+      if (session == null ||
+          !(_restoredDeviceSession ||
+              oldEnough && _successfulPlaybackResolves > 0)) {
+        return data;
+      }
+      final activeRecovery = guestSessions.recovery;
+      if (activeRecovery != null) {
+        await Future.any([activeRecovery, cancelled]);
+        if (cancellation != _cancellation || _isDisposed) {
           throw CatPawSourceFailure.playback('cancelled');
         }
-        if (stopwatch.elapsed > timeout) {
-          cancelPending();
-          throw TimeoutException('数据请求超时，请检查网络或稍后重试', timeout);
+        if (guestSessions.value == null || guestSessions.value == session) {
+          return data;
         }
-
-        // 1. 处理待发起的网络请求
-        final drainResult = _rt.evaluate('__drainFetches()');
-        final drainStr = drainResult.stringResult;
-        if (drainStr.isNotEmpty && drainStr != '[]' && drainStr != 'null') {
-          try {
-            final dynamic list = jsonDecode(drainStr);
-            if (list is List) {
-              for (final item in list) {
-                if (item is Map) {
-                  final req = Map<String, dynamic>.from(item);
-                  final id = req['id'];
-                  unawaited(
-                    _executeFetch(req)
-                        .then((resp) {
-                          if (!_isDisposed && cancellation == _cancellation) {
-                            final safeJson = jsonEncode(resp)
-                                .replaceAll('\u2028', '\\u2028')
-                                .replaceAll('\u2029', '\\u2029');
-                            _rt.evaluate('__resolveFetch($id, $safeJson);');
-                          }
-                        })
-                        .catchError((err) {
-                          if (!_isDisposed && cancellation == _cancellation) {
-                            _rt.evaluate(
-                              '__rejectFetch($id, ${jsonEncode(err.toString())});',
-                            );
-                          }
-                        }),
-                  );
-                }
-              }
-            }
-          } catch (_) {}
-        }
-
-        // 2. 检查主异步任务是否完成
-        final pollResult = _rt.evaluate('__pollEval($taskId)');
-        final pollStr = pollResult.stringResult;
-        if (pollStr.isNotEmpty && pollStr != 'null') {
-          try {
-            final dynamic pollJson = jsonDecode(pollStr);
-            if (pollJson is Map && pollJson['done'] == true) {
-              rawResult = pollJson['result'];
-              break;
-            }
-          } catch (_) {}
-        }
-
-        _syncSavedDevice();
-        _rt.executePendingJob();
-        await Future.delayed(const Duration(milliseconds: 10));
+        return _runEval(jsCode, timeout, stopwatch, cancellation);
       }
-
-      _syncSavedDevice();
-
-      final raw = rawResult?.toString() ?? '';
-      if (raw.isEmpty || raw == 'null' || raw == 'undefined') {
-        return null;
-      }
-      dynamic data;
+      final complete = Completer<void>();
+      guestSessions.recovery = complete.future;
       try {
-        data = jsonDecode(raw);
-        if (data is String) {
-          try {
-            data = jsonDecode(data);
-          } catch (_) {}
+        final decision = await guestSessions.invalidate(session);
+        if (decision == GuestRecoveryDecision.none) return data;
+        if (cancellation != _cancellation || _isDisposed) {
+          throw CatPawSourceFailure.playback('cancelled');
         }
-      } catch (e) {
-        data = raw;
-      }
-
-      if (data is Map && data['__error'] == true) {
-        final code = data['code']?.toString() ?? '';
-        throw CatPawSourceFailure(
-          '站源执行失败：${data['message']}',
-          code: RegExp(r'^[A-Za-z0-9_.-]{1,64}$').hasMatch(code)
-              ? code
-              : 'JS_EXECUTION',
+        _restoredDeviceSession = false;
+        diagnostics.add(
+          SourceDiagnosticEntry(
+            at: DateTime.now().toUtc(),
+            context: diagnosticContext,
+            stage: '游客会话恢复',
+            sessionStatus: decision == GuestRecoveryDecision.reload
+                ? '载入其他请求已更新的游客会话'
+                : '四个官方接口均返回空正文，重新初始化游客会话；每十分钟最多恢复一次',
+          ),
         );
+        return await _runEval(jsCode, timeout, stopwatch, cancellation);
+      } finally {
+        complete.complete();
+        guestSessions.recovery = null;
       }
-      return data;
     } catch (error) {
       failure = error;
       rethrow;
@@ -870,6 +821,7 @@ globalThis.__native_save_device = function(json) {
             at: DateTime.now().toUtc(),
             context: diagnosticContext,
             stage: '$operation（排队 ${queueMs}ms）',
+            sessionStatus: operation == '播放取流' ? _guestStatus : '',
             elapsedMs: stopwatch.elapsedMilliseconds,
             errorCode: failure is CatPawSourceFailure
                 ? failure.code
@@ -890,10 +842,156 @@ globalThis.__native_save_device = function(json) {
     }
   }
 
+  Future<dynamic> _runEval(
+    String jsCode,
+    Duration timeout,
+    Stopwatch stopwatch,
+    int cancellation,
+  ) async {
+    _assertReady();
+    if (cancellation != _cancellation) {
+      throw CatPawSourceFailure.playback('cancelled');
+    }
+    final evaluation = ++_evaluationSequence;
+    _modelResponses = [];
+    _syncDeviceSession();
+    _rt.evaluate('globalThis.__hongguoCancelled = false;');
+    final evalStart = _rt.evaluate(
+      '__startEval(function() { return ($jsCode); })',
+    );
+    if (evalStart.isError) {
+      throw Exception('JS 表达式启动失败: ${evalStart.rawResult}');
+    }
+
+    final taskId = int.tryParse(evalStart.stringResult) ?? 0;
+    if (taskId == 0) {
+      throw Exception('JS 任务初始化失败: ${evalStart.rawResult}');
+    }
+
+    dynamic rawResult;
+
+    while (true) {
+      if (cancellation != _cancellation) {
+        throw CatPawSourceFailure.playback('cancelled');
+      }
+      if (stopwatch.elapsed > timeout) {
+        cancelPending();
+        throw TimeoutException('数据请求超时，请检查网络或稍后重试', timeout);
+      }
+
+      // 1. 处理待发起的网络请求
+      final drainResult = _rt.evaluate('__drainFetches()');
+      final drainStr = drainResult.stringResult;
+      if (drainStr.isNotEmpty && drainStr != '[]' && drainStr != 'null') {
+        try {
+          final dynamic list = jsonDecode(drainStr);
+          if (list is List) {
+            for (final item in list) {
+              if (item is Map) {
+                final req = Map<String, dynamic>.from(item)
+                  ..['evaluation'] = evaluation;
+                final id = req['id'];
+                unawaited(
+                  _executeFetch(req)
+                      .then((resp) {
+                        if (!_isDisposed && cancellation == _cancellation) {
+                          final safeJson = jsonEncode(resp)
+                              .replaceAll('\u2028', '\\u2028')
+                              .replaceAll('\u2029', '\\u2029');
+                          _rt.evaluate('__resolveFetch($id, $safeJson);');
+                        }
+                      })
+                      .catchError((err) {
+                        if (!_isDisposed && cancellation == _cancellation) {
+                          _rt.evaluate(
+                            '__rejectFetch($id, ${jsonEncode(err.toString())});',
+                          );
+                        }
+                      }),
+                );
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 2. 检查主异步任务是否完成
+      final pollResult = _rt.evaluate('__pollEval($taskId)');
+      final pollStr = pollResult.stringResult;
+      if (pollStr.isNotEmpty && pollStr != 'null') {
+        try {
+          final dynamic pollJson = jsonDecode(pollStr);
+          if (pollJson is Map && pollJson['done'] == true) {
+            rawResult = pollJson['result'];
+            break;
+          }
+        } catch (_) {}
+      }
+
+      _syncSavedDevice();
+      _rt.executePendingJob();
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
+
+    _syncSavedDevice();
+
+    final raw = rawResult?.toString() ?? '';
+    if (raw.isEmpty || raw == 'null' || raw == 'undefined') {
+      return null;
+    }
+    dynamic data;
+    try {
+      data = jsonDecode(raw);
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {}
+      }
+    } catch (e) {
+      data = raw;
+    }
+
+    if (data is Map && data['__error'] == true) {
+      final code = data['code']?.toString() ?? '';
+      throw CatPawSourceFailure(
+        '站源执行失败：${data['message']}',
+        code: RegExp(r'^[A-Za-z0-9_.-]{1,64}$').hasMatch(code)
+            ? code
+            : 'JS_EXECUTION',
+      );
+    }
+    return data;
+  }
+
+  String get _guestStatus {
+    if (!persistentDeviceSession) return '独立游客会话';
+    final now = guestSessions.now();
+    final created = _injectedDeviceCreatedAt;
+    final age = created == null
+        ? '未记录'
+        : '${max(0, now.difference(created).inSeconds)}秒';
+    final last = _lastSuccessfulPlayback;
+    final success = last == null
+        ? '本次尚未成功'
+        : '${max(0, now.difference(last).inSeconds)}秒前';
+    return '游客会话创建距今：$age；本环境成功取流：$_successfulPlaybackResolves次；最近成功：$success';
+  }
+
+  bool _emptyModelFailure(dynamic data) =>
+      data is Map &&
+      data['error'] == 'EMPTY_RESPONSE' &&
+      _modelResponses.length == 4 &&
+      _modelResponses.every(
+        (entry) => entry.status == 200 && entry.errorCode == 'EMPTY_RESPONSE',
+      );
+
   void _syncDeviceSession() {
     if (!persistentDeviceSession) return;
-    final session = _cachedDeviceSession;
+    final session = guestSessions.value;
     if (_injectedDeviceSession == session) return;
+    _rt.evaluate(
+      'if (typeof HongguoApp !== "undefined" && typeof HongguoApp.resetGuestSession === "function") HongguoApp.resetGuestSession();',
+    );
     if (session == null) {
       _rt.evaluate('delete globalThis.__hongguoCachedDevice;');
     } else {
@@ -902,6 +1000,7 @@ globalThis.__native_save_device = function(json) {
       );
     }
     _injectedDeviceSession = session;
+    _injectedDeviceCreatedAt = guestSessions.createdAt;
   }
 
   String? snapshotDetail(String id) {
@@ -937,15 +1036,10 @@ globalThis.__native_save_device = function(json) {
       final val = check.stringResult;
       if (val.isNotEmpty && val != 'null' && val != 'undefined') {
         _rt.evaluate('globalThis.__pendingSavedDevice = null;');
-        if (!persistentDeviceSession || !_validDeviceSession(val)) return;
-        _cachedDeviceSession = val;
+        if (!persistentDeviceSession || !HongguoGuestSession.valid(val)) return;
+        guestSessions.accept(val);
         _injectedDeviceSession = val;
-        unawaited(() async {
-          try {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString(_deviceSessionKey, val);
-          } catch (_) {}
-        }());
+        _injectedDeviceCreatedAt = guestSessions.createdAt;
       }
     } catch (_) {}
   }

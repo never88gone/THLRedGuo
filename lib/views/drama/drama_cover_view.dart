@@ -33,7 +33,9 @@ class DramaBackdrop extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final fallbackColor = isDark ? const Color(0xFF131419) : const Color(0xFFF1F3F5);
+    final fallbackColor = isDark
+        ? const Color(0xFF131419)
+        : const Color(0xFFF1F3F5);
 
     Widget content = Stack(
       fit: StackFit.expand,
@@ -41,11 +43,17 @@ class DramaBackdrop extends StatelessWidget {
         if (!DramaCover.imagesDisabled && drama.cover.isNotEmpty)
           ClipRect(
             child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.mirror),
+              imageFilter: ImageFilter.blur(
+                sigmaX: sigma,
+                sigmaY: sigma,
+                tileMode: TileMode.mirror,
+              ),
               child: Transform.scale(
                 scale: 1.18,
                 child: CachedCoverImage(
-                  key: ValueKey('backdrop-${drama.cleanSourceId.isNotEmpty ? drama.cleanSourceId : drama.id}'),
+                  key: ValueKey(
+                    'backdrop-${drama.cleanSourceId.isNotEmpty ? drama.cleanSourceId : drama.id}',
+                  ),
                   drama: drama,
                   repository: repository,
                   placeholder: Container(color: fallbackColor),
@@ -58,7 +66,8 @@ class DramaBackdrop extends StatelessWidget {
         Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: dimColor ??
+              color:
+                  dimColor ??
                   (isDark
                       ? Colors.black.withValues(alpha: 0.45)
                       : Colors.white.withValues(alpha: 0.60)),
@@ -101,11 +110,13 @@ class DramaCover extends StatelessWidget {
     required this.drama,
     required this.repository,
     this.radius = 14,
+    this.showEpisodeCount = true,
   });
 
   final Drama drama;
   final AppRepository repository;
   final double radius;
+  final bool showEpisodeCount;
 
   static const imagesDisabled = bool.fromEnvironment('DISABLE_REMOTE_IMAGES');
 
@@ -117,10 +128,7 @@ class DramaCover extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            colors.surfaceContainerHighest,
-            colors.surfaceContainer,
-          ],
+          colors: [colors.surfaceContainerHighest, colors.surfaceContainer],
         ),
       ),
       child: Center(
@@ -157,7 +165,9 @@ class DramaCover extends StatelessWidget {
               placeholder,
               if (!imagesDisabled && drama.id.isNotEmpty)
                 CachedCoverImage(
-                  key: ValueKey('drama-cover-${drama.cleanSourceId.isNotEmpty ? drama.cleanSourceId : drama.id}'),
+                  key: ValueKey(
+                    'drama-cover-${drama.cleanSourceId.isNotEmpty ? drama.cleanSourceId : drama.id}',
+                  ),
                   drama: drama,
                   repository: repository,
                   placeholder: placeholder,
@@ -171,12 +181,15 @@ class DramaCover extends StatelessWidget {
                   ),
                 ),
               ),
-              if (drama.episodes > 0)
+              if (showEpisodeCount && drama.episodes > 0)
                 Positioned(
                   left: 8,
                   bottom: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0x99000000),
                       borderRadius: BorderRadius.circular(6),
@@ -201,7 +214,10 @@ class DramaCover extends StatelessWidget {
                   left: 8,
                   top: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       gradient: AppGradients.gold,
                       borderRadius: BorderRadius.circular(6),
@@ -271,20 +287,22 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
   void _loadFile(Drama drama, {bool force = false}) {
     final future = widget.repository.cover(drama, force: force);
     _file = future;
-    future.then((path) {
-      if (!mounted || _file != future) return;
-      if (path.isNotEmpty && _resolvedPath != path) {
-        setState(() {
-          _resolvedPath = path;
-          _coverFailed = false;
+    future
+        .then((path) {
+          if (!mounted || _file != future) return;
+          if (path.isNotEmpty && _resolvedPath != path) {
+            setState(() {
+              _resolvedPath = path;
+              _coverFailed = false;
+            });
+          }
+        })
+        .catchError((_) {
+          if (!mounted || _file != future) return;
+          if (_resolvedPath == null) {
+            setState(() => _coverFailed = true);
+          }
         });
-      }
-    }).catchError((_) {
-      if (!mounted || _file != future) return;
-      if (_resolvedPath == null) {
-        setState(() => _coverFailed = true);
-      }
-    });
   }
 
   @override
@@ -456,10 +474,10 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
     builder: (context, snapshot) {
       final path =
           (snapshot.hasData &&
-                  snapshot.data != null &&
-                  snapshot.data!.isNotEmpty)
-              ? snapshot.data!
-              : _resolvedPath;
+              snapshot.data != null &&
+              snapshot.data!.isNotEmpty)
+          ? snapshot.data!
+          : _resolvedPath;
 
       if (path != null && path.isNotEmpty && !_coverFailed) {
         return _buildImage(path);

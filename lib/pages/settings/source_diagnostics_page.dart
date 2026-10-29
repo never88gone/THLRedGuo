@@ -204,7 +204,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '应用版本 $version · 保留最近 60 条脱敏记录。使用独立游客会话检查搜索、分页、详情与播放解析，不影响日常游客凭据。可导出日志文件或复制报告后手动反馈，不会自动上传。',
+                      '应用版本 $version · 保留最近 60 条脱敏记录。使用当前游客会话检查搜索、分页、详情与播放解析，保留收藏和历史。可导出日志文件或复制报告后手动反馈，不会自动上传。',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colors.onSurfaceVariant,
                       ),

@@ -107,6 +107,8 @@ void main() {
       expect(switchTile.value, isTrue);
 
       // 3. 点击开关关闭自动连播
+      await tester.ensureVisible(autoAdvanceFinder);
+      await tester.pumpAndSettle();
       await tester.tap(autoAdvanceFinder);
       await tester.pumpAndSettle();
 
@@ -161,6 +163,8 @@ void main() {
       expect(find.text('自动连播：开'), findsOneWidget);
 
       // 点击该按钮关闭自动连播
+      await tester.ensureVisible(tvBtnFinder);
+      await tester.pumpAndSettle();
       await tester.tap(tvBtnFinder);
       await tester.pumpAndSettle();
 

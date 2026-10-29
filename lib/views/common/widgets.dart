@@ -149,7 +149,12 @@ class DramaTile extends StatelessWidget {
             children: [
               Hero(
                 tag: heroTag ?? 'drama-cover-${drama.id}',
-                child: DramaCover(drama: drama, repository: repository, radius: 14),
+                child: DramaCover(
+                  drama: drama,
+                  repository: repository,
+                  radius: 14,
+                  showEpisodeCount: badge == null || badge!.isEmpty,
+                ),
               ),
               if (badge != null && badge!.isNotEmpty)
                 Positioned(
@@ -167,7 +172,10 @@ class DramaTile extends StatelessWidget {
                         vertical: 4,
                       ),
                       child: Text(
-                        badge!,
+                        [
+                          badge!,
+                          if (drama.episodes > 0) '共 ${drama.episodes} 集',
+                        ].join(' · '),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

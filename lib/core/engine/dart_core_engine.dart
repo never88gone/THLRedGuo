@@ -1018,7 +1018,16 @@ class DartCoreEngine {
           playTarget = '${sourceId}_$playTarget';
         }
         var playRes = await rt.play('flag', playTarget, flags: flags);
-        if (playRes.url.isEmpty && sourceId.isNotEmpty) {
+        if (playRes.url.isEmpty &&
+            sourceId.isNotEmpty &&
+            (source != 'hongguo' ||
+                const {
+                  '',
+                  'NO_STREAM',
+                  'NO_STREAM_URL',
+                  'MISSING_EPISODE',
+                  'MISSING_MODEL',
+                }.contains(playRes.errorCode))) {
           final fallbackTarget = '${sourceId}_$episodeIndex';
           if (fallbackTarget != playTarget) {
             playRes = await rt.play('flag', fallbackTarget, flags: flags);
