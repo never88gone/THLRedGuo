@@ -48,6 +48,9 @@ fastlane/
 
 tvos/THLRedLookTests
 tvos/THLRedLookUITests
-scripts
-test
-integration_test
+scripts/
+test/
+test_driver/
+integration_test/
+PRD/
+AGENTS.md
