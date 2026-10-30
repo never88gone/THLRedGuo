@@ -151,7 +151,7 @@ THLRedLook
 ├── macos/                 # macOS 桌面端平台工程与权限配置
 ├── windows/               # Windows 桌面端 Runner 与 CMake 构建系统
 ├── tvos/                  # Apple tvOS 原生独立工程（SwiftUI + AVKit + Focus Engine）
-└── scripts/               # 工程工具链与辅助脚本
+└── .github/ci/            # 构建、打包、官方 JS 校验与 TestFlight 工具
 ```
 
 ---
@@ -176,6 +176,22 @@ flutter pub get
 # 启动本地调试（全平台支持）
 flutter run
 ```
+
+### 构建与发布
+
+仓库保留的最小工具链位于 `.github/ci/`，CI 和本地打包使用相同入口：
+
+```bash
+python3 .github/ci/build_android.py
+python3 .github/ci/build_windows.py
+python3 .github/ci/build_ios.py
+python3 .github/ci/build_macos.py
+python3 .github/ci/build_tvos.py
+```
+
+Apple 平台的签名打包使用 `--export-options` 指定对应的 ExportOptions.plist；tvOS 归档另加 `--package`。tvOS 本地调试先在 `tvos/` 运行 `pod install`，再打开 `THLRedLook.xcworkspace`，选择 Apple TV 模拟器运行。
+
+应用版本保持 `1.0.0`。Apple 平台 CI 自动打包并上传 TestFlight；tvOS 公开组分发仅由手动工作流明确勾选 `publish_public` 触发。
 
 ---
 

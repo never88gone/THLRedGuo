@@ -7,13 +7,13 @@ on:
     paths:
       - 'tvos/**'
       - 'assets/sources/hongguo.js'
-      - 'scripts/**'
+      - '.github/ci/**'
       - '.github/workflows/build-tvos.yml'
   pull_request:
     paths:
       - 'tvos/**'
       - 'assets/sources/hongguo.js'
-      - 'scripts/**'
+      - '.github/ci/**'
       - '.github/workflows/build-tvos.yml'
   workflow_dispatch:
     inputs:
@@ -94,9 +94,9 @@ jobs:
       - name: 构建并打包 tvOS 原生应用
         run: |
           if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f tvos/ExportOptions.plist ]; then
-            python scripts/build_tvos.py --package --export-options tvos/ExportOptions.plist
+            python .github/ci/build_tvos.py --package --export-options tvos/ExportOptions.plist
           else
-            python scripts/build_tvos.py --package
+            python .github/ci/build_tvos.py --package
           fi
       - name: 上传 tvOS 至 App Store Connect (TestFlight)
         env:
@@ -123,7 +123,7 @@ jobs:
           signed_ipa=$(find dist/tvos -type f -name "*tvos-signed.ipa" | head -n1)
           if [ -n "$signed_ipa" ] && [ -f "$signed_ipa" ]; then
             echo "正在上传 tvOS 签名包到 App Store Connect: $signed_ipa"
-            python scripts/source_manifest.py verify --ipa "$signed_ipa"
+            python .github/ci/source_manifest.py verify --ipa "$signed_ipa"
             xcrun altool --upload-app -f "$signed_ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
             echo "✅ tvOS 版本成功上传到 App Store Connect！"
           else
@@ -138,7 +138,7 @@ jobs:
           PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY || vars.APP_STORE_CONNECT_PRIVATE_KEY }}
         run: |
           signed_ipa=$(find dist/tvos -type f -name "*tvos-signed.ipa" | head -n1)
-          python scripts/publish_testflight.py --ipa "$signed_ipa" --report dist/tvos/testflight-release.json
+          python .github/ci/publish_testflight.py --ipa "$signed_ipa" --report dist/tvos/testflight-release.json
       - name: 清理 tvOS 钥匙串与临时凭证
         if: always()
         run: |

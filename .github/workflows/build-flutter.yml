@@ -14,7 +14,7 @@ on:
       - 'packages/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
-      - 'scripts/**'
+      - '.github/ci/**'
       - '.github/workflows/build-flutter.yml'
   pull_request:
     paths:
@@ -27,7 +27,7 @@ on:
       - 'packages/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
-      - 'scripts/**'
+      - '.github/ci/**'
       - '.github/workflows/build-flutter.yml'
   workflow_dispatch:
     inputs:
@@ -80,7 +80,7 @@ jobs:
       - name: 配置 Android 发布签名
         id: signing
         run: |
-          python scripts/configure_signing.py
+          python .github/ci/configure_signing.py
           if [ -f android/key.properties ]; then
             echo "release=true" >> "$GITHUB_OUTPUT"
           else
@@ -93,7 +93,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       - name: 构建 Android APK
-        run: python scripts/build_android.py
+        run: python .github/ci/build_android.py
       - name: 校验 APK 签名证书
         if: steps.signing.outputs.release == 'true'
         shell: bash
@@ -122,7 +122,7 @@ jobs:
           done
       - name: 清理临时签名凭证
         if: always()
-        run: python scripts/configure_signing.py --clean
+        run: python .github/ci/configure_signing.py --clean
       - name: 上传 Android 安装包
         uses: actions/upload-artifact@v4
         with:
@@ -153,7 +153,7 @@ jobs:
       - name: 检查 Windows 构建环境
         run: flutter doctor -v
       - name: 构建 Windows 便携包
-        run: python scripts/build_windows.py
+        run: python .github/ci/build_windows.py
       - name: 上传 Windows 安装包
         uses: actions/upload-artifact@v4
         with:
@@ -224,9 +224,9 @@ jobs:
       - name: 构建 iOS 应用安装包
         run: |
           if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f ios/ExportOptions.plist ]; then
-            python scripts/build_ios.py --export-options ios/ExportOptions.plist
+            python .github/ci/build_ios.py --export-options ios/ExportOptions.plist
           else
-            python scripts/build_ios.py
+            python .github/ci/build_ios.py
           fi
       - name: 上传 iOS 至 App Store Connect (TestFlight)
         env:
@@ -255,7 +255,7 @@ jobs:
             echo "正在上传 iOS 签名包到 App Store Connect: $signed_ipa"
             xcrun altool --upload-app -f "$signed_ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
             echo "✅ iOS 版本成功上传到 App Store Connect！"
-            python scripts/set_testflight_notes.py || true
+            python .github/ci/set_testflight_notes.py || true
           else
             echo "::error::未发现签名的 iOS IPA 产物，无法上传。"
             exit 1
@@ -346,9 +346,9 @@ jobs:
       - name: 构建并打包 macOS DMG 安装包
         run: |
           if [ "${{ steps.signing.outputs.has_signing }}" = "true" ] && [ -f macos/ExportOptions.plist ]; then
-            python scripts/build_macos.py --export-options macos/ExportOptions.plist
+            python .github/ci/build_macos.py --export-options macos/ExportOptions.plist
           else
-            python scripts/build_macos.py
+            python .github/ci/build_macos.py
           fi
       - name: 清理 macOS 钥匙串与临时凭证
         if: always()
