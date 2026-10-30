@@ -361,6 +361,13 @@ final class PlaybackTests: XCTestCase {
         let model = PlayerViewModel(drama: data.drama, allEpisodes: data.episodes, repository: repository, store: LocalStore(defaults: defaults, cloudUpload: { _ in }))
         model.danmakuEnabled = true
         defer { model.onDisappear() }
+        let firstEpisode = Int(ProcessInfo.processInfo.environment["THL_NATURAL_FIRST_EPISODE"] ?? "") ?? 5
+        let completeEpisodes = Int(ProcessInfo.processInfo.environment["THL_NATURAL_COMPLETE_EPISODES"] ?? "") ?? 3
+        let finalEpisode = firstEpisode + completeEpisodes
+        guard firstEpisode > 0, completeEpisodes > 0, finalEpisode <= data.episodes.count else {
+            XCTFail("Natural playback range is outside the selected drama")
+            return
+        }
         let began = Date()
         var events: [[String: Any]] = []
         func record(_ event: [String: Any]) {
@@ -371,15 +378,15 @@ final class PlaybackTests: XCTestCase {
                 print("THL_NATURAL " + text)
             }
         }
-        record(["stage": "selected", "title": data.drama.title, "seriesId": data.drama.cleanSourceId, "rate": 1, "seek": false, "firstEpisode": 5, "completeEpisodes": 3])
-        await model.preparePlayback(episodeIndex: 5)
-        for episode in 5...8 {
+        record(["stage": "selected", "title": data.drama.title, "seriesId": data.drama.cleanSourceId, "rate": 1, "seek": false, "firstEpisode": firstEpisode, "completeEpisodes": completeEpisodes])
+        await model.preparePlayback(episodeIndex: firstEpisode)
+        for episode in firstEpisode...finalEpisode {
             try await ready(model)
             XCTAssertEqual(model.currentEpisodeIndex, episode)
             XCTAssertEqual(model.playbackRate, 1)
             XCTAssertFalse(try XCTUnwrap(model.player).isMuted)
             record(["stage": "ready", "episode": episode, "duration": model.duration, "position": model.currentTime, "video": true, "audio": true])
-            if episode == 8 { break }
+            if episode == finalEpisode { break }
             let deadline = Date().addingTimeInterval(max(180, model.duration * 1.3 + 40))
             var lastLogged = -1
             while model.currentEpisodeIndex == episode && Date() < deadline {
@@ -398,7 +405,7 @@ final class PlaybackTests: XCTestCase {
             record(["stage": "autoNext", "from": episode, "to": model.currentEpisodeIndex])
         }
         XCTAssertNil(model.errorMessage)
-        record(["stage": "complete", "naturalCompleteEpisodes": 3, "currentEpisode": model.currentEpisodeIndex, "seek": false])
+        record(["stage": "complete", "naturalCompleteEpisodes": completeEpisodes, "currentEpisode": model.currentEpisodeIndex, "seek": false])
         let bytes = try JSONSerialization.data(withJSONObject: events, options: [.prettyPrinted, .sortedKeys])
         let attachment = XCTAttachment(string: String(decoding: bytes, as: UTF8.self))
         attachment.name = "natural-playback.json"

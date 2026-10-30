@@ -101,6 +101,35 @@ void main() {
       );
     });
 
+    for (final code in ['EMPTY_RESPONSE', 'RESPONSE_NOT_UTF8']) {
+      test('$code 使用一秒、三秒退避并在两次重试后停止', () {
+        final recovery = PlaybackRecovery();
+        expect(
+          recovery.next(null, errorCode: code),
+          PlaybackRecoveryAction.refresh,
+        );
+        expect(recovery.retryDelay, const Duration(seconds: 1));
+        expect(recovery.attemptLimit, 2);
+        expect(
+          recovery.next(null, errorCode: code),
+          PlaybackRecoveryAction.refresh,
+        );
+        expect(recovery.retryDelay, const Duration(seconds: 3));
+        expect(
+          recovery.next(null, errorCode: code),
+          PlaybackRecoveryAction.stop,
+        );
+        expect(recovery.attempts, 2);
+        recovery.reset();
+        expect(recovery.attemptLimit, PlaybackRecovery.maxAttempts);
+        expect(
+          recovery.next(null, errorCode: code),
+          PlaybackRecoveryAction.refresh,
+        );
+        expect(recovery.retryDelay, const Duration(seconds: 1));
+      });
+    }
+
     test('未加密、本地或不支持缓存的播放器不选缓存恢复', () {
       for (final plan in [
         const PlaybackPlan(url: 'https://synthetic.test/plain.mp4'),

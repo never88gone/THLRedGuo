@@ -453,7 +453,15 @@ void main() {
                 HongguoGuestSession.shared.createdAt ?? DateTime.now();
             final retainedGuest = HongguoGuestSession.shared.value;
             final startedEpisode = h.viewport(t).index;
-            final end = created.add(const Duration(minutes: 12));
+            final watchStarted = DateTime.now();
+            final end = watchStarted.add(
+              const Duration(
+                seconds: int.fromEnvironment(
+                  'NATURAL_PLAYBACK_SECONDS',
+                  defaultValue: 720,
+                ),
+              ),
+            );
             var lastBucket = -1;
             while (DateTime.now().isBefore(end)) {
               await t.pump();
@@ -464,6 +472,9 @@ void main() {
                 lastBucket = bucket;
                 final row = <String, Object?>{
                   'ageSeconds': DateTime.now().difference(created).inSeconds,
+                  'watchSeconds': DateTime.now()
+                      .difference(watchStarted)
+                      .inSeconds,
                   'episode': v.detail.episodes[v.index].number,
                   'positionMs': v.player.state.position.inMilliseconds,
                   'buffering': v.player.state.buffering,
@@ -485,7 +496,7 @@ void main() {
             await home();
             await detail('雾锁情迷');
             await play();
-            await recordVideo('reenter after twelve minutes');
+            await recordVideo('reenter after continuous playback');
             debugPrint(
               'IOS_GUEST_RECOVERIES ${SourceDiagnostics.shared.entries.where((e) => e.stage == '游客会话恢复').length}',
             );

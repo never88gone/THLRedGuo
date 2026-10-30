@@ -1419,7 +1419,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         PlaybackRecoveryAction.cache => '正在尝试本集缓存解密',
         PlaybackRecoveryAction.alternative => '正在切换备用线路',
         PlaybackRecoveryAction.refresh =>
-          '正在重新获取播放地址（${_recovery.attempts}/${PlaybackRecovery.maxAttempts}）',
+          '正在重新获取播放地址（${_recovery.attempts}/${_recovery.attemptLimit}）',
         _ => '正在准备播放',
       };
     });
@@ -1605,7 +1605,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       });
     } catch (error) {
       DiaryService.add(
-        '[Play] 播放失败: 剧=${widget.detail.drama.cleanSourceId}, 集=${widget.detail.episodes[index].number}, 阶段=$failureStage, 恢复=${_recovery.attempts}/${PlaybackRecovery.maxAttempts}, ${playbackFailureSummary(error)}',
+        '[Play] 播放失败: 剧=${widget.detail.drama.cleanSourceId}, 集=${widget.detail.episodes[index].number}, 阶段=$failureStage, 恢复=${_recovery.attempts}/${PlaybackRecovery.attemptLimitFor(error is AppFailure ? error.code : '')}, ${playbackFailureSummary(error)}',
       );
       if (!_closed && mounted && ticket == _generation) {
         if (prepared != null && identical(_plan, prepared)) {
@@ -1619,7 +1619,10 @@ class _PlayerScreenState extends State<PlayerScreen>
               error is! FormatException &&
               error is! FileSystemException) {
             final failed = prepared ?? failedPlan ?? retained ?? recoveryPlan;
-            final action = _recovery.next(failed);
+            final action = _recovery.next(
+              failed,
+              errorCode: error is AppFailure ? error.code : '',
+            );
             if (action != PlaybackRecoveryAction.stop) {
               unawaited(
                 _play(

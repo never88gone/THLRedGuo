@@ -5,41 +5,54 @@ enum PlaybackRecoveryAction { cache, alternative, refresh, stop }
 class PlaybackRecovery {
   static const maxAttempts = 5;
   int _attempts = 0;
+  int _attemptLimit = maxAttempts;
   bool _cacheAttempted = false;
+  Duration _retryDelay = Duration.zero;
   int get attempts => _attempts;
+  int get attemptLimit => _attemptLimit;
   bool get cacheAttempted => _cacheAttempted;
-  Duration get retryDelay => Duration(milliseconds: 300 * _attempts);
+  Duration get retryDelay => _retryDelay;
+
+  static int attemptLimitFor(String errorCode) =>
+      const {'EMPTY_RESPONSE', 'RESPONSE_NOT_UTF8'}.contains(errorCode)
+      ? 2
+      : maxAttempts;
 
   static bool audioOutputFailed(String error) =>
       error.toLowerCase().contains('could not open/initialize audio device');
 
   void reset() {
     _attempts = 0;
+    _attemptLimit = maxAttempts;
     _cacheAttempted = false;
+    _retryDelay = Duration.zero;
   }
 
   PlaybackRecoveryAction next(
     PlaybackPlan? plan, {
     bool allowCache = false,
     bool decryptedStream = false,
+    String errorCode = '',
   }) {
-    if (_attempts >= maxAttempts) {
+    _attemptLimit = attemptLimitFor(errorCode);
+    if (_attempts >= _attemptLimit) {
       return PlaybackRecoveryAction.stop;
     }
+    _attempts++;
+    _retryDelay = _attemptLimit == 2
+        ? Duration(seconds: _attempts == 1 ? 1 : 3)
+        : Duration(milliseconds: 300 * _attempts);
     if (allowCache &&
         !_cacheAttempted &&
         plan != null &&
         !plan.local &&
         (plan.decryptionKey.isNotEmpty || decryptedStream)) {
       _cacheAttempted = true;
-      _attempts++;
       return PlaybackRecoveryAction.cache;
     }
     if (plan?.hasAlternative == true) {
-      _attempts++;
       return PlaybackRecoveryAction.alternative;
     }
-    _attempts++;
     return PlaybackRecoveryAction.refresh;
   }
 }
