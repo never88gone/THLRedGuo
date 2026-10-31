@@ -66,6 +66,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: 注入官方 JS 固定签名配置
+        if: github.event_name != 'pull_request'
+        env:
+          HONGGUO_SIGNING_CONFIG: ${{ secrets.HONGGUO_SIGNING_CONFIG }}
+        run: python .github/ci/prepare_official_source.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -146,6 +151,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: 注入官方 JS 固定签名配置
+        if: github.event_name != 'pull_request'
+        env:
+          HONGGUO_SIGNING_CONFIG: ${{ secrets.HONGGUO_SIGNING_CONFIG }}
+        run: python .github/ci/prepare_official_source.py
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -174,6 +184,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: 注入官方 JS 固定签名配置
+        if: github.event_name != 'pull_request'
+        env:
+          HONGGUO_SIGNING_CONFIG: ${{ secrets.HONGGUO_SIGNING_CONFIG }}
+        run: python .github/ci/prepare_official_source.py
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -285,6 +300,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: 注入官方 JS 固定签名配置
+        if: github.event_name != 'pull_request'
+        env:
+          HONGGUO_SIGNING_CONFIG: ${{ secrets.HONGGUO_SIGNING_CONFIG }}
+        run: python .github/ci/prepare_official_source.py
       - uses: subosito/flutter-action@v2
         with:
           channel: stable

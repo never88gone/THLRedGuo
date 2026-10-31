@@ -1,0 +1,45 @@
+name: Build Official JS Source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/sources/hongguo.js'
+      - '.github/ci/prepare_official_source.py'
+      - '.github/workflows/build-official-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: official-js-source
+  cancel-in-progress: true
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 生成可直接导入的官方 JS
+        env:
+          HONGGUO_SIGNING_CONFIG: ${{ secrets.HONGGUO_SIGNING_CONFIG }}
+        run: python .github/ci/prepare_official_source.py --output dist/source/hongguo.js
+      - name: 上传 JS 构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-js-source
+          path: dist/source/hongguo.js
+          if-no-files-found: error
+          retention-days: 14
+      - name: 发布可直接导入的 JS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view official-source >/dev/null 2>&1; then
+            gh release create official-source --target "$GITHUB_SHA" --title '官方短剧 JS 数据源' --notes 'CI 生成的可直接导入版本，无需 APK。此发布不会分发 TestFlight 公开组。' --prerelease --latest=false
+          fi
+          gh release upload official-source dist/source/hongguo.js --clobber

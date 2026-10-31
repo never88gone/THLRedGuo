@@ -23,6 +23,8 @@
 
 应用内置官方 `assets/sources/hongguo.js`，也可在数据源管理页面导入兼容的 JS 数据源。iOS、iPadOS 与 tvOS 的浏览和在线播放均通过 JS 数据源工作，用户无需准备或导入 Android APK。
 
+独立导入请使用 [发布版 hongguo.js](https://github.com/never88gone/THLRedGuo/releases/download/official-source/hongguo.js)。Git 源码中的同名文件是构建模板，不包含固定签名配置；GitHub Actions 从 `HONGGUO_SIGNING_CONFIG` Secret 注入后生成可用 JS 与安装包。配置仍包含在分发文件中，Secrets 保护的是源码仓库与构建过程。
+
 - **iOS / iPadOS**：进入「设置 → JS 数据源插件管理」管理数据源。
 - **tvOS**：进入「设置 → 站源管理」查看当前 JS 版本、导入数据源网址和执行诊断。
 
@@ -166,6 +168,14 @@ THLRedLook
 ---
 
 ## 开发与本地构建
+
+本地构建前，需要通过私有配置文件注入官方 JS 配置，文件仅包含 Base64 编码的 `id`（9 字节）与 `material`（32 字节）：
+
+```bash
+python3 .github/ci/prepare_official_source.py --config /path/to/private-signing.json
+```
+
+完成本地构建后执行 `python3 .github/ci/prepare_official_source.py --restore`，将源码恢复为模板再提交。私有配置与生成的 JS 不应提交 Git；CI 自动读取同结构的 `HONGGUO_SIGNING_CONFIG` Secret，不向日志输出配置值。拉取请求不注入此配置，其构建产物不作为可播放的发布包。
 
 ### 环境准备
 - **Flutter SDK**：3.44.x+（推荐使用 `fvm`）
