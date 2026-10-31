@@ -6,6 +6,7 @@ on:
     tags: ['v*']
     paths:
       - 'lib/**'
+      - 'shared/**'
       - 'assets/**'
       - 'android/**'
       - 'ios/**'
@@ -19,6 +20,7 @@ on:
   pull_request:
     paths:
       - 'lib/**'
+      - 'shared/**'
       - 'assets/**'
       - 'android/**'
       - 'ios/**'

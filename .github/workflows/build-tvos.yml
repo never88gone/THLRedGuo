@@ -6,12 +6,14 @@ on:
     tags: ['v*']
     paths:
       - 'tvos/**'
+      - 'shared/**'
       - 'assets/sources/hongguo.js'
       - '.github/ci/**'
       - '.github/workflows/build-tvos.yml'
   pull_request:
     paths:
       - 'tvos/**'
+      - 'shared/**'
       - 'assets/sources/hongguo.js'
       - '.github/ci/**'
       - '.github/workflows/build-tvos.yml'
