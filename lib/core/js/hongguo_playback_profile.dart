@@ -6,7 +6,7 @@ class HongguoPlaybackProfile {
   static int _revision = 0;
   static Map<String, dynamic>? _runtime;
   static Future<Map<String, dynamic>?>? _loading;
-  static String _summary = '尚未读取';
+  static String _summary = 'JS 内置签名 v04.10.03';
 
   static bool get supported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;

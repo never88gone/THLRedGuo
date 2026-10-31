@@ -287,7 +287,7 @@ public actor NativeBridge {
 
     /// 获取或构建指定数据源的 CatPawOpen JS 运行时上下文
     private func getOrCreateContext(sourceId: String) -> JSContext? {
-        if sourceId == "hongguo" {
+        if sourceId == "hongguo", jsContexts[sourceId]?.evaluateScript("globalThis.__hongguoHasBuiltInSigning === true")?.toBool() != true {
             let revision = playbackProfileRevision()
             if loadedPlaybackProfileRevision != revision {
                 applyLocalPlaybackProfileChange()
@@ -592,6 +592,7 @@ public actor NativeBridge {
 
     private func refreshSigningCache(_ context: JSContext) {
         localPlaybackProfileUnavailable = false
+        guard context.evaluateScript("globalThis.__hongguoHasBuiltInSigning === true")?.toBool() != true else { return }
         do {
             if let profile = try playbackProfileLoader() {
                 context.setObject(["configuration": profile.configuration, "sdkVersion": profile.sdkVersion] as NSDictionary,

@@ -651,11 +651,7 @@ public final class SourceDiagnostics: ObservableObject {
         lines.append("· 源指纹 SHA256: \(Self.sourceHash)")
         lines.append("· 数据源版本: \(Self.sourceRevision)")
         lines.append("· 打包校验: \(Self.sourceBundleStatus)")
-        if let profile = try? HongguoPlaybackProfileVault.load() {
-            lines.append("· 签名方式: JS 数据源 · 本机兼容缓存 \(profile.appVersion)")
-        } else {
-            lines.append("· 签名方式: JS 数据源")
-        }
+        lines.append("· 签名方式: JS 内置签名 v04.10.03")
         lines.append("· 应用提交: \(Self.sourceManifest["appCommit"] ?? "未记录")")
         lines.append("· 运行源状态: \(sourceRuntimeStatus)")
         lines.append(contentsOf: sourceRuntimeLines.map { "  - " + $0 })

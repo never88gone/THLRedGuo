@@ -78,7 +78,7 @@ final class LocalLibraryTests: XCTestCase {
     }
 
 
-    func testLocalProfileChangesRefreshEveryIndependentBridgeWithoutRestart() async throws {
+    func testBuiltInSigningIgnoresLegacyConfigurationAcrossBridges() async throws {
         let (defaults, name) = try storage()
         defer { defaults.removePersistentDomain(forName: name) }
         let guest = #"{"device_id":"7345678901234567100","iid":"7345678901234567200"}"#
@@ -103,33 +103,33 @@ final class LocalLibraryTests: XCTestCase {
             XCTAssertEqual((value["episodes"] as? [[String: Any]])?.count, 1)
         }
         XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 4)
-        XCTAssertEqual(profile.readCount, 4)
+        XCTAssertEqual(profile.readCount, 0)
         for _ in 0..<2 {
             profile.replace(with: HongguoApkProfile(appVersion: "7.4.3.32", sdkVersion: "v04.10.03-ml-android",
-                                                   configuration: Self.publicTestConfiguration, importedAt: Date()))
+                                                   configuration: "unused-legacy-configuration", importedAt: Date()))
             for bridge in bridges {
                 let result = try await bridge.request(action: "detail", payload: payload)
                 XCTAssertEqual((result["episodes"] as? [[String: Any]])?.count, 1)
                 _ = try await bridge.request(action: "detail", payload: payload)
             }
         }
-        XCTAssertEqual(profile.readCount, 12)
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 12)
+        XCTAssertEqual(profile.readCount, 0)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 4)
         profile.replace(with: nil)
         for bridge in bridges {
             let value = try await bridge.request(action: "detail", payload: payload)
             XCTAssertEqual((value["episodes"] as? [[String: Any]])?.count, 1)
         }
-        XCTAssertEqual(profile.readCount, 16)
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 16)
+        XCTAssertEqual(profile.readCount, 0)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 4)
         XCTAssertEqual(LocalProfileDetailProtocol.signatureVersions,
-                       Array(repeating: UInt32(3), count: 4) + Array(repeating: UInt32(5), count: 8) + Array(repeating: UInt32(3), count: 4))
+                       Array(repeating: UInt32(5), count: 4))
         XCTAssertEqual(LocalProfileDetailProtocol.unexpectedCount, 0)
         XCTAssertEqual(defaults.string(forKey: "thl_tv_hongguo_device_session"), guest)
-        print("THL_PROFILE_REFRESH independentBridges=4 import=true replacement=true removal=true registrations=0 guestPreserved=true")
+        print("THL_BUILTIN_SIGNING independentBridges=4 legacyCacheReads=0 registrations=0 guestPreserved=true")
     }
 
-    func testTemporaryProfileReadFailureCanRetryWithoutImportOrGuestReset() async throws {
+    func testBuiltInSigningIgnoresUnreadableLegacyCache() async throws {
         let (defaults, name) = try storage()
         defer { defaults.removePersistentDomain(forName: name) }
         let guest = #"{"device_id":"7345678901234567100","iid":"7345678901234567200"}"#
@@ -137,7 +137,7 @@ final class LocalLibraryTests: XCTestCase {
         defaults.set(Date().timeIntervalSince1970, forKey: "thl_tv_hongguo_guest_created_at")
         let profile = MemoryPlaybackProfile()
         let value = HongguoApkProfile(appVersion: "7.4.3.32", sdkVersion: "v04.10.03-ml-android",
-                                    configuration: Self.publicTestConfiguration, importedAt: Date())
+                                    configuration: "unused-legacy-configuration", importedAt: Date())
         profile.replace(with: value)
         profile.failNextLoad(with: .unavailable(-25308))
         let config = URLSessionConfiguration.ephemeral
@@ -152,58 +152,29 @@ final class LocalLibraryTests: XCTestCase {
         let payload: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567000"]]
         _ = try await bridge.request(action: "detail", payload: payload)
         XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 1)
-        XCTAssertEqual(profile.readCount, 1)
+        XCTAssertEqual(profile.readCount, 0)
         let another: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567001"]]
         _ = try await bridge.request(action: "detail", payload: another)
         _ = try await bridge.request(action: "detail", payload: another)
-        XCTAssertEqual(profile.readCount, 2)
+        XCTAssertEqual(profile.readCount, 0)
         XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 2)
         profile.replace(with: value)
         profile.failNextLoad(with: .invalidProfile)
         for _ in 0..<2 {
             _ = try await bridge.request(action: "detail", payload: payload)
         }
-        XCTAssertEqual(profile.readCount, 3)
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 3)
+        XCTAssertEqual(profile.readCount, 0)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 2)
         profile.replace(with: value)
         _ = try await bridge.request(action: "detail", payload: payload)
-        XCTAssertEqual(profile.readCount, 4)
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 4)
-        XCTAssertEqual(LocalProfileDetailProtocol.signatureVersions, [3, 5, 3, 5])
+        XCTAssertEqual(profile.readCount, 0)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 2)
+        XCTAssertEqual(LocalProfileDetailProtocol.signatureVersions, [5, 5])
         XCTAssertEqual(LocalProfileDetailProtocol.unexpectedCount, 0)
         XCTAssertEqual(defaults.string(forKey: "thl_tv_hongguo_device_session"), guest)
-        print("THL_PROFILE_TEMPORARY_READ optionalCacheRetry=true fallbackAllowed=true runtimePreserved=true registrations=0 guestPreserved=true")
+        print("THL_BUILTIN_SIGNING unreadableLegacyCacheIgnored=true legacyCacheReads=0 runtimePreserved=true guestPreserved=true")
     }
 
-    func testKeychainSaveRefreshesIndependentBridgesWithoutChangingProfile() async throws {
-        try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_PROFILE_REVISION_SAVE"] == "1")
-        let existing = try XCTUnwrap(HongguoPlaybackProfileVault.load())
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let reads = MemoryPlaybackProfile()
-        let bridges = (0..<3).map { index in
-            NativeBridge(baseDirectory: root.appendingPathComponent(String(index)), persistentDeviceSession: false,
-                         playbackProfileLoader: { _ = try reads.load(); return try HongguoPlaybackProfileVault.load() })
-        }
-        for bridge in bridges {
-            _ = try await bridge.request(action: "jsSource.identity", payload: [:])
-        }
-        XCTAssertEqual(reads.readCount, 3)
-        let before = HongguoPlaybackProfileVault.revision
-        try HongguoPlaybackProfileVault.save(existing)
-        XCTAssertNotEqual(HongguoPlaybackProfileVault.revision, before)
-        for bridge in bridges {
-            _ = try await bridge.request(action: "jsSource.identity", payload: [:])
-            _ = try await bridge.request(action: "jsSource.identity", payload: [:])
-        }
-        XCTAssertEqual(reads.readCount, 6)
-        let restored = try XCTUnwrap(HongguoPlaybackProfileVault.load())
-        XCTAssertTrue(restored.configuration == existing.configuration)
-        XCTAssertEqual(restored.importedAt, existing.importedAt)
-        print("THL_PROFILE_KEYCHAIN sameProfilePreserved=true independentBridgesRefreshed=3 httpRequests=0")
-    }
-
-    private static let publicTestConfiguration = "ECAwQEw/rJ1MQhrAhZrMyOZB1ayQYzOjKuLfhV223CN5DQ5ZH/gnq4Rot5BLUUmxFaBMJi/WGdYGbSf1EKF7DNiecpNl3Ht+MNfesoMNOVfVFYigB5X1sZRe0Rg38DpDEn2xtPPnSDmUjKUgyVGIFHV7qYsOYH/e8YB0i/+wYBvCoMww338iNy7KxF2wzSN5QqBdEZRFhpyzzM6f7kYUCqEmSL4CQ7rGEnm9smaTEjnIhWt9WvIV6Ke/S1GTeabi1BOoaQ=="
 
     func testSourceRuntimeReportDetectsMismatchedOrFailedContext() {
         let recorder = SourceDiagnostics()

@@ -190,7 +190,12 @@ class CatPawJsRuntime {
     if (result.isError) {
       throw Exception('JS 脚本加载失败: ${result.rawResult}');
     }
-    if (HongguoPlaybackProfile.supported) {
+    final builtInSigning =
+        _rt
+            .evaluate('globalThis.__hongguoHasBuiltInSigning === true')
+            .stringResult ==
+        'true';
+    if (HongguoPlaybackProfile.supported && !builtInSigning) {
       final bundled = await rootBundle.loadString('assets/sources/hongguo.js');
       if (sha256.convert(utf8.encode(script)) ==
           sha256.convert(utf8.encode(bundled))) {
@@ -1485,7 +1490,6 @@ class CatPawRuntimePool {
   final Map<String, String> _scripts = {};
   final Map<String, Future<CatPawJsRuntime>> _pending = {};
   final Map<String, int> _generations = {};
-  final Map<String, int> _profileRevisions = {};
   bool _isDisposed = false;
 
   CatPawRuntimePool([http.Client? httpClient])
@@ -1501,10 +1505,7 @@ class CatPawRuntimePool {
   }) async {
     if (_isDisposed) throw StateError('CatPawRuntimePool 已经销毁');
     final key = '$sourceId\u0000$scope';
-    final profileRevision = sourceId == 'hongguo'
-        ? HongguoPlaybackProfile.revision
-        : 0;
-    if (_scripts[key] == script && _profileRevisions[key] == profileRevision) {
+    if (_scripts[key] == script) {
       final pending = _pending[key];
       if (pending != null) return pending;
       final runtime = _pool[key];
@@ -1521,7 +1522,6 @@ class CatPawRuntimePool {
     _removeKey(key);
     final generation = _generations[key]!;
     _scripts[key] = script;
-    _profileRevisions[key] = profileRevision;
     final runtime = CatPawJsRuntime(_httpClient);
     final future = () async {
       try {
@@ -1548,7 +1548,6 @@ class CatPawRuntimePool {
     _generations[key] = (_generations[key] ?? 0) + 1;
     _pending.remove(key);
     _scripts.remove(key);
-    _profileRevisions.remove(key);
     _pool.remove(key)?.dispose();
   }
 
