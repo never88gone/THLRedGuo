@@ -372,6 +372,7 @@ final class PlaybackTests: XCTestCase {
             XCTFail("Natural playback range is outside the selected drama")
             return
         }
+        let savedGuest = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session")
         let began = Date()
         var events: [[String: Any]] = []
         func record(_ event: [String: Any]) {
@@ -390,6 +391,11 @@ final class PlaybackTests: XCTestCase {
             XCTAssertEqual(model.playbackRate, 1)
             XCTAssertFalse(try XCTUnwrap(model.player).isMuted)
             record(["stage": "ready", "episode": episode, "duration": model.duration, "position": model.currentTime, "video": true, "audio": true])
+            if episode == firstEpisode, let path = ProcessInfo.processInfo.environment["THL_NATURAL_REIMPORT_PATH"] {
+                let imported = try await Task.detached { try HongguoApkImporter(url: URL(fileURLWithPath: path)).extract() }.value
+                try HongguoPlaybackProfileVault.save(imported)
+                record(["stage": "profileReimport", "currentEpisode": episode, "restart": false])
+            }
             if episode == finalEpisode { break }
             let deadline = Date().addingTimeInterval(max(180, model.duration * 1.3 + 40))
             var lastLogged = -1
@@ -409,6 +415,7 @@ final class PlaybackTests: XCTestCase {
             record(["stage": "autoNext", "from": episode, "to": model.currentEpisodeIndex])
         }
         XCTAssertNil(model.errorMessage)
+        XCTAssertEqual(UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session"), savedGuest)
         record(["stage": "complete", "naturalCompleteEpisodes": completeEpisodes, "currentEpisode": model.currentEpisodeIndex, "seek": false])
         let bytes = try JSONSerialization.data(withJSONObject: events, options: [.prettyPrinted, .sortedKeys])
         let attachment = XCTAttachment(string: String(decoding: bytes, as: UTF8.self))

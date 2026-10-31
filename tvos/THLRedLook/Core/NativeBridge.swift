@@ -68,6 +68,9 @@ public actor NativeBridge {
     private var successfulPlaybackResolves = 0
     private var lastSuccessfulPlaybackAt: TimeInterval?
     private let timeProvider: @Sendable () -> TimeInterval
+    private let playbackProfileLoader: @Sendable () throws -> HongguoApkProfile?
+    private let playbackProfileRevision: @Sendable () -> UInt64
+    private var loadedPlaybackProfileRevision: UInt64?
 
     // 沙盒路径
     private var baseDirURL: URL
@@ -87,7 +90,7 @@ public actor NativeBridge {
         lastSuccessfulPlaybackAt = nil
     }
 
-    init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用", persistentDeviceSession: Bool = true, deviceDefaults: UserDefaults = .standard, timeProvider: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 }) {
+    init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用", persistentDeviceSession: Bool = true, deviceDefaults: UserDefaults = .standard, timeProvider: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 }, playbackProfileLoader: @escaping @Sendable () throws -> HongguoApkProfile? = { try HongguoPlaybackProfileVault.load() }, playbackProfileRevision: @escaping @Sendable () -> UInt64 = { HongguoPlaybackProfileVault.revision }) {
         if let httpSession {
             self.httpSession = httpSession
         } else {
@@ -108,6 +111,8 @@ public actor NativeBridge {
         self.persistentDeviceSession = persistentDeviceSession
         self.deviceDefaults = deviceDefaults
         self.timeProvider = timeProvider
+        self.playbackProfileLoader = playbackProfileLoader
+        self.playbackProfileRevision = playbackProfileRevision
         let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
         self.baseDirURL = baseDirectory ?? cachesDir.appendingPathComponent("THLRedLook_Data")
@@ -241,6 +246,13 @@ public actor NativeBridge {
 
     /// 获取或构建指定数据源的 CatPawOpen JS 运行时上下文
     private func getOrCreateContext(sourceId: String) -> JSContext? {
+        if sourceId == "hongguo" {
+            let revision = playbackProfileRevision()
+            if loadedPlaybackProfileRevision != revision {
+                applyLocalPlaybackProfileChange()
+                loadedPlaybackProfileRevision = revision
+            }
+        }
         if let existing = jsContexts[sourceId] {
             synchronizeGuestSession(existing, sourceId: sourceId)
             return existing
@@ -522,7 +534,7 @@ public actor NativeBridge {
         if sourceId == "hongguo", script == BuiltInHongguoJSContent, context.exception == nil {
             context.evaluateScript("globalThis.__hongguoRequireLocalProfile = true;")
             do {
-                if let profile = try HongguoPlaybackProfileVault.load() {
+                if let profile = try playbackProfileLoader() {
                     context.setObject(["configuration": profile.configuration, "sdkVersion": profile.sdkVersion] as NSDictionary,
                                       forKeyedSubscript: "__hongguoPendingLocalProfile" as NSString)
                     context.evaluateScript("""

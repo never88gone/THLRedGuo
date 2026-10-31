@@ -16,6 +16,18 @@ enum HongguoProfileStorageError: Error, LocalizedError {
 enum HongguoPlaybackProfileVault {
     private static let service = "THLRedGuo.OfficialPlaybackProfile"
     private static let account = "userImportedAPK"
+    private static let changes = ProfileChanges()
+
+    private final class ProfileChanges: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value: UInt64 = 0
+
+        var revision: UInt64 { lock.withLock { value } }
+
+        func advance() { lock.withLock { value &+= 1 } }
+    }
+
+    static var revision: UInt64 { changes.revision }
 
     private static var query: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
@@ -48,17 +60,22 @@ enum HongguoPlaybackProfileVault {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
         let update = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        if update == errSecSuccess { return }
+        if update == errSecSuccess {
+            changes.advance()
+            return
+        }
         guard update == errSecItemNotFound else { throw HongguoProfileStorageError.unavailable(update) }
         var request = query
         attributes.forEach { request[$0.key] = $0.value }
         let status = SecItemAdd(request as CFDictionary, nil)
         guard status == errSecSuccess else { throw HongguoProfileStorageError.unavailable(status) }
+        changes.advance()
     }
 
     static func remove() throws {
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else { throw HongguoProfileStorageError.unavailable(status) }
+        changes.advance()
     }
 
     static func metadata() throws -> [String: Any] {

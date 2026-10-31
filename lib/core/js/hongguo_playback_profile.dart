@@ -42,11 +42,11 @@ class HongguoPlaybackProfile {
       final value = await _channel.invokeMapMethod<String, dynamic>(
         'hongguoPlaybackProfileRuntime',
       );
+      if (revision != _revision) return runtimeConfiguration();
       if (value?['configuration'] is! String) {
         _recordMetadata(value);
         return null;
       }
-      if (revision != _revision) return runtimeConfiguration();
       _runtime = Map<String, dynamic>.of(value!);
       _recordMetadata({'imported': true, 'appVersion': value['appVersion']});
       return Map<String, dynamic>.of(value);
