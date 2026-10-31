@@ -1,0 +1,148 @@
+name: Publish Uploaded TestFlight Builds
+
+'on':
+  workflow_dispatch:
+    inputs:
+      publish_public:
+        description: '确认将指定的已上传构建发布到现有公开测试组'
+        type: boolean
+        required: true
+        default: false
+      version:
+        description: '应用版本'
+        type: string
+        required: true
+        default: '1.0.0'
+      tvos_build:
+        description: 'tvOS 构建号（留空则不发布 tvOS）'
+        type: string
+        required: false
+      ios_build:
+        description: 'iOS 构建号（留空则不发布 iOS）'
+        type: string
+        required: false
+      group_name:
+        description: '现有公开测试组名称'
+        type: string
+        required: true
+        default: '外部测试'
+      notes:
+        description: '可选更新说明（留空保留已上传构建的说明）'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight-public-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: inputs.publish_public == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 安装发布工具依赖
+        run: python -m pip install --quiet pyjwt cryptography certifi
+      - name: 发布指定构建并核对公开测试状态
+        env:
+          PUBLISH_PUBLIC: ${{ inputs.publish_public && 'true' || 'false' }}
+          APP_VERSION: ${{ inputs.version }}
+          TVOS_BUILD: ${{ inputs.tvos_build }}
+          IOS_BUILD: ${{ inputs.ios_build }}
+          GROUP_NAME: ${{ inputs.group_name }}
+          RELEASE_NOTES: ${{ inputs.notes }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID || vars.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID || vars.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY_B64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY || vars.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, socket, sys, time
+          from pathlib import Path
+          from urllib.parse import urlencode
+          if os.environ.get('PUBLISH_PUBLIC') != 'true':
+              raise SystemExit('Explicit public release confirmation is required')
+          version = os.environ['APP_VERSION']
+          targets = [(platform, os.environ.get(key, '').strip()) for platform, key in [('TV_OS', 'TVOS_BUILD'), ('IOS', 'IOS_BUILD')]]
+          targets = [(platform, number) for platform, number in targets if number]
+          if not targets or not re.fullmatch(r'[0-9]+(?:\.[0-9]+){1,3}', version) or any(not re.fullmatch(r'[0-9]+', number) for _, number in targets):
+              raise SystemExit('Supply exact version and numeric build numbers')
+          sys.path.insert(0, str(Path('.github/ci').resolve()))
+          from set_testflight_notes import api_request, get_credentials, make_jwt
+          from publish_testflight import group_contains_build, public_status, request_with_retry, select_public_group
+          key, issuer, private = get_credentials()
+          if not all([key, issuer, private]):
+              raise SystemExit('App Store Connect credentials are missing')
+          socket.setdefaulttimeout(30)
+          def operation(path, method, body):
+              return api_request('https://api.appstoreconnect.apple.com/v1' + path, make_jwt(key, issuer, private), method=method, data=body)
+          def request(path, method='GET', body=None):
+              return request_with_retry(operation, path, method, body)
+          apps = request('/apps?' + urlencode({'filter[bundleId]': 'com.never88gone.redlook'}))['data']
+          if len(apps) != 1:
+              raise SystemExit('Expected exactly one matching app')
+          app = apps[0]['id']
+          group = select_public_group(request('/apps/' + app + '/betaGroups')['data'], os.environ.get('GROUP_NAME') or None)
+          if group['attributes'].get('hasAccessToAllBuilds') is True:
+              raise SystemExit('Public group must use explicit build selection')
+          selected = []
+          for platform, number in targets:
+              response = request('/builds?' + urlencode({'filter[app]': app, 'filter[version]': number, 'include': 'preReleaseVersion'}))
+              included = {row['id']: row for row in response.get('included', []) if row['type'] == 'preReleaseVersions'}
+              matches = []
+              for row in response['data']:
+                  relation = row.get('relationships', {}).get('preReleaseVersion', {}).get('data') or {}
+                  pre = included.get(relation.get('id'), {}).get('attributes', {})
+                  if row['attributes']['version'] == number and pre.get('platform') == platform and pre.get('version') == version:
+                      matches.append(row)
+              if len(matches) != 1 or matches[0]['attributes']['processingState'] != 'VALID' or matches[0]['attributes']['expired']:
+                  raise SystemExit('Exact build is missing, expired or not processed: ' + platform + ' ' + number)
+              bid = matches[0]['id']
+              state = request('/builds/' + bid + '/buildBetaDetail')['data']['attributes']['externalBuildState']
+              if state not in ['READY_FOR_BETA_SUBMISSION', 'WAITING_FOR_REVIEW', 'IN_REVIEW', 'READY_FOR_BETA_TESTING', 'BETA_APPROVED', 'IN_BETA_TESTING']:
+                  raise SystemExit('Build cannot be publicly distributed: ' + state)
+              selected.append({'id': bid, 'platform': platform, 'number': number})
+          notes = os.environ.get('RELEASE_NOTES', '').strip()
+          report = {'version': version, 'group': group['attributes']['name'], 'publicLink': group['attributes']['publicLink'], 'builds': []}
+          for build in selected:
+              bid = build['id']
+              if notes:
+                  localizations = request('/builds/' + bid + '/betaBuildLocalizations')['data']
+                  loc = next((row for row in localizations if row['attributes']['locale'] == 'zh-Hans'), None)
+                  if loc and loc['attributes'].get('whatsNew') != notes:
+                      request('/betaBuildLocalizations/' + loc['id'], 'PATCH', {'data': {'type': 'betaBuildLocalizations', 'id': loc['id'], 'attributes': {'whatsNew': notes}}})
+                  elif not loc:
+                      request('/betaBuildLocalizations', 'POST', {'data': {'type': 'betaBuildLocalizations', 'attributes': {'locale': 'zh-Hans', 'whatsNew': notes}, 'relationships': {'build': {'data': {'type': 'builds', 'id': bid}}}}})
+              state = request('/builds/' + bid + '/buildBetaDetail')['data']['attributes']['externalBuildState']
+              if state == 'READY_FOR_BETA_SUBMISSION':
+                  request('/betaAppReviewSubmissions', 'POST', {'data': {'type': 'betaAppReviewSubmissions', 'relationships': {'build': {'data': {'type': 'builds', 'id': bid}}}}})
+              if not group_contains_build(request, group['id'], bid):
+                  request('/builds/' + bid + '/relationships/betaGroups', 'POST', {'data': [{'type': 'betaGroups', 'id': group['id']}]})
+              for attempt in range(7):
+                  state = request('/builds/' + bid + '/buildBetaDetail')['data']['attributes']['externalBuildState']
+                  if state == 'IN_BETA_TESTING' or attempt == 6:
+                      break
+                  print(build['platform'], build['number'], state, flush=True)
+                  time.sleep(10)
+              attached = group_contains_build(request, group['id'], bid)
+              report['builds'].append({**build, 'state': state, 'attached': attached, 'status': public_status(state, attached)})
+              Path('testflight-public-release.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
+              print(json.dumps(report['builds'][-1], ensure_ascii=False), flush=True)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('TestFlight: ' + report['publicLink'] + '\n\n')
+              summary.write('\n'.join('- ' + row['platform'] + ' ' + row['number'] + ': ' + row['status'] for row in report['builds']) + '\n')
+          PY
+      - name: 保存公开发布记录
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-public-release
+          path: testflight-public-release.json
+          if-no-files-found: ignore
+          retention-days: 14
