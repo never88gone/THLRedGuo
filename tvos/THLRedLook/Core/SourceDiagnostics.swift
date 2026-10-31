@@ -13,6 +13,7 @@ public enum DiagnosticCategory: String, CaseIterable, Codable {
     case httpError = "http_error"             // HTTP 服务端返回非 2xx 异常
     case businessRejected = "business_reject" // 平台服务端业务拦截/频控
     case invalidResponse = "invalid_resp"     // 返回数据结构不符合规范
+    case configuration = "configuration"
     case unknown = "unknown"                  // 其他未知异常
 
     public var name: String {
@@ -26,6 +27,7 @@ public enum DiagnosticCategory: String, CaseIterable, Codable {
         case .httpError: return "HTTP服务端异常"
         case .businessRejected: return "业务风控拦截"
         case .invalidResponse: return "响应数据格式异常"
+        case .configuration: return "本机播放配置"
         case .unknown: return "未归类异常"
         }
     }
@@ -41,6 +43,7 @@ public enum DiagnosticCategory: String, CaseIterable, Codable {
         case .httpError: return "HTTP异常"
         case .businessRejected: return "风控拦截"
         case .invalidResponse: return "数据异常"
+        case .configuration: return "配置未就绪"
         case .unknown: return "检测失败"
         }
     }
@@ -586,7 +589,7 @@ public final class SourceDiagnostics: ObservableObject {
                 value.replaceSubrange(range, with: desensitizeUrl(String(value[range])))
             }
         }
-        if let pattern = try? NSRegularExpression(pattern: #"(?i)(\"?(?:device_id(?:_str)?|install_id(?:_str)?|iid|openudid|cdid|cookie|authorization|access_token|refresh_token|device_token|session_id|token|password|query|keyword|search_word)\"?\s*[:=]\s*)(\"[^\"]*\"|[^\s,;]+)"#) {
+        if let pattern = try? NSRegularExpression(pattern: #"(?i)(\"?(?:configuration|common_key|sign_key|mLicensetStr|x[-_](?:gorgon|helios|medusa|argus|ladon)|device_id(?:_str)?|install_id(?:_str)?|iid|openudid|cdid|cookie|authorization|access_token|refresh_token|device_token|session_id|token|password|query|keyword|search_word)\"?\s*[:=]\s*)(\"[^\"]*\"|[^\s,;]+)"#) {
             value = pattern.stringByReplacingMatches(in: value, range: NSRange(value.startIndex..., in: value), withTemplate: "$1[已隐藏]")
         }
         return value
@@ -603,6 +606,11 @@ public final class SourceDiagnostics: ObservableObject {
 
     public static func advice(_ entry: SourceDiagnosticEntry) -> String {
         if !entry.suggestion.isEmpty { return entry.suggestion }
+        if entry.errorCode.hasPrefix("LOCAL_PROFILE_") {
+            return entry.errorCode == "LOCAL_PROFILE_UNAVAILABLE"
+                ? "本机播放配置暂不可访问，请解锁设备后重试。"
+                : "请打开设置中的站源管理，用手机导入红果官方 APK。"
+        }
         if entry.errorCode.hasPrefix("DNS") || entry.category == .dnsError {
             return "请检查当前网络的 DNS 或路由器屏蔽规则，并用手机热点作对照。"
         }
@@ -640,6 +648,11 @@ public final class SourceDiagnostics: ObservableObject {
         lines.append("· 源指纹 SHA256: \(Self.sourceHash)")
         lines.append("· 数据源版本: \(Self.sourceRevision)")
         lines.append("· 打包校验: \(Self.sourceBundleStatus)")
+        if let profile = try? HongguoPlaybackProfileVault.load() {
+            lines.append("· 本机播放配置: 已导入红果 \(profile.appVersion) · 仅本机存储")
+        } else {
+            lines.append("· 本机播放配置: 未导入或暂不可访问")
+        }
         lines.append("· 应用提交: \(Self.sourceManifest["appCommit"] ?? "未记录")")
         lines.append("· 运行源状态: \(sourceRuntimeStatus)")
         lines.append(contentsOf: sourceRuntimeLines.map { "  - " + $0 })

@@ -7,14 +7,21 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A41C80E59CBF4F2096A85A01 /* TVQualitySelectionDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A41C80E59CBF4F2096A85A02 /* TVQualitySelectionDrawer.swift */; };
-		E6E285CB14404C4988A2A1A1 /* NetworkEgressLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6E285CB14404C4988A2A1A2 /* NetworkEgressLookup.swift */; };
+		00F6DAC96490A839B6FC75EA /* HongguoApkProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E4F0775CA2B5213DAF9E20 /* HongguoApkProfile.swift */; };
+		12F647818F7F44998727220E /* OverseasSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */; };
+		1F6926DCCD8AAF72AD718D1E /* ApkProfileImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D255715E326D23643B59BC9D /* ApkProfileImportSheet.swift */; };
 		308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */; };
 		3B9F1C5ADE795910FBD0AD03 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6299EBC862612C3A90774337 /* Foundation.framework */; };
 		3EB52B87EAB6FA6FA6506647 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6299EBC862612C3A90774337 /* Foundation.framework */; };
 		3F654B7E4306B53376917E16 /* CENCDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */; };
+		46A67D6BBFE54AF28CD2FBE5 /* PlaybackAssetFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C07BD5FD8B42DAB56D1F2E /* PlaybackAssetFactory.swift */; };
 		528D7CCDCE1C7AF18D3AC99E /* Pods_THLRedLookTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 221C9DFACA76E6DED5DC2B01 /* Pods_THLRedLookTests.framework */; };
 		6A2238549A7893510B3D7A7C /* Pods_THLRedLook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */; };
+		6E79A4B5895BFF20763CC4EF /* HongguoPlaybackProfileVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE331441D1AFFDF86A367EC0 /* HongguoPlaybackProfileVault.swift */; };
+		7689C3C1BE0A477888B3828B /* StartupPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */; };
+		7A25873DCEE90B41E3C04905 /* ApkProfileImportServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30C46674D4352DBF7CD9CB5 /* ApkProfileImportServer.swift */; };
+		81C7FE1DA08787168F35C136 /* ICloudSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */; };
+		90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */; };
 		A10000012C00000100000001 /* THLRedLookApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000012C00000100000001 /* THLRedLookApp.swift */; };
 		A10000022C00000100000001 /* SourceSite.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022C00000100000001 /* SourceSite.swift */; };
 		A10000032C00000100000001 /* Drama.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000032C00000100000001 /* Drama.swift */; };
@@ -25,7 +32,6 @@
 		A10000082C00000100000001 /* RankingBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000082C00000100000001 /* RankingBoard.swift */; };
 		A10000092C00000100000001 /* LanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000092C00000100000001 /* LanModels.swift */; };
 		A10000102C00000100000001 /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000102C00000100000001 /* LocalStore.swift */; };
-		ICLOUD002C00000100000001 /* ICloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ICLOUD001C00000100000001 /* ICloudSyncService.swift */; };
 		A10000112C00000100000001 /* NativeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000112C00000100000001 /* NativeBridge.swift */; };
 		A10000122C00000100000001 /* NativeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000122C00000100000001 /* NativeRepository.swift */; };
 		A10000132C00000100000001 /* LanSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000132C00000100000001 /* LanSyncService.swift */; };
@@ -55,31 +61,29 @@
 		A10000452C00000100000001 /* TVBlankStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000452C00000100000001 /* TVBlankStateView.swift */; };
 		A10000982C00000100000001 /* CENCMP4Decryptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000982C00000100000001 /* CENCMP4Decryptor.swift */; };
 		A10000992C00000100000001 /* PlatformProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000992C00000100000001 /* PlatformProtocols.swift */; };
+		A41C80E59CBF4F2096A85A01 /* TVQualitySelectionDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A41C80E59CBF4F2096A85A02 /* TVQualitySelectionDrawer.swift */; };
+		A4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */; };
+		A648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift */; };
+		A75AFF05E2765687A3A41090 /* SettingsContactPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */; };
+		A7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift */; };
+		ABE3FEB2542D475BB3C6F7D7 /* DiagnosticsShareServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E5CF00A15647D68EF83727 /* DiagnosticsShareServer.swift */; };
+		AC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */; };
+		AD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift */; };
+		AF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift */; };
+		AFE6F58902DA55C6890424B4 /* SettingsCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE6F58902DA55C6890424B4 /* SettingsCategory.swift */; };
+		BC32017434634EDB97D9747C /* EncryptedMediaStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5AC1048D4D429CBF09340E /* EncryptedMediaStream.swift */; };
 		BC5B31CB27136862380FB32F /* PlaybackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF46F916F921E87B28F33AB /* PlaybackTests.swift */; };
+		C2CF716976FB47A0AF61ABA3 /* CENCStreamIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = D176E2EF155444349D7D7EAB /* CENCStreamIndex.swift */; };
 		CABD071B5C68D672495450B9 /* LocalLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */; };
 		DFB5B536F10F369514C3C5B4 /* RemoteNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */; };
 		E34571822EE6111100000021 /* SourceDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6111100000022 /* SourceDiagnostics.swift */; };
 		E34571822EE6222200000021 /* VideoCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000022 /* VideoCacheManager.swift */; };
 		E34571822EE6222200000031 /* TVCustomSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000032 /* TVCustomSplitView.swift */; };
 		E34571822EE6222200000033 /* TVSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34571822EE6222200000034 /* TVSidebarView.swift */; };
+		E6E285CB14404C4988A2A1A1 /* NetworkEgressLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6E285CB14404C4988A2A1A2 /* NetworkEgressLookup.swift */; };
 		FEED00012C00000100000001 /* VideoFeedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00112C00000100000001 /* VideoFeedViewModel.swift */; };
 		FEED00022C00000100000001 /* TVVideoFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED00122C00000100000001 /* TVVideoFeedView.swift */; };
-		AFE6F58902DA55C6890424B4 /* SettingsCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE6F58902DA55C6890424B4 /* SettingsCategory.swift */; };
-		AD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift */; };
-		A648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift */; };
-		A7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift */; };
-		AF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift */; };
-		A75AFF05E2765687A3A41090 /* SettingsContactPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */; };
-		AC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */; };
-		A4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */; };
-		90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */; };
-		81C7FE1DA08787168F35C136 /* ICloudSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */; };
-		46A67D6BBFE54AF28CD2FBE5 /* PlaybackAssetFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C07BD5FD8B42DAB56D1F2E /* PlaybackAssetFactory.swift */; };
-		BC32017434634EDB97D9747C /* EncryptedMediaStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5AC1048D4D429CBF09340E /* EncryptedMediaStream.swift */; };
-		C2CF716976FB47A0AF61ABA3 /* CENCStreamIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = D176E2EF155444349D7D7EAB /* CENCStreamIndex.swift */; };
-		7689C3C1BE0A477888B3828B /* StartupPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */; };
-		ABE3FEB2542D475BB3C6F7D7 /* DiagnosticsShareServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E5CF00A15647D68EF83727 /* DiagnosticsShareServer.swift */; };
-		12F647818F7F44998727220E /* OverseasSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */; };
+		ICLOUD002C00000100000001 /* ICloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ICLOUD001C00000100000001 /* ICloudSyncService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -100,8 +104,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A41C80E59CBF4F2096A85A02 /* TVQualitySelectionDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVQualitySelectionDrawer.swift; sourceTree = "<group>"; };
-		E6E285CB14404C4988A2A1A2 /* NetworkEgressLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkEgressLookup.swift; sourceTree = "<group>"; };
 		041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLook.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D9437790F04A5D01FEC2D84 /* Pods-THLRedLookTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLookTests.debug.xcconfig"; path = "Target Support Files/Pods-THLRedLookTests/Pods-THLRedLookTests.debug.xcconfig"; sourceTree = "<group>"; };
 		221C9DFACA76E6DED5DC2B01 /* Pods_THLRedLookTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLookTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -110,9 +112,15 @@
 		3A2AC2E0C811128FF9CE4D20 /* Pods-THLRedLookTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLookTests.release.xcconfig"; path = "Target Support Files/Pods-THLRedLookTests/Pods-THLRedLookTests.release.xcconfig"; sourceTree = "<group>"; };
 		5DEF076423A4DDD1829FFF47 /* THLRedLookUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = THLRedLookUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6299EBC862612C3A90774337 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		66E4F0775CA2B5213DAF9E20 /* HongguoApkProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HongguoApkProfile.swift; path = ../shared/apple/HongguoApkProfile.swift; sourceTree = "<group>"; };
 		6A9AED8C8EB9E35575961261 /* THLRedLookTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = THLRedLookTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverseasSearchTests.swift; sourceTree = "<group>"; };
 		83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CENCDecoderTests.swift; sourceTree = "<group>"; };
+		8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ICloudSyncTests.swift; sourceTree = "<group>"; };
+		98E5CF00A15647D68EF83727 /* DiagnosticsShareServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsShareServer.swift; sourceTree = "<group>"; };
 		9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalLibraryTests.swift; sourceTree = "<group>"; };
+		A41C80E59CBF4F2096A85A02 /* TVQualitySelectionDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVQualitySelectionDrawer.swift; sourceTree = "<group>"; };
+		ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListLoadingTests.swift; sourceTree = "<group>"; };
 		B10000002C00000100000001 /* THLRedLook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = THLRedLook.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000012C00000100000001 /* THLRedLookApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = THLRedLookApp.swift; sourceTree = "<group>"; };
 		B10000022C00000100000001 /* SourceSite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceSite.swift; sourceTree = "<group>"; };
@@ -124,7 +132,6 @@
 		B10000082C00000100000001 /* RankingBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingBoard.swift; sourceTree = "<group>"; };
 		B10000092C00000100000001 /* LanModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanModels.swift; sourceTree = "<group>"; };
 		B10000102C00000100000001 /* LocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStore.swift; sourceTree = "<group>"; };
-		ICLOUD001C00000100000001 /* ICloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSyncService.swift; sourceTree = "<group>"; };
 		B10000112C00000100000001 /* NativeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBridge.swift; sourceTree = "<group>"; };
 		B10000122C00000100000001 /* NativeRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRepository.swift; sourceTree = "<group>"; };
 		B10000132C00000100000001 /* LanSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanSyncService.swift; sourceTree = "<group>"; };
@@ -156,32 +163,33 @@
 		B10000452C00000100000001 /* TVBlankStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVBlankStateView.swift; sourceTree = "<group>"; };
 		B10000982C00000100000001 /* CENCMP4Decryptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CENCMP4Decryptor.swift; sourceTree = "<group>"; };
 		B10000992C00000100000001 /* PlatformProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformProtocols.swift; sourceTree = "<group>"; };
+		B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceDiagnosticsSheetView.swift; sourceTree = "<group>"; };
+		B648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSyncPanel.swift; sourceTree = "<group>"; };
 		B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CENCMediaDownloader.swift; sourceTree = "<group>"; };
+		B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsContactPanel.swift; sourceTree = "<group>"; };
+		B7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoragePanel.swift; sourceTree = "<group>"; };
+		BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAboutPanel.swift; sourceTree = "<group>"; };
+		BD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSourcesPanel.swift; sourceTree = "<group>"; };
+		BF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHelpPanel.swift; sourceTree = "<group>"; };
+		BFE6F58902DA55C6890424B4 /* SettingsCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCategory.swift; sourceTree = "<group>"; };
+		D176E2EF155444349D7D7EAB /* CENCStreamIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../ios/Runner/CENCStreamIndex.swift; sourceTree = SOURCE_ROOT; };
+		D255715E326D23643B59BC9D /* ApkProfileImportSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ApkProfileImportSheet.swift; sourceTree = "<group>"; };
 		DDF46F916F921E87B28F33AB /* PlaybackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaybackTests.swift; sourceTree = "<group>"; };
 		E34571822EE6111100000022 /* SourceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceDiagnostics.swift; sourceTree = "<group>"; };
 		E34571822EE6222200000022 /* VideoCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCacheManager.swift; sourceTree = "<group>"; };
 		E34571822EE6222200000032 /* TVCustomSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVCustomSplitView.swift; sourceTree = "<group>"; };
 		E34571822EE6222200000034 /* TVSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSidebarView.swift; sourceTree = "<group>"; };
+		E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupPerformanceTests.swift; sourceTree = "<group>"; };
+		E6E285CB14404C4988A2A1A2 /* NetworkEgressLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkEgressLookup.swift; sourceTree = "<group>"; };
 		EA0AC74BAC1238FE7FC98B9C /* Pods-THLRedLook.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLook.release.xcconfig"; path = "Target Support Files/Pods-THLRedLook/Pods-THLRedLook.release.xcconfig"; sourceTree = "<group>"; };
+		EE5AC1048D4D429CBF09340E /* EncryptedMediaStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../ios/Runner/EncryptedMediaStream.swift; sourceTree = SOURCE_ROOT; };
+		F30C46674D4352DBF7CD9CB5 /* ApkProfileImportServer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ApkProfileImportServer.swift; sourceTree = "<group>"; };
+		F4C07BD5FD8B42DAB56D1F2E /* PlaybackAssetFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackAssetFactory.swift; sourceTree = "<group>"; };
 		FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteNavigationTests.swift; sourceTree = "<group>"; };
+		FE331441D1AFFDF86A367EC0 /* HongguoPlaybackProfileVault.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HongguoPlaybackProfileVault.swift; path = ../shared/apple/HongguoPlaybackProfileVault.swift; sourceTree = "<group>"; };
 		FEED00112C00000100000001 /* VideoFeedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFeedViewModel.swift; sourceTree = "<group>"; };
 		FEED00122C00000100000001 /* TVVideoFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVVideoFeedView.swift; sourceTree = "<group>"; };
-		BFE6F58902DA55C6890424B4 /* SettingsCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCategory.swift; sourceTree = "<group>"; };
-		BD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSourcesPanel.swift; sourceTree = "<group>"; };
-		B648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSyncPanel.swift; sourceTree = "<group>"; };
-		B7E17BAFC7E5535F8F6350AF /* SettingsStoragePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoragePanel.swift; sourceTree = "<group>"; };
-		BF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHelpPanel.swift; sourceTree = "<group>"; };
-		B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsContactPanel.swift; sourceTree = "<group>"; };
-		BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAboutPanel.swift; sourceTree = "<group>"; };
-		B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceDiagnosticsSheetView.swift; sourceTree = "<group>"; };
-		ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ListLoadingTests.swift; sourceTree = "<group>"; };
-		8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ICloudSyncTests.swift; sourceTree = "<group>"; };
-		F4C07BD5FD8B42DAB56D1F2E /* PlaybackAssetFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackAssetFactory.swift; sourceTree = "<group>"; };
-		EE5AC1048D4D429CBF09340E /* EncryptedMediaStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../ios/Runner/EncryptedMediaStream.swift"; sourceTree = SOURCE_ROOT; };
-		D176E2EF155444349D7D7EAB /* CENCStreamIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../ios/Runner/CENCStreamIndex.swift"; sourceTree = SOURCE_ROOT; };
-		E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupPerformanceTests.swift; sourceTree = "<group>"; };
-		98E5CF00A15647D68EF83727 /* DiagnosticsShareServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsShareServer.swift; sourceTree = "<group>"; };
-		6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverseasSearchTests.swift; sourceTree = "<group>"; };
+		ICLOUD001C00000100000001 /* ICloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSyncService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -219,6 +227,15 @@
 				FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */,
 			);
 			path = THLRedLookUITests;
+			sourceTree = "<group>";
+		};
+		22EE514ABD32812A24D85A57 /* LocalPlayback */ = {
+			isa = PBXGroup;
+			children = (
+				66E4F0775CA2B5213DAF9E20 /* HongguoApkProfile.swift */,
+				FE331441D1AFFDF86A367EC0 /* HongguoPlaybackProfileVault.swift */,
+			);
+			name = LocalPlayback;
 			sourceTree = "<group>";
 		};
 		60221B46C52FED984663019F /* Frameworks */ = {
@@ -273,6 +290,7 @@
 				60221B46C52FED984663019F /* Frameworks */,
 				B10A80F99E2D9849B8980719 /* THLRedLookTests */,
 				05D057238BF0376567EE6F32 /* THLRedLookUITests */,
+				22EE514ABD32812A24D85A57 /* LocalPlayback */,
 			);
 			sourceTree = "<group>";
 		};
@@ -344,6 +362,7 @@
 				B10000132C00000100000001 /* LanSyncService.swift */,
 				B10000142C00000100000001 /* DownloadService.swift */,
 				B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */,
+				F30C46674D4352DBF7CD9CB5 /* ApkProfileImportServer.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -457,7 +476,6 @@
 			isa = PBXGroup;
 			children = (
 				B10000322C00000100000001 /* SettingsView.swift */,
-			
 				BFE6F58902DA55C6890424B4 /* SettingsCategory.swift */,
 				BD95F59E63EF543881E628E4 /* SettingsSourcesPanel.swift */,
 				B648A2148D005AEFA2361CEF /* SettingsSyncPanel.swift */,
@@ -466,7 +484,8 @@
 				B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */,
 				BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */,
 				B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */,
-);
+				D255715E326D23643B59BC9D /* ApkProfileImportSheet.swift */,
+			);
 			path = Settings;
 			sourceTree = "<group>";
 		};
@@ -763,6 +782,10 @@
 				E34571822EE6222200000033 /* TVSidebarView.swift in Sources */,
 				A10000352C00000100000001 /* TVTheme.swift in Sources */,
 				308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */,
+				00F6DAC96490A839B6FC75EA /* HongguoApkProfile.swift in Sources */,
+				6E79A4B5895BFF20763CC4EF /* HongguoPlaybackProfileVault.swift in Sources */,
+				7A25873DCEE90B41E3C04905 /* ApkProfileImportServer.swift in Sources */,
+				1F6926DCCD8AAF72AD718D1E /* ApkProfileImportSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

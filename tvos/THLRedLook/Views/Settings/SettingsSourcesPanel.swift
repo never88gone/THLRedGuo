@@ -11,6 +11,8 @@ public struct SettingsSourcesPanel: View {
     @State private var showingClearAllAlert = false
     @State private var importURLString = ""
     @State private var isImporting = false
+    @State private var showingApkImport = false
+    @State private var localApkVersion: String?
 
     private enum SourcesFocus: Hashable {
         case diagnostics
@@ -18,6 +20,7 @@ public struct SettingsSourcesPanel: View {
         case officialSource
         case importNetwork
         case clearAll
+        case importApk
     }
     @FocusState private var focusedButton: SourcesFocus?
 
@@ -39,6 +42,22 @@ public struct SettingsSourcesPanel: View {
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.65))
             }
+
+            HStack(spacing: 28) {
+                TVButton(title: "手机导入官方 APK", icon: "qrcode", isProminent: localApkVersion == nil,
+                         isExternalFocused: focusedButton == .importApk) { showingApkImport = true }
+                    .focused($focusedButton, equals: .importApk)
+                    .accessibilityIdentifier("settings.importOfficialApk")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(localApkVersion.map { "本机播放配置：红果 \($0)" } ?? "尚未导入本机播放配置")
+                        .font(.system(size: 29, weight: .medium))
+                        .accessibilityIdentifier("settings.localApkProfile")
+                    Text("手机扫码选择官方 APK，配置仅保存在当前电视。")
+                        .font(.system(size: 25)).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .focusSection()
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("应用 " + SourceDiagnostics.version + " · " + SourceDiagnostics.sourceRevision)
@@ -206,6 +225,16 @@ public struct SettingsSourcesPanel: View {
                 }
             }
         )
+        .task { refreshApkProfile() }
+        .sheet(isPresented: $showingApkImport, onDismiss: {
+            refreshApkProfile()
+            focusedButton = .importApk
+        }) {
+            ApkProfileImportSheet(onClose: { showingApkImport = false }, onImported: {
+                await NativeBridge.shared.applyLocalPlaybackProfileChange()
+                refreshApkProfile()
+            })
+        }
         .alert("清空自定义数据源", isPresented: $showingClearAllAlert) {
             Button("取消", role: .cancel) {}
             Button("全部清空", role: .destructive) {
@@ -223,6 +252,10 @@ public struct SettingsSourcesPanel: View {
         } message: {
             Text("确定要清空所有自定义导入的 JS 数据源吗？官方内置数据源将保留，此操作不可撤销。")
         }
+    }
+
+    private func refreshApkProfile() {
+        localApkVersion = (try? HongguoPlaybackProfileVault.load())?.appVersion
     }
 
     private var importAlertOverlay: some View {

@@ -81,6 +81,12 @@ public actor NativeBridge {
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
 
+    public func applyLocalPlaybackProfileChange() {
+        jsContexts.removeValue(forKey: "hongguo")
+        successfulPlaybackResolves = 0
+        lastSuccessfulPlaybackAt = nil
+    }
+
     init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用", persistentDeviceSession: Bool = true, deviceDefaults: UserDefaults = .standard, timeProvider: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 }) {
         if let httpSession {
             self.httpSession = httpSession
@@ -513,6 +519,22 @@ public actor NativeBridge {
 
         // 4. 执行 Spider 脚本代码
         context.evaluateScript(script)
+        if sourceId == "hongguo", script == BuiltInHongguoJSContent, context.exception == nil {
+            context.evaluateScript("globalThis.__hongguoRequireLocalProfile = true;")
+            do {
+                if let profile = try HongguoPlaybackProfileVault.load() {
+                    context.setObject(["configuration": profile.configuration, "sdkVersion": profile.sdkVersion] as NSDictionary,
+                                      forKeyedSubscript: "__hongguoPendingLocalProfile" as NSString)
+                    context.evaluateScript("""
+                    try { globalThis.__hongguoUseLocalApkProfile(globalThis.__hongguoPendingLocalProfile); }
+                    catch (_) { globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_INVALID'; }
+                    delete globalThis.__hongguoPendingLocalProfile;
+                    """)
+                }
+            } catch {
+                context.evaluateScript("globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_UNAVAILABLE';")
+            }
+        }
         if sourceId == "hongguo" {
             let ready = context.exception == nil && context.evaluateScript("typeof spider !== 'undefined' && typeof spider.play === 'function'")?.toBool() == true
             diagnostics.registerSourceRuntime(context: diagnosticContext, script: script, ready: ready)
@@ -606,7 +628,10 @@ public actor NativeBridge {
         } : nil
         let category: DiagnosticCategory
         let description: String
-        if code == "MEDIA_URL_EXPIRED" {
+        if code.hasPrefix("LOCAL_PROFILE_") {
+            category = .configuration
+            description = code == "LOCAL_PROFILE_UNAVAILABLE" ? "本机播放配置暂不可访问，请解锁设备后重试" : "请在设置中导入红果官方 APK 后重试"
+        } else if code == "MEDIA_URL_EXPIRED" {
             category = .invalidResponse
             description = "本集媒体地址已经过期，请重新获取"
         } else if code.hasPrefix("MEDIA_HTTP_") {
@@ -629,7 +654,7 @@ public actor NativeBridge {
         let age = created > 0 ? String(max(0, Int(timeProvider() - created))) + "秒" : "未记录"
         let lastSuccess = lastSuccessfulPlaybackAt.map { String(max(0, Int(timeProvider() - $0))) + "秒前" } ?? "本次运行尚未成功"
         let sessionStatus = "游客会话创建距今：\(age)；本桥接成功取流：\(successfulPlaybackResolves)次；最近成功：\(lastSuccess)"
-        let advice = upstream?.suggestion ?? "请保留当前剧集与集数，并在设置的数据源诊断中扫码导出报告。"
+        let advice = code.hasPrefix("LOCAL_PROFILE_") ? description : upstream?.suggestion ?? "请保留当前剧集与集数，并在设置的数据源诊断中扫码导出报告。"
         diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "播放取流 第\(episode)集", host: upstream?.host ?? URL(string: trace.url)?.host ?? "", url: upstream?.url ?? trace.url, method: upstream?.method ?? trace.method, logId: upstream?.logId ?? trace.logId, status: upstream?.status ?? trace.status, errorCode: code, category: category, errorDetail: detail, suggestion: advice, responseSnippet: upstream?.responseSnippet ?? trace.snippet, sessionStatus: sessionStatus, bodyBytes: upstream?.bodyBytes, contentType: upstream?.contentType ?? "", contentEncoding: upstream?.contentEncoding ?? "", declaredBodyBytes: upstream?.declaredBodyBytes))
         return NSError(domain: "CatPawOpen.Playback", code: -2, userInfo: [NSLocalizedDescriptionKey: detail + "（" + code + "）", "diagnosticCode": code, "diagnosticCategory": category.rawValue, "diagnosticAdvice": advice, "diagnosticSession": sessionStatus])
     }
@@ -881,7 +906,9 @@ public actor NativeBridge {
                     let rawCat = evaluated?["category"] as? String ?? ""
                     let rawCode = evaluated?["code"] as? String ?? ""
                     let errCat: DiagnosticCategory
-                    if let parsedCat = DiagnosticCategory(rawValue: rawCat), rawCat != "js_error" {
+                    if rawCode.hasPrefix("LOCAL_PROFILE_") {
+                        errCat = .configuration
+                    } else if let parsedCat = DiagnosticCategory(rawValue: rawCat), rawCat != "js_error" {
                         errCat = parsedCat
                     } else if errMsg.contains("网络") || errMsg.contains("DNS") {
                         errCat = .dnsError

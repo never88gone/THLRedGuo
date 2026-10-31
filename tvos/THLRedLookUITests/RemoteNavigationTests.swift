@@ -4,6 +4,51 @@ final class RemoteNavigationTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.never88gone.redlook")
     private let remote = XCUIRemote.shared
 
+    func testLocalOfficialApkImportAndRemoteReturn() throws {
+        guard let path = ProcessInfo.processInfo.environment["THL_LOCAL_APK_PATH"] else { throw XCTSkip("Requires a user-supplied official APK") }
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "settings_sources"]
+        app.launch()
+        wait("source settings ready", seconds: 30) { self.app.buttons["settings.importOfficialApk"].exists }
+        trace("local-import-initial")
+        if app.buttons["nav.settings"].hasFocus { press(.right, focus: "settings.nav.sources") }
+        if app.buttons["settings.nav.sources"].hasFocus { press(.right) }
+        trace("local-import-panel")
+        if !app.buttons["settings.importOfficialApk"].hasFocus { press(.up) }
+        wait("APK import focus") { self.app.buttons["settings.importOfficialApk"].hasFocus }
+        press(.select)
+        wait("APK URL ready", seconds: 20) { self.app.staticTexts["apkImport.url"].exists }
+        wait("APK back focus") { self.app.buttons["apkImport.back"].hasFocus }
+        let url = try XCTUnwrap(URL(string: app.staticTexts["apkImport.url"].label))
+        let taskDone = expectation(description: "local HTTP import")
+        var status = 0
+        var responseBody = ""
+        var request = URLRequest(url: url.appendingPathComponent("import"))
+        request.httpMethod = "POST"
+        request.setValue("application/vnd.android.package-archive", forHTTPHeaderField: "Content-Type")
+        URLSession.shared.uploadTask(with: request, fromFile: URL(fileURLWithPath: path)) { data, response, error in
+            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            responseBody = data.map { String(decoding: $0, as: UTF8.self) } ?? String(describing: error)
+            taskDone.fulfill()
+        }.resume()
+        wait(for: [taskDone], timeout: 150)
+        XCTAssertEqual(status, 200, responseBody)
+        XCTAssertFalse(responseBody.contains("configuration"))
+        wait("APK success displayed", seconds: 20) { self.app.staticTexts["apkImport.success"].label.contains("7.4.3.32") }
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "local-apk-import-success"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        press(.menu)
+        wait("APK returns focus") { self.app.buttons["settings.importOfficialApk"].hasFocus }
+        XCTAssertTrue(app.staticTexts["settings.localApkProfile"].label.contains("7.4.3.32"))
+        app.terminate()
+        app.launch()
+        wait("APK Keychain survives restart", seconds: 30) { self.app.staticTexts["settings.localApkProfile"].label.contains("7.4.3.32") }
+        print("THL_LOCAL_APK_IMPORT http200=true keychainRestart=true menuReturnFocus=true version=7.4.3.32")
+    }
+
     func testImportedOldIOSHistoryDisplaysAndPersistsWithRemoteFocus() throws {
         guard ProcessInfo.processInfo.environment["ICLOUD_OLD_HISTORY_UI"] == "1" else { throw XCTSkip("Requires isolated imported history fixture") }
         continueAfterFailure = false

@@ -60,6 +60,48 @@ import CoreMedia
       self.deviceChannel = channel
       channel.setMethodCallHandler { [weak self] call, result in
         guard let self = self else { return }
+        if call.method == "hongguoPlaybackProfileMetadata" || call.method == "hongguoPlaybackProfileRuntime" {
+          do {
+            if call.method == "hongguoPlaybackProfileRuntime", let profile = try HongguoPlaybackProfileVault.load() {
+              result(["configuration": profile.configuration, "sdkVersion": profile.sdkVersion, "appVersion": profile.appVersion])
+            } else {
+              result(try HongguoPlaybackProfileVault.metadata())
+            }
+          } catch {
+            result(FlutterError(code: "LOCAL_PROFILE_UNAVAILABLE", message: error.localizedDescription, details: nil))
+          }
+          return
+        }
+        if call.method == "importHongguoPlaybackApk" {
+          guard let arguments = call.arguments as? [String: Any], let path = arguments["path"] as? String, path.hasPrefix("/") else {
+            result(FlutterError(code: "INVALID_APK_FILE", message: "请选择本机的红果官方 APK", details: nil))
+            return
+          }
+          Task {
+            do {
+              let profile = try await Task.detached(priority: .userInitiated) {
+                let url = URL(fileURLWithPath: path)
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                return try HongguoApkImporter(url: url).extract()
+              }.value
+              try HongguoPlaybackProfileVault.save(profile)
+              result(try HongguoPlaybackProfileVault.metadata())
+            } catch {
+              result(FlutterError(code: "APK_IMPORT_FAILED", message: error.localizedDescription, details: nil))
+            }
+          }
+          return
+        }
+        if call.method == "removeHongguoPlaybackProfile" {
+          do {
+            try HongguoPlaybackProfileVault.remove()
+            result(["imported": false])
+          } catch {
+            result(FlutterError(code: "LOCAL_PROFILE_UNAVAILABLE", message: error.localizedDescription, details: nil))
+          }
+          return
+        }
         if call.method == "exportDiagnostics" {
           self.exportDiagnostics(call.arguments, result: result)
           return

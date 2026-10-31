@@ -13,10 +13,12 @@ class PlaybackRecovery {
   bool get cacheAttempted => _cacheAttempted;
   Duration get retryDelay => _retryDelay;
 
-  static int attemptLimitFor(String errorCode) =>
-      const {'EMPTY_RESPONSE', 'RESPONSE_NOT_UTF8'}.contains(errorCode)
-      ? 2
-      : maxAttempts;
+  static int attemptLimitFor(String errorCode) {
+    if (errorCode.startsWith('LOCAL_PROFILE_')) return 0;
+    return const {'EMPTY_RESPONSE', 'RESPONSE_NOT_UTF8'}.contains(errorCode)
+        ? 2
+        : maxAttempts;
+  }
 
   static bool audioOutputFailed(String error) =>
       error.toLowerCase().contains('could not open/initialize audio device');
