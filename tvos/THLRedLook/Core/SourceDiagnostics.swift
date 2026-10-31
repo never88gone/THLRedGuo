@@ -145,16 +145,16 @@ public final class SourceDiagnostics: ObservableObject {
     public let objectWillChange = ObservableObjectPublisher()
     private let lock = NSLock()
     private var records: [SourceDiagnosticEntry] = []
-    private var sourceRuntimes: [String: (hash: String, ready: Bool)] = [:]
+    private var sourceRuntimes: [String: (hash: String, ready: Bool, importedVersion: String?)] = [:]
     private var networkResult: NetworkEgressResult?
     @MainActor private var networkTask: Task<Void, Never>?
 
     public init() {}
 
-    public func registerSourceRuntime(context: String, script: String, ready: Bool) {
+    public func registerSourceRuntime(context: String, script: String, ready: Bool, importedVersion: String? = nil) {
         let hash = Self.fingerprint(script)
         lock.lock()
-        sourceRuntimes[context] = (hash, ready)
+        sourceRuntimes[context] = (hash, ready, importedVersion)
         lock.unlock()
         NSLog("[Source] app=%@ context=%@ sha256=%@ ready=%d bundleMatch=%d", Self.version, context, hash, ready ? 1 : 0, hash == Self.sourceHash ? 1 : 0)
         DispatchQueue.main.async { self.objectWillChange.send() }
@@ -185,7 +185,8 @@ public final class SourceDiagnostics: ObservableObject {
         lock.unlock()
         return values.keys.sorted().map { key in
             let value = values[key]!
-            return key + " · SHA256 " + value.hash + " · " + (value.ready ? "已加载" : "加载失败")
+            return key + " · SHA256 " + value.hash + " · " + (value.ready ? "已加载" : "加载失败") +
+                (value.importedVersion.map { " · 导入版本 " + Self.redact(String($0.prefix(128))) } ?? "")
         }
     }
 
@@ -194,8 +195,10 @@ public final class SourceDiagnostics: ObservableObject {
         let values = Array(sourceRuntimes.values)
         lock.unlock()
         if values.isEmpty { return "运行 JS 尚未加载" }
-        return values.allSatisfy { $0.ready && $0.hash == Self.sourceHash }
-            ? "运行 JS 与本包一致" : "运行 JS 加载或版本校验异常，请导出诊断"
+        guard values.allSatisfy({ $0.ready && ($0.hash == Self.sourceHash || $0.importedVersion != nil) }) else {
+            return "运行 JS 加载或版本校验异常，请导出诊断"
+        }
+        return values.contains { $0.importedVersion != nil } ? "已加载导入的更新版 JS" : "运行 JS 与本包一致"
     }
 
     public var networkEgress: NetworkEgressResult? {

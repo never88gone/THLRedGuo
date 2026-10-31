@@ -173,6 +173,8 @@ public actor NativeBridge {
         }
         installedSources.removeAll()
         sourceScripts.removeAll()
+        let official = BuiltInHongguoJSContent
+        let bundledMeta = extractScriptMeta(script: official, fallbackId: "hongguo") ?? [:]
 
         let files = (try? FileManager.default.contentsOfDirectory(at: sourcesDirURL, includingPropertiesForKeys: nil)) ?? []
 
@@ -182,30 +184,67 @@ public actor NativeBridge {
             }
             if var meta = extractScriptMeta(script: script, fallbackId: file.deletingPathExtension().lastPathComponent) {
                 let sid = meta["id"] as? String ?? file.deletingPathExtension().lastPathComponent
-                if sid == "hongguo" && script != BuiltInHongguoJSContent {
-                    script = BuiltInHongguoJSContent
-                    meta = extractScriptMeta(script: script, fallbackId: "hongguo") ?? meta
-                    try? BuiltInHongguoJSContent.write(to: file, atomically: true, encoding: .utf8)
+                if sid == "hongguo" && script != BuiltInHongguoJSContent &&
+                    !isSourceVersionNewer(meta["version"] as? String ?? "", than: bundledMeta["version"] as? String ?? "") {
+                    script = official
+                    meta = bundledMeta
+                    try? official.write(to: file, atomically: true, encoding: .utf8)
                     NSLog("🎬 [NativeBridge] 扫描时已将旧版沙盒数据源自动热升级为最新内置官方源")
+                }
+                if sid == "hongguo", let existing = installedSources[sid],
+                   !isSourceVersionNewer(meta["version"] as? String ?? "", than: existing["version"] as? String ?? "") {
+                    continue
                 }
                 installedSources[sid] = meta
                 sourceScripts[sid] = script
             }
         }
 
-        let official = BuiltInHongguoJSContent
-        if !official.isEmpty {
-            var meta = extractScriptMeta(script: official, fallbackId: "hongguo") ?? [:]
+        if !official.isEmpty, sourceScripts["hongguo"] == nil {
+            var meta = bundledMeta
             meta["sha256"] = SourceDiagnostics.fingerprint(official)
             meta["sourceCommit"] = SourceDiagnostics.sourceManifest["sourceCommit"] ?? ""
             installedSources["hongguo"] = meta
             sourceScripts["hongguo"] = official
+        }
+        if let script = sourceScripts["hongguo"] {
+            installedSources["hongguo"]?["sha256"] = SourceDiagnostics.fingerprint(script)
+            installedSources["hongguo"]?["sourceCommit"] = script == official ? SourceDiagnostics.sourceManifest["sourceCommit"] ?? "" : ""
         }
 
         // 如果存在活跃源但不在已安装列表中，清空或重置
         if !installedSources.keys.contains(activeSourceId) {
             activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : (installedSources.keys.first ?? "")
         }
+    }
+
+    private func isSourceVersionNewer(_ candidate: String, than baseline: String) -> Bool {
+        guard candidate.count <= 128, baseline.count <= 128 else { return false }
+        let pattern = #"^(\d{1,9})\.(\d{1,9})\.(\d{1,9})(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return false }
+        func fields(_ value: String) -> [String]? {
+            guard let match = expression.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) else { return nil }
+            return (1...4).map { index in Range(match.range(at: index), in: value).map { String(value[$0]) } ?? "" }
+        }
+        guard let a = fields(candidate), let b = fields(baseline) else { return false }
+        for index in 0..<3 {
+            let left = Int(a[index])!, right = Int(b[index])!
+            if left != right { return left > right }
+        }
+        if a[3].isEmpty || b[3].isEmpty { return a[3].isEmpty && !b[3].isEmpty }
+        let ap = a[3].split(separator: "."), bp = b[3].split(separator: ".")
+        for index in 0..<min(ap.count, bp.count) {
+            let left = ap[index], right = bp[index]
+            if left == right { continue }
+            let an = left.allSatisfy { $0.isASCII && $0.isNumber }, bn = right.allSatisfy { $0.isASCII && $0.isNumber }
+            if an != bn { return !an }
+            if an {
+                let digitsA = left.drop(while: { $0 == "0" }), digitsB = right.drop(while: { $0 == "0" })
+                if digitsA.count != digitsB.count { return digitsA.count > digitsB.count }
+                if digitsA != digitsB { return digitsA.lexicographicallyPrecedes(digitsB) == false }
+            } else { return right.lexicographicallyPrecedes(left) }
+        }
+        return ap.count > bp.count
     }
 
     /// 解析 Spider 脚本中的元数据 (meta)
@@ -542,7 +581,8 @@ public actor NativeBridge {
         }
         if sourceId == "hongguo" {
             let ready = context.exception == nil && context.evaluateScript("typeof spider !== 'undefined' && typeof spider.play === 'function'")?.toBool() == true
-            diagnostics.registerSourceRuntime(context: diagnosticContext, script: script, ready: ready)
+            diagnostics.registerSourceRuntime(context: diagnosticContext, script: script, ready: ready,
+                                              importedVersion: script != BuiltInHongguoJSContent ? installedSources[sourceId]?["version"] as? String : nil)
         }
         context.evaluateScript("if (typeof spider !== 'undefined' && typeof spider.init === 'function') { spider.init({}); }")
 
@@ -756,7 +796,9 @@ public actor NativeBridge {
             let ready = getOrCreateContext(sourceId: "hongguo") != nil
             return ["id": "hongguo", "sha256": SourceDiagnostics.fingerprint(script),
                     "bundleSha256": SourceDiagnostics.sourceHash, "runtimeReady": ready,
-                    "sourceCommit": SourceDiagnostics.sourceManifest["sourceCommit"] ?? ""]
+                    "sourceCommit": installedSources["hongguo"]?["sourceCommit"] as? String ?? "",
+                    "version": installedSources["hongguo"]?["version"] as? String ?? "",
+                    "origin": script == BuiltInHongguoJSContent ? "bundled" : "imported"]
 
         case "jsSource.list":
             return [

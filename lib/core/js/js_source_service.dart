@@ -55,6 +55,15 @@ class JsSourceService extends ChangeNotifier {
 
       for (final preset in kPresetJsSources) {
         final script = await preset.loadScript();
+        final installed = _sources.where((source) => source.id == preset.id);
+        if (installed.any(
+          (source) => JsSourceMeta.isVersionNewer(
+            source.version,
+            JsSourceMeta.scriptVersion(script),
+          ),
+        )) {
+          continue;
+        }
         await _repository.jsSourceSaveAndLoad(script, preset.fileName);
       }
       _sources = await _repository.jsSourceList();
@@ -64,7 +73,8 @@ class JsSourceService extends ChangeNotifier {
       var savedActiveId = _preferences?.getString(_activeSourceKey) ?? '';
 
       // 验证 savedActiveId 是否依然存在
-      if (savedActiveId.isEmpty || !_sources.any((s) => s.id == savedActiveId)) {
+      if (savedActiveId.isEmpty ||
+          !_sources.any((s) => s.id == savedActiveId)) {
         if (_sources.isNotEmpty) {
           savedActiveId = _sources.first.id;
         }
@@ -112,7 +122,8 @@ class JsSourceService extends ChangeNotifier {
     if (ok) {
       _sources = await _repository.jsSourceList();
       if (_sources.isNotEmpty &&
-          (_activeSourceId.isEmpty || !_sources.any((s) => s.id == _activeSourceId))) {
+          (_activeSourceId.isEmpty ||
+              !_sources.any((s) => s.id == _activeSourceId))) {
         await switchSource(_sources.first.id);
       }
     }
@@ -142,7 +153,9 @@ class JsSourceService extends ChangeNotifier {
       final script = await response.transform(utf8.decoder).join();
       if (script.trim().isEmpty) return false;
 
-      var fileName = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'remote_source.js';
+      var fileName = uri.pathSegments.isNotEmpty
+          ? uri.pathSegments.last
+          : 'remote_source.js';
       if (!fileName.endsWith('.js')) {
         fileName = '$fileName.js';
       }

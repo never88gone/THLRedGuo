@@ -481,6 +481,8 @@ class DartCoreEngine {
 
   Future<void> _scanSources() async {
     await _ensureDirectories();
+    final scannedSources = <String, JsSourceMeta>{};
+    final scannedScripts = <String, String>{};
 
     // 默认纯净启动：不自动预载任何数据源，完全由用户按需分别导入或一键导入
     // 扫描 sources 目录下的已导入 js 插件文件
@@ -495,13 +497,33 @@ class DartCoreEngine {
             final content = await file.readAsString();
             final meta = _parseScriptMeta(content, p.basename(file.path));
             if (meta != null) {
-              _installedSources[meta.id] = meta;
-              _sourceScripts[meta.id] = content;
+              final existing = scannedSources[meta.id];
+              if (meta.id == 'hongguo' &&
+                  existing != null &&
+                  !JsSourceMeta.isVersionNewer(
+                    meta.version,
+                    existing.version,
+                  )) {
+                continue;
+              }
+              scannedSources[meta.id] = meta;
+              scannedScripts[meta.id] = content;
             }
           } catch (_) {}
         }
       }
     } catch (_) {}
+    for (final entry in _sourceScripts.entries) {
+      if (scannedScripts[entry.key] != entry.value) {
+        _spiderPool.remove(entry.key);
+      }
+    }
+    _installedSources
+      ..clear()
+      ..addAll(scannedSources);
+    _sourceScripts
+      ..clear()
+      ..addAll(scannedScripts);
 
     if (_installedSources.isNotEmpty &&
         !_installedSources.containsKey(_activeSourceId)) {

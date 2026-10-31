@@ -43,6 +43,40 @@ final class LocalLibraryTests: XCTestCase {
         XCTAssertEqual(identity["runtimeReady"] as? Bool, true)
     }
 
+    func testNewerImportedOfficialSourceSurvivesScanAndBridgeRestart() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = MemoryPlaybackProfile()
+        let recorder = SourceDiagnostics()
+        let bridge = NativeBridge(baseDirectory: root, diagnostics: recorder, persistentDeviceSession: false,
+                                  playbackProfileLoader: { try cache.load() })
+        func script(_ version: String) -> String {
+            "var count=0; var spider={meta:{id:'hongguo',name:'合成导入源',version:'\(version)'},play:async function(){return {url:'https://stream.fixture.invalid/imported-'+(++count)+'.mp4',quality:1080,qualities:[1080]}}};"
+        }
+        _ = try await bridge.request(action: "jsSource.saveAndLoad", payload: ["script": script("9999.0.0-dev.2"), "fileName": "hongguo.js"])
+        let newer = script("9999.0.0-dev.10")
+        _ = try await bridge.request(action: "jsSource.saveAndLoad", payload: ["script": newer, "fileName": "hongguo-update.js"])
+        let hash = SourceDiagnostics.fingerprint(newer)
+        let identity = try await bridge.request(action: "jsSource.identity", payload: [:])
+        XCTAssertEqual(identity["sha256"] as? String, hash)
+        XCTAssertEqual(identity["origin"] as? String, "imported")
+        XCTAssertEqual(identity["version"] as? String, "9999.0.0-dev.10")
+        XCTAssertEqual(identity["sourceCommit"] as? String, "")
+        XCTAssertEqual(recorder.sourceRuntimeStatus, "已加载导入的更新版 JS")
+        let payload: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567000", "source": "hongguo"], "index": 1]
+        let first = try await bridge.request(action: "resolve", payload: payload)
+        XCTAssertTrue((first["url"] as? String)?.contains("imported-1.mp4") == true)
+        _ = try await bridge.request(action: "jsSource.scan", payload: [:])
+        let second = try await bridge.request(action: "resolve", payload: payload)
+        XCTAssertTrue((second["url"] as? String)?.contains("imported-2.mp4") == true)
+        let restarted = NativeBridge(baseDirectory: root, persistentDeviceSession: false, playbackProfileLoader: { try cache.load() })
+        let restartedIdentity = try await restarted.request(action: "jsSource.identity", payload: [:])
+        XCTAssertEqual(restartedIdentity["sha256"] as? String, hash)
+        let afterRestart = try await restarted.request(action: "resolve", payload: payload)
+        XCTAssertTrue((afterRestart["url"] as? String)?.contains("imported-1.mp4") == true)
+        XCTAssertEqual(cache.readCount, 0)
+    }
+
 
     func testLocalProfileChangesRefreshEveryIndependentBridgeWithoutRestart() async throws {
         let (defaults, name) = try storage()
