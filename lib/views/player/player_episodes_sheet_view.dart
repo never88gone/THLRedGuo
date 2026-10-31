@@ -94,10 +94,12 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
         ? mediaQuery.size.height * 0.88
         : mediaQuery.size.height * 0.62;
 
-    final crossAxisCount = isLandscape
-        ? (mediaQuery.size.width >= 900 ? 10 : 8)
-        : 5;
-    final childAspectRatio = isLandscape ? 1.35 : 1.25;
+    final maxTileWidth = mediaQuery.textScaler.scale(isLandscape ? 80 : 90);
+    final tileHeight = max(
+      52.0,
+      (mediaQuery.textScaler.scale(15) + mediaQuery.textScaler.scale(9)) * 1.5 +
+          10,
+    );
 
     final episodes = widget.episodes;
     final currentEp =
@@ -431,11 +433,11 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                       SliverPadding(
                         padding: const EdgeInsets.only(bottom: 16),
                         sliver: SliverGrid(
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
+                          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: maxTileWidth,
                             crossAxisSpacing: 9,
                             mainAxisSpacing: 9,
-                            childAspectRatio: childAspectRatio,
+                            mainAxisExtent: tileHeight,
                           ),
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
