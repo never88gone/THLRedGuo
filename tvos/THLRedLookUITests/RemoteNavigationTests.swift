@@ -1620,9 +1620,8 @@ final class RemoteNavigationTests: XCTestCase {
         press(.select)
         wait("feed opens detail", seconds: 60) { self.app.buttons["detail.play"].hasFocus }
         press(.select)
-        wait("detail player ready", seconds: 120) {
-            self.app.staticTexts["player.position"].exists && self.seconds(self.app.staticTexts["player.position"].label) > 0
-        }
+        let child = try automaticFeedReady(title: second.title, minimum: resumedSecond.position)
+        XCTAssertEqual(child.episode, resumedSecond.episode)
         showControls()
         focusDrawer()
         press(.select)
