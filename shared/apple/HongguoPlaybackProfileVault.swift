@@ -8,7 +8,7 @@ enum HongguoProfileStorageError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable: return "无法访问本机播放配置，请解锁设备后重试"
-        case .invalidProfile: return "播放配置无效，请重新导入官方 APK"
+        case .invalidProfile: return "本机签名缓存无效"
         }
     }
 }

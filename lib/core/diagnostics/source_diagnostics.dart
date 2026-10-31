@@ -697,8 +697,8 @@ class SourceDiagnostics extends ChangeNotifier {
     }
     return switch (code) {
       'LOCAL_PROFILE_REQUIRED' ||
-      'LOCAL_PROFILE_INVALID' => '请在设置的数据源页面导入红果官方 APK，建立本机播放配置。',
-      'LOCAL_PROFILE_UNAVAILABLE' => '本机播放配置暂不可访问，请解锁设备后重试。',
+      'LOCAL_PROFILE_INVALID' => '请更新 JS 数据源后重试，持续失败时导出诊断报告。',
+      'LOCAL_PROFILE_UNAVAILABLE' => '本机签名缓存暂不可访问，请稍后重试。',
       'SEARCH_TAB_MISSING' => '官方连接成功但未提供短剧分类，请导出日志并对照不同网络；仅凭此响应无法确定地区限制。',
       'INVALID_SEARCH_CURSOR' => '官方搜索游标未推进，请重新搜索；持续出现时导出日志反馈。',
       'SEARCH_EMPTY' => '诊断搜索未取得样本，尚未验证分页、详情与播放解析，请导出日志反馈。',
@@ -856,7 +856,7 @@ class SourceDiagnostics extends ChangeNotifier {
     );
     buffer.writeln('  - 数据源指纹: hongguo · SHA256 $sourceHash');
     if (HongguoPlaybackProfile.supported) {
-      buffer.writeln('  - 本机播放配置: ${HongguoPlaybackProfile.diagnosticSummary}');
+      buffer.writeln('  - 签名方式: ${HongguoPlaybackProfile.diagnosticSummary}');
     }
     buffer.writeln(
       '  - 系统地区: ${Platform.localeName} · 时区: ${DateTime.now().timeZoneName}',

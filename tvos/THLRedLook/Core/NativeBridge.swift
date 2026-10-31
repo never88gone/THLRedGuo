@@ -250,12 +250,16 @@ public actor NativeBridge {
     private func getOrCreateContext(sourceId: String) -> JSContext? {
         if sourceId == "hongguo" {
             let revision = playbackProfileRevision()
-            if loadedPlaybackProfileRevision != revision || localPlaybackProfileUnavailable {
+            if loadedPlaybackProfileRevision != revision {
                 applyLocalPlaybackProfileChange()
                 loadedPlaybackProfileRevision = revision
             }
         }
         if let existing = jsContexts[sourceId] {
+            if sourceId == "hongguo", localPlaybackProfileUnavailable,
+               sourceScripts[sourceId] == BuiltInHongguoJSContent {
+                refreshSigningCache(existing)
+            }
             synchronizeGuestSession(existing, sourceId: sourceId)
             return existing
         }
@@ -534,23 +538,7 @@ public actor NativeBridge {
         // 4. 执行 Spider 脚本代码
         context.evaluateScript(script)
         if sourceId == "hongguo", script == BuiltInHongguoJSContent, context.exception == nil {
-            context.evaluateScript("globalThis.__hongguoRequireLocalProfile = true;")
-            do {
-                if let profile = try playbackProfileLoader() {
-                    context.setObject(["configuration": profile.configuration, "sdkVersion": profile.sdkVersion] as NSDictionary,
-                                      forKeyedSubscript: "__hongguoPendingLocalProfile" as NSString)
-                    context.evaluateScript("""
-                    try { globalThis.__hongguoUseLocalApkProfile(globalThis.__hongguoPendingLocalProfile); }
-                    catch (_) { globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_INVALID'; }
-                    delete globalThis.__hongguoPendingLocalProfile;
-                    """)
-                }
-            } catch HongguoProfileStorageError.invalidProfile {
-                context.evaluateScript("globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_INVALID';")
-            } catch {
-                localPlaybackProfileUnavailable = true
-                context.evaluateScript("globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_UNAVAILABLE';")
-            }
+            refreshSigningCache(context)
         }
         if sourceId == "hongguo" {
             let ready = context.exception == nil && context.evaluateScript("typeof spider !== 'undefined' && typeof spider.play === 'function'")?.toBool() == true
@@ -560,6 +548,26 @@ public actor NativeBridge {
 
         jsContexts[sourceId] = context
         return context
+    }
+
+    private func refreshSigningCache(_ context: JSContext) {
+        localPlaybackProfileUnavailable = false
+        do {
+            if let profile = try playbackProfileLoader() {
+                context.setObject(["configuration": profile.configuration, "sdkVersion": profile.sdkVersion] as NSDictionary,
+                                  forKeyedSubscript: "__hongguoPendingLocalProfile" as NSString)
+                context.evaluateScript("""
+                try { globalThis.__hongguoUseLocalApkProfile(globalThis.__hongguoPendingLocalProfile); }
+                catch (_) { globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_INVALID'; }
+                delete globalThis.__hongguoPendingLocalProfile;
+                """)
+            }
+        } catch HongguoProfileStorageError.invalidProfile {
+            context.evaluateScript("globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_INVALID';")
+        } catch {
+            localPlaybackProfileUnavailable = true
+            context.evaluateScript("globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_UNAVAILABLE';")
+        }
     }
 
     private func synchronizeGuestSession(_ context: JSContext, sourceId: String) {
@@ -647,7 +655,7 @@ public actor NativeBridge {
         let description: String
         if code.hasPrefix("LOCAL_PROFILE_") {
             category = .configuration
-            description = code == "LOCAL_PROFILE_UNAVAILABLE" ? "本机播放配置暂不可访问，请解锁设备后重试" : "请在设置中导入红果官方 APK 后重试"
+            description = code == "LOCAL_PROFILE_UNAVAILABLE" ? "本机签名缓存暂不可访问，请稍后重试" : "数据源签名配置不可用，请更新数据源后重试"
         } else if code == "MEDIA_URL_EXPIRED" {
             category = .invalidResponse
             description = "本集媒体地址已经过期，请重新获取"

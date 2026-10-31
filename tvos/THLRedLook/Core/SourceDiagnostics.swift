@@ -608,8 +608,8 @@ public final class SourceDiagnostics: ObservableObject {
         if !entry.suggestion.isEmpty { return entry.suggestion }
         if entry.errorCode.hasPrefix("LOCAL_PROFILE_") {
             return entry.errorCode == "LOCAL_PROFILE_UNAVAILABLE"
-                ? "本机播放配置暂不可访问，请解锁设备后重试。"
-                : "请打开设置中的站源管理，用手机导入红果官方 APK。"
+                ? "本机签名缓存暂不可访问，请稍后重试。"
+                : "请更新 JS 数据源后重试，持续失败时导出诊断报告。"
         }
         if entry.errorCode.hasPrefix("DNS") || entry.category == .dnsError {
             return "请检查当前网络的 DNS 或路由器屏蔽规则，并用手机热点作对照。"
@@ -649,9 +649,9 @@ public final class SourceDiagnostics: ObservableObject {
         lines.append("· 数据源版本: \(Self.sourceRevision)")
         lines.append("· 打包校验: \(Self.sourceBundleStatus)")
         if let profile = try? HongguoPlaybackProfileVault.load() {
-            lines.append("· 本机播放配置: 已导入红果 \(profile.appVersion) · 仅本机存储")
+            lines.append("· 签名方式: JS 数据源 · 本机兼容缓存 \(profile.appVersion)")
         } else {
-            lines.append("· 本机播放配置: 未导入或暂不可访问")
+            lines.append("· 签名方式: JS 数据源")
         }
         lines.append("· 应用提交: \(Self.sourceManifest["appCommit"] ?? "未记录")")
         lines.append("· 运行源状态: \(sourceRuntimeStatus)")

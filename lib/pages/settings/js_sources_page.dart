@@ -2,14 +2,12 @@ import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/js/js_source_models.dart';
 import 'package:THLRedLook/core/js/js_source_presets.dart';
 import 'package:THLRedLook/core/js/js_source_service.dart';
-import 'package:THLRedLook/core/js/hongguo_playback_profile.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 
 class JsSourcesPage extends StatefulWidget {
@@ -31,163 +29,11 @@ class JsSourcesPage extends StatefulWidget {
 class _JsSourcesPageState extends State<JsSourcesPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _scriptController = TextEditingController();
-  bool _importingApk = false;
-  Map<String, dynamic> _apkMetadata = const {};
-  String? _apkMessage;
 
   late final JsSourceService _service =
       widget.service ??
       JsSourceService.current ??
       JsSourceService(widget.repository);
-
-  @override
-  void initState() {
-    super.initState();
-    _loadApkMetadata();
-  }
-
-  Future<void> _loadApkMetadata() async {
-    if (!HongguoPlaybackProfile.supported) return;
-    try {
-      final value = await HongguoPlaybackProfile.metadata();
-      if (mounted) setState(() => _apkMetadata = value);
-    } catch (_) {
-      if (mounted) {
-        setState(() => _apkMessage = '本机播放配置暂不可访问，请稍后重试');
-      }
-    }
-  }
-
-  Future<void> _importOfficialApk() async {
-    if (_importingApk) return;
-    setState(() {
-      _importingApk = true;
-      _apkMessage = null;
-    });
-    var picked = false;
-    try {
-      final file = await FilePicker.pickFile(
-        type: FileType.custom,
-        allowedExtensions: const ['apk'],
-      );
-      if (file == null) return;
-      picked = true;
-      final length = await file.length();
-      if (length == null || length > 314572800 || file.path == null) {
-        throw PlatformException(
-          code: 'INVALID_APK_FILE',
-          message: '请选择不超过 300 MB 的红果官方 APK',
-        );
-      }
-      final metadata = await HongguoPlaybackProfile.importApk(file.path!);
-      if (!mounted) return;
-      setState(() {
-        _apkMetadata = metadata;
-        _apkMessage = '已导入红果 ${metadata['appVersion']}，可以返回播放';
-      });
-    } on PlatformException catch (error) {
-      if (mounted) {
-        setState(() => _apkMessage = error.message ?? 'APK 导入失败，请重试');
-      }
-    } catch (_) {
-      if (mounted) setState(() => _apkMessage = '无法导入 APK，请重新选择官方安装包');
-    } finally {
-      if (picked) {
-        try {
-          await FilePicker.clearTemporaryFiles();
-        } catch (_) {}
-      }
-      if (mounted) setState(() => _importingApk = false);
-    }
-  }
-
-  Future<void> _removeApkProfile() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('移除本机播放配置'),
-        content: const Text('移除后，在线播放需要重新导入红果官方 APK。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('移除'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await HongguoPlaybackProfile.remove();
-      if (mounted) {
-        setState(() {
-          _apkMetadata = const {'imported': false};
-          _apkMessage = '已移除本机播放配置';
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _apkMessage = '暂时无法移除，请稍后重试');
-    }
-  }
-
-  Widget _apkProfileCard() {
-    final imported = _apkMetadata['imported'] == true;
-    return Card(
-      key: const ValueKey('hongguo-apk-profile-card'),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('红果本机播放配置', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 10),
-            Text(
-              imported
-                  ? '已导入红果 ${_apkMetadata['appVersion']}'
-                  : '选择官方 APK，建立本机播放配置',
-              key: const ValueKey('hongguo-apk-profile-status'),
-            ),
-            const SizedBox(height: 8),
-            const Text('配置仅保存在当前设备，不同步到 iCloud。'),
-            if (_apkMessage != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                _apkMessage!,
-                key: const ValueKey('hongguo-apk-profile-message'),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 12,
-              children: [
-                FilledButton.icon(
-                  key: const ValueKey('hongguo-import-official-apk'),
-                  onPressed: _importingApk ? null : _importOfficialApk,
-                  icon: _importingApk
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.file_open_outlined),
-                  label: Text(_importingApk ? '正在导入…' : '导入官方 APK'),
-                ),
-                if (imported)
-                  TextButton(
-                    key: const ValueKey('hongguo-remove-apk-profile'),
-                    onPressed: _importingApk ? null : _removeApkProfile,
-                    child: const Text('移除本机配置'),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   void dispose() {
@@ -722,10 +568,6 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              if (HongguoPlaybackProfile.supported) ...[
-                _apkProfileCard(),
-                const SizedBox(height: 18),
-              ],
               // 架构说明卡片
               Container(
                 decoration: BoxDecoration(

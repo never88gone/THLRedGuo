@@ -19,8 +19,8 @@ class HongguoPlaybackProfile {
         value?['imported'] == true &&
             version is String &&
             RegExp(r'^[0-9.]{1,32}$').hasMatch(version)
-        ? '已导入红果 $version · 仅本机存储'
-        : '未导入';
+        ? 'JS 数据源 · 本机兼容缓存 $version'
+        : 'JS 内置签名';
   }
 
   static Future<Map<String, dynamic>> metadata() async {
@@ -58,8 +58,8 @@ class HongguoPlaybackProfile {
       if (revision != _revision) return runtimeConfiguration();
       _summary =
           error is PlatformException && error.code == 'LOCAL_PROFILE_INVALID'
-          ? '配置无效，请重新导入'
-          : '暂不可访问';
+          ? 'JS 数据源 · 兼容缓存无效'
+          : 'JS 数据源 · 兼容缓存暂不可访问';
       rethrow;
     } finally {
       if (identical(_loading, future)) _loading = null;
@@ -79,7 +79,7 @@ class HongguoPlaybackProfile {
   static Future<void> remove() async {
     await _channel.invokeMethod<void>('removeHongguoPlaybackProfile');
     _invalidate();
-    _summary = '未导入';
+    _summary = 'JS 内置签名';
   }
 
   static void _invalidate() {

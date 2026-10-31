@@ -65,14 +65,10 @@ final class LocalLibraryTests: XCTestCase {
         }
         let payload: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567000"]]
         for bridge in bridges {
-            do {
-                _ = try await bridge.request(action: "detail", payload: payload)
-                XCTFail("Missing profile must stop before HTTP")
-            } catch {
-                XCTAssertTrue(error.localizedDescription.contains("导入"), error.localizedDescription)
-            }
+            let value = try await bridge.request(action: "detail", payload: payload)
+            XCTAssertEqual((value["episodes"] as? [[String: Any]])?.count, 1)
         }
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 0)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 4)
         XCTAssertEqual(profile.readCount, 4)
         for _ in 0..<2 {
             profile.replace(with: HongguoApkProfile(appVersion: "7.4.3.32", sdkVersion: "v04.10.03-ml-android",
@@ -84,18 +80,16 @@ final class LocalLibraryTests: XCTestCase {
             }
         }
         XCTAssertEqual(profile.readCount, 12)
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 8)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 12)
         profile.replace(with: nil)
         for bridge in bridges {
-            do {
-                _ = try await bridge.request(action: "detail", payload: payload)
-                XCTFail("Removed profile must not retain old signing state")
-            } catch {
-                XCTAssertTrue(error.localizedDescription.contains("导入"), error.localizedDescription)
-            }
+            let value = try await bridge.request(action: "detail", payload: payload)
+            XCTAssertEqual((value["episodes"] as? [[String: Any]])?.count, 1)
         }
         XCTAssertEqual(profile.readCount, 16)
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 8)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 16)
+        XCTAssertEqual(LocalProfileDetailProtocol.signatureVersions,
+                       Array(repeating: UInt32(3), count: 4) + Array(repeating: UInt32(5), count: 8) + Array(repeating: UInt32(3), count: 4))
         XCTAssertEqual(LocalProfileDetailProtocol.unexpectedCount, 0)
         XCTAssertEqual(defaults.string(forKey: "thl_tv_hongguo_device_session"), guest)
         print("THL_PROFILE_REFRESH independentBridges=4 import=true replacement=true removal=true registrations=0 guestPreserved=true")
@@ -122,33 +116,29 @@ final class LocalLibraryTests: XCTestCase {
         let bridge = NativeBridge(baseDirectory: root, httpSession: session, diagnostics: SourceDiagnostics(), deviceDefaults: defaults,
                                   playbackProfileLoader: { try profile.load() }, playbackProfileRevision: { profile.revision })
         let payload: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567000"]]
-        do {
-            _ = try await bridge.request(action: "detail", payload: payload)
-            XCTFail("Unavailable profile must stop before HTTP")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("解锁"), error.localizedDescription) }
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 0)
-        XCTAssertEqual(profile.readCount, 1)
         _ = try await bridge.request(action: "detail", payload: payload)
-        _ = try await bridge.request(action: "detail", payload: payload)
-        XCTAssertEqual(profile.readCount, 2)
         XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 1)
+        XCTAssertEqual(profile.readCount, 1)
+        let another: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567001"]]
+        _ = try await bridge.request(action: "detail", payload: another)
+        _ = try await bridge.request(action: "detail", payload: another)
+        XCTAssertEqual(profile.readCount, 2)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 2)
         profile.replace(with: value)
         profile.failNextLoad(with: .invalidProfile)
         for _ in 0..<2 {
-            do {
-                _ = try await bridge.request(action: "detail", payload: payload)
-                XCTFail("Invalid profile must require replacement")
-            } catch { XCTAssertTrue(error.localizedDescription.contains("无效"), error.localizedDescription) }
+            _ = try await bridge.request(action: "detail", payload: payload)
         }
         XCTAssertEqual(profile.readCount, 3)
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 1)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 3)
         profile.replace(with: value)
         _ = try await bridge.request(action: "detail", payload: payload)
         XCTAssertEqual(profile.readCount, 4)
-        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 2)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 4)
+        XCTAssertEqual(LocalProfileDetailProtocol.signatureVersions, [3, 5, 3, 5])
         XCTAssertEqual(LocalProfileDetailProtocol.unexpectedCount, 0)
         XCTAssertEqual(defaults.string(forKey: "thl_tv_hongguo_device_session"), guest)
-        print("THL_PROFILE_TEMPORARY_READ manualRetryRecovered=true invalidProfileCached=true registrations=0 guestPreserved=true")
+        print("THL_PROFILE_TEMPORARY_READ optionalCacheRetry=true fallbackAllowed=true runtimePreserved=true registrations=0 guestPreserved=true")
     }
 
     func testKeychainSaveRefreshesIndependentBridgesWithoutChangingProfile() async throws {
@@ -761,9 +751,11 @@ private final class LocalProfileDetailProtocol: URLProtocol {
     private static let lock = NSLock()
     private static var requests = 0
     private static var unexpected = 0
+    private static var versions: [UInt32] = []
     static var requestCount: Int { lock.withLock { requests } }
     static var unexpectedCount: Int { lock.withLock { unexpected } }
-    static func reset() { lock.withLock { requests = 0; unexpected = 0 } }
+    static var signatureVersions: [UInt32] { lock.withLock { versions } }
+    static func reset() { lock.withLock { requests = 0; unexpected = 0; versions = [] } }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -771,13 +763,13 @@ private final class LocalProfileDetailProtocol: URLProtocol {
         guard request.url?.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "novel/player/video_detail/v1",
               URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "device_id" })?.value == "7345678901234567100",
               let signature = request.value(forHTTPHeaderField: "x-medusa"), let data = Data(base64Encoded: signature), data.count >= 4,
-              let time = UInt32(request.value(forHTTPHeaderField: "x-khronos") ?? ""),
-              data.prefix(4).enumerated().reduce(UInt32(0), { $0 | UInt32($1.element) << (8 * $1.offset) }) ^ time == 5 else {
+              let time = UInt32(request.value(forHTTPHeaderField: "x-khronos") ?? "") else {
             Self.lock.withLock { Self.unexpected += 1 }
             client?.urlProtocol(self, didFailWithError: URLError(.cancelled))
             return
         }
-        Self.lock.withLock { Self.requests += 1 }
+        let version = data.prefix(4).enumerated().reduce(UInt32(0), { $0 | UInt32($1.element) << (8 * $1.offset) }) ^ time
+        Self.lock.withLock { Self.requests += 1; Self.versions.append(version) }
         let body = Data(#"{"data":{"video_data":{"series_title":"合成剧集","episode_cnt":1,"video_list":[{"vid":"7345678901234568000"}]}}}"#.utf8)
         client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json; charset=utf-8"])!, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: body)
