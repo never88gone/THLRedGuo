@@ -6,6 +6,7 @@ import sys
 import traceback
 from pathlib import Path
 
+from prepare_official_source import prepared_official_source
 from build_mirrors import china_mirror_environment, mirrored_pub_lockfile
 from app_build import BuildVariant, add_variant_argument, sync_project_version, get_beijing_build_number
 
@@ -19,7 +20,6 @@ def run_command(cmd, **kwargs):
 
 def main():
     root = Path(__file__).resolve().parents[2]
-    sync_project_version(root, "1.0.0")
     beijing_build = get_beijing_build_number()
     os.environ["TZ"] = "Asia/Shanghai"
     parser = argparse.ArgumentParser()
@@ -30,7 +30,11 @@ def main():
     environment = os.environ.copy()
     environment['TZ'] = 'Asia/Shanghai'
     flutter = 'flutter' if os.name == 'nt' else (shutil.which('flutter') or 'flutter')
-    with china_mirror_environment(environment, options.cn_mirrors, gradle=False) as env:
+    with (
+        prepared_official_source(root),
+        china_mirror_environment(environment, options.cn_mirrors, gradle=False) as env,
+    ):
+        sync_project_version(root, "1.0.0")
         with mirrored_pub_lockfile(root, env):
             run_command([flutter, 'pub', 'get'], cwd=root, env=env, check=True)
             run_command([flutter, 'build', 'windows', '--release', '--no-pub', '--build-name=1.0.0', f'--build-number={beijing_build}', '-v', *variant.flutter_arguments], cwd=root, env=env, check=True)

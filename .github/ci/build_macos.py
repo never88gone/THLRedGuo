@@ -12,8 +12,9 @@ from pathlib import Path
 
 from app_build import BuildVariant, add_variant_argument, sync_project_version, get_beijing_build_number
 
+from prepare_official_source import prepared_official_source
+
 root = Path(__file__).resolve().parents[2]
-sync_project_version(root, "1.0.0")
 
 
 def run(cmd, **kwargs):
@@ -142,6 +143,12 @@ def main():
     if not flutter or not xcodebuild:
         raise SystemExit("请先确保 Flutter 与 Xcode 命令行工具已正确安装并加入 PATH。")
 
+    with prepared_official_source(root):
+        sync_project_version(root, "1.0.0")
+        build(options, variant, flutter, xcodebuild)
+
+
+def build(options, variant, flutter, xcodebuild):
     run([flutter, "pub", "get"])
     # 关键：先执行 flutter build macos --config-only 生成 ephemeral 依赖与 xcfilelist，避免 clean CI 环境下 xcodebuild 报错
     run([flutter, "build", "macos", "--config-only", "--release", *variant.flutter_arguments])

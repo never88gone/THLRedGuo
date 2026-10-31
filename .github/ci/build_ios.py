@@ -10,11 +10,9 @@ from pathlib import Path
 
 from app_build import BuildVariant, add_variant_argument, sync_project_version, get_beijing_build_number
 
+from prepare_official_source import prepared_official_source
+
 root = Path(__file__).resolve().parents[2]
-sync_project_version(root, "1.0.0")
-beijing_build = get_beijing_build_number()
-os.environ["TZ"] = "Asia/Shanghai"
-os.environ["BUILD_NUMBER"] = beijing_build
 
 
 def run(arguments, **kwargs):
@@ -32,6 +30,15 @@ def main():
     flutter = shutil.which('flutter')
     if not flutter or not shutil.which('pod'):
         raise SystemExit('请安装 Flutter 和 CocoaPods。')
+    with prepared_official_source(root):
+        sync_project_version(root, "1.0.0")
+        build(options, variant, flutter)
+
+
+def build(options, variant, flutter):
+    beijing_build = get_beijing_build_number()
+    os.environ["TZ"] = "Asia/Shanghai"
+    os.environ["BUILD_NUMBER"] = beijing_build
     run([flutter, 'pub', 'get'])
     run(['pod', 'install'], cwd=root / 'ios')
     output = root / 'dist' / 'ios'

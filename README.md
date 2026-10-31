@@ -9,6 +9,12 @@
   <a href="https://t.me/tanghulutvos"><img src="https://img.shields.io/badge/Telegram-Group-26A5E4?style=flat-square&logo=telegram&logoColor=white" alt="Telegram Group" /></a>
 </p>
 
+## 项目定位
+
+以下声明适用于本项目当前公开源码：
+
+> 本项目仅用于学习交流网络框架与架构设计，出于法律合规与安全考虑，已移除目标平台的核心签名参数（Secret/Salt），不提供开箱即用的破解功能。
+
 > ⚠️ **免责声明 (Disclaimer)**：
 > 1. **仅供学习研究**：本项目仅供编程技术交流、Flutter 跨平台与 Apple tvOS 原生应用架构研究使用，严禁用于任何商业牟利或侵权用途；
 > 2. **纯客户端工具，无内容存储**：本项目为纯本地端侧播放器工具，无需注册登录即可直接使用；开发者不搭建、不运营任何流媒体服务器，不提供、不存储、不分发任何音视频资源；
@@ -23,7 +29,7 @@
 
 应用内置官方 `assets/sources/hongguo.js`，也可在数据源管理页面导入兼容的 JS 数据源。iOS、iPadOS 与 tvOS 的浏览和在线播放均通过 JS 数据源工作，用户无需准备或导入 Android APK。
 
-独立导入请使用 [发布版 hongguo.js](https://github.com/never88gone/THLRedGuo/releases/download/official-source/hongguo.js)。Git 源码中的同名文件是构建模板，不包含固定签名配置；GitHub Actions 从 `HONGGUO_SIGNING_CONFIG` Secret 注入后生成可用 JS 与安装包。配置仍包含在分发文件中，Secrets 保护的是源码仓库与构建过程。
+独立导入请使用 [发布版 hongguo.js](https://github.com/never88gone/THLRedGuo/releases/download/official-source/hongguo.js)。
 
 - **iOS / iPadOS**：进入「设置 → JS 数据源插件管理」管理数据源。
 - **tvOS**：进入「设置 → 站源管理」查看当前 JS 版本、导入数据源网址和执行诊断。
@@ -169,14 +175,6 @@ THLRedLook
 
 ## 开发与本地构建
 
-本地构建前，需要通过私有配置文件注入官方 JS 配置，文件仅包含 Base64 编码的 `id`（9 字节）与 `material`（32 字节）：
-
-```bash
-python3 .github/ci/prepare_official_source.py --config /path/to/private-signing.json
-```
-
-完成本地构建后执行 `python3 .github/ci/prepare_official_source.py --restore`，将源码恢复为模板再提交。私有配置与生成的 JS 不应提交 Git；CI 自动读取同结构的 `HONGGUO_SIGNING_CONFIG` Secret，不向日志输出配置值。拉取请求不注入此配置，其构建产物不作为可播放的发布包。
-
 ### 环境准备
 - **Flutter SDK**：3.44.x+（推荐使用 `fvm`）
 - **Python**：3.10+（用于运行工程工具链脚本）
@@ -186,7 +184,7 @@ python3 .github/ci/prepare_official_source.py --config /path/to/private-signing.
   - Windows：Visual Studio 2022 C++ 桌面开发套件
 
 ### 运行与调试
-本项目零服务器配置依赖，一键拉取依赖即可运行：
+使用 Flutter 启动本地调试：
 
 ```bash
 # 获取 Flutter 依赖

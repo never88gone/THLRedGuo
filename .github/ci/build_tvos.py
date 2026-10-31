@@ -10,8 +10,9 @@ import sys
 from pathlib import Path
 from app_build import sync_project_version, get_beijing_timestamp_build_number
 
+from prepare_official_source import prepared_official_source
+
 root = Path(__file__).resolve().parents[2]
-sync_project_version(root, "1.0.0")
 
 def run(cmd, **kwargs):
     print("Executing: " + " ".join(cmd), flush=True)
@@ -41,6 +42,12 @@ def main():
         print("未找到 Xcode 工程或 Workspace", file=sys.stderr)
         sys.exit(1)
 
+    with prepared_official_source(root):
+        sync_project_version(root, "1.0.0")
+        build(args, xcodebuild, workspace_path, project_path)
+
+
+def build(args, xcodebuild, workspace_path, project_path):
     configuration = "Release" if (args.release or args.package) else "Debug"
     destination = "generic/platform=tvOS"
 
@@ -169,6 +176,7 @@ def main():
         print(f"开始构建 tvOS 工程 [{configuration}] -> {destination}...")
         run(cmd)
         print("tvOS 构建成功！")
+
 
 if __name__ == "__main__":
     main()
