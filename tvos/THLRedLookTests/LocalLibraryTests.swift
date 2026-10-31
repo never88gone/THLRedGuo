@@ -61,7 +61,7 @@ final class LocalLibraryTests: XCTestCase {
         let bridges = ["播放", "下一集", "推荐", "弹幕"].enumerated().map { index, context in
             NativeBridge(baseDirectory: root.appendingPathComponent(String(index)), httpSession: session,
                          diagnostics: SourceDiagnostics(), diagnosticContext: context, deviceDefaults: defaults,
-                         playbackProfileLoader: { profile.load() }, playbackProfileRevision: { profile.revision })
+                         playbackProfileLoader: { try profile.load() }, playbackProfileRevision: { profile.revision })
         }
         let payload: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567000"]]
         for bridge in bridges {
@@ -101,6 +101,56 @@ final class LocalLibraryTests: XCTestCase {
         print("THL_PROFILE_REFRESH independentBridges=4 import=true replacement=true removal=true registrations=0 guestPreserved=true")
     }
 
+    func testTemporaryProfileReadFailureCanRetryWithoutImportOrGuestReset() async throws {
+        let (defaults, name) = try storage()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let guest = #"{"device_id":"7345678901234567100","iid":"7345678901234567200"}"#
+        defaults.set(guest, forKey: "thl_tv_hongguo_device_session")
+        defaults.set(Date().timeIntervalSince1970, forKey: "thl_tv_hongguo_guest_created_at")
+        let profile = MemoryPlaybackProfile()
+        let value = HongguoApkProfile(appVersion: "7.4.3.32", sdkVersion: "v04.10.03-ml-android",
+                                    configuration: Self.publicTestConfiguration, importedAt: Date())
+        profile.replace(with: value)
+        profile.failNextLoad(with: .unavailable(-25308))
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [LocalProfileDetailProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        LocalProfileDetailProtocol.reset()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bridge = NativeBridge(baseDirectory: root, httpSession: session, diagnostics: SourceDiagnostics(), deviceDefaults: defaults,
+                                  playbackProfileLoader: { try profile.load() }, playbackProfileRevision: { profile.revision })
+        let payload: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567000"]]
+        do {
+            _ = try await bridge.request(action: "detail", payload: payload)
+            XCTFail("Unavailable profile must stop before HTTP")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("解锁"), error.localizedDescription) }
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 0)
+        XCTAssertEqual(profile.readCount, 1)
+        _ = try await bridge.request(action: "detail", payload: payload)
+        _ = try await bridge.request(action: "detail", payload: payload)
+        XCTAssertEqual(profile.readCount, 2)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 1)
+        profile.replace(with: value)
+        profile.failNextLoad(with: .invalidProfile)
+        for _ in 0..<2 {
+            do {
+                _ = try await bridge.request(action: "detail", payload: payload)
+                XCTFail("Invalid profile must require replacement")
+            } catch { XCTAssertTrue(error.localizedDescription.contains("无效"), error.localizedDescription) }
+        }
+        XCTAssertEqual(profile.readCount, 3)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 1)
+        profile.replace(with: value)
+        _ = try await bridge.request(action: "detail", payload: payload)
+        XCTAssertEqual(profile.readCount, 4)
+        XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 2)
+        XCTAssertEqual(LocalProfileDetailProtocol.unexpectedCount, 0)
+        XCTAssertEqual(defaults.string(forKey: "thl_tv_hongguo_device_session"), guest)
+        print("THL_PROFILE_TEMPORARY_READ manualRetryRecovered=true invalidProfileCached=true registrations=0 guestPreserved=true")
+    }
+
     func testKeychainSaveRefreshesIndependentBridgesWithoutChangingProfile() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_PROFILE_REVISION_SAVE"] == "1")
         let existing = try XCTUnwrap(HongguoPlaybackProfileVault.load())
@@ -109,7 +159,7 @@ final class LocalLibraryTests: XCTestCase {
         let reads = MemoryPlaybackProfile()
         let bridges = (0..<3).map { index in
             NativeBridge(baseDirectory: root.appendingPathComponent(String(index)), persistentDeviceSession: false,
-                         playbackProfileLoader: { _ = reads.load(); return try HongguoPlaybackProfileVault.load() })
+                         playbackProfileLoader: { _ = try reads.load(); return try HongguoPlaybackProfileVault.load() })
         }
         for bridge in bridges {
             _ = try await bridge.request(action: "jsSource.identity", payload: [:])
@@ -692,10 +742,18 @@ private final class MemoryPlaybackProfile: @unchecked Sendable {
     private var profile: HongguoApkProfile?
     private var version: UInt64 = 0
     private var reads = 0
+    private var pendingError: HongguoProfileStorageError?
 
     var revision: UInt64 { lock.withLock { version } }
     var readCount: Int { lock.withLock { reads } }
-    func load() -> HongguoApkProfile? { lock.withLock { reads += 1; return profile } }
+    func load() throws -> HongguoApkProfile? {
+        try lock.withLock {
+            reads += 1
+            if let error = pendingError { pendingError = nil; throw error }
+            return profile
+        }
+    }
+    func failNextLoad(with error: HongguoProfileStorageError) { lock.withLock { pendingError = error } }
     func replace(with value: HongguoApkProfile?) { lock.withLock { profile = value; version &+= 1 } }
 }
 

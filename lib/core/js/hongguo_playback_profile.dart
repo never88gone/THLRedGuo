@@ -54,8 +54,12 @@ class HongguoPlaybackProfile {
     _loading = future;
     try {
       return await future;
-    } catch (_) {
-      _summary = '暂不可访问';
+    } catch (error) {
+      if (revision != _revision) return runtimeConfiguration();
+      _summary =
+          error is PlatformException && error.code == 'LOCAL_PROFILE_INVALID'
+          ? '配置无效，请重新导入'
+          : '暂不可访问';
       rethrow;
     } finally {
       if (identical(_loading, future)) _loading = null;

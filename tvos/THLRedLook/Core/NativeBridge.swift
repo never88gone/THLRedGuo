@@ -71,6 +71,7 @@ public actor NativeBridge {
     private let playbackProfileLoader: @Sendable () throws -> HongguoApkProfile?
     private let playbackProfileRevision: @Sendable () -> UInt64
     private var loadedPlaybackProfileRevision: UInt64?
+    private var localPlaybackProfileUnavailable = false
 
     // 沙盒路径
     private var baseDirURL: URL
@@ -86,6 +87,7 @@ public actor NativeBridge {
 
     public func applyLocalPlaybackProfileChange() {
         jsContexts.removeValue(forKey: "hongguo")
+        localPlaybackProfileUnavailable = false
         successfulPlaybackResolves = 0
         lastSuccessfulPlaybackAt = nil
     }
@@ -248,7 +250,7 @@ public actor NativeBridge {
     private func getOrCreateContext(sourceId: String) -> JSContext? {
         if sourceId == "hongguo" {
             let revision = playbackProfileRevision()
-            if loadedPlaybackProfileRevision != revision {
+            if loadedPlaybackProfileRevision != revision || localPlaybackProfileUnavailable {
                 applyLocalPlaybackProfileChange()
                 loadedPlaybackProfileRevision = revision
             }
@@ -543,7 +545,10 @@ public actor NativeBridge {
                     delete globalThis.__hongguoPendingLocalProfile;
                     """)
                 }
+            } catch HongguoProfileStorageError.invalidProfile {
+                context.evaluateScript("globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_INVALID';")
             } catch {
+                localPlaybackProfileUnavailable = true
                 context.evaluateScript("globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_UNAVAILABLE';")
             }
         }

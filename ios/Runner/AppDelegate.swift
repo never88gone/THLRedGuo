@@ -67,6 +67,8 @@ import CoreMedia
             } else {
               result(try HongguoPlaybackProfileVault.metadata())
             }
+          } catch HongguoProfileStorageError.invalidProfile {
+            result(FlutterError(code: "LOCAL_PROFILE_INVALID", message: HongguoProfileStorageError.invalidProfile.localizedDescription, details: nil))
           } catch {
             result(FlutterError(code: "LOCAL_PROFILE_UNAVAILABLE", message: error.localizedDescription, details: nil))
           }

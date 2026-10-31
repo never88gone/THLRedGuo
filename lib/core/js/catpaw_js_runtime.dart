@@ -140,6 +140,7 @@ class CatPawJsRuntime {
   List<SourceDiagnosticEntry> _modelResponses = [];
   final HongguoGuestSession guestSessions;
   bool _ready = false;
+  bool _localProfileUnavailable = false;
   bool _isDisposed = false;
   final Set<Completer<void>> _requestAborts = {};
   int _activeRequests = 0;
@@ -174,10 +175,12 @@ class CatPawJsRuntime {
 
   bool get isReady => _ready;
   bool get isDisposed => _isDisposed;
+  bool get localProfileUnavailable => _localProfileUnavailable;
   bool get hasPendingWork => _activeRequests > 0 || _activeEvals > 0;
 
   Future<void> init(String script) async {
     if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
+    _localProfileUnavailable = false;
     if (persistentDeviceSession) await guestSessions.preload();
     _rt = getJavascriptRuntime(xhr: false);
     _injectGlobals();
@@ -199,9 +202,13 @@ try {
 } catch (_) { globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_INVALID'; }
 ''');
           }
-        } catch (_) {
+        } catch (error) {
+          final invalid =
+              error is PlatformException &&
+              error.code == 'LOCAL_PROFILE_INVALID';
+          _localProfileUnavailable = !invalid;
           _rt.evaluate(
-            "globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_UNAVAILABLE';",
+            "globalThis.__hongguoProfileErrorCode = '${invalid ? 'LOCAL_PROFILE_INVALID' : 'LOCAL_PROFILE_UNAVAILABLE'}';",
           );
         }
       }
@@ -1496,7 +1503,7 @@ class CatPawRuntimePool {
       final pending = _pending[key];
       if (pending != null) return pending;
       final runtime = _pool[key];
-      if (runtime != null) return runtime;
+      if (runtime != null && !runtime.localProfileUnavailable) return runtime;
     }
     _removeKey(key);
     final generation = _generations[key]!;
