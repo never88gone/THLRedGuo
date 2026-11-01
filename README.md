@@ -97,7 +97,7 @@
 | :--- | :--- | :--- |
 | **Android** | 适配手机、折叠屏与老旧设备，兼容 Android 7.1+（API 25+），支持竖屏短剧滑动手势、画中画（PiP）浮窗、arm64-v8a / armeabi-v7a / x86_64 三架构 | 原生 Flutter + NDK 编译，输出 APK / AAB |
 | **Android TV** | 自动识别大屏电视模式，锁定横屏影院布局，完整适配遥控器方向键与焦点移动 | 共用 Flutter 源码，自适应电视 UI 布局 |
-| **iOS** | 适配 iPhone / iPad，原生画中画（PiP）小窗播放与后台接续、深色模式自适应、原生手势返回与低功耗下载 | Xcode 编译签名，输出 IPA 归档；支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装 |
+| **iOS / iPadOS** | 适配 iPhone、iPad 与 iPhone Duo 双屏折叠设备，原生画中画（PiP）小窗播放与后台接续、深色模式自适应、原生手势返回与低功耗下载 | 支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装，或通过 Xcode 编译打包 |
 | **macOS** | 桌面端大屏响应式三栏/分栏布局，键盘方向键与快捷键全面支持 | macOS App / PKG 安装包 |
 | **Windows** | 基于 `media_kit` / libmpv 硬件解码，集成专属 Shader 画质增强滤镜 | 独立免安装绿色包 / 便携目录（含完整 DLL 与运行环境） |
 | **Apple tvOS** | 独立原生工程（`tvos/`），纯 SwiftUI + Siri Remote 焦点引擎 + AVKit 原生渲染打造，具备完整客厅大屏交互与原生影院体验 | 独立 Xcode 工程，输出 tvOS IPA；支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装 |
@@ -158,57 +158,15 @@
 
 ---
 
-## 目录结构概览
-
-```
-THLRedLook
-├── lib/                   # Flutter 跨平台业务逻辑、页面 UI、播放器控制器与端侧调度
-├── android/               # Android 原生平台工程与清单配置
-├── ios/                   # iOS 原生平台工程、Podfile 与签名配置
-├── macos/                 # macOS 桌面端平台工程与权限配置
-├── windows/               # Windows 桌面端 Runner 与 CMake 构建系统
-├── tvos/                  # Apple tvOS 原生独立工程（SwiftUI + AVKit + Focus Engine）
-└── .github/ci/            # 构建、打包、官方 JS 校验与 TestFlight 工具
-```
-
----
-
-## 开发与本地构建
-
-### 环境准备
-- **Flutter SDK**：3.44.x+（推荐使用 `fvm`）
-- **Python**：3.10+（用于运行工程工具链脚本）
-- **平台依赖**：
-  - Android：JDK 17+、Android SDK 36
-  - iOS / macOS / tvOS：macOS 系统、Xcode 16+、CocoaPods
-  - Windows：Visual Studio 2022 C++ 桌面开发套件
-
-### 运行与调试
-使用 Flutter 启动本地调试：
+## 构建说明
 
 ```bash
-# 获取 Flutter 依赖
+# 获取依赖
 flutter pub get
 
-# 启动本地调试（全平台支持）
+# 启动运行
 flutter run
 ```
-
-### 构建与发布
-
-仓库保留的最小工具链位于 `.github/ci/`，CI 和本地打包使用相同入口：
-
-```bash
-python3 .github/ci/build_android.py
-python3 .github/ci/build_windows.py
-python3 .github/ci/build_ios.py
-python3 .github/ci/build_macos.py
-python3 .github/ci/build_tvos.py
-```
-
-Apple 平台的签名打包使用 `--export-options` 指定对应的 ExportOptions.plist；tvOS 归档另加 `--package`。tvOS 本地调试先在 `tvos/` 运行 `pod install`，再打开 `THLRedLook.xcworkspace`，选择 Apple TV 模拟器运行。
-
-应用版本保持 `1.0.0`。Apple 平台 CI 自动打包并上传 TestFlight；tvOS 公开组分发仅由手动工作流明确勾选 `publish_public` 触发。
 
 ---
 
