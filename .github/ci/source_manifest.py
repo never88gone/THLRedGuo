@@ -8,6 +8,8 @@ import subprocess
 from pathlib import Path
 from zipfile import ZipFile
 
+from prepare_official_source import TOKENS, is_ci, parse_configuration
+
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'assets/sources/hongguo.js'
 MANIFEST = 'hongguo-source.json'
@@ -46,6 +48,46 @@ def verify_bytes(data, manifest, expected):
     if data != expected or metadata.get('id') != 'hongguo' or metadata.get('sha256') != digest(data):
         raise ValueError('Packaged official source does not match repository or manifest')
     return metadata
+
+
+def verify_flutter_source(data, expected=None):
+    expected = SOURCE.read_bytes() if expected is None else expected
+    if data != expected:
+        raise ValueError('Packaged Flutter source does not match the prepared official source')
+    configurations = re.findall(
+        rb'const builtInConfiguration=\{id:"([^"\r\n]*)",material:"([^"\r\n]*)"\};',
+        data,
+    )
+    if len(configurations) != 1:
+        raise ValueError('Packaged Flutter source configuration is missing or invalid')
+    values = dict(zip(TOKENS, (value.decode('ascii') for value in configurations[0])))
+    if any(token.encode() in data for token in TOKENS.values()):
+        if not (is_ci() and os.environ.get('GITHUB_EVENT_NAME') == 'pull_request' and values == TOKENS):
+            raise ValueError('Packaged Flutter source still contains signing placeholders')
+    else:
+        parse_configuration(json.dumps(values))
+    version = re.search(rb'version:\s*"([^"]+)"', data[:2000])
+    if len(data) < 1000 or not re.search(rb'id:\s*"hongguo"', data[:2000]) or not version:
+        raise ValueError('Packaged Flutter official source metadata is invalid')
+    metadata = {'sourceVersion': version.group(1).decode(), 'sha256': digest(data)}
+    print('Packaged Flutter official source verified:', metadata['sourceVersion'], metadata['sha256'])
+    return metadata
+
+
+def verify_flutter_archive(path, source_path):
+    prefix = source_path.rsplit('/', 1)[0] + '/'
+    with ZipFile(path) as archive:
+        scripts = [name for name in archive.namelist() if name.startswith(prefix) and name.endswith('.js')]
+        if scripts != [source_path]:
+            raise ValueError('Flutter package must contain only the official source script')
+        return verify_flutter_source(archive.read(source_path))
+
+
+def verify_flutter_directory(directory):
+    scripts = sorted(path.relative_to(directory).as_posix() for path in directory.rglob('*.js') if path.is_file())
+    if scripts != ['hongguo.js']:
+        raise ValueError('Flutter bundle must contain only the official source script')
+    return verify_flutter_source((directory / 'hongguo.js').read_bytes())
 
 
 def inspect_ipa(path, require_manifest=True):
