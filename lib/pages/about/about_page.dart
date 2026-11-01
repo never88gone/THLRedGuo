@@ -10,6 +10,7 @@ import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/utils/sources/source_gate_taps.dart';
 import 'package:THLRedLook/views/sources/source_switcher_sheet.dart';
+import 'package:THLRedLook/views/update/app_update_dialog.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key, required this.store});
@@ -182,7 +183,7 @@ class _AboutPageState extends State<AboutPage> {
                 ),
               ),
               const SizedBox(height: 28),
-              // 2. 版本号卡片
+              // 2. 版本号卡片与检查更新
               Card(
                 elevation: 0,
                 color: isDark ? AppColors.darkCard : AppColors.greyLight,
@@ -190,17 +191,36 @@ class _AboutPageState extends State<AboutPage> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.darkSurfaceHighest,
-                    child: Icon(
-                      Icons.verified_rounded,
-                      color: isActivated ? AppColors.green : AppColors.hongguoRed,
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.darkSurfaceHighest,
+                        child: Icon(
+                          Icons.verified_rounded,
+                          color: isActivated ? AppColors.green : AppColors.hongguoRed,
+                        ),
+                      ),
+                      title: const Text('应用版本'),
+                      subtitle: Text(_versionDisplay),
+                      onTap: _onVersionTapped,
                     ),
-                  ),
-                  title: const Text('应用版本'),
-                  subtitle: Text(_versionDisplay),
-                  onTap: _onVersionTapped,
+                    const Divider(height: 1, indent: 56),
+                    ListTile(
+                      key: const ValueKey('about-check-update-tile'),
+                      leading: const CircleAvatar(
+                        backgroundColor: AppColors.darkSurfaceHighest,
+                        child: Icon(
+                          Icons.system_update_rounded,
+                          color: AppColors.hongguoRed,
+                        ),
+                      ),
+                      title: const Text('检查新版本'),
+                      subtitle: const Text('从 GitHub Releases 检测最新版本与更新日志'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => triggerCheckUpdate(context),
+                    ),
+                  ],
                 ),
               ),
 
