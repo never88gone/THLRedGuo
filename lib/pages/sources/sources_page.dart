@@ -186,7 +186,7 @@ class _SourcesScreenState extends State<SourcesScreen> {
                   const Padding(
                     padding: EdgeInsets.only(bottom: 16),
                     child: Text(
-                      '各站源可分别更新和检测。更新会查找新剧、继续加载一页历史内容，并分批补齐资料；离开此页后任务继续。',
+                      '各站源可进行网络连通性与播放检测，诊断各环节握手状态。',
                     ),
                   ),
                   if (sources.isEmpty)
@@ -237,12 +237,6 @@ class _SourcesScreenState extends State<SourcesScreen> {
                 Text('${status?.count ?? 0} 部'),
               ],
             ),
-            const SizedBox(height: 8),
-            Text('最近更新：${sourceTimestamp(status?.updatedAt)}'),
-            if (status != null && status.count > 0)
-              Text(
-                '已加载至第 ${status.page} 页${status.hasMore ? ' · 可继续加载' : ' · 当前分页已加载完'}',
-              ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 10,
@@ -250,12 +244,6 @@ class _SourcesScreenState extends State<SourcesScreen> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 FilledButton.icon(
-                  key: ValueKey('update-${source.id}'),
-                  onPressed: enabled ? () => _run(source, 'update') : null,
-                  icon: const Icon(Icons.sync_rounded),
-                  label: const Text('更新'),
-                ),
-                OutlinedButton.icon(
                   key: ValueKey('check-${source.id}'),
                   onPressed: enabled ? () => _run(source, 'check') : null,
                   icon: const Icon(Icons.network_check),
@@ -266,23 +254,6 @@ class _SourcesScreenState extends State<SourcesScreen> {
                     onPressed: pending ? null : () => _run(source, 'cancel'),
                     child: const Text('停止'),
                   ),
-                PopupMenuButton<String>(
-                  tooltip: '${source.name}更多操作',
-                  enabled: enabled,
-                  onSelected: (operation) => _run(source, operation),
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'more',
-                      enabled: status?.hasMore ?? true,
-                      child: const Text('继续加载一页'),
-                    ),
-                    const PopupMenuItem(value: 'metadata', child: Text('补齐资料')),
-                    const PopupMenuItem(
-                      value: 'checkCatalog',
-                      child: Text('仅检测目录'),
-                    ),
-                  ],
-                ),
               ],
             ),
             if (busy) ...[

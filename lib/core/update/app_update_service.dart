@@ -89,6 +89,16 @@ class AppUpdateService {
   static const String githubReleasesApi =
       'https://api.github.com/repos/$repoOwner/$repoName/releases/latest';
 
+  /// 判断当前平台是否支持客户端内独立检查更新
+  /// iOS 与 Apple tvOS 统一通过 TestFlight 分发与自动更新，不在此进行更新检测
+  static bool get isSupportedPlatform {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux;
+  }
+
   /// 检查 GitHub Releases 是否有新版本
   Future<AppUpdateInfo> checkUpdate({
     http.Client? client,
@@ -243,8 +253,6 @@ class AppUpdateService {
       case TargetPlatform.macOS:
         return lower.endsWith('.dmg') ||
             (lower.contains('mac') && lower.endsWith('.zip'));
-      case TargetPlatform.iOS:
-        return lower.endsWith('.ipa');
       default:
         return false;
     }

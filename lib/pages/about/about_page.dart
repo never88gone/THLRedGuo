@@ -10,6 +10,7 @@ import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/utils/sources/source_gate_taps.dart';
 import 'package:THLRedLook/views/sources/source_switcher_sheet.dart';
+import 'package:THLRedLook/core/update/app_update_service.dart';
 import 'package:THLRedLook/views/update/app_update_dialog.dart';
 
 class AboutPage extends StatefulWidget {
@@ -205,21 +206,23 @@ class _AboutPageState extends State<AboutPage> {
                       subtitle: Text(_versionDisplay),
                       onTap: _onVersionTapped,
                     ),
-                    const Divider(height: 1, indent: 56),
-                    ListTile(
-                      key: const ValueKey('about-check-update-tile'),
-                      leading: const CircleAvatar(
-                        backgroundColor: AppColors.darkSurfaceHighest,
-                        child: Icon(
-                          Icons.system_update_rounded,
-                          color: AppColors.hongguoRed,
+                    if (AppUpdateService.isSupportedPlatform) ...[
+                      const Divider(height: 1, indent: 56),
+                      ListTile(
+                        key: const ValueKey('about-check-update-tile'),
+                        leading: const CircleAvatar(
+                          backgroundColor: AppColors.darkSurfaceHighest,
+                          child: Icon(
+                            Icons.system_update_rounded,
+                            color: AppColors.hongguoRed,
+                          ),
                         ),
+                        title: const Text('检查新版本'),
+                        subtitle: const Text('从 GitHub Releases 检测最新版本与更新日志'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => triggerCheckUpdate(context),
                       ),
-                      title: const Text('检查新版本'),
-                      subtitle: const Text('从 GitHub Releases 检测最新版本与更新日志'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => triggerCheckUpdate(context),
-                    ),
+                    ],
                   ],
                 ),
               ),

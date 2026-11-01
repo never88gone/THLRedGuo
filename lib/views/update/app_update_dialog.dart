@@ -19,6 +19,20 @@ Future<void> triggerCheckUpdate(
   BuildContext context, {
   bool silentIfNoUpdate = false,
 }) async {
+  if (!AppUpdateService.isSupportedPlatform) {
+    if (!silentIfNoUpdate) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('iOS 与 tvOS 端通过 TestFlight 自动更新'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+    return;
+  }
+
   if (!silentIfNoUpdate) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(

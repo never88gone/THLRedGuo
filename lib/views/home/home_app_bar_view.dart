@@ -21,7 +21,6 @@ class HomeAppBarView extends StatelessWidget implements PreferredSizeWidget {
     required this.supportsSourceManagement,
     required this.sourcesEmpty,
     required this.loading,
-    required this.isUpdaterBusy,
     required this.catalogSortLabel,
     required this.isSortedOrFiltered,
     required this.screenWidth,
@@ -50,7 +49,6 @@ class HomeAppBarView extends StatelessWidget implements PreferredSizeWidget {
   final bool supportsSourceManagement;
   final bool sourcesEmpty;
   final bool loading;
-  final bool isUpdaterBusy;
   final String catalogSortLabel;
   final bool isSortedOrFiltered;
   final double screenWidth;

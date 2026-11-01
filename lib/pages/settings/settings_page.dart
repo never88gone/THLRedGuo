@@ -29,6 +29,7 @@ import 'package:THLRedLook/utils/theme/app_theme.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 import 'package:THLRedLook/views/settings/settings_group_view.dart';
 import 'package:THLRedLook/views/sources/source_switcher_sheet.dart';
+import 'package:THLRedLook/core/update/app_update_service.dart';
 import 'package:THLRedLook/views/update/app_update_dialog.dart';
 
 export 'storage_page.dart' show storageSize;
@@ -366,14 +367,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: '关于与支持',
                 icon: Icons.info_outline_rounded,
                 children: [
-                  ListTile(
-                    key: const ValueKey('settings-check-update-entry'),
-                    leading: const Icon(Icons.system_update_rounded),
-                    title: const Text('检查新版本'),
-                    subtitle: const Text('检测官方 GitHub 最新版本及各端安装包'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => triggerCheckUpdate(context),
-                  ),
+                  if (AppUpdateService.isSupportedPlatform)
+                    ListTile(
+                      key: const ValueKey('settings-check-update-entry'),
+                      leading: const Icon(Icons.system_update_rounded),
+                      title: const Text('检查新版本'),
+                      subtitle: const Text('检测官方 GitHub 最新版本及各端安装包'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => triggerCheckUpdate(context),
+                    ),
                   ListTile(
                     key: const ValueKey('settings-app-intro-entry'),
                     leading: const Icon(Icons.menu_book_outlined),

@@ -32,7 +32,6 @@ import 'package:THLRedLook/views/sources/source_switcher_sheet.dart';
 import 'package:THLRedLook/pages/downloads/batch_download_page.dart';
 import 'package:THLRedLook/core/download/batch_downloads.dart';
 import 'package:THLRedLook/views/drama/drama_actions.dart';
-import 'package:THLRedLook/core/store/library_updater.dart';
 import 'package:THLRedLook/core/store/saved_library.dart';
 import 'package:THLRedLook/views/home/home_selection_bar_view.dart';
 import 'package:THLRedLook/views/home/home_search_bar_view.dart';
@@ -82,11 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _categoriesLoading = false;
   String? _categoriesError;
   int _categoryGeneration = 0;
-  late final LibraryUpdater _updater;
-  final _changedSources = <String>{};
   final _selectedDramas = <String, Drama>{};
-  Timer? _cacheRefreshTimer;
-  bool _refreshingUpdatedCache = false;
   bool _selectionMode = false;
   bool _showRecommendations = false;
   String _sourceSignature = '';
@@ -108,12 +103,10 @@ class _HomeScreenState extends State<HomeScreen> {
         .where((source) => source.onlineSearch)
         .toList();
     if (online.isEmpty) {
-      return '筛选本机已更新剧库';
+      return '搜索短剧';
     }
     final names = online.map((source) => source.name).join('、');
-    return online.length == _group.sources.length
-        ? '搜索$names'
-        : '搜索$names及本机剧库';
+    return '搜索$names';
   }
 
   String get _category => _categorySelections[_group.id] ?? '';
@@ -162,18 +155,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshCatalog() async {
-    if (widget.repository.supportsSourceManagement && _group.id != 'hongguo') {
-      if (_group.sources.any((source) => _updater.busy(source.id))) return;
-      _pauseCatalog();
-      await _updater.update(_group.sources);
-      return;
-    }
     await _loadCategories(force: true);
     if (mounted) await _load(force: true);
-  }
-
-  void _updateChanged() {
-    if (mounted) setState(() {});
   }
 
   bool get _isSourceInitializing {
@@ -238,74 +221,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (signature != _sourceSignature) {
       _sourceSignature = signature;
-    }
-  }
-
-  void _catalogUpdated(String source) {
-    if (!mounted) return;
-    _changedSources.add(source);
-    _cacheRefreshTimer?.cancel();
-    _cacheRefreshTimer = Timer(const Duration(milliseconds: 100), () {
-      unawaited(_reloadUpdatedCache());
-    });
-  }
-
-  Future<void> _reloadUpdatedCache() async {
-    if (_refreshingUpdatedCache) return;
-    _refreshingUpdatedCache = true;
-    final epoch = widget.store.profileEpoch;
-    try {
-      while (mounted &&
-          _changedSources.isNotEmpty &&
-          epoch == widget.store.profileEpoch) {
-        final sources = Set.of(_changedSources);
-        _changedSources.clear();
-        final updates = <String, Drama>{};
-        for (final source in sources) {
-          if (!widget.store.allowsSource(source)) continue;
-          try {
-            final cached = await widget.repository.cached(source);
-            for (final drama in cached.items) {
-              if (widget.store.allowsSource(drama.source)) {
-                updates[drama.id] = drama;
-              }
-            }
-          } catch (error) {
-            if (mounted && epoch == widget.store.profileEpoch) {
-              setState(() => _error = '更新后读取缓存失败：$error');
-            }
-          }
-        }
-        if (!mounted || epoch != widget.store.profileEpoch) return;
-        _browser.updateDramas(updates.values);
-        setState(() {
-          _items = [
-            for (final item in _items)
-              updates[item.id] == null ? item : item.merge(updates[item.id]!),
-          ];
-          for (final id in _selectedDramas.keys.toList()) {
-            if (updates[id] != null) {
-              _selectedDramas[id] = _selectedDramas[id]!.merge(updates[id]!);
-            }
-          }
-        });
-        await saveUserChange(
-          context,
-          () => widget.store.refreshDramas(updates.values),
-        );
-        if (!mounted || epoch != widget.store.profileEpoch) return;
-        if (_group.sources.any((source) => sources.contains(source.id))) {
-          await _loadCategories(cacheOnly: true);
-          if (mounted &&
-              !_loading &&
-              !_loadingMore &&
-              (!_onlineSearch || _search.text.trim().isEmpty)) {
-            await _load(cacheOnly: true);
-          }
-        }
-      }
-    } finally {
-      _refreshingUpdatedCache = false;
     }
   }
 
@@ -508,12 +423,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _allSources = widget.store.catalogView.allSources;
     _sourceSignature = widget.store.sources.map((site) => site.id).join(',');
     _browser = CatalogBrowser(widget.repository);
-    _updater = LibraryUpdater(
-      widget.repository,
-      widget.store,
-      onCatalogChanged: _catalogUpdated,
-    )..addListener(_updateChanged);
-    _updater.startWatching();
     widget.store.addListener(_sourcesChanged);
     JsSourceService.current?.addListener(_sourcesChanged);
     widget.repository.catalogUpdates.addListener(_metadataChanged);
@@ -530,9 +439,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _feed.dispose();
-    _updater.removeListener(_updateChanged);
-    _updater.dispose();
-    _cacheRefreshTimer?.cancel();
     widget.store.removeListener(_sourcesChanged);
     JsSourceService.current?.removeListener(_sourcesChanged);
     widget.repository.catalogUpdates.removeListener(_metadataChanged);
@@ -1332,11 +1238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   loading:
                       _loading ||
                       _loadingMore ||
-                      _categoriesLoading ||
-                      _group.sources.any((source) => _updater.busy(source.id)),
-                  isUpdaterBusy: _group.sources.any(
-                    (source) => _updater.busy(source.id),
-                  ),
+                      _categoriesLoading,
                   catalogSortLabel: widget.store.catalogView.sort.label,
                   isSortedOrFiltered:
                       widget.store.catalogView.sort != CatalogSort.source ||
