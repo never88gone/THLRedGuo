@@ -75,7 +75,7 @@ public final class TVDanmakuTrackCoordinator {
                 continue
             }
 
-            let textWidth = (cleanText as NSString).size(withAttributes: [.font: font]).width + 36
+            let textWidth = (cleanText as NSString).size(withAttributes: [.font: font]).width + 16
 
             // 为新入场弹幕挑选最佳轨道
             var bestLane = -1
@@ -194,7 +194,7 @@ public struct TVDanmakuView: View {
     @ViewBuilder
     private func danmakuItemView(item: TVPlannedDanmaku) -> some View {
         Text(item.text)
-            .font(.system(size: style.fontSize, weight: .heavy, design: .rounded))
+            .font(.system(size: style.fontSize, weight: .bold))
             .foregroundColor(.white.opacity(style.opacity))
             // 8 方向 1.5pt 高对比度深黑描边（强光、白底、复杂背景下字体轮廓极其锐利清爽）
             .shadow(color: .black.opacity(style.opacity), radius: 0, x: 1.5, y: 0)
@@ -206,13 +206,7 @@ public struct TVDanmakuView: View {
             .shadow(color: .black.opacity(style.opacity * 0.95), radius: 0, x: 1.2, y: -1.2)
             .shadow(color: .black.opacity(style.opacity * 0.95), radius: 0, x: -1.2, y: 1.2)
             // 外部柔和深影增强大屏立体感
-            .shadow(color: .black.opacity(style.opacity * 0.8), radius: 4, x: 0, y: 2)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(Color.black.opacity(0.32 * style.opacity))
-            )
+            .shadow(color: .black.opacity(style.opacity * 0.8), radius: 3, x: 0, y: 1.5)
             .fixedSize()
             .frame(width: item.width)
     }
