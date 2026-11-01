@@ -40,6 +40,7 @@ public final class ICloudSyncService: ObservableObject {
     public static let keyFollows = "thl_icloud_sync_v1_follows"
     public static let keySettings = "thl_icloud_sync_v1_settings"
     public static let keyMeta = "thl_icloud_sync_v1_meta"
+    public static let maxHistoryCount = 40
 
     private let kvStore: ICloudKeyValueStore
     private let defaults: UserDefaults
@@ -136,7 +137,7 @@ public final class ICloudSyncService: ObservableObject {
                                   source: remoteSettings["source"] as? String, danmaku: remoteSettings["danmaku"] as? Bool)
 
             var wrote = false
-            if remoteHistory.1 == 0 && Set(remoteHistory.0) != Set(mergedHistory.prefix(300)) {
+            if remoteHistory.1 == 0 && Set(remoteHistory.0) != Set(mergedHistory.prefix(Self.maxHistoryCount)) {
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.sortedKeys]
                 let formatter = ISO8601DateFormatter()
@@ -145,7 +146,7 @@ public final class ICloudSyncService: ObservableObject {
                     var container = encoder.singleValueContainer()
                     try container.encode(formatter.string(from: date))
                 }
-                wrote = setChanged(String(decoding: try encoder.encode(Array(mergedHistory.prefix(300))), as: UTF8.self), key: Self.keyHistory) || wrote
+                wrote = setChanged(String(decoding: try encoder.encode(Array(mergedHistory.prefix(Self.maxHistoryCount))), as: UTF8.self), key: Self.keyHistory) || wrote
             }
             if remoteDramas.1 == 0 && (remoteFollows != follows || Set(remoteDramas.0) != Set(mergedDramas)) {
                 let dramaData = try JSONEncoder().encode(mergedDramas)
@@ -168,9 +169,10 @@ public final class ICloudSyncService: ObservableObject {
             }
             lastSyncDate = Date()
             let skipped = remoteHistory.1 + remoteDramas.1
+            let syncedCount = min(mergedHistory.count, Self.maxHistoryCount)
             lastStatusMessage = skipped > 0
                 ? "部分记录格式不兼容，已保留云端原文（\(skipped)条）"
-                : "已合并（\(mergedHistory.count)条记录，\(mergedDramas.count)部追剧），等待 iCloud 分发"
+                : "已合并（\(syncedCount)条历史记录，\(mergedDramas.count)部追剧），等待 iCloud 分发"
         } catch {
             lastStatusMessage = "云端数据读取失败，本地和云端原文已保留"
         }

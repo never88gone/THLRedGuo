@@ -25,6 +25,7 @@ class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
   static const String keyMeta = 'thl_icloud_sync_v1_meta';
   static const String prefSyncEnabled = 'thl_icloud_sync_enabled';
   static const String prefLastSyncDate = 'thl_icloud_last_sync_date';
+  static const int maxHistoryCount = 40;
 
   bool _initialized = false;
   bool _isSyncing = false;
@@ -146,6 +147,10 @@ class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
             } catch (_) {
               historySkipped = true;
             }
+          }
+          if (remoteHistory.length > maxHistoryCount) {
+            remoteHistory.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+            remoteHistory.removeRange(maxHistoryCount, remoteHistory.length);
           }
         } catch (e) {
           rethrow;
@@ -306,10 +311,10 @@ class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
       if (!historySkipped &&
           historyContent(remoteHistory) !=
-              historyContent(sortedHistory.take(300))) {
+              historyContent(sortedHistory.take(maxHistoryCount))) {
         await write(
           keyHistory,
-          sortedHistory.take(300).map((e) => e.toJson()).toList(),
+          sortedHistory.take(maxHistoryCount).map((e) => e.toJson()).toList(),
         );
       }
 
@@ -368,9 +373,12 @@ class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
         prefLastSyncDate,
         _lastSyncDate!.millisecondsSinceEpoch,
       );
+      final syncedHistoryCount = sortedHistory.length > maxHistoryCount
+          ? maxHistoryCount
+          : sortedHistory.length;
       _lastStatusMessage = historySkipped || dramasSkipped
           ? '部分记录格式不兼容，已保留云端原文'
-          : '已合并 (${sortedHistory.length}条记录, ${mergedFavorites.length}部追剧)，等待 iCloud 分发';
+          : '已合并 ($syncedHistoryCount条历史记录, ${mergedFavorites.length}部追剧)，等待 iCloud 分发';
     } catch (e) {
       debugPrint('iCloud 同步失败: $e');
       if (current()) _lastStatusMessage = 'iCloud 同步失败，本地记录已保留，请重试';

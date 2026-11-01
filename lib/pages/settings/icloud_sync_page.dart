@@ -230,7 +230,7 @@ class _ICloudSyncPageState extends State<ICloudSyncPage> {
                   const ListTile(
                     leading: Icon(Icons.history_rounded, color: AppColors.hongguoRed),
                     title: Text('观看记录 (Watch History)'),
-                    subtitle: Text('短剧播放集数、进度秒数与最后观看时间，跨端自动接续起播'),
+                    subtitle: Text('短剧播放集数、进度秒数与最后观看时间（同步最近 40 条），跨端自动接续起播'),
                   ),
                   const Divider(height: 1, indent: 56),
                   const ListTile(
