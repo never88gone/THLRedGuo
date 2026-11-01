@@ -17,7 +17,7 @@ class PlaybackPreferences {
     this.speed = 1,
     this.quality = 0,
     this.autoAdvance = true,
-    this.pictureInPicture = false,
+    this.pictureInPicture = true,
     this.danmaku = true,
     this.danmakuStyle = const DanmakuStyle(),
     this.preload = true,
@@ -73,7 +73,7 @@ class PlaybackPreferences {
     final speed = (value['speed'] as num? ?? 1).toDouble();
     final quality = value['quality'] as int? ?? 0;
     final autoAdvance = value['autoAdvance'] as bool? ?? true;
-    final pictureInPicture = value['pictureInPicture'] as bool? ?? false;
+    final pictureInPicture = value['pictureInPicture'] as bool? ?? true;
     final danmaku = value['danmaku'] as bool? ?? true;
     final danmakuStyle = value['danmakuStyle'] is Map
         ? DanmakuStyle.fromJson(value['danmakuStyle'] as Map<String, dynamic>)
