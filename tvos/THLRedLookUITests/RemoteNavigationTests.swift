@@ -4,6 +4,46 @@ final class RemoteNavigationTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.never88gone.redlook")
     private let remote = XCUIRemote.shared
 
+    func testDebugSourceSelectedEpisodeAndNaturalNext() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7695704804978330649", "-testDramaTitle", "满院亲戚全是上古大妖第五季"]
+        app.launch()
+        defer { app.terminate() }
+        wait("debug detail ready", seconds: 60) { self.app.buttons["detail.play"].exists }
+        yaoDetailPlayFocus()
+        focusChunk(0)
+        press(.down, focus: "detail.episode.1")
+        press(.right, focus: "detail.episode.2")
+        press(.right, focus: "detail.episode.3")
+        press(.select)
+        yaoReady(season: 5, episode: 3)
+        let resumedSeconds = seconds(app.staticTexts["player.position"].label)
+        func capture(_ name: String) {
+            let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        capture("debug-selected-episode-3")
+        print("THL_DEBUG_TV_UI selected=3 natural=true seek=false speed=1 resumedSeconds=\(resumedSeconds)")
+        wait("debug natural episode 3 completes to 4", seconds: 110) {
+            self.yaoControls()
+            return self.app.staticTexts["player.episode"].label.contains("第 4 集") && self.seconds(self.app.staticTexts["player.position"].label) >= 3
+        }
+        capture("debug-natural-episode-4")
+        focusDrawer()
+        press(.select, focus: "drawer.episode.4")
+        press(.left, focus: "drawer.episode.3")
+        press(.select)
+        yaoReady(season: 5, episode: 3)
+        capture("debug-drawer-selected-episode-3")
+        press(.menu, focus: "player.wake")
+        press(.menu)
+        wait("debug returns to selected detail focus") { self.app.buttons["detail.episode.3"].hasFocus }
+        print("THL_DEBUG_TV_UI_RESULT selected=3 autoNext=4 drawer=3 detailBackFocus=true natural=true seek=false")
+    }
+
     func testImportedOldIOSHistoryDisplaysAndPersistsWithRemoteFocus() throws {
         guard ProcessInfo.processInfo.environment["ICLOUD_OLD_HISTORY_UI"] == "1" else { throw XCTSkip("Requires isolated imported history fixture") }
         continueAfterFailure = false

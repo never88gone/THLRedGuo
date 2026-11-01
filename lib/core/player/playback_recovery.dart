@@ -23,6 +23,14 @@ class PlaybackRecovery {
   static bool audioOutputFailed(String error) =>
       error.toLowerCase().contains('could not open/initialize audio device');
 
+  static bool videoOutputFailed(String error) {
+    final message = error.toLowerCase();
+    return message.contains(
+          'error opening/initializing the selected video_out (--vo) device',
+        ) ||
+        message.contains('error opening/initializing the vo window');
+  }
+
   void reset() {
     _attempts = 0;
     _attemptLimit = maxAttempts;

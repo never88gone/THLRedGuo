@@ -355,6 +355,39 @@ final class PlaybackTests: XCTestCase {
         print("THL_CONTINUOUS automaticTransitions=7 lastEpisode=8 error=false")
     }
 
+    func testLiveDebugSourceVideoAudioAndNaturalNext() async throws {
+        try live()
+        await JSSourceService.shared.initialize()
+        let data = try await detail("7695704804978330649")
+        let model = try model(data)
+        defer { model.onDisappear() }
+        let savedGuest = UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session")
+        await model.preparePlayback(episodeIndex: 3)
+        try await ready(model)
+        XCTAssertEqual(model.currentEpisodeIndex, 3)
+        XCTAssertEqual(model.selectedQuality, 1080)
+        XCTAssertEqual(model.playbackRate, 1)
+        XCTAssertFalse(try XCTUnwrap(model.player).isMuted)
+        XCTAssertGreaterThan(try XCTUnwrap(model.player).volume, 0)
+        let initial = model.currentTime
+        try await wait(seconds: 20) { model.currentTime > initial + 3 }
+        print("THL_DEBUG_TV_NATIVE episode=3 quality=1080 firstFrame=true audioTrack=true volume=positive natural=true seek=false")
+        let deadline = Date().addingTimeInterval(120)
+        while model.currentEpisodeIndex == 3 && Date() < deadline {
+            XCTAssertNil(model.errorMessage)
+            try await Task.sleep(nanoseconds: 500_000_000)
+        }
+        XCTAssertEqual(model.currentEpisodeIndex, 4)
+        try await ready(model)
+        let next = model.currentTime
+        try await wait(seconds: 20) { model.currentTime > next + 5 }
+        XCTAssertEqual(model.selectedQuality, 1080)
+        XCTAssertFalse(try XCTUnwrap(model.player).isMuted)
+        XCTAssertGreaterThan(try XCTUnwrap(model.player).volume, 0)
+        XCTAssertEqual(UserDefaults.standard.string(forKey: "thl_tv_hongguo_device_session"), savedGuest)
+        print("THL_DEBUG_TV_NATIVE_RESULT episode=4 quality=1080 firstFrame=true audioTrack=true volume=positive natural=true seek=false guestPreserved=true")
+    }
+
     func testLiveNaturalContinuousPlaybackWithoutSeeking() async throws {
         try live()
         await JSSourceService.shared.initialize()

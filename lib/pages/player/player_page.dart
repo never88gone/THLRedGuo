@@ -144,6 +144,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _showControlsOnPlaybackReady = true;
   bool _pendingError = false;
   bool _requireRecovery = false;
+  bool _encryptedVideoOutputFailed = false;
   bool _pictureInPictureSupported = false;
   bool _pictureInPictureActive = false;
   bool _pictureInPictureRequested = false;
@@ -276,7 +277,14 @@ class _PlayerScreenState extends State<PlayerScreen>
               '[Play] 原生播放错误: 剧=${widget.detail.drama.cleanSourceId}, 集=${widget.detail.episodes[_index].number}, ${playbackFailureSummary(AppFailure(error, code: 'native_stream'))}',
             );
           }
-          _queueRecovery(force: PlaybackRecovery.audioOutputFailed(error));
+          final videoOutputFailed = PlaybackRecovery.videoOutputFailed(error);
+          if (Platform.isAndroid && videoOutputFailed) {
+            _encryptedVideoOutputFailed = true;
+          }
+          _queueRecovery(
+            force:
+                videoOutputFailed || PlaybackRecovery.audioOutputFailed(error),
+          );
         }
       }),
     );
@@ -1372,9 +1380,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     if (index != _index) _forceOnline = false;
     final forceEncryptedCache =
-        recoveryAction != null &&
-        (_recovery.cacheAttempted ||
-            (_plan?.decryptionKey.isNotEmpty ?? false));
+        _encryptedVideoOutputFailed ||
+        (recoveryAction != null &&
+            (_recovery.cacheAttempted ||
+                (_plan?.decryptionKey.isNotEmpty ?? false)));
     final warmed =
         handoffPlan ??
         (recoveryAction == null && _preloadEnabled && !widget.localOnly
@@ -1387,7 +1396,6 @@ class _PlayerScreenState extends State<PlayerScreen>
             : null);
     _preloader.clear();
     final ticket = ++_generation;
-    unawaited(_encryptedPlayback.cancel());
     _enhancement.suspend();
     _seekSequence++;
     _danmaku.setPlan(null);
@@ -1440,9 +1448,10 @@ class _PlayerScreenState extends State<PlayerScreen>
         await _enhancement.beforeMedia();
         if (_closed || ticket != _generation) return;
         _openedIndex = -1;
-        if (!isSeamlessAdvance) {
+        if (!isSeamlessAdvance || _player is LunaExoPlayer) {
           await _player.stop();
         }
+        await _encryptedPlayback.cancel();
         final previous = _plan ?? recoveryPlan;
         _plan = null;
         if (recoveryAction == PlaybackRecoveryAction.alternative ||
@@ -1507,7 +1516,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           throw AppFailure('站源未返回播放地址，请重试');
         }
         final platform = _player.platform;
-        if (platform is NativePlayer) {
+        if (_player is! LunaExoPlayer && platform is NativePlayer) {
           if (Platform.isAndroid) {
             if (_television) {
               await platform.setProperty('hwdec', 'mediacodec');
