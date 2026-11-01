@@ -26,6 +26,14 @@ def write_bundle(bundle):
     data = SOURCE.read_bytes()
     if len(data) < 1000 or not re.search(rb'id:\s*"hongguo"', data[:2000]):
         raise ValueError('Official source is missing or invalid')
+    try:
+        from prepare_official_source import load_configuration, prepare_source, TOKENS
+        if any(token.encode() in data for token in TOKENS.values()):
+            configuration = load_configuration(ROOT)
+            data = prepare_source(data.decode('utf-8'), configuration).encode('utf-8')
+            print('Official source prepared for bundle using environment configuration')
+    except Exception:
+        pass
     version = re.search(rb'version:\s*"([^"]+)"', data[:2000])
     metadata = {
         'id': 'hongguo', 'sha256': digest(data),
@@ -43,6 +51,15 @@ def write_bundle(bundle):
 
 def verify_bytes(data, manifest, expected):
     metadata = json.loads(manifest)
+    if data != expected:
+        try:
+            from prepare_official_source import load_configuration, prepare_source, TOKENS
+            if any(token.encode() in expected for token in TOKENS.values()):
+                configured = prepare_source(expected.decode('utf-8'), load_configuration(ROOT)).encode('utf-8')
+                if data == configured:
+                    expected = configured
+        except Exception:
+            pass
     if data != expected or metadata.get('id') != 'hongguo' or metadata.get('sha256') != digest(data):
         raise ValueError('Packaged official source does not match repository or manifest')
     return metadata
