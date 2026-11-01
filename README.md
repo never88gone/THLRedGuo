@@ -65,6 +65,12 @@
 | :---: | :---: | :---: |
 | <img src="assets/screenshots/mobile_detail.png" width="180" alt="剧集详情" /> | <img src="assets/screenshots/mobile_player_portrait.png" width="180" alt="竖屏播放" /> | <img src="assets/screenshots/mobile_player_fullscreen.png" width="260" alt="横屏播放" /> |
 
+### 📱 iPhone Duo 双屏折叠设备适配 (iOS)
+
+| iPhone Duo 发现页自适应栅格与沉浸体验 |
+| :---: |
+| <img src="assets/screenshots/iphone_duo_home.png" width="300" alt="iPhone Duo 发现页" /> |
+
 ### 🗂️ 追剧、历史、离线缓存与插件管理
 
 | 我的追剧收藏 | 最近观看 | 离线下载管理 | JS 数据源插件管理 |
