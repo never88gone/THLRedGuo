@@ -52,4 +52,6 @@ flutter:
   assets:
     - assets/video_enhancement/
     - assets/branding/
-    - assets/sources/
+    - path: assets/sources/hongguo.js
+      transformers:
+        - package: tool/prepare_local_debug_source.dart

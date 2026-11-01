@@ -63,15 +63,9 @@ def load_configuration(root=ROOT, config_path=None):
     if config_path is not None:
         raw = Path(config_path).read_text(encoding='utf-8')
     elif not raw and not is_ci():
-        candidates = [
-            root.parent.parent / 'publicinfo' / 'THLRedGuo-signing.json',
-            Path('/Volumes/MacintoshData/Work/MY/Project/publicinfo/THLRedGuo-signing.json'),
-        ]
-        for path in candidates:
-            if path.is_file():
-                raw = path.read_text(encoding='utf-8')
-                os.environ['HONGGUO_SIGNING_CONFIG'] = raw
-                break
+        path = root.parent.parent / 'publicinfo' / 'THLRedGuo-signing.json'
+        if path.is_file():
+            raw = path.read_text(encoding='utf-8')
     if not raw:
         raise ValueError(
             'Missing publicinfo/THLRedGuo-signing.json or HONGGUO_SIGNING_CONFIG'
@@ -169,7 +163,6 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--config', type=Path)
     parser.add_argument('--restore', action='store_true')
-    parser.add_argument('--run', nargs=argparse.REMAINDER, help='在注入签名的上下文中执行命令，并在命令退出或中断时自动恢复模板')
     options = parser.parse_args()
     try:
         if options.restore:
@@ -179,18 +172,6 @@ def main():
             )
             print('Official source template restored')
             return
-        if options.run:
-            import subprocess
-            cmd = options.run
-            if cmd and cmd[0] == '--':
-                cmd = cmd[1:]
-            if not cmd:
-                raise SystemExit('Please specify command to run after --run')
-            load_configuration(config_path=options.config)
-            env = os.environ.copy()
-            with prepared_official_source(ROOT):
-                result = subprocess.run(cmd, cwd=ROOT, env=env)
-                raise SystemExit(result.returncode)
         configuration = load_configuration(config_path=options.config)
         prepared = prepare_source(options.source.read_text(encoding='utf-8'), configuration)
         destination = options.output or options.source
