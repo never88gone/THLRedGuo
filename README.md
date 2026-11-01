@@ -67,9 +67,9 @@
 
 ### 📱 iPhone Duo 双屏折叠设备适配 (iOS)
 
-| iPhone Duo 发现页自适应栅格与沉浸体验 |
-| :---: |
-| <img src="assets/screenshots/iphone_duo_home.png" width="300" alt="iPhone Duo 发现页" /> |
+| iPhone Duo 折叠态 (外屏 3 列自适应网格) | iPhone Duo 展开态 (折叠屏打开 4 列大画幅瀑布流) |
+| :---: | :---: |
+| <img src="assets/screenshots/iphone_duo_home.png" width="220" alt="iPhone Duo 折叠外屏" /> | <img src="assets/screenshots/iphone_duo_unfolded.png" width="310" alt="iPhone Duo 展开内屏" /> |
 
 ### 🗂️ 追剧、历史、离线缓存与插件管理
 
