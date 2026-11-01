@@ -101,7 +101,9 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         if (televisionMode) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            window.setFormat(android.graphics.PixelFormat.RGBA_8888)
+            // 关键修复：大屏电视芯片（晶晨/联发科/瑞芯微/海思等）的硬件视频合成器 (HWC) 要求窗口保持不透明 (OPAQUE)。
+            // 若错误设为 RGBA_8888 会引入透明通道，破坏视频硬件直通图层混合，导致电视端黑屏（有声音无图像）。
+            window.setFormat(android.graphics.PixelFormat.OPAQUE)
             val lp = window.attributes
             lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
             window.attributes = lp

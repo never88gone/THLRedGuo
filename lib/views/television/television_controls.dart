@@ -651,7 +651,7 @@ class TelevisionSettingsDialog extends StatelessWidget {
             Text(
               decoderMode == PlaybackDecoderMode.hardware
                   ? '⚡ 推荐：MediaCodec 原生硬解加速，大屏低功耗、画质细腻。'
-                  : '🛡️ 兼容：单通道硬解串行保护，杜绝老旧电视黑屏与卡顿拖慢。',
+                  : '🛡️ 兼容：MediaKit 软解兼容引擎，专治黑屏无画面、老旧电视仅有声音无图像。',
               style: const TextStyle(fontSize: 13, color: Colors.white70),
             ),
             const SizedBox(height: 20),

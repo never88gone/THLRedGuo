@@ -383,7 +383,7 @@ class _PlayerMenuState extends State<PlayerMenu> {
             subtitle: Text(
               preferences.decoderMode == PlaybackDecoderMode.hardware
                   ? '⚡ 极速硬解优先（MediaCodec 硬件加速）'
-                  : '🛡️ 兼容稳定模式（单通道串行硬解保护）',
+                  : '🛡️ 兼容稳定模式（MediaKit 软解兼容引擎）',
             ),
             trailing: DropdownButton<PlaybackDecoderMode>(
               value: preferences.decoderMode,

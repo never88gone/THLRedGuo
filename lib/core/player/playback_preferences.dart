@@ -5,7 +5,7 @@ const playbackSpeeds = [.5, .75, 1.0, 1.25, 1.5, 2.0, 3.0];
 
 enum PlaybackDecoderMode {
   hardware('极速硬解优先', '启用 GPU/MediaCodec 硬件加速，大屏低功耗更流畅'),
-  compatible('兼容稳定模式', '单通道串行硬解防冲突，解决老旧芯片黑屏与拖慢');
+  compatible('兼容稳定模式', 'MediaKit 兼容软解引擎，专治黑屏无画面、声音正常但无图像');
 
   const PlaybackDecoderMode(this.label, this.description);
   final String label;
