@@ -42,23 +42,10 @@ public struct TVPlayerControlsOverlay: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // MARK: - 顶部信息与返回条（局部顶部渐变，全屏贴顶铺满）
+            // MARK: - 顶部剧集信息条（局部顶部渐变，全屏贴顶铺满；无需返回按钮，由原生 Menu 键直接返回）
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 20) {
-                    overlayBarButton(
-                        title: "返回",
-                        icon: "chevron.left",
-                        target: .back
-                    ) {
-                        onDismiss()
-                    }
-                    .onMoveCommand { dir in
-                        if dir == .down {
-                            focusedControl = feedActions == nil ? .playPause : .nextDrama
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(viewModel.drama.title)
                             .accessibilityIdentifier("player.title")
                             .font(.title3)
@@ -100,7 +87,6 @@ public struct TVPlayerControlsOverlay: View {
                     .padding(.top, 18)
                     .onMoveCommand { direction in
                         if direction == .down { focusedControl = .playPause }
-                        if direction == .up { focusedControl = .back }
                     }
                     Text(feedActions.errorMessage ?? "画面模式下按上下键切换短剧，点按显示控制")
                         .font(.system(size: 22))
@@ -171,10 +157,12 @@ public struct TVPlayerControlsOverlay: View {
                         .foregroundColor(.white)
                 }
 
-                // 底部两层操作栏：第一层（主播放控制） + 第二层（播放设置与增强）
+                // 底部两层操作栏：第一层（主播放控制） + 第二层（播放设置与增强），均整体水平居中对齐
                 VStack(spacing: 14) {
                     // MARK: - 第一层：播放与选集主控制栏
                     HStack(spacing: 14) {
+                        Spacer()
+
                         // 1. 快退10秒
                         overlayBarButton(
                             title: "快退10秒",
@@ -185,7 +173,7 @@ public struct TVPlayerControlsOverlay: View {
                         }
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: focusedControl = feedActions == nil ? .back : .nextDrama
+                            case .up: if feedActions != nil { focusedControl = .nextDrama }
                             case .down: focusedControl = .speed
                             case .right: focusedControl = .playPause
                             default: break
@@ -205,7 +193,7 @@ public struct TVPlayerControlsOverlay: View {
                         .accessibilityLabel(viewModel.wantsPlayback ? "暂停" : "播放")
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: focusedControl = feedActions == nil ? .back : .nextDrama
+                            case .up: if feedActions != nil { focusedControl = .nextDrama }
                             case .down: focusedControl = .speed
                             case .left: focusedControl = .seekBackward
                             case .right: focusedControl = .seekForward
@@ -223,7 +211,7 @@ public struct TVPlayerControlsOverlay: View {
                         }
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: focusedControl = feedActions == nil ? .back : .nextDrama
+                            case .up: if feedActions != nil { focusedControl = .nextDrama }
                             case .down:
                                 if let plan = viewModel.plan, !plan.qualities.isEmpty {
                                     focusedControl = .quality
@@ -253,7 +241,7 @@ public struct TVPlayerControlsOverlay: View {
                         .opacity(viewModel.currentEpisodeIndex <= 1 ? 0.5 : 1.0)
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: focusedControl = feedActions == nil ? .back : .nextDrama
+                            case .up: if feedActions != nil { focusedControl = .nextDrama }
                             case .down:
                                 if let plan = viewModel.plan, !plan.qualities.isEmpty {
                                     focusedControl = .quality
@@ -278,7 +266,7 @@ public struct TVPlayerControlsOverlay: View {
                         }
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: focusedControl = feedActions == nil ? .back : .nextDrama
+                            case .up: if feedActions != nil { focusedControl = .nextDrama }
                             case .down: focusedControl = .danmaku
                             case .left:
                                 if viewModel.currentEpisodeIndex > 1 {
@@ -308,7 +296,7 @@ public struct TVPlayerControlsOverlay: View {
                         .opacity(viewModel.currentEpisodeIndex >= viewModel.allEpisodes.count ? 0.5 : 1.0)
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: focusedControl = feedActions == nil ? .back : .nextDrama
+                            case .up: if feedActions != nil { focusedControl = .nextDrama }
                             case .down: focusedControl = .danmakuSettings
                             case .left: focusedControl = .episodeDrawer
                             case .right: focusedControl = .speed
@@ -318,9 +306,12 @@ public struct TVPlayerControlsOverlay: View {
 
                         Spacer()
                     }
+                    .frame(maxWidth: .infinity)
 
                     // MARK: - 第二层：播放设置与观影增强栏
                     HStack(spacing: 14) {
+                        Spacer()
+
                         // 7. 播放倍速
                         overlayBarButton(
                             title: "\(String(format: "%.1f", viewModel.playbackRate))x 倍速",
@@ -417,6 +408,7 @@ public struct TVPlayerControlsOverlay: View {
 
                         Spacer()
                     }
+                    .frame(maxWidth: .infinity)
                 }
             }
             .padding(.horizontal, 56)

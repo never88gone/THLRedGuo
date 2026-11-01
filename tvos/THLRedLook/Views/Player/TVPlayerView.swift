@@ -289,6 +289,20 @@ public struct TVPlayerView: View {
                     onPanEnded: handlePanEnded,
                     onLeftArrow: { handleQuickSeek(by: -10) },
                     onRightArrow: { handleQuickSeek(by: 10) },
+                    onUpArrow: {
+                        if let feedActions {
+                            if feedActions.canGoPrevious { feedActions.onPrevious() }
+                        } else {
+                            handlePreviousEpisode()
+                        }
+                    },
+                    onDownArrow: {
+                        if feedActions != nil {
+                            Task { _ = await nextFeedDrama() }
+                        } else {
+                            handleNextEpisode()
+                        }
+                    },
                     onSelect: { viewModel.showControls() },
                     onPlayPause: { viewModel.togglePlayPause() },
                     onMenu: { onRemoteMenuPressed() }
@@ -444,11 +458,41 @@ public struct TVPlayerView: View {
         case .right:
             handleQuickSeek(by: 10)
         case .up:
-            if let feedActions, feedActions.canGoPrevious { feedActions.onPrevious() }
+            if let feedActions {
+                if feedActions.canGoPrevious { feedActions.onPrevious() }
+            } else {
+                handlePreviousEpisode()
+            }
         case .down:
-            if feedActions != nil { Task { _ = await nextFeedDrama() } }
+            if feedActions != nil {
+                Task { _ = await nextFeedDrama() }
+            } else {
+                handleNextEpisode()
+            }
         default:
             break
+        }
+    }
+
+    private func handlePreviousEpisode() {
+        guard viewModel.currentEpisodeIndex > 1 else {
+            viewModel.showToast("已经是第 1 集")
+            return
+        }
+        viewModel.showToast("正在切换至第 \(viewModel.currentEpisodeIndex - 1) 集")
+        Task {
+            await viewModel.previousEpisode()
+        }
+    }
+
+    private func handleNextEpisode() {
+        guard viewModel.currentEpisodeIndex < viewModel.allEpisodes.count else {
+            viewModel.showToast("已经是最后一集")
+            return
+        }
+        viewModel.showToast("正在切换至第 \(viewModel.currentEpisodeIndex + 1) 集")
+        Task {
+            await viewModel.nextEpisode()
         }
     }
 
@@ -758,6 +802,8 @@ public struct TVRemoteTouchSurfaceView: UIViewRepresentable {
     public var onPanEnded: () -> Void
     public var onLeftArrow: (() -> Void)? = nil
     public var onRightArrow: (() -> Void)? = nil
+    public var onUpArrow: (() -> Void)? = nil
+    public var onDownArrow: (() -> Void)? = nil
     public var onSelect: (() -> Void)? = nil
     public var onPlayPause: (() -> Void)? = nil
     public var onMenu: (() -> Void)? = nil
@@ -779,6 +825,8 @@ public struct TVRemoteTouchSurfaceView: UIViewRepresentable {
         view.onPanEnded = onPanEnded
         view.onLeftArrow = onLeftArrow
         view.onRightArrow = onRightArrow
+        view.onUpArrow = onUpArrow
+        view.onDownArrow = onDownArrow
         view.onSelect = onSelect
         view.onPlayPause = onPlayPause
         view.onMenu = onMenu
@@ -791,6 +839,8 @@ public class TVTouchCapturingView: UIView, UIGestureRecognizerDelegate {
     var onPanEnded: (() -> Void)?
     var onLeftArrow: (() -> Void)?
     var onRightArrow: (() -> Void)?
+    var onUpArrow: (() -> Void)?
+    var onDownArrow: (() -> Void)?
     var onSelect: (() -> Void)?
     var onPlayPause: (() -> Void)?
     var onMenu: (() -> Void)?
@@ -815,42 +865,56 @@ public class TVTouchCapturingView: UIView, UIGestureRecognizerDelegate {
         panGesture.delegate = self
         addGestureRecognizer(panGesture)
 
-        // 2. 遥控器 Left 按键专用手势
+        // 2. 遥控器 Left 按键专用手势（快退10秒）
         let leftTap = UITapGestureRecognizer(target: self, action: #selector(handleLeftPress))
         leftTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.leftArrow.rawValue)]
         leftTap.cancelsTouchesInView = false
         leftTap.delegate = self
         addGestureRecognizer(leftTap)
 
-        // 3. 遥控器 Right 按键专用手势
+        // 3. 遥控器 Right 按键专用手势（快进10秒）
         let rightTap = UITapGestureRecognizer(target: self, action: #selector(handleRightPress))
         rightTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.rightArrow.rawValue)]
         rightTap.cancelsTouchesInView = false
         rightTap.delegate = self
         addGestureRecognizer(rightTap)
 
-        // 4. 遥控器 Select 确认按键手势
+        // 4. 遥控器 Up 按键专用手势（上一集）
+        let upTap = UITapGestureRecognizer(target: self, action: #selector(handleUpPress))
+        upTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.upArrow.rawValue)]
+        upTap.cancelsTouchesInView = false
+        upTap.delegate = self
+        addGestureRecognizer(upTap)
+
+        // 5. 遥控器 Down 按键专用手势（下一集）
+        let downTap = UITapGestureRecognizer(target: self, action: #selector(handleDownPress))
+        downTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.downArrow.rawValue)]
+        downTap.cancelsTouchesInView = false
+        downTap.delegate = self
+        addGestureRecognizer(downTap)
+
+        // 6. 遥控器 Select 确认按键手势
         let selectTap = UITapGestureRecognizer(target: self, action: #selector(handleSelectPress))
         selectTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.select.rawValue)]
         selectTap.cancelsTouchesInView = false
         selectTap.delegate = self
         addGestureRecognizer(selectTap)
 
-        // 5. 遥控器 Play/Pause 按键手势
+        // 7. 遥控器 Play/Pause 按键手势
         let playPauseTap = UITapGestureRecognizer(target: self, action: #selector(handlePlayPausePress))
         playPauseTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.playPause.rawValue)]
         playPauseTap.cancelsTouchesInView = false
         playPauseTap.delegate = self
         addGestureRecognizer(playPauseTap)
 
-        // 6. 遥控器 Menu 按键手势
+        // 8. 遥控器 Menu 按键手势
         let menuTap = UITapGestureRecognizer(target: self, action: #selector(handleMenuPress))
         menuTap.allowedPressTypes = [NSNumber(value: UIPress.PressType.menu.rawValue)]
         menuTap.cancelsTouchesInView = false
         menuTap.delegate = self
         addGestureRecognizer(menuTap)
 
-        // 7. 遥控器触控板轻扫手势 (Swipe Right: 快进, Swipe Left: 快退)
+        // 9. 遥控器触控板轻扫手势 (Swipe Right: 快进, Swipe Left: 快退, Swipe Up: 上一集, Swipe Down: 下一集)
         let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handleRightPress))
         swipeRight.direction = .right
         swipeRight.cancelsTouchesInView = false
@@ -862,6 +926,18 @@ public class TVTouchCapturingView: UIView, UIGestureRecognizerDelegate {
         swipeLeft.cancelsTouchesInView = false
         swipeLeft.delegate = self
         addGestureRecognizer(swipeLeft)
+
+        let swipeUp = UISwipeGestureRecognizer(target: self, action: #selector(handleUpPress))
+        swipeUp.direction = .up
+        swipeUp.cancelsTouchesInView = false
+        swipeUp.delegate = self
+        addGestureRecognizer(swipeUp)
+
+        let swipeDown = UISwipeGestureRecognizer(target: self, action: #selector(handleDownPress))
+        swipeDown.direction = .down
+        swipeDown.cancelsTouchesInView = false
+        swipeDown.delegate = self
+        addGestureRecognizer(swipeDown)
     }
 
     required init?(coder: NSCoder) {
@@ -881,6 +957,16 @@ public class TVTouchCapturingView: UIView, UIGestureRecognizerDelegate {
     @objc private func handleRightPress() {
         print("THL_GESTURE_RIGHT_PRESS_CAPTURED")
         onRightArrow?()
+    }
+
+    @objc private func handleUpPress() {
+        print("THL_GESTURE_UP_PRESS_CAPTURED")
+        onUpArrow?()
+    }
+
+    @objc private func handleDownPress() {
+        print("THL_GESTURE_DOWN_PRESS_CAPTURED")
+        onDownArrow?()
     }
 
     @objc private func handleSelectPress() {
@@ -922,6 +1008,14 @@ public class TVTouchCapturingView: UIView, UIGestureRecognizerDelegate {
             case .rightArrow:
                 print("THL_PRESSES_BEGAN_RIGHT_ARROW")
                 onRightArrow?()
+                handled = true
+            case .upArrow:
+                print("THL_PRESSES_BEGAN_UP_ARROW")
+                onUpArrow?()
+                handled = true
+            case .downArrow:
+                print("THL_PRESSES_BEGAN_DOWN_ARROW")
+                onDownArrow?()
                 handled = true
             case .select:
                 print("THL_PRESSES_BEGAN_SELECT")

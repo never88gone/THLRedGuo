@@ -421,17 +421,25 @@ final class RemoteNavigationTests: XCTestCase {
         case "player.back": press(.down, focus: "player.playPause")
         case "player.seekForward": press(.left, focus: "player.playPause")
         case "player.seekBackward": press(.right, focus: "player.playPause")
-        case "player.nextEpisode", "player.prevEpisode", "player.episodeDrawer":
-            press(.up, focus: "player.back")
-            press(.down, focus: "player.playPause")
+        case "player.prevEpisode":
+            press(.left, focus: "player.seekForward")
+            press(.left, focus: "player.playPause")
+        case "player.episodeDrawer":
+            press(.left)
+            press(.left, focus: "player.seekForward")
+            press(.left, focus: "player.playPause")
+        case "player.nextEpisode":
+            press(.left, focus: "player.episodeDrawer")
+            press(.left)
+            press(.left, focus: "player.playPause")
         case "player.speed": press(.up, focus: "player.playPause")
         case "player.quality":
             press(.up, focus: "player.seekForward")
             press(.left, focus: "player.playPause")
         case "player.danmaku", "player.danmakuSettings":
             press(.up)
-            press(.up, focus: "player.back")
-            press(.down, focus: "player.playPause")
+            press(.left)
+            press(.left, focus: "player.playPause")
         default: break
         }
         if let changed = yaoSnapshots().first(where: { $0.hasFocus })?.identifier,
@@ -1064,9 +1072,8 @@ final class RemoteNavigationTests: XCTestCase {
             self.app.buttons["player.playPause"].exists && self.app.buttons["player.playPause"].hasFocus
         }
 
-        // 验证 11 个控制按钮均存在于界面上
+        // 验证 10 个居中底部控制按钮均存在于界面上（已移除顶部多余的返回按钮，改由原生 Menu 键返回）
         let allControlIds = [
-            "player.back",
             "player.seekBackward",
             "player.playPause",
             "player.seekForward",
@@ -1087,13 +1094,7 @@ final class RemoteNavigationTests: XCTestCase {
         try? fullShot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/tvos27-focus-20261020/tvos_player_bottom_controls_bar.png"))
         try? fullShot.pngRepresentation.write(to: URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/build/verification/tvos27-focus-20261020/tvos_player_two_tier_controls.png"))
 
-        // 2. 测试向上导航至顶部返回按钮并返回主播放键
-        press(.up, focus: "player.back")
-        XCTAssertTrue(app.buttons["player.back"].hasFocus)
-        press(.down, focus: "player.playPause")
-        XCTAssertTrue(app.buttons["player.playPause"].hasFocus)
-
-        // 3. 测试向左导航至快退10秒并点击
+        // 2. 测试向左导航至快退10秒并点击
         press(.left, focus: "player.seekBackward")
         XCTAssertTrue(app.buttons["player.seekBackward"].hasFocus)
         press(.select)
