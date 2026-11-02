@@ -185,6 +185,8 @@ flowchart TD
 
 跨域重定向必须重新判断凭据适用范围，不将原域名的鉴权头复制给任意新域名。
 
+当前官方业务请求范围包含 `reading.snssdk.com`、`api5-normal.fqnovel.com` 和已支持的 `api*-normal-sinfonline*.fqnovel.com` 域名，并限制为 HTTPS 的 `/reading/`、`/novel/` 路径。主取流、备用取流和记忆备用线路后的下一集采用相同会话规则；不向任意同后缀域名广播账号凭据。
+
 ### 5.2 账号上下文与签名顺序
 
 逻辑账号上下文至少需要区分：数据源、本地用户、官方账号、登录状态、会话引用、设备会话引用、账号上下文版本。用户 ID、设备 ID、剧 ID 和分集 ID 采用字符串，不经过 JavaScript `Number` 的大整数转换。

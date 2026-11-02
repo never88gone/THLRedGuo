@@ -37,7 +37,7 @@ final class HongguoAccountVault: @unchecked Sendable {
     static func businessURL(_ url: URL) -> Bool {
         guard url.scheme == "https", url.port == nil else { return false }
         let host = url.host ?? ""
-        return (host == "reading.snssdk.com" || host.range(of: "^api[0-9]+-normal-sinfonline[a-z]\\.fqnovel\\.com$", options: .regularExpression) != nil) &&
+        return (host == "reading.snssdk.com" || host == "api5-normal.fqnovel.com" || host.range(of: "^api[0-9]+-normal-sinfonline[a-z]\\.fqnovel\\.com$", options: .regularExpression) != nil) &&
             (url.path.hasPrefix("/reading/") || url.path.hasPrefix("/novel/"))
     }
     func header(for url: URL, record: HongguoAccountRecord? = nil) -> String {

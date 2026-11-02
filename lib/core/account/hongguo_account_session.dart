@@ -217,6 +217,7 @@ class HongguoAccountSession extends ChangeNotifier {
       uri.scheme == 'https' &&
       !uri.hasPort &&
       (uri.host == 'reading.snssdk.com' ||
+          uri.host == 'api5-normal.fqnovel.com' ||
           RegExp(
             r'^api[0-9]+-normal-sinfonline[a-z]\.fqnovel\.com$',
           ).hasMatch(uri.host)) &&

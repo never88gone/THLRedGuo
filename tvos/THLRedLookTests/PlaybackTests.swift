@@ -18,7 +18,8 @@ final class PlaybackTests: XCTestCase {
             HongguoCookie(name: "uid_tt", value: "expired", domain: "hongguoduanju.com", path: "/", expires: now.addingTimeInterval(-60))])
         let vault = HongguoAccountVault.shared
         XCTAssertEqual(vault.header(for: try XCTUnwrap(URL(string: "https://reading.snssdk.com/novel/player/multi_video_model/v1/")), record: record), "sessionid=synthetic-session")
-        for raw in ["https://v5-reading-video.qznovelvod.com/reading/test", "https://github.com/reading/test", "https://reading.snssdk.com.evil.test/reading/test", "http://reading.snssdk.com/reading/test", "https://reading.snssdk.com/unrelated"] {
+        XCTAssertEqual(vault.header(for: try XCTUnwrap(URL(string: "https://api5-normal.fqnovel.com/novel/player/multi_video_model/v1/")), record: record), "sessionid=synthetic-session")
+        for raw in ["https://v5-reading-video.qznovelvod.com/reading/test", "https://github.com/reading/test", "https://reading.snssdk.com.evil.test/reading/test", "http://reading.snssdk.com/reading/test", "https://reading.snssdk.com/unrelated", "https://api5-normal.fqnovel.com.evil.test/novel/player/multi_video_model/v1/", "https://api5-normal.fqnovel.com/unrelated"] {
             XCTAssertEqual(vault.header(for: try XCTUnwrap(URL(string: raw)), record: record), "")
         }
     }

@@ -50,6 +50,8 @@ void main() {
       'http://reading.snssdk.com/reading/test',
       'https://reading.snssdk.com/other',
       'https://log.snssdk.com/service/2/device_register/',
+      'https://api5-normal.fqnovel.com.evil.test/novel/player/multi_video_model/v1/',
+      'https://api5-normal.fqnovel.com/unrelated',
     ]) {
       expect(session.headerFor(Uri.parse(url)), isEmpty);
     }
@@ -200,5 +202,86 @@ void main() {
       throwsA(isA<Exception>()),
     );
     expect(requests, 2);
+  });
+
+  test('四条取流线路与记忆备用线路均携带账号，CDN不接收账号', () async {
+    SharedPreferences.setMockInitialValues({});
+    final session = HongguoAccountSession.shared;
+    await session.bindProfile('synthetic-account-fallback');
+    await session.accept(
+      cookies(),
+      {'id': '123'},
+      expectedRevision: session.revision,
+      device: jsonEncode({
+        'iid': '7345678901234567200',
+        'device_id': '7345678901234567100',
+      }),
+    );
+    addTearDown(session.logout);
+    final hosts = <String>[];
+    final accountAttached = <bool>[];
+    final mediaAccountAttached = <bool>[];
+    const media = 'https://fixture.qznovelvod.com/account-fallback.mp4';
+    final client = MockClient((request) async {
+      if (request.url.host == 'fixture.qznovelvod.com') {
+        mediaAccountAttached.add((request.headers['Cookie'] ?? '').isNotEmpty);
+        return http.Response('', 200, headers: {'content-type': 'video/mp4'});
+      }
+      hosts.add(request.url.host);
+      accountAttached.add(
+        request.headers['Cookie'] == 'sessionid=synthetic-session',
+      );
+      if (request.url.host != 'api5-normal.fqnovel.com') {
+        return http.Response('', 200);
+      }
+      final payload = jsonDecode(request.body) as Map;
+      final videoId = payload['mixed_video_id_map']['1004'][0] as String;
+      return http.Response(
+        jsonEncode({
+          'code': 0,
+          'data': {
+            videoId: {
+              'video_model': {
+                'video_list': {
+                  'main': {
+                    'main_url': base64Encode(utf8.encode(media)),
+                    'codec_type': 'h264',
+                    'definition': '1080p',
+                    'vwidth': 1080,
+                    'vheight': 1920,
+                  },
+                },
+              },
+            },
+          },
+        }),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
+    final runtime = CatPawJsRuntime(client);
+    addTearDown(runtime.dispose);
+    addTearDown(client.close);
+    await runtime.init(
+      await rootBundle.loadString('assets/sources/hongguo.js'),
+    );
+    expect(
+      (await runtime.play('', '7345678901234567123_7345678901234568456')).url,
+      media,
+    );
+    expect(
+      (await runtime.play('', '7345678901234567123_7345678901234568457')).url,
+      media,
+    );
+    expect(hosts, [
+      'api5-normal-sinfonlineb.fqnovel.com',
+      'reading.snssdk.com',
+      'reading.snssdk.com',
+      'api5-normal.fqnovel.com',
+      'api5-normal.fqnovel.com',
+    ]);
+    expect(accountAttached, everyElement(isTrue));
+    expect(mediaAccountAttached, isNotEmpty);
+    expect(mediaAccountAttached, everyElement(isFalse));
   });
 }
