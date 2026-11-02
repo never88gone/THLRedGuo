@@ -118,6 +118,15 @@ public struct SavedLibraryView: View {
                                 .accessibilityIdentifier("library.card.\(drama.id)")
                                 .accessibilityValue(entry?.progressLabel ?? "本地收藏")
                                 .id(FocusTarget.card(drama.id))
+                                .contextMenu {
+                                    if viewModel.selectedTab == .follows {
+                                        Button(role: .destructive) {
+                                            viewModel.removeFollow(dramaId: drama.id)
+                                        } label: {
+                                            Label("取消追剧", systemImage: "bookmark.slash")
+                                        }
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, 48)

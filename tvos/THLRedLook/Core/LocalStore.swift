@@ -41,6 +41,7 @@ public final class LocalStore: ObservableObject {
     @Published public var currentSourceId: String = "hongguo"
     @Published public var cachedCategories: [CatalogCategory] = []
     @Published public var cachedHomeDramas: [Drama] = []
+    public private(set) var deletedFollowIds: Set<String> = []
 
     private let defaults: UserDefaults
     private let cloudUpload: (LocalStore) -> Void
@@ -50,6 +51,7 @@ public final class LocalStore: ObservableObject {
     private let historyKey = "zgj_tv_history"
     private let followsKey = "zgj_tv_follows"
     private let followedDramasKey = "zgj_tv_followed_dramas"
+    private let deletedFollowIdsKey = "zgj_tv_deleted_follow_ids"
     private let searchHistoryKey = "zgj_tv_search_history"
     private let unlockedKey = "zgj_tv_sources_unlocked"
     private let settingsKey = "zgj_tv_resource_settings"
@@ -101,6 +103,10 @@ public final class LocalStore: ObservableObject {
         if let data = defaults.data(forKey: followedDramasKey),
            let list = try? JSONDecoder().decode([Drama].self, from: data) {
             followedDramas = list
+        }
+
+        if let deletedList = defaults.stringArray(forKey: deletedFollowIdsKey) {
+            deletedFollowIds = Set(deletedList)
         }
 
         if let data = defaults.data(forKey: settingsKey),
@@ -204,7 +210,9 @@ public final class LocalStore: ObservableObject {
         if state == .none {
             follows.removeValue(forKey: drama.id)
             followedDramas.removeAll { $0.id == drama.id }
+            deletedFollowIds.insert(drama.id)
         } else {
+            deletedFollowIds.remove(drama.id)
             follows[drama.id] = state
             if !followedDramas.contains(where: { $0.id == drama.id }) {
                 followedDramas.insert(drama, at: 0)
@@ -217,8 +225,22 @@ public final class LocalStore: ObservableObject {
         saveFollows()
     }
 
+    public func removeFollow(dramaId: String) {
+        guard !dramaId.isEmpty else { return }
+        follows.removeValue(forKey: dramaId)
+        followedDramas.removeAll { $0.id == dramaId }
+        deletedFollowIds.insert(dramaId)
+        saveFollows()
+    }
+
     public func followState(for dramaId: String) -> FollowState {
         follows[dramaId] ?? .none
+    }
+
+    public func acknowledgeDeletedFollowIds(_ ids: Set<String>) {
+        guard !ids.isEmpty else { return }
+        deletedFollowIds.subtract(ids)
+        defaults.set(Array(deletedFollowIds), forKey: deletedFollowIdsKey)
     }
 
     private func saveFollows() {
@@ -228,6 +250,7 @@ public final class LocalStore: ObservableObject {
         if let dramaData = try? JSONEncoder().encode(followedDramas) {
             defaults.set(dramaData, forKey: followedDramasKey)
         }
+        defaults.set(Array(deletedFollowIds), forKey: deletedFollowIdsKey)
         cloudUpload(self)
     }
 
@@ -237,15 +260,16 @@ public final class LocalStore: ObservableObject {
         if let source, !source.isEmpty { setSource(source) }
         if let danmaku { danmakuEnabled = danmaku }
         self.history = history
-        self.follows = follows
-        self.followedDramas = followedDramas
+        // 排除已删除墓碑中的追剧，防止云端旧数据复活覆盖本地删除操作
+        self.follows = follows.filter { !deletedFollowIds.contains($0.key) }
+        self.followedDramas = followedDramas.filter { !deletedFollowIds.contains($0.id) }
         if let data = try? JSONEncoder().encode(history) {
             defaults.set(data, forKey: historyKey)
         }
-        if let data = try? JSONEncoder().encode(follows) {
+        if let data = try? JSONEncoder().encode(self.follows) {
             defaults.set(data, forKey: followsKey)
         }
-        if let data = try? JSONEncoder().encode(followedDramas) {
+        if let data = try? JSONEncoder().encode(self.followedDramas) {
             defaults.set(data, forKey: followedDramasKey)
         }
     }

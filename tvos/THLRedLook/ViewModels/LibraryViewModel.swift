@@ -65,6 +65,10 @@ public final class LibraryViewModel: ObservableObject {
     public func removeHistory(dramaId: String) {
         store.removeHistory(dramaId: dramaId)
     }
+
+    public func removeFollow(dramaId: String) {
+        store.removeFollow(dramaId: dramaId)
+    }
 }
 
 @MainActor

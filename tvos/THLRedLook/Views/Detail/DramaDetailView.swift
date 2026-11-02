@@ -177,7 +177,7 @@ public struct DramaDetailView: View {
 
                                         // 追剧按钮
                                         TVButton(
-                                            title: viewModel.followState == .none ? "收藏" : "已收藏",
+                                            title: viewModel.followState == .none ? "追剧" : "已追剧",
                                             icon: viewModel.followState == .none ? "bookmark" : "bookmark.fill",
                                             isExternalFocused: focusedTarget == .favorite
                                         ) {
@@ -186,11 +186,18 @@ public struct DramaDetailView: View {
                                         .focused($focusedTarget, equals: .favorite)
                                         .id("detail_favorite")
                                         .accessibilityIdentifier("detail.favorite")
+                                        .accessibilityLabel(viewModel.followState == .none ? "追剧" : "已追剧(已收藏)")
 
                                         if viewModel.followState != .none {
                                             Menu {
                                                 ForEach([FollowState.wishlist, .watching, .watched, .updated]) { state in
                                                     Button(state.label) { viewModel.setFollowState(state) }
+                                                }
+                                                Divider()
+                                                Button(role: .destructive) {
+                                                    viewModel.setFollowState(.none)
+                                                } label: {
+                                                    Label("取消追剧", systemImage: "bookmark.slash")
                                                 }
                                             } label: {
                                                 Label(viewModel.followState.label, systemImage: "list.bullet")

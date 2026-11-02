@@ -296,12 +296,19 @@ final class RemoteNavigationTests: XCTestCase {
         app.launchArguments = ["-testPage", "library"]
         app.launch()
         XCTAssertTrue(app.buttons["library.tab.history"].waitForExistence(timeout: 30))
-        if app.buttons["nav.library"].hasFocus { press(.down, focus: "library.tab.history") }
+        if app.buttons["nav.library"].hasFocus { press(.right, focus: "library.tab.history") }
         wait("library starts at history") { self.app.buttons["library.tab.history"].hasFocus }
         press(.right, focus: "library.tab.follows")
         press(.select)
         press(.down, focus: "library.filter.all")
-        press(.down, focus: "library.card." + id)
+        press(.down)
+        if !app.buttons["library.card." + id].hasFocus {
+            for _ in 0..<10 {
+                if app.buttons["library.card." + id].hasFocus { break }
+                press(.right)
+            }
+        }
+        wait("focus favorite card") { self.app.buttons["library.card." + id].hasFocus }
         press(.select)
         XCTAssertTrue(app.buttons["detail.favorite"].waitForExistence(timeout: 30))
         XCTAssertTrue(app.buttons["detail.favorite"].label.contains("已收藏"))
@@ -362,7 +369,7 @@ final class RemoteNavigationTests: XCTestCase {
         app.launchArguments = ["-testPage", "library"]
         app.launch()
         XCTAssertTrue(app.buttons["library.tab.history"].waitForExistence(timeout: 30))
-        if app.buttons["nav.library"].hasFocus { press(.down, focus: "library.tab.history") }
+        if app.buttons["nav.library"].hasFocus { press(.right, focus: "library.tab.history") }
         wait("history tab focus") { self.app.buttons["library.tab.history"].hasFocus }
         press(.down, focus: "library.card." + id)
         XCTAssertTrue((app.buttons["library.card." + id].value as? String ?? "").contains("第 2 集"))

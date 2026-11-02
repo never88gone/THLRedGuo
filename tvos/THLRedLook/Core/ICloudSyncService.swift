@@ -120,11 +120,13 @@ public final class ICloudSyncService: ObservableObject {
             }
             var dramas = Dictionary(store.followedDramas.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
             for drama in remoteDramas.0 {
+                if store.deletedFollowIds.contains(drama.id) { continue }
                 dramas[drama.id] = dramas[drama.id]?.merge(with: drama) ?? drama
             }
             var follows = store.follows
             var remoteFollows: [String: FollowState] = [:]
             for (id, value) in followsJSON["follows"] as? [String: Any] ?? [:] {
+                if store.deletedFollowIds.contains(id) { continue }
                 let status = (value as? String) ?? (value as? [String: Any])?["status"] as? String ?? ""
                 let state = FollowState.from(string: status)
                 if state != .none {
@@ -132,7 +134,8 @@ public final class ICloudSyncService: ObservableObject {
                     remoteFollows[id] = state
                 }
             }
-            let mergedDramas = dramas.values.sorted { $0.id < $1.id }
+            let mergedDramas = dramas.values.filter { !store.deletedFollowIds.contains($0.id) }.sorted { $0.id < $1.id }
+            follows = follows.filter { !store.deletedFollowIds.contains($0.key) }
             store.applySyncedData(history: mergedHistory, follows: follows, followedDramas: mergedDramas,
                                   source: remoteSettings["source"] as? String, danmaku: remoteSettings["danmaku"] as? Bool)
 
@@ -167,6 +170,7 @@ public final class ICloudSyncService: ObservableObject {
                     return
                 }
             }
+            store.acknowledgeDeletedFollowIds(store.deletedFollowIds)
             lastSyncDate = Date()
             let skipped = remoteHistory.1 + remoteDramas.1
             let syncedCount = min(mergedHistory.count, Self.maxHistoryCount)
