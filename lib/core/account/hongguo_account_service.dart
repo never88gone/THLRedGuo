@@ -75,6 +75,12 @@ class HongguoAccountService {
     final request = await _http!
         .openUrl('GET', uri)
         .timeout(const Duration(seconds: 15));
+    try {
+      _check(revision);
+    } catch (_) {
+      request.abort();
+      rethrow;
+    }
     request.followRedirects = false;
     if (web) {
       request.headers.set('User-Agent', 'Mozilla/5.0 THLRedLook/1.0.0');

@@ -59,6 +59,12 @@ class _Request implements HttpClientRequest {
   final _Headers headers = _Headers();
   @override
   bool followRedirects = true;
+  bool aborted = false;
+  @override
+  void abort([Object? exception, StackTrace? stackTrace]) {
+    aborted = true;
+  }
+
   @override
   Future<HttpClientResponse> close() async => respond(uri, headers);
   @override
@@ -77,6 +83,20 @@ class _Client implements HttpClient {
   void close({bool force = false}) {}
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _DeferredClient extends _Client {
+  _DeferredClient(super.respond);
+  final opened = Completer<void>();
+  final release = Completer<void>();
+  late _Request pending;
+  @override
+  Future<HttpClientRequest> openUrl(String method, Uri url) async {
+    pending = _Request(url, respond);
+    opened.complete();
+    await release.future;
+    return pending;
+  }
 }
 
 void main() {
@@ -309,5 +329,48 @@ void main() {
         ),
       ),
     );
+  });
+  test('切换账号期间已打开但未发送的请求不能附加新账号Cookie', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('synthetic-library-race');
+    HongguoAccountCookies cookies(String token) => HongguoAccountCookies()
+      ..merge(Uri.parse('https://hongguoduanju.com/'), [
+        'sessionid=$token; Path=/; Secure',
+      ]);
+    await session.accept(cookies('synthetic-a'), {
+      'id': '123',
+    }, expectedRevision: session.revision);
+    var sent = 0;
+    final client = _DeferredClient((_, _) {
+      sent++;
+      return _Reply({
+        'code': 0,
+        'data': {'video_shelf_info': []},
+      });
+    });
+    await HttpOverrides.runZoned(() async {
+      final service = HongguoAccountService(session: session);
+      addTearDown(service.dispose);
+      final result = expectLater(
+        service.library(history: false),
+        throwsA(
+          isA<HongguoAccountFailure>().having(
+            (e) => e.code,
+            'code',
+            'CANCELLED',
+          ),
+        ),
+      );
+      await client.opened.future;
+      await session.logout();
+      await session.accept(cookies('synthetic-b'), {
+        'id': '456',
+      }, expectedRevision: session.revision);
+      client.release.complete();
+      await result;
+      expect(sent, 0);
+      expect(client.pending.headers.value('Cookie'), isNull);
+      expect(client.pending.aborted, true);
+    }, createHttpClient: (_) => client);
   });
 }
