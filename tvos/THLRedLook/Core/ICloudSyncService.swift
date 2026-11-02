@@ -174,7 +174,7 @@ public final class ICloudSyncService: ObservableObject {
                 let dramaData = try JSONEncoder().encode(mergedDramas)
                 var followsPayload: [String: Any] = [
                     "follows": follows.mapValues(\.rawValue),
-                    "dramas": JSONSerialization.jsonObject(with: dramaData)
+                    "dramas": try JSONSerialization.jsonObject(with: dramaData)
                 ]
                 if !allDeletedFollows.isEmpty {
                     let nowMs = Int64(Date().timeIntervalSince1970 * 1000)

@@ -31,6 +31,8 @@ dependencies:
   html: ^0.15.7
   flutter_js: ^0.8.7
   url_launcher: ^6.3.3
+  flutter_secure_storage: ^11.2.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

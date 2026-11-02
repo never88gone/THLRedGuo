@@ -12,6 +12,9 @@ PODS:
     - Flutter
   - flutter_js (0.1.0):
     - Flutter
+  - flutter_secure_storage_darwin (10.0.0):
+    - Flutter
+    - FlutterMacOS
   - integration_test (0.0.1):
     - Flutter
   - media_kit_libs_ios_video (1.0.4):
@@ -39,6 +42,7 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - flutter_foreground_task (from `.symlinks/plugins/flutter_foreground_task/ios`)
   - flutter_js (from `.symlinks/plugins/flutter_js/ios`)
+  - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - media_kit_libs_ios_video (from `.symlinks/plugins/media_kit_libs_ios_video/ios`)
   - media_kit_video (from `.symlinks/plugins/media_kit_video/ios`)
@@ -60,6 +64,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_foreground_task/ios"
   flutter_js:
     :path: ".symlinks/plugins/flutter_js/ios"
+  flutter_secure_storage_darwin:
+    :path: ".symlinks/plugins/flutter_secure_storage_darwin/darwin"
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
   media_kit_libs_ios_video:
@@ -85,6 +91,7 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_foreground_task: ff24d2fb1aefdcde8ed192e8b0574348aab3a30e
   flutter_js: 867813c1830e1d9b2c5d547cdb6f61801e2f2145
+  flutter_secure_storage_darwin: 46e401699982ee74142909676535e0f6a7321e58
   integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
   media_kit_libs_ios_video: 5a18affdb97d1f5d466dc79988b13eff6c5e2854
   media_kit_video: 1746e198cb697d1ffb734b1d05ec429d1fcd1474

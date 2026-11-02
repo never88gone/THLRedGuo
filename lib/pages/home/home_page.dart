@@ -1,3 +1,5 @@
+import 'package:THLRedLook/core/account/hongguo_account_session.dart';
+import 'package:THLRedLook/pages/account/account_page.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -73,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasMore = true;
   String? _error;
   int _generation = 0;
+  int _accountRevision = -1;
   int _tab = 0;
   String _submittedQuery = '';
   final _categorySelections = <String, String>{};
@@ -418,6 +421,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _submittedQuery = widget.initialSearchQuery;
       }
     }
+    _accountRevision = HongguoAccountSession.shared.revision;
+    HongguoAccountSession.shared.addListener(_officialAccountChanged);
     _scroll.addListener(_onCatalogScroll);
     _source = SourceSite.byId(widget.store.source);
     _allSources = widget.store.catalogView.allSources;
@@ -438,6 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    HongguoAccountSession.shared.removeListener(_officialAccountChanged);
     _feed.dispose();
     widget.store.removeListener(_sourcesChanged);
     JsSourceService.current?.removeListener(_sourcesChanged);
@@ -451,6 +457,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _scroll.removeListener(_onCatalogScroll);
     _scroll.dispose();
     super.dispose();
+  }
+
+  void _officialAccountChanged() {
+    final revision = HongguoAccountSession.shared.revision;
+    if (!mounted || _accountRevision == revision) return;
+    _accountRevision = revision;
+    unawaited(_refreshCatalog());
+    unawaited(_feed.refresh());
   }
 
   void _onCatalogScroll() {
@@ -567,7 +581,8 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (error) {
       if (!mounted || generation != _generation) return;
       final errorStr = error.toString();
-      final isCursorExpired = errorStr.contains('CURSOR_EXPIRED') ||
+      final isCursorExpired =
+          errorStr.contains('CURSOR_EXPIRED') ||
           errorStr.contains('MISSING_CURSOR') ||
           errorStr.contains('游标');
       if (isCursorExpired && more) {
@@ -1214,12 +1229,13 @@ class _HomeScreenState extends State<HomeScreen> {
           (4, Icons.play_circle_outline, Icons.play_circle, '推荐'),
           (1, Icons.bookmark_border_rounded, Icons.bookmark_rounded, '追剧'),
           (2, Icons.history_rounded, Icons.history_rounded, '最近观看'),
-          if (widget.store.canDownload)
+          if (widget.store.canDownload && (desktop || television))
             (3, Icons.download_outlined, Icons.download_rounded, '下载'),
+          (5, Icons.person_outline, Icons.person, '我的'),
         ];
         final navIndex = destinations.indexWhere((item) => item.$1 == _tab);
         final scaffold = Scaffold(
-          appBar: _tab == 4
+          appBar: _tab == 4 || _tab == 5
               ? null
               : HomeAppBarView(
                   selectionMode: _selectionMode,
@@ -1235,10 +1251,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   supportsSourceManagement:
                       widget.repository.supportsSourceManagement,
                   sourcesEmpty: _hasNoSourcePlugins,
-                  loading:
-                      _loading ||
-                      _loadingMore ||
-                      _categoriesLoading,
+                  loading: _loading || _loadingMore || _categoriesLoading,
                   catalogSortLabel: widget.store.catalogView.sort.label,
                   isSortedOrFiltered:
                       widget.store.catalogView.sort != CatalogSort.source ||
@@ -1365,6 +1378,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                           selectionInBody:
                                               desktop || television,
                                         )
+                                : _tab == 5
+                                ? AccountScreen(
+                                    repository: widget.repository,
+                                    store: widget.store,
+                                  )
                                 : _tab == 3
                                 ? DownloadsScreen(
                                     repository: widget.repository,
@@ -1586,9 +1604,7 @@ class _HomeScreenState extends State<HomeScreen> {
               gridKey: 'catalog-${_group.id}-$_category-$_submittedQuery',
               loadingMessage: _search.text.trim().isNotEmpty
                   ? '正在搜索相关短剧...'
-                  : (_category.isNotEmpty
-                        ? '正在获取分类短剧...'
-                        : '正在加载精选短剧...'),
+                  : (_category.isNotEmpty ? '正在获取分类短剧...' : '正在加载精选短剧...'),
               loadingHint: '数据加载中，请稍候片刻',
               onRetryLoad: () => _load(force: true),
               onLoadMore: () => _load(more: true),

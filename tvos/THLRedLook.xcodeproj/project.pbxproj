@@ -10,6 +10,7 @@
 		00F6DAC96490A839B6FC75EA /* HongguoApkProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E4F0775CA2B5213DAF9E20 /* HongguoApkProfile.swift */; };
 		12F647818F7F44998727220E /* OverseasSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */; };
 		1F6926DCCD8AAF72AD718D1E /* ApkProfileImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D255715E326D23643B59BC9D /* ApkProfileImportSheet.swift */; };
+		25C440231CE2B2DA7D759FBF /* TVAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90236F9F822D5D6ADD2A01CC /* TVAccountView.swift */; };
 		308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */; };
 		3B9F1C5ADE795910FBD0AD03 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6299EBC862612C3A90774337 /* Foundation.framework */; };
 		3EB52B87EAB6FA6FA6506647 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6299EBC862612C3A90774337 /* Foundation.framework */; };
@@ -22,6 +23,7 @@
 		7A25873DCEE90B41E3C04905 /* ApkProfileImportServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30C46674D4352DBF7CD9CB5 /* ApkProfileImportServer.swift */; };
 		81C7FE1DA08787168F35C136 /* ICloudSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */; };
 		90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */; };
+		9B439046CEA28AFCCA409716 /* HongguoAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8916276259AF5B77E0B0DE40 /* HongguoAccount.swift */; };
 		A10000012C00000100000001 /* THLRedLookApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000012C00000100000001 /* THLRedLookApp.swift */; };
 		A10000022C00000100000001 /* SourceSite.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022C00000100000001 /* SourceSite.swift */; };
 		A10000032C00000100000001 /* Drama.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000032C00000100000001 /* Drama.swift */; };
@@ -116,7 +118,9 @@
 		6A9AED8C8EB9E35575961261 /* THLRedLookTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = THLRedLookTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverseasSearchTests.swift; sourceTree = "<group>"; };
 		83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CENCDecoderTests.swift; sourceTree = "<group>"; };
+		8916276259AF5B77E0B0DE40 /* HongguoAccount.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HongguoAccount.swift; path = THLRedLook/Core/HongguoAccount.swift; sourceTree = SOURCE_ROOT; };
 		8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ICloudSyncTests.swift; sourceTree = "<group>"; };
+		90236F9F822D5D6ADD2A01CC /* TVAccountView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVAccountView.swift; path = THLRedLook/Views/Settings/TVAccountView.swift; sourceTree = SOURCE_ROOT; };
 		98E5CF00A15647D68EF83727 /* DiagnosticsShareServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsShareServer.swift; sourceTree = "<group>"; };
 		9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalLibraryTests.swift; sourceTree = "<group>"; };
 		A41C80E59CBF4F2096A85A02 /* TVQualitySelectionDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVQualitySelectionDrawer.swift; sourceTree = "<group>"; };
@@ -291,6 +295,8 @@
 				B10A80F99E2D9849B8980719 /* THLRedLookTests */,
 				05D057238BF0376567EE6F32 /* THLRedLookUITests */,
 				22EE514ABD32812A24D85A57 /* LocalPlayback */,
+				8916276259AF5B77E0B0DE40 /* HongguoAccount.swift */,
+				90236F9F822D5D6ADD2A01CC /* TVAccountView.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -786,6 +792,8 @@
 				6E79A4B5895BFF20763CC4EF /* HongguoPlaybackProfileVault.swift in Sources */,
 				7A25873DCEE90B41E3C04905 /* ApkProfileImportServer.swift in Sources */,
 				1F6926DCCD8AAF72AD718D1E /* ApkProfileImportSheet.swift in Sources */,
+				9B439046CEA28AFCCA409716 /* HongguoAccount.swift in Sources */,
+				25C440231CE2B2DA7D759FBF /* TVAccountView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

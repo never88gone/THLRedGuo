@@ -148,6 +148,12 @@ public final class LocalStore: ObservableObject {
         }
     }
 
+    public func clearAccountCatalogCache() {
+        cachedHomeDramas = []; cachedCategories = []
+        defaults.removeObject(forKey: cachedHomeDramasKey)
+        defaults.removeObject(forKey: cachedCategoriesKey)
+    }
+
     public func saveCachedCatalog(categories: [CatalogCategory], dramas: [Drama]) {
         if !categories.isEmpty {
             self.cachedCategories = categories

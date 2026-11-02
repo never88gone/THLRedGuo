@@ -10,6 +10,48 @@ final class PlaybackTests: XCTestCase {
     private var videoLayer: AVPlayerLayer?
     private var testStarted = Date()
 
+    func testOfficialAccountCookieScope() throws {
+        let now = Date()
+        let record = HongguoAccountRecord(id: "123", nickname: "synthetic", cookies: [
+            HongguoCookie(name: "sessionid", value: "synthetic-session", domain: "hongguoduanju.com", path: "/", expires: now.addingTimeInterval(60)),
+            HongguoCookie(name: "passport_csrf_token", value: "synthetic-csrf", domain: "hongguoduanju.com", path: "/", expires: nil),
+            HongguoCookie(name: "uid_tt", value: "expired", domain: "hongguoduanju.com", path: "/", expires: now.addingTimeInterval(-60))])
+        let vault = HongguoAccountVault.shared
+        XCTAssertEqual(vault.header(for: try XCTUnwrap(URL(string: "https://reading.snssdk.com/novel/player/multi_video_model/v1/")), record: record), "sessionid=synthetic-session")
+        for raw in ["https://v5-reading-video.qznovelvod.com/reading/test", "https://github.com/reading/test", "https://reading.snssdk.com.evil.test/reading/test", "http://reading.snssdk.com/reading/test", "https://reading.snssdk.com/unrelated"] {
+            XCTAssertEqual(vault.header(for: try XCTUnwrap(URL(string: raw)), record: record), "")
+        }
+    }
+
+    func testOfficialAccountSourceContracts() async throws {
+        let command = try await NativeBridge.shared.accountRequest("qr")
+        let url = try XCTUnwrap(URLComponents(string: try XCTUnwrap(command["url"] as? String)))
+        XCTAssertEqual(url.host, "hongguoduanju.com")
+        XCTAssertEqual(url.path, "/passport/web/get_qrcode/")
+        XCTAssertEqual(url.queryItems?.first { $0.name == "aid" }?.value, "513755")
+        let profile = try await NativeBridge.shared.accountParse("profile", body: "{\"code\":0,\"data\":{\"biz_user_id\":7688558312157088793,\"user_name\":\"synthetic\"}}")
+        XCTAssertEqual(profile["id"] as? String, "7688558312157088793")
+        do {
+            _ = try await NativeBridge.shared.accountParse("poll", body: "{\"message\":\"error\",\"data\":{\"error_code\":1102,\"description\":\"synthetic\"}}")
+            XCTFail("Business rejection must remain distinguishable from a network failure")
+        } catch { XCTAssertEqual(error as? HongguoAccountError, .business(1102)) }
+    }
+
+    func testOfficialAccountProfileRequestUsesBoundDevice() async throws {
+        try XCTSkipIf(HongguoAccountVault.shared.snapshot.record != nil, "Requires an isolated guest fixture")
+        let suite = "THLRedLook.AccountContract." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("{\"iid\":\"7345678901234567200\",\"device_id\":\"7345678901234567100\",\"cdid\":\"synthetic-device\"}", forKey: "thl_tv_hongguo_device_session")
+        let bridge = NativeBridge(deviceDefaults: defaults)
+        let command = try await bridge.accountRequest("profile")
+        let url = try XCTUnwrap(URLComponents(string: try XCTUnwrap(command["url"] as? String)))
+        XCTAssertEqual(url.host, "api5-normal-sinfonlinea.fqnovel.com")
+        XCTAssertEqual(url.path, "/reading/user/info/v1/")
+        XCTAssertEqual(url.queryItems?.first { $0.name == "device_id" }?.value, "7345678901234567100")
+        XCTAssertNotNil((command["headers"] as? [String: String])?["x-medusa"])
+    }
+
     override func setUp() {
         super.setUp()
         testStarted = Date()

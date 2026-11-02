@@ -4,6 +4,49 @@ final class RemoteNavigationTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.never88gone.redlook")
     private let remote = XCUIRemote.shared
 
+    func testAuthenticatedAccountRestoresAndSearches() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "settings"]
+        app.launch()
+        XCTAssertTrue(app.buttons["退出登录"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["红果账号已登录"].firstMatch.waitForExistence(timeout: 30))
+        app.terminate()
+        app.launchArguments = ["-testPage", "search", "-testQuery", "都市"]
+        app.launch()
+        XCTAssertTrue(app.buttons["search.result.0"].waitForExistence(timeout: 50))
+        app.terminate()
+        app.launchArguments = ["-testPage", "settings"]
+        app.launch()
+        XCTAssertTrue(app.buttons["退出登录"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["红果账号已登录"].firstMatch.waitForExistence(timeout: 30))
+        print("THL_ACCOUNT_AUTH restore=true appProfile=true businessSearch=true imagesDisabled=true")
+    }
+
+    func testHongguoAccountQrRemoteFlow() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "settings"]
+        app.launch()
+        defer { app.terminate() }
+        wait("account navigation ready", seconds: 30) { self.app.buttons["nav.settings"].exists || self.app.buttons["hongguo-account-login"].exists }
+        trace("account-before-enter")
+        if app.buttons["nav.settings"].hasFocus { remote.press(.right) }
+        wait("account login focused", seconds: 15) { self.app.buttons["hongguo-account-login"].hasFocus }
+        press(.select)
+        wait("QR issued", seconds: 30) { self.app.staticTexts["等待手机红果 App 扫码确认"].exists }
+        trace("account-qr-ready")
+        XCTAssertTrue(app.buttons["取消登录"].hasFocus)
+        press(.menu)
+        wait("cancel restores login focus") { self.app.buttons["hongguo-account-login"].hasFocus }
+        press(.down)
+        trace("account-settings-focus")
+        press(.menu)
+        wait("account returns to navigation") { self.app.buttons["nav.settings"].hasFocus }
+        print("THL_ACCOUNT_REMOTE qrIssued=true cancel=true focusRestored=true menuReturn=true realAuthorization=false imagesDisabled=true")
+    }
+
     func testDebugSourceSelectedEpisodeAndNaturalNext() throws {
         continueAfterFailure = false
         app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"

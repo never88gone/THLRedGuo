@@ -84,6 +84,7 @@ public actor NativeBridge {
 
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
+    private var accountRevision: UInt64 = 0
 
     public func applyLocalPlaybackProfileChange() {
         jsContexts.removeValue(forKey: "hongguo")
@@ -106,7 +107,7 @@ public actor NativeBridge {
             config.httpShouldSetCookies = false
             config.httpCookieStorage = nil
             config.urlCache = URLCache(memoryCapacity: 20 * 1024 * 1024, diskCapacity: 100 * 1024 * 1024)
-            self.httpSession = URLSession(configuration: config)
+            self.httpSession = URLSession(configuration: config, delegate: HongguoBusinessRedirectDelegate(), delegateQueue: nil)
         }
         self.diagnostics = diagnostics
         self.diagnosticContext = diagnosticContext
@@ -286,7 +287,39 @@ public actor NativeBridge {
     }
 
     /// 获取或构建指定数据源的 CatPawOpen JS 运行时上下文
+    public func accountRequest(_ action: String, payload: [String: String] = [:]) throws -> [String: Any] {
+        sourceScripts["__official_account"] = BuiltInHongguoJSContent
+        guard let context = getOrCreateContext(sourceId: "__official_account") else { throw HongguoAccountError.invalid }
+        let expression = try spiderExpression("accountRequest", [action, payload])
+        guard let response = evalAsync(context: context, scriptExpr: expression) else { throw HongguoAccountError.invalid }
+        guard response["ok"] as? Bool == true, let result = response["data"] as? [String: Any] else {
+            let detail = response["error"] as? String ?? ""
+            let code = detail.contains("buildAccountRequest") ? "ACCOUNT_BUILDER_UNAVAILABLE" :
+                detail.contains("__hongguoLocalSign") ? "ACCOUNT_SIGNER_UNAVAILABLE" :
+                detail.contains("LOCAL_PROFILE_REQUIRED") ? "LOCAL_PROFILE_REQUIRED" :
+                SourceDiagnostics.safeCode(response["code"])
+            throw HongguoAccountError.preparation(code.isEmpty ? "JS_EXECUTION" : code)
+        }
+        return result
+    }
+
+    public func accountParse(_ action: String, body: String) throws -> [String: Any] {
+        sourceScripts["__official_account"] = BuiltInHongguoJSContent
+        guard let context = getOrCreateContext(sourceId: "__official_account") else { throw HongguoAccountError.invalid }
+        let expression = try spiderExpression("accountParse", [action, body])
+        context.exception = nil
+        let result = context.evaluateScript(expression)
+        if let message = context.exception?.toString(), let range = message.range(of: "ACCOUNT_BUSINESS_-?[0-9]{1,9}", options: .regularExpression),
+           let code = Int(message[range].dropFirst("ACCOUNT_BUSINESS_".count)) { throw HongguoAccountError.business(code) }
+        guard let result, context.exception == nil,
+              let data = result.toDictionary() as? [String: Any] else { throw HongguoAccountError.invalid }
+        return data
+    }
+
     private func getOrCreateContext(sourceId: String) -> JSContext? {
+        let revision = HongguoAccountVault.shared.snapshot.revision
+        if revision != accountRevision { jsContexts.removeAll(); accountRevision = revision }
+
         if sourceId == "hongguo", jsContexts[sourceId]?.evaluateScript("globalThis.__hongguoHasBuiltInSigning === true")?.toBool() != true {
             let revision = playbackProfileRevision()
             if loadedPlaybackProfileRevision != revision {
@@ -339,7 +372,8 @@ public actor NativeBridge {
         }
         context.setObject(saveDeviceBlock, forKeyedSubscript: "__native_save_device" as NSString)
 
-        if persistentDeviceSession, let cachedDevice = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"), SavedGuestSession.valid(cachedDevice) {
+        let accountDevice = (script == BuiltInHongguoJSContent ? HongguoAccountVault.shared.snapshot.record?.device : nil).flatMap { try? JSONSerialization.data(withJSONObject: $0) }.map { String(decoding: $0, as: UTF8.self) }
+        if let cachedDevice = accountDevice ?? (persistentDeviceSession ? deviceDefaults.string(forKey: "thl_tv_hongguo_device_session") : nil), SavedGuestSession.valid(cachedDevice) {
             trace.recordGuest(json: cachedDevice, createdAt: deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at"))
             context.evaluateScript("""
             try {
@@ -350,6 +384,9 @@ public actor NativeBridge {
         }
 
         // 2. 注入原生高性能 HTTP 请求桥接
+        let trustedAccountSource = script == BuiltInHongguoJSContent
+        let expectedAccountRevision = HongguoAccountVault.shared.snapshot.revision
+        context.evaluateScript("globalThis.__hongguoAccountActive = \(trustedAccountSource && HongguoAccountVault.shared.snapshot.record != nil);")
         let session = httpSession
         let recorder = diagnostics
         let diagnosticContext = diagnosticContext
@@ -378,6 +415,21 @@ public actor NativeBridge {
                     req.setValue(String(describing: v), forHTTPHeaderField: k)
                 }
             }
+            let accountBusiness = HongguoAccountVault.businessURL(url)
+            if accountBusiness {
+                let account = HongguoAccountVault.shared.snapshot
+                guard expectedAccountRevision == account.revision else {
+                    return ["status": 0, "headers": [:], "body": "", "error": "CANCELLED"]
+                }
+                if account.record != nil {
+                    guard trustedAccountSource else {
+                        return ["status": 0, "headers": [:], "body": "", "error": "ACCOUNT_SOURCE_UNTRUSTED"]
+                    }
+                    let cookie = HongguoAccountVault.shared.header(for: url)
+                    guard !cookie.isEmpty else { return ["status": 0, "headers": [:], "body": "", "error": "ACCOUNT_EXPIRED"] }
+                    req.setValue(cookie, forHTTPHeaderField: "Cookie")
+                }
+            }
             if let body = opts?["body"] as? String {
                 req.httpBody = body.data(using: .utf8)
             }
@@ -393,6 +445,9 @@ public actor NativeBridge {
             let timedOut = semaphore.wait(timeout: .now() + timeout) == .timedOut
             if timedOut { task.cancel() }
             let response = result.snapshot(timedOut: timedOut)
+            if accountBusiness && expectedAccountRevision != HongguoAccountVault.shared.snapshot.revision {
+                return ["status": 0, "headers": [:], "body": "", "error": "CANCELLED"]
+            }
 
             var tabsDesc = ""
             var snippet = ""
@@ -612,6 +667,7 @@ public actor NativeBridge {
     }
 
     private func synchronizeGuestSession(_ context: JSContext, sourceId: String) {
+        if HongguoAccountVault.shared.snapshot.record?.device != nil { return }
         guard persistentDeviceSession, sourceId == "hongguo",
               let latest = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"),
               SavedGuestSession.valid(latest) else { return }
@@ -645,6 +701,7 @@ public actor NativeBridge {
 
     /// 在 JS 运行时中异步评估 Promise 并等待结果
     private func evalAsync(context: JSContext, scriptExpr: String) -> [String: Any]? {
+        let expectedAccountRevision = HongguoAccountVault.shared.snapshot.revision
         let sem = DispatchSemaphore(value: 0)
         var resultData: [String: Any]? = nil
 
@@ -684,6 +741,7 @@ public actor NativeBridge {
         _ = sem.wait(timeout: .now() + 60.0)
         context.setObject(nil, forKeyedSubscript: doneKey as NSString)
 
+        guard expectedAccountRevision == HongguoAccountVault.shared.snapshot.revision else { return nil }
         return resultData
     }
 

@@ -19,7 +19,7 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
         case .search: return "搜索"
         case .library: return "追剧与历史"
         case .downloads: return "下载"
-        case .settings: return "设置"
+        case .settings: return "我的"
         }
     }
 
@@ -31,7 +31,7 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
         case .search: return "magnifyingglass"
         case .library: return "bookmark.fill"
         case .downloads: return "arrow.down.circle.fill"
-        case .settings: return "gearshape.fill"
+        case .settings: return "person.crop.circle.fill"
         }
     }
 
@@ -81,6 +81,8 @@ public struct MainTabView: View {
     @State private var deepLinkQuery: String? = nil
     @State private var deepLinkEpisode: Int? = nil
     @State private var testInitialEpisodeIndex: Int = 1
+
+    @State private var visibleAccountRevision: UInt64 = 0
 
     public init() {
         let args = CommandLine.arguments
@@ -312,7 +314,7 @@ public struct MainTabView: View {
                             )
                             .padding(.top, 32)
                         case .settings:
-                            SettingsView(
+                            TVAccountView(
                                 initialCategory: settingsInitialCategory,
                                 forceFocusActiveSource: isSettingsActiveDemo,
                                 focusSidebarTrigger: settingsSidebarTrigger,
@@ -354,6 +356,13 @@ public struct MainTabView: View {
         }
         .onChange(of: selectedTab) { _, tab in
             if tab == .feed { feedFocusTrigger += 1 }
+        }
+        .onReceive(HongguoAccountModel.shared.$account) { _ in
+            let revision = HongguoAccountVault.shared.snapshot.revision
+            guard revision != visibleAccountRevision else { return }
+            visibleAccountRevision = revision
+            store.clearAccountCatalogCache()
+            Task { await videoFeedViewModel.refresh() }
         }
         .onReceive(lanService.$incomingPlayback) { incoming in
             guard let inc = incoming else { return }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import '../account/hongguo_account_session.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -46,6 +47,7 @@ class DartCoreEngine {
 
   // 内存目录缓存
   final Map<String, Map<String, dynamic>> _catalogCache = {};
+  int _accountRevision = -1;
 
   Future<void> _ensureDirectories() async {
     if (_baseDir.isEmpty) {
@@ -154,6 +156,12 @@ class DartCoreEngine {
     String action,
     Map<String, dynamic> input,
   ) async {
+    final revision = HongguoAccountSession.shared.revision;
+    if (revision != _accountRevision) {
+      _accountRevision = revision;
+      _catalogCache.clear();
+      _spiderPool.clear();
+    }
     switch (action) {
       case 'initialize':
         return _initialize(input);
