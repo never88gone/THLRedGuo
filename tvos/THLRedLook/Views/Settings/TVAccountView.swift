@@ -25,7 +25,7 @@ struct TVAccountView: View {
                             .focused($focus, equals: "login")
                             .accessibilityIdentifier("hongguo-account-login")
                         if model.loggedIn {
-                            Button("确认账号") { Task { await model.verify() } }.disabled(model.busy)
+                            Button("确认账号") { Task { await model.verify(force: true) } }.disabled(model.busy)
                             Button("退出登录") { confirmingLogout = true }
                         }
                     }
