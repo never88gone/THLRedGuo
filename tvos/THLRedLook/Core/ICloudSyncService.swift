@@ -113,9 +113,10 @@ public final class ICloudSyncService: ObservableObject {
 
             var history = Dictionary(store.history.map { ($0.id, $0) }, uniquingKeysWith: { old, new in old.updatedAt > new.updatedAt ? old : new })
             for entry in remoteHistory.0 where history[entry.id] == nil || entry.updatedAt > history[entry.id]!.updatedAt {
+                if store.deletedHistoryIds.contains(entry.id) { continue }
                 history[entry.id] = entry
             }
-            let mergedHistory = history.values.sorted {
+            let mergedHistory = history.values.filter { !store.deletedHistoryIds.contains($0.id) }.sorted {
                 $0.updatedAt == $1.updatedAt ? $0.id < $1.id : $0.updatedAt > $1.updatedAt
             }
             var dramas = Dictionary(store.followedDramas.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
@@ -171,6 +172,7 @@ public final class ICloudSyncService: ObservableObject {
                 }
             }
             store.acknowledgeDeletedFollowIds(store.deletedFollowIds)
+            store.acknowledgeDeletedHistoryIds(store.deletedHistoryIds)
             lastSyncDate = Date()
             let skipped = remoteHistory.1 + remoteDramas.1
             let syncedCount = min(mergedHistory.count, Self.maxHistoryCount)

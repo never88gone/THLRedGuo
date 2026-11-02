@@ -93,6 +93,21 @@ final class ICloudSyncTests: XCTestCase {
         XCTAssertEqual(store.followState(for: shared.id), .none)
     }
 
+    func testLocalHistoryClearAndRemoveDoesNotResurrectFromCloud() throws {
+        let (service, cloud, store) = try setup()
+        try seed(cloud)
+        let shared = Drama(id: "hongguo:7688558312157088793", sourceId: "7688558312157088793", title: "同步合成短剧")
+        service.syncWithCloud(store: store)
+        XCTAssertEqual(store.history.first?.drama.id, shared.id)
+
+        store.clearHistory()
+        XCTAssertTrue(store.history.isEmpty)
+        XCTAssertTrue(store.deletedHistoryIds.contains(shared.id))
+
+        service.syncWithCloud(store: store)
+        XCTAssertTrue(store.history.isEmpty)
+    }
+
     func testMalformedRecordDoesNotDiscardGoodHistoryOrRewriteCloudOriginal() throws {
         let (service, cloud, store) = try setup()
         try seed(cloud)

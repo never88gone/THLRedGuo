@@ -42,6 +42,7 @@ public final class LocalStore: ObservableObject {
     @Published public var cachedCategories: [CatalogCategory] = []
     @Published public var cachedHomeDramas: [Drama] = []
     public private(set) var deletedFollowIds: Set<String> = []
+    public private(set) var deletedHistoryIds: Set<String> = []
 
     private let defaults: UserDefaults
     private let cloudUpload: (LocalStore) -> Void
@@ -52,6 +53,7 @@ public final class LocalStore: ObservableObject {
     private let followsKey = "zgj_tv_follows"
     private let followedDramasKey = "zgj_tv_followed_dramas"
     private let deletedFollowIdsKey = "zgj_tv_deleted_follow_ids"
+    private let deletedHistoryIdsKey = "zgj_tv_deleted_history_ids"
     private let searchHistoryKey = "zgj_tv_search_history"
     private let unlockedKey = "zgj_tv_sources_unlocked"
     private let settingsKey = "zgj_tv_resource_settings"
@@ -107,6 +109,10 @@ public final class LocalStore: ObservableObject {
 
         if let deletedList = defaults.stringArray(forKey: deletedFollowIdsKey) {
             deletedFollowIds = Set(deletedList)
+        }
+
+        if let deletedHList = defaults.stringArray(forKey: deletedHistoryIdsKey) {
+            deletedHistoryIds = Set(deletedHList)
         }
 
         if let data = defaults.data(forKey: settingsKey),
@@ -166,6 +172,7 @@ public final class LocalStore: ObservableObject {
             ?? followedDramas.first { $0.id == drama.id }
         let current = previous?.merge(with: drama) ?? drama
         let entry = WatchEntry(drama: current, episode: episode, position: min(position, duration), duration: duration, updatedAt: Date())
+        deletedHistoryIds.remove(drama.id)
         history.removeAll { $0.drama.id == drama.id }
         history.insert(entry, at: 0)
         if history.count > 300 {
@@ -183,24 +190,38 @@ public final class LocalStore: ObservableObject {
     }
 
     public func clearHistory(for source: String? = nil) {
+        let removed: [WatchEntry]
         if let s = source, !s.isEmpty {
             let target = s.lowercased()
+            removed = history.filter { $0.drama.source.lowercased() == target }
             history.removeAll { $0.drama.source.lowercased() == target }
         } else {
+            removed = history
             history.removeAll()
+        }
+        for item in removed {
+            deletedHistoryIds.insert(item.id)
         }
         saveHistory()
     }
 
     public func removeHistory(dramaId: String) {
         history.removeAll { $0.drama.id == dramaId }
+        deletedHistoryIds.insert(dramaId)
         saveHistory()
+    }
+
+    public func acknowledgeDeletedHistoryIds(_ ids: Set<String>) {
+        guard !ids.isEmpty else { return }
+        deletedHistoryIds.subtract(ids)
+        defaults.set(Array(deletedHistoryIds), forKey: deletedHistoryIdsKey)
     }
 
     private func saveHistory() {
         if let data = try? JSONEncoder().encode(history) {
             defaults.set(data, forKey: historyKey)
         }
+        defaults.set(Array(deletedHistoryIds), forKey: deletedHistoryIdsKey)
         cloudUpload(self)
     }
 
@@ -259,11 +280,11 @@ public final class LocalStore: ObservableObject {
         defer { applyingCloudData = false }
         if let source, !source.isEmpty { setSource(source) }
         if let danmaku { danmakuEnabled = danmaku }
-        self.history = history
+        self.history = history.filter { !deletedHistoryIds.contains($0.id) }
         // 排除已删除墓碑中的追剧，防止云端旧数据复活覆盖本地删除操作
         self.follows = follows.filter { !deletedFollowIds.contains($0.key) }
         self.followedDramas = followedDramas.filter { !deletedFollowIds.contains($0.id) }
-        if let data = try? JSONEncoder().encode(history) {
+        if let data = try? JSONEncoder().encode(self.history) {
             defaults.set(data, forKey: historyKey)
         }
         if let data = try? JSONEncoder().encode(self.follows) {

@@ -125,6 +125,12 @@ public struct SavedLibraryView: View {
                                         } label: {
                                             Label("取消追剧", systemImage: "bookmark.slash")
                                         }
+                                    } else if viewModel.selectedTab == .history {
+                                        Button(role: .destructive) {
+                                            viewModel.removeHistory(dramaId: drama.id)
+                                        } label: {
+                                            Label("删除观看记录", systemImage: "trash")
+                                        }
                                     }
                                 }
                             }
