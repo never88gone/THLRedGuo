@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档状态 | v0.2，需求草案；已核对扫码候选链路，登录能力尚未实现、尚未验收 |
+| 文档状态 | v0.3，需求草案；官网扫码申请与等待状态查询已验证，完整账号登录尚未实现、尚未验收 |
 | 编写日期 | 2026-11-02 |
 | 开发分支 | `dev`，从当前 `main` 基线创建 |
 | 应用版本 | 保持 `1.0.0`，不因本需求修改版本及既有构建配置 |
@@ -37,7 +37,7 @@
 | 数据保存 | 已有本地收藏、历史、进度和部分平台 iCloud 同步 | 官方账号数据单独建模，保持现有本地资料及删除墓碑语义 |
 | 研究 APK | 本机已有官方 APK `7.4.3.32`，文件哈希与既有来源记录一致 | 作为本轮研究基线；不将该历史样本表述为当前最新版 |
 | 账号入口 | 本轮静态扫描发现短信、授权、账号资料、退出等路径及登录文案 | 仅证明 APK 包含相关实现线索，不证明入口已启用或 THL 已能调用 |
-| 红果 App 扫码 | APK 有官方网页扫码确认入口；公开 Passport SDK 有申请、轮询方法；本轮最小申请返回业务错误 `16`、“该应用无权限” | 优先研究红果官方 App 扫码；目前没有签发可用二维码，不能开放为已实现功能 |
+| 红果 App 扫码 | APK 有网页扫码确认入口；官网域名及官网应用 ID `513755` 已成功申请临时二维码并查询到 `new`；此前移动端 ID `8662` 的最小申请被拒绝 | 优先接入官网扫码链路；申请成功不等于账号登录完成，尚需用户扫码和 THL 业务接口验证 |
 | 抖音扫码 | 此前移动应用配置申请二维码遭服务器拒绝；APK 内有抖音 OAuth 二维码路径 | 与红果 App 扫码分开验证，不将其他 App 的二维码或授权结果视为红果观看账号会话 |
 
 ### 2.1 本轮发现的 APK 静态路径线索
@@ -62,8 +62,8 @@
 
 | 环节 | 已找到的方法或行为 | 已知限制 |
 | --- | --- | --- |
-| 等待登录端申请 | Passport Web SDK 的 `getQrcode` 使用 GET `/passport/web/get_qrcode/`，传入 `next` 及附加参数 | 需要服务端接受对应应用与请求配置；路径存在不等于红果应用已获准使用 |
-| 等待登录端查询 | `checkQrconnect` 使用 GET `/passport/web/check_qrconnect/`，传入同次申请的 `token`、`next` 及附加参数 | 尚未拿到有效申请结果，未进入真实轮询；状态值、有效期、频率和最终会话签发均待确认 |
+| 等待登录端申请 | Passport Web SDK 的 `getQrcode` 使用 GET `/passport/web/get_qrcode/`，传入 `next` 及附加参数；在 `hongguoduanju.com` 使用官网 ID `513755` 已返回成功、临时票据及过期时间 | 移动端和官网配置不能混用；尚未显示真实二维码或进行用户授权 |
+| 等待登录端查询 | `checkQrconnect` 使用 GET `/passport/web/check_qrconnect/`，传入同次申请的 `token`、`next` 及附加参数；同次官网申请的一次查询成功返回 `status: new` | 只验证了等待扫码状态；扫描、确认、过期及最终会话签发待验证，不能仅按轮询 HTTP 200 判断登录成功 |
 | 红果 App 识别 | APK 的扫码配置默认识别 `changdunovel.com`、`reading.snssdk.com` 的 `/ucenter_web/app/sdk-next` 页面 | 配置可由服务端更新；仅证明存在手机端处理入口 |
 | 手机端确认 | 官方 `scan-auth` 组件调用 POST `/passport/mobile/scan_qrcode/` 与 POST `/passport/mobile/confirm_qrcode/` | 从扫码链接取得临时 `token`；扫描响应的 `confirmed_url` 提供确认所需的 `csrf_token`、`csrf_ts`，不能自行伪造确认 |
 | 开放平台授权 | SDK 另有 POST `/passport/open/get_qrcode/`、POST `/passport/open/check_qrcode/`，APK 有创作者中心专用扫描处理 | 依赖对应的 `client_key`、授权范围及场景；不能借用创作者配置作为 THL 的观看账号登录 |
@@ -72,11 +72,28 @@
 
 一次受控的未登录申请以 APK 的应用 ID `8662`、已知 Passport 域名和官方消费者首页作为 `next`，向 `/passport/web/get_qrcode/` 发出请求。服务端返回 HTTP 200，但正文为 `message: error`、`error_code: 16`、`description: 该应用无权限`，未签发二维码。该请求不是已捕获的红果官方网页完整请求；这一结果证明本次最小配置不可用，尚不能区分应用能力限制、必要配置缺失或其他服务端校验，不能据此断言该能力永远不可用。
 
-研究只使用本次探测新建的内存 Cookie 容器，没有扫描、确认、发送验证码或登录账号；未保存临时票据、二维码内容和 Cookie 值，也未获取或解码二维码图片。
+参考用户提供的 hongguoTV 仓库后，核对到另一条具体配置：`https://hongguoduanju.com`、`aid=513755`、`passport_jssdk_version=3.4.10`、`next=https://hongguoduanju.com/`。按该公开网站配置低频申请，官方接口返回 `message: success`、`error_code: 0`、临时票据、二维码字段及过期时间；随后同一会话的一次查询返回 `status: new`。返回的扫码页面位于 `reading.snssdk.com/reading_offline/novelread/page/scan-code.html`，不能直接将此前的 `sdk-next` 组件视为这条链路的实际手机页面。这证明官网申请路径当前可用，修正了仅依据移动端配置失败而对官网能力作出的限制判断。
+
+研究只使用本次探测新建的内存 Cookie 容器，没有扫描、确认、发送验证码或登录账号；未保存临时票据、二维码内容和 Cookie 值，也未获取或解码二维码图片。实际账号登录态尚未签发给 THL。
 
 官方创作者网站当前页面与调用方代码只启用手机号、密码登录。共享组件虽然有 `qrcode` 枚举和标题，但当前登录组件没有对应的二维码内容或轮询实现，不能当作可用扫码入口。官网的 App 下载二维码同样不能当作登录二维码。
 
 接入前还必须证明：合法申请能够成功；红果官方 App 能识别并完成用户确认；THL 自己的等待会话能取得服务端签发的登录态；账号资料与红果观看账号一致；会话能用于对应的官方业务 API。申请失败时停止本次流程，展示真实业务错误；不继续无效轮询、不生成替代二维码、不更换为其他产品的应用 ID 或客户端配置。
+
+### 2.3 官网扫码会话在 THL 中的使用依据
+
+参考仓库固定为 [hongguoTV `3e2db1b`](https://github.com/tsukiyo-zero/hongguoTV/tree/3e2db1b75126c804d6b1e1dc6acb5e8c6f365766)，仅阅读相关文本源码，未执行其程序、导入其用户资料或将其代码合入 THL。
+
+| 参考实现 | 源码行为 | THL 接入边界 |
+| --- | --- | --- |
+| [WebLogin](https://github.com/tsukiyo-zero/hongguoTV/blob/3e2db1b75126c804d6b1e1dc6acb5e8c6f365766/kotlin-tv/core/src/main/kotlin/com/hongguotv/core/WebLogin.kt) | 同一次申请和轮询保留 Cookie；确认后只跟随官网 HTTPS 跳转，检查 `sessionid` 或 `sessionid_ss`，再请求 Passport 账号资料 | 在 THL 内发起新的用户扫码会话；不能只取得 UID、昵称或临时二维码票据就视为登录成功 |
+| [CloudAccount](https://github.com/tsukiyo-zero/hongguoTV/blob/3e2db1b75126c804d6b1e1dc6acb5e8c6f365766/kotlin-tv/core/src/main/kotlin/com/hongguotv/core/CloudAccount.kt) | 将会话 Cookie 与设备上下文用于已签名的账号请求，读取 `/reading/user/info/v1/` 的 `biz_user_id`、`user_name`，并有收藏、历史、预约等接口 | 提供可参考的跨官网与账号 API 路径；THL 仍需以真实账号逐项验证，不能把第三方源码当作全部接口已经验收 |
+| 推荐列表 | 登录时可携带账号 Cookie | 可纳入统一账号请求层，仍需核对设备、签名、游标与账号隔离 |
+| 正式取流 | `ContentRepository.streamLadder` 使用独立的 `PlaybackDeviceSession` 匿名身份，而非上述账号 Cookie | 该仓库的扫码能力不能证明“登录即可修复取流空正文”，也未满足 THL“登录后所有适用官方业务请求使用账号上下文”的完整要求 |
+
+当前 THL 的官方 JS 仍有固定 `user_is_login: 0`，Flutter 与 tvOS 尚无完整账号会话契约，不能直接放入用户资料后宣称已经接入。实施时需增加官方源可选账号能力、宿主安全存储、完整 `Set-Cookie` 处理、取消与过期控制、账号校验及请求范围限制。官网登录 Cookie 不自动广播到所有域名；哪些账号 Cookie 可用于指定的官方业务 API，须单独证明并显式约束，CDN 与第三方服务不接收账号凭据。
+
+协议研究和申请、查询的脱敏证据保存在已忽略的 `build/verification/hongguotv-login-20261102`。完整扫码、账号资料和带账号的播放尚未在 THL 验证。
 
 ## 3. 需求范围与阶段
 
