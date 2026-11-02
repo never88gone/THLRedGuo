@@ -86,7 +86,7 @@ struct TVQrLoginView: View {
                     Image(uiImage: qr).interpolation(.none).resizable().scaledToFit().padding(24).background(.white)
                         .accessibilityLabel("红果登录二维码")
                 } else if model.busy { ProgressView() }
-                else { Image(systemName: "qrcode").font(.system(size: 180)).foregroundStyle(.secondary) }
+                else { Image(systemName: "clock").font(.system(size: 120)).foregroundStyle(.secondary) }
             }.frame(width: 370, height: 370)
             Text(model.message).font(.system(size: 29))
             if model.qrURL != nil { Text("剩余 \(model.remaining) 秒").font(.system(size: 25)) }

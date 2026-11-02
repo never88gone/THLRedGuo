@@ -356,7 +356,7 @@ class _HongguoQrLoginScreenState extends State<HongguoQrLoginScreen>
                 else
                   const SizedBox(
                     height: 220,
-                    child: Icon(Icons.qr_code_2, size: 100),
+                    child: Icon(Icons.timer_off_outlined, size: 80),
                   ),
                 const SizedBox(height: 16),
                 if (login?.confirmed == true && !login!.cancelled)
