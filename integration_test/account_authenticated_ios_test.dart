@@ -101,14 +101,14 @@ void main() {
       final preferences = store.playbackPreferences;
       final favorites = store.favorites.map((d) => d.id).toSet();
       final history = store.history.map((d) => d.drama.id).toSet();
-      await tap(key('bottom-nav-4'));
+      await tap(key('bottom-nav-2'));
       await wait(
         () =>
             find.byType(AccountScreen).evaluate().isNotEmpty &&
             account.verified,
         'restored account profile verification',
       );
-      expect(find.text('退出登录'), findsOneWidget);
+      expect(find.byKey(const Key('hongguo-account-menu')), findsOneWidget);
       await tap(key('bottom-nav-0'));
       await wait(
         () => find.byType(HomeCatalogView).evaluate().isNotEmpty,

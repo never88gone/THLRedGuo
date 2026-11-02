@@ -4,47 +4,72 @@ final class RemoteNavigationTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.never88gone.redlook")
     private let remote = XCUIRemote.shared
 
-    func testAuthenticatedAccountRestoresAndSearches() throws {
+    func testAuthenticatedAccountLibraryAndSettings() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
         continueAfterFailure = false
         app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "library"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["hongguo-account-menu"].waitForExistence(timeout: 30))
+        if app.buttons["nav.library"].hasFocus { remote.press(.right) }
+        wait("my sidebar history focused") { self.app.buttons["library.tab.history"].hasFocus }
+        wait("cloud history loaded", seconds: 40) {
+            !self.app.staticTexts["正在获取账号列表"].exists && (self.app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.card.")).count > 0 || self.app.staticTexts["暂无观看记录"].exists || self.app.staticTexts["library.error"].exists)
+        }
+        XCTAssertFalse(app.staticTexts["library.error"].exists)
+        press(.right)
+        wait("history content focused") { self.app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.card.")).allElementsBoundByIndex.contains { $0.hasFocus } }
+        let historyCard = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.card.")).allElementsBoundByIndex.first { $0.hasFocus }
+        let historyID = try XCTUnwrap(historyCard?.identifier)
+        press(.select)
+        XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 50))
+        press(.menu)
+        wait("history detail restores card focus") { self.app.buttons[historyID].hasFocus }
+        press(.left, focus: "library.tab.history")
+        press(.down, focus: "library.tab.follows")
+        press(.select)
+        wait("cloud follows loaded", seconds: 40) {
+            !self.app.staticTexts["正在获取账号列表"].exists && (self.app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.card.")).count > 0 || self.app.staticTexts["暂无追剧记录"].exists || self.app.staticTexts["library.error"].exists)
+        }
+        XCTAssertFalse(app.staticTexts["library.error"].exists)
+        press(.right)
+        wait("account list content focused") { self.app.buttons["library.emptyAction"].hasFocus || self.app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.card.")).allElementsBoundByIndex.contains { $0.hasFocus } }
+        press(.up, focus: "hongguo-account-menu")
+        press(.select)
+        XCTAssertTrue(app.buttons["退出登录"].waitForExistence(timeout: 5))
+        press(.menu)
+        wait("cancel account menu restores focus") { self.app.buttons["hongguo-account-menu"].hasFocus }
+        press(.menu)
+        wait("my returns main navigation") { self.app.buttons["nav.library"].hasFocus }
+        app.terminate()
         app.launchArguments = ["-testPage", "settings"]
         app.launch()
-        XCTAssertTrue(app.buttons["退出登录"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.staticTexts["红果账号已登录"].firstMatch.waitForExistence(timeout: 30))
-        app.terminate()
-        app.launchArguments = ["-testPage", "search", "-testQuery", "都市"]
-        app.launch()
-        XCTAssertTrue(app.buttons["search.result.0"].waitForExistence(timeout: 50))
-        app.terminate()
-        app.launchArguments = ["-testPage", "settings"]
-        app.launch()
-        XCTAssertTrue(app.buttons["退出登录"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.staticTexts["红果账号已登录"].firstMatch.waitForExistence(timeout: 30))
-        print("THL_ACCOUNT_AUTH restore=true appProfile=true businessSearch=true imagesDisabled=true")
+        XCTAssertTrue(app.buttons["nav.settings"].waitForExistence(timeout: 30))
+        if app.buttons["nav.settings"].hasFocus { remote.press(.right) }
+        wait("settings opens directly") { self.app.buttons["settings.nav.sources"].hasFocus }
+        XCTAssertFalse(app.buttons["应用设置"].exists)
+        print("THL_MY_LIBRARY history=true follows=true menuCancel=true settingsDirect=true imagesDisabled=true")
     }
 
     func testHongguoAccountQrRemoteFlow() throws {
         continueAfterFailure = false
         app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
-        app.launchArguments = ["-testPage", "settings"]
+        app.launchArguments = ["-testPage", "library"]
         app.launch()
         defer { app.terminate() }
-        wait("account navigation ready", seconds: 30) { self.app.buttons["nav.settings"].exists || self.app.buttons["hongguo-account-login"].exists }
-        trace("account-before-enter")
-        if app.buttons["nav.settings"].hasFocus { remote.press(.right) }
-        wait("account login focused", seconds: 15) { self.app.buttons["hongguo-account-login"].hasFocus }
+        try XCTSkipIf(app.buttons["hongguo-account-menu"].waitForExistence(timeout: 3), "保留已有真实账号会话")
+        wait("account navigation ready", seconds: 30) { self.app.buttons["nav.library"].exists || self.app.buttons["hongguo-account-login"].exists }
+        if app.buttons["nav.library"].hasFocus { remote.press(.right) }
+        wait("library sidebar focused") { self.app.buttons["library.tab.history"].hasFocus }
+        press(.right)
+        press(.up, focus: "hongguo-account-login")
         press(.select)
         wait("QR issued", seconds: 30) { self.app.staticTexts["等待手机红果 App 扫码确认"].exists }
-        trace("account-qr-ready")
-        XCTAssertTrue(app.buttons["取消登录"].hasFocus)
         press(.menu)
         wait("cancel restores login focus") { self.app.buttons["hongguo-account-login"].hasFocus }
-        press(.down)
-        trace("account-settings-focus")
         press(.menu)
-        wait("account returns to navigation") { self.app.buttons["nav.settings"].hasFocus }
-        print("THL_ACCOUNT_REMOTE qrIssued=true cancel=true focusRestored=true menuReturn=true realAuthorization=false imagesDisabled=true")
+        wait("account returns to navigation") { self.app.buttons["nav.library"].hasFocus }
     }
 
     func testDebugSourceSelectedEpisodeAndNaturalNext() throws {

@@ -196,4 +196,118 @@ void main() {
       }),
     );
   });
+  test('账号追剧和历史使用当前会话并补齐剧集资料，大整数和毫秒进度不丢失', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('synthetic-library');
+    final cookies = HongguoAccountCookies()
+      ..merge(Uri.parse('https://hongguoduanju.com/'), [
+        'sessionid=synthetic-library; Path=/; Secure',
+      ]);
+    await session.accept(cookies, {
+      'id': '123',
+      'nickname': '合成',
+      'avatar': 'https://example.test/avatar',
+    }, expectedRevision: session.revision);
+    final service = HongguoAccountService(session: session);
+    addTearDown(service.dispose);
+    await HttpOverrides.runZoned(
+      () async {
+        final follows = await service.library(history: false);
+        expect(follows.single.drama.cleanSourceId, '7688558312157088793');
+        expect(follows.single.drama.title, '合成剧详情');
+        final history = await service.library(history: true);
+        expect(history.single.drama.title, '合成剧详情');
+        expect(history.single.episode, 12);
+        expect(history.single.position, 23.5);
+        expect(history.single.duration, 90);
+        expect(history.single.drama.episodes, 120);
+        expect(history.single.updatedAt.millisecondsSinceEpoch, 1700000000000);
+      },
+      createHttpClient: (_) => _Client((uri, headers) {
+        expect(headers.value('Cookie'), 'sessionid=synthetic-library');
+        if (uri.path.contains('/bookshelf/')) {
+          expect(uri.path, '/reading/bookapi/bookshelf/video/list/v1/');
+          expect(uri.queryParameters['target_user_id'], '123');
+          return _Reply({
+            'code': 0,
+            'data': {
+              'video_shelf_info': [
+                {
+                  'series_id': '7688558312157088793',
+                  'book_type': 2,
+                  'collect_time': 1700000000,
+                },
+              ],
+            },
+          });
+        }
+        if (uri.path.contains('/read_progress/')) {
+          expect(uri.queryParameters['limit'], '50');
+          return _Reply({
+            'code': 0,
+            'data': null,
+            'video_data': [
+              {
+                'series_id': '7688558312157088793',
+                'vid': '1234567890123456789',
+                'vid_index': 12,
+                'current_play_time': 23500,
+                'current_total_time': 90000,
+                'last_watch_time': 1700000000,
+              },
+            ],
+          });
+        }
+        expect(uri.path, '/reading/bookapi/multi-detail/v1/');
+        expect(uri.queryParameters['book_id'], '7688558312157088793');
+        return _Reply({
+          'code': 0,
+          'data': [
+            {
+              'book_id': '7688558312157088793',
+              'book_name': '合成剧详情',
+              'episode_cnt': 120,
+            },
+          ],
+        });
+      }),
+    );
+    await session.bindProfile('other');
+    await session.bindProfile('synthetic-library');
+    expect(session.avatar, 'https://example.test/avatar');
+    await session.logout();
+    expect(session.avatar, isEmpty);
+  });
+  test('账号列表格式改变和业务拒绝不能变成成功空列表', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('synthetic-invalid-library');
+    final cookies = HongguoAccountCookies()
+      ..merge(Uri.parse('https://hongguoduanju.com/'), [
+        'sessionid=synthetic-library; Path=/; Secure',
+      ]);
+    await session.accept(cookies, {
+      'id': '123',
+    }, expectedRevision: session.revision);
+    final service = HongguoAccountService(session: session);
+    addTearDown(service.dispose);
+    await HttpOverrides.runZoned(
+      () async {
+        await expectLater(
+          service.library(history: false),
+          throwsA(isA<HongguoAccountFailure>()),
+        );
+        await expectLater(
+          service.library(history: true),
+          throwsA(isA<HongguoAccountFailure>()),
+        );
+      },
+      createHttpClient: (_) => _Client(
+        (uri, _) => _Reply(
+          uri.path.contains('/bookshelf/')
+              ? {'code': 0, 'data': {}}
+              : {'code': 15, 'data': {}},
+        ),
+      ),
+    );
+  });
 }

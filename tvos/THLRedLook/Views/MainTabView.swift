@@ -17,9 +17,9 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
         case .feed: return "推荐"
         case .rankings: return "榜单"
         case .search: return "搜索"
-        case .library: return "追剧与历史"
+        case .library: return "我的"
         case .downloads: return "下载"
-        case .settings: return "我的"
+        case .settings: return "设置"
         }
     }
 
@@ -29,9 +29,9 @@ public enum TVAppTab: String, CaseIterable, Identifiable {
         case .feed: return "play.rectangle.fill"
         case .rankings: return "chart.bar.fill"
         case .search: return "magnifyingglass"
-        case .library: return "bookmark.fill"
+        case .library: return "person.crop.circle.fill"
         case .downloads: return "arrow.down.circle.fill"
-        case .settings: return "person.crop.circle.fill"
+        case .settings: return "gearshape.fill"
         }
     }
 
@@ -314,7 +314,7 @@ public struct MainTabView: View {
                             )
                             .padding(.top, 32)
                         case .settings:
-                            TVAccountView(
+                            SettingsView(
                                 initialCategory: settingsInitialCategory,
                                 forceFocusActiveSource: isSettingsActiveDemo,
                                 focusSidebarTrigger: settingsSidebarTrigger,

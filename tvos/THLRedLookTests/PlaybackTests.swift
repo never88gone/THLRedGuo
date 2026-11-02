@@ -38,6 +38,20 @@ final class PlaybackTests: XCTestCase {
         } catch { XCTAssertEqual(error as? HongguoAccountError, .business(1102)) }
     }
 
+    func testOfficialAccountLibraryContracts() async throws {
+        let rows = try await NativeBridge.shared.accountParse("history", body: "{\"code\":0,\"data\":null,\"video_data\":[{\"series_id\":7688558312157088793,\"vid\":1234567890123456789,\"vid_index\":12,\"current_play_time\":23500,\"current_total_time\":90000}]}")
+        let items = try XCTUnwrap(rows["items"] as? [[String: Any]])
+        XCTAssertEqual(items.first?["id"] as? String, "7688558312157088793")
+        XCTAssertEqual((items.first?["episode"] as? NSNumber)?.intValue, 12)
+        XCTAssertEqual((items.first?["positionMs"] as? NSNumber)?.intValue, 23500)
+        let favorites = try await NativeBridge.shared.accountParse("favorites", body: "{\"code\":0,\"data\":{\"video_shelf_info\":[{\"series_id\":7688558312157088793,\"book_type\":2,\"collect_time\":1700000000}]}}")
+        XCTAssertEqual((favorites["items"] as? [[String: Any]])?.first?["id"] as? String, "7688558312157088793")
+        do {
+            _ = try await NativeBridge.shared.accountParse("favorites", body: "{\"code\":0,\"data\":null}")
+            XCTFail("Invalid library data must remain an error")
+        } catch { XCTAssertEqual(error as? HongguoAccountError, .invalid) }
+    }
+
     func testOfficialAccountProfileRequestUsesBoundDevice() async throws {
         try XCTSkipIf(HongguoAccountVault.shared.snapshot.record != nil, "Requires an isolated guest fixture")
         let suite = "THLRedLook.AccountContract." + UUID().uuidString

@@ -412,7 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     if (widget.initialTab != 0) {
-      _tab = widget.initialTab;
+      _tab = {2, 5}.contains(widget.initialTab) ? 1 : widget.initialTab;
     }
     if (widget.initialSearchVisible) {
       _searchVisible = true;
@@ -1227,15 +1227,13 @@ class _HomeScreenState extends State<HomeScreen> {
         final destinations = [
           (0, Icons.explore_outlined, Icons.explore, '发现'),
           (4, Icons.play_circle_outline, Icons.play_circle, '推荐'),
-          (1, Icons.bookmark_border_rounded, Icons.bookmark_rounded, '追剧'),
-          (2, Icons.history_rounded, Icons.history_rounded, '最近观看'),
-          if (widget.store.canDownload && (desktop || television))
+          (1, Icons.person_outline, Icons.person, '我的'),
+          if (widget.store.canDownload)
             (3, Icons.download_outlined, Icons.download_rounded, '下载'),
-          (5, Icons.person_outline, Icons.person, '我的'),
         ];
         final navIndex = destinations.indexWhere((item) => item.$1 == _tab);
         final scaffold = Scaffold(
-          appBar: _tab == 4 || _tab == 5
+          appBar: _tab == 4 || {1, 2, 5}.contains(_tab)
               ? null
               : HomeAppBarView(
                   selectionMode: _selectionMode,
@@ -1378,10 +1376,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                           selectionInBody:
                                               desktop || television,
                                         )
-                                : _tab == 5
+                                : {1, 2, 5}.contains(_tab)
                                 ? AccountScreen(
                                     repository: widget.repository,
                                     store: widget.store,
+                                    initialHistory: widget.initialTab == 2,
+                                    onOpen: _openDrama,
+                                    onOpenSettings: () =>
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) => SettingsScreen(
+                                              repository: widget.repository,
+                                              store: widget.store,
+                                            ),
+                                          ),
+                                        ),
+                                    localLibraryBuilder: (history) =>
+                                        SavedLibrary(
+                                          key: ValueKey('my-local-$history'),
+                                          repository: widget.repository,
+                                          store: widget.store,
+                                          history: history,
+                                          onOpen: _openDrama,
+                                          onContinue: (drama) =>
+                                              _openDrama(drama, resume: true),
+                                          onDownload:
+                                              widget
+                                                      .repository
+                                                      .supportsDownloads &&
+                                                  widget.store.canDownload
+                                              ? (drama) => _openDrama(
+                                                  drama,
+                                                  download: true,
+                                                )
+                                              : null,
+                                        ),
                                   )
                                 : _tab == 3
                                 ? DownloadsScreen(
@@ -1389,21 +1418,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     store: widget.store,
                                     embedded: true,
                                   )
-                                : SavedLibrary(
-                                    key: ValueKey('saved-tab-$_tab'),
-                                    repository: widget.repository,
-                                    store: widget.store,
-                                    history: _tab == 2,
-                                    onOpen: _openDrama,
-                                    onContinue: (drama) =>
-                                        _openDrama(drama, resume: true),
-                                    onDownload:
-                                        widget.repository.supportsDownloads &&
-                                            widget.store.canDownload
-                                        ? (drama) =>
-                                              _openDrama(drama, download: true)
-                                        : null,
-                                  ),
+                                : const SizedBox.shrink(),
                           ),
                         ),
                         Positioned.fill(

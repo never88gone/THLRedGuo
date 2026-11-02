@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../js/catpaw_js_runtime.dart';
 import '../diagnostics/source_diagnostics.dart';
 import 'hongguo_account_session.dart';
+import '../../models/catalog/models.dart';
 
 class HongguoQrLogin {
   HongguoQrLogin(
@@ -286,6 +287,58 @@ class HongguoAccountService {
     final revision = session.revision;
     final account = await _call('profile', {}, null, revision);
     session.confirm(account, revision);
+  }
+
+  Future<List<WatchEntry>> library({required bool history}) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    final response = await _call(
+      history ? 'history' : 'favorites',
+      history ? {} : {'userId': session.id},
+      null,
+      revision,
+    );
+    final rows = (response['items'] as List)
+        .map((v) => Map<String, dynamic>.from(v as Map))
+        .toList();
+    final details = <String, Map<String, dynamic>>{};
+    for (var offset = 0; offset < rows.length; offset += 50) {
+      final result = await _call(
+        'libraryDetails',
+        {'ids': rows.skip(offset).take(50).map((v) => v['id']).join(',')},
+        null,
+        revision,
+      );
+      for (final item in result['items'] as List) {
+        final row = Map<String, dynamic>.from(item as Map);
+        details[row['id'].toString()] = row;
+      }
+    }
+    _check(revision);
+    return rows.map((row) {
+      final detail = details[row['id'].toString()] ?? row;
+      final id = row['id'].toString();
+      final title = detail['title']?.toString() ?? '';
+      return WatchEntry(
+        drama: Drama(
+          id: 'hongguo:$id',
+          source: 'hongguo',
+          sourceId: id,
+          title: title.isEmpty ? '剧集$id' : title,
+          cover: detail['cover']?.toString() ?? '',
+          description: detail['description']?.toString() ?? '',
+          episodes: intValue(detail['episodes']) > 0
+              ? intValue(detail['episodes'])
+              : intValue(row['episodes']),
+        ),
+        episode: intValue(row['episode']),
+        position: (row['positionMs'] as num? ?? 0) / 1000,
+        duration: (row['durationMs'] as num? ?? 0) / 1000,
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(
+          intValue(row['updatedAt']),
+        ),
+      );
+    }).toList();
   }
 
   void dispose() {

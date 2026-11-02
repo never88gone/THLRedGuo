@@ -158,6 +158,7 @@ public struct DramaCardView: View {
     public var progressText: String? = nil
     public var forceFocused: Bool = false
     public var onUpCommand: (() -> Void)? = nil
+    public var onLeftCommand: (() -> Void)? = nil
     public var onDownCommand: (() -> Void)? = nil
     public var onSelect: () -> Void
 
@@ -169,6 +170,7 @@ public struct DramaCardView: View {
         progressText: String? = nil,
         forceFocused: Bool = false,
         onUpCommand: (() -> Void)? = nil,
+        onLeftCommand: (() -> Void)? = nil,
         onDownCommand: (() -> Void)? = nil,
         onSelect: @escaping () -> Void
     ) {
@@ -178,6 +180,7 @@ public struct DramaCardView: View {
         self.progressText = progressText
         self.forceFocused = forceFocused
         self.onUpCommand = onUpCommand
+        self.onLeftCommand = onLeftCommand
         self.onDownCommand = onDownCommand
         self.onSelect = onSelect
     }
@@ -199,6 +202,8 @@ public struct DramaCardView: View {
                 onUpCommand?()
             } else if direction == .down {
                 onDownCommand?()
+            } else if direction == .left {
+                onLeftCommand?()
             }
         }
     }

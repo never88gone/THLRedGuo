@@ -5,17 +5,25 @@ import '../../core/account/hongguo_account_session.dart';
 import '../../core/account/hongguo_account_service.dart';
 import '../../core/bridge/core_bridge.dart';
 import '../../core/store/local_store.dart';
-import '../settings/settings_page.dart';
-import '../downloads/downloads_page.dart';
+import '../../models/catalog/models.dart';
+import '../../views/common/widgets.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({
     super.key,
     required this.repository,
     required this.store,
+    required this.localLibraryBuilder,
+    required this.onOpen,
+    required this.onOpenSettings,
+    this.initialHistory = true,
   });
   final AppRepository repository;
   final LocalStore store;
+  final Widget Function(bool) localLibraryBuilder;
+  final ValueChanged<Drama> onOpen;
+  final VoidCallback onOpenSettings;
+  final bool initialHistory;
   @override
   State<AccountScreen> createState() => _AccountScreenState();
 }
@@ -23,39 +31,79 @@ class AccountScreen extends StatefulWidget {
 class _AccountScreenState extends State<AccountScreen> {
   final account = HongguoAccountSession.shared;
   final service = HongguoAccountService();
-  String? error;
-  bool checking = false;
+  final lists = <bool, List<WatchEntry>>{};
+  final errors = <bool, String>{};
+  final loading = <bool>{};
+  late bool history = widget.initialHistory;
+  int revision = -1;
   @override
   void initState() {
     super.initState();
-    if (account.loggedIn) unawaited(_verify());
+    account.addListener(_accountChanged);
+    _accountChanged();
+  }
+
+  void _accountChanged() {
+    if (revision != account.revision) {
+      revision = account.revision;
+      lists.clear();
+      errors.clear();
+      loading.clear();
+      if (account.loggedIn) unawaited(_verifyAndLoad());
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _verifyAndLoad() async {
+    final owner = revision;
+    try {
+      await service.verify();
+    } catch (_) {}
+    if (mounted && owner == revision) await _load(history);
+  }
+
+  Future<void> _load(bool tab, {bool refresh = false}) async {
+    if (!account.loggedIn ||
+        loading.contains(tab) ||
+        !refresh && lists.containsKey(tab)) {
+      return;
+    }
+    final owner = revision;
+    setState(() {
+      loading.add(tab);
+      errors.remove(tab);
+    });
+    try {
+      final entries = await service.library(history: tab);
+      if (!mounted || owner != account.revision) return;
+      setState(() => lists[tab] = entries);
+    } catch (_) {
+      if (mounted && owner == account.revision) {
+        setState(() => errors[tab] = '账号列表获取失败，请重试');
+      }
+    } finally {
+      if (mounted && owner == account.revision) {
+        setState(() => loading.remove(tab));
+      }
+    }
+  }
+
+  void _select(bool value) {
+    setState(() => history = value);
+    if (account.loggedIn) unawaited(_load(value));
   }
 
   @override
   void dispose() {
+    account.removeListener(_accountChanged);
     service.dispose();
     super.dispose();
-  }
-
-  Future<void> _verify() async {
-    setState(() {
-      checking = true;
-      error = null;
-    });
-    try {
-      await service.verify();
-    } catch (_) {
-      if (mounted) setState(() => error = '暂时无法确认账号，请稍后重试；本地资料已保留');
-    } finally {
-      if (mounted) setState(() => checking = false);
-    }
   }
 
   Future<void> _login() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(builder: (_) => const HongguoQrLoginScreen()),
     );
-    if (mounted) setState(() => error = null);
   }
 
   Future<void> _logout() async {
@@ -80,125 +128,224 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       await account.logout();
     } catch (_) {
-      if (mounted) setState(() => error = '已退出当前会话，安全存储清理失败，请重试退出');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('当前会话已退出，安全存储清理失败，请重试')));
+      }
     }
   }
 
+  Widget _accountButton() {
+    if (!account.loggedIn) {
+      return TextButton.icon(
+        key: const Key('hongguo-account-login'),
+        onPressed: _login,
+        icon: const Icon(Icons.person_outline),
+        label: const Text('登录'),
+      );
+    }
+    final avatar =
+        !const bool.fromEnvironment('DISABLE_REMOTE_IMAGES') &&
+            Uri.tryParse(account.avatar)?.scheme == 'https'
+        ? NetworkImage(account.avatar)
+        : null;
+    return PopupMenuButton<String>(
+      key: const Key('hongguo-account-menu'),
+      tooltip: '账号菜单',
+      onSelected: (_) => _logout(),
+      itemBuilder: (_) => [
+        const PopupMenuItem(value: 'logout', child: Text('退出登录')),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 18,
+              foregroundImage: avatar,
+              onForegroundImageError: avatar == null ? null : (_, _) {},
+              child: const Icon(Icons.person),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                account.nickname,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: account,
-    builder: (context, _) => SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Text('我的', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 20),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
+  Widget build(BuildContext context) => SafeArea(
+    child: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              Text('我的', style: Theme.of(context).textTheme.headlineSmall),
+              IconButton(
+                key: const Key('my-settings'),
+                tooltip: '设置',
+                onPressed: widget.onOpenSettings,
+                icon: const Icon(Icons.settings_outlined),
+              ),
+              const Spacer(),
+              Flexible(child: _accountButton()),
+            ],
+          ),
+        ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 600;
+              final tabs = [
+                for (final value in [false, true])
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: TextButton.icon(
+                      key: ValueKey(value ? 'my-history' : 'my-follows'),
+                      onPressed: () => _select(value),
+                      style: TextButton.styleFrom(
+                        backgroundColor: history == value
+                            ? Theme.of(context).colorScheme.secondaryContainer
+                            : null,
+                      ),
+                      icon: Icon(value ? Icons.history : Icons.bookmark_border),
+                      label: Text(value ? '历史记录' : '追剧'),
+                    ),
+                  ),
+              ];
+              final content = account.loggedIn
+                  ? _cloudLibrary()
+                  : widget.localLibraryBuilder(history);
+              if (!wide) {
+                return Column(
+                  children: [
+                    Row(children: tabs),
+                    Expanded(child: content),
+                  ],
+                );
+              }
+              return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.account_circle_outlined, size: 64),
-                  const SizedBox(height: 12),
-                  Text(
-                    account.loggedIn ? account.nickname : '登录红果账号',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    account.loggedIn
-                        ? checking
-                              ? '正在确认登录状态'
-                              : account.verified
-                              ? '红果账号已登录'
-                              : '登录状态待确认'
-                        : '使用手机红果 App 扫码，在手机上确认登录',
-                  ),
-                  if (account.loggedIn)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        '账号尾号：${account.id.length > 4 ? account.id.substring(account.id.length - 4) : account.id}',
-                      ),
+                  SizedBox(
+                    width: 180,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: tabs,
                     ),
-                  const SizedBox(height: 18),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      FilledButton.icon(
-                        key: const Key('hongguo-account-login'),
-                        onPressed: _login,
-                        icon: const Icon(Icons.qr_code),
-                        label: Text(
-                          account.loggedIn ? '重新扫码 / 切换账号' : '红果 App 扫码登录',
-                        ),
-                      ),
-                      if (account.loggedIn)
-                        OutlinedButton(
-                          onPressed: checking ? null : _verify,
-                          child: const Text('确认账号状态'),
-                        ),
-                      if (account.loggedIn)
-                        TextButton(
-                          onPressed: _logout,
-                          child: const Text('退出登录'),
-                        ),
-                    ],
                   ),
-                  if (error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 14),
-                      child: Text(error!),
-                    ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: content),
                 ],
-              ),
-            ),
+              );
+            },
           ),
-          const SizedBox(height: 20),
-          ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: Text('本地用户：${widget.store.profile.name}'),
-            subtitle: const Text('红果账号与当前本地用户绑定，收藏、历史和进度继续保留'),
-          ),
-          if (widget.store.canDownload)
-            ListTile(
-              leading: const Icon(Icons.download_outlined),
-              title: const Text('下载管理'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => DownloadsScreen(
-                    repository: widget.repository,
-                    store: widget.store,
-                  ),
-                ),
-              ),
-            ),
-          ListTile(
-            leading: const Icon(Icons.settings_outlined),
-            title: const Text('应用设置'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => SettingsScreen(
-                  repository: widget.repository,
-                  store: widget.store,
-                ),
-              ),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Text('本地追剧与最近观看可从主导航进入。官方账号收藏、历史、点赞和预约同步尚未接入。'),
-          ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
+  Widget _cloudLibrary() {
+    final entries = lists[history] ?? const <WatchEntry>[];
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(child: Text('红果账号 · ${history ? '历史记录' : '追剧'}')),
+              IconButton(
+                key: const Key('account-library-refresh'),
+                tooltip: '刷新列表',
+                onPressed: loading.contains(history)
+                    ? null
+                    : () => _load(history, refresh: true),
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+        ),
+        if (loading.contains(history)) const LinearProgressIndicator(),
+        if (errors[history] != null)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    errors[history]!,
+                    key: const Key('account-library-error'),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _load(history, refresh: true),
+                  child: const Text('重试'),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: entries.isEmpty
+              ? Center(
+                  child: Text(
+                    loading.contains(history)
+                        ? '正在获取账号列表'
+                        : errors[history] != null
+                        ? '暂时无法读取账号列表'
+                        : history
+                        ? '暂无观看记录'
+                        : '暂无追剧记录',
+                    key: const Key('account-library-state'),
+                  ),
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = (constraints.maxWidth / 170).floor().clamp(
+                      2,
+                      8,
+                    );
+                    final width =
+                        (constraints.maxWidth - 32 - (columns - 1) * 12) /
+                        columns;
+                    return GridView.builder(
+                      key: ValueKey('account-library-$history'),
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 12,
+                        mainAxisExtent: DramaTile.extentFor(context, width),
+                      ),
+                      itemCount: entries.length,
+                      itemBuilder: (_, index) {
+                        final entry = entries[index];
+                        return DramaTile(
+                          key: ValueKey('account-card-${entry.drama.id}'),
+                          drama: entry.drama,
+                          repository: widget.repository,
+                          onTap: () => widget.onOpen(entry.drama),
+                          subtitle: history
+                              ? '第 ${entry.episode} 集 · ${formatPosition(entry.position)}'
+                              : '账号追剧',
+                        );
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
 }
 
 class HongguoQrLoginScreen extends StatefulWidget {

@@ -22,7 +22,7 @@ void main() {
     final store = root.store!;
     final follows = store.favorites.map((d) => d.id).toSet();
     final beforeRevision = HongguoAccountSession.shared.revision;
-    await tester.tap(find.byKey(const ValueKey('bottom-nav-4')));
+    await tester.tap(find.byKey(const ValueKey('bottom-nav-2')));
     await _wait(
       tester,
       () => find.byType(AccountScreen).evaluate().isNotEmpty,
@@ -30,7 +30,7 @@ void main() {
     );
     expect(find.text('我的'), findsWidgets);
     if (HongguoAccountSession.shared.loggedIn) {
-      expect(find.text('退出登录'), findsOneWidget);
+      expect(find.byKey(const Key('hongguo-account-menu')), findsOneWidget);
       return;
     }
     await tester.tap(find.byKey(const Key('hongguo-account-login')));

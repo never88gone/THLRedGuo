@@ -21,6 +21,30 @@ public final class LibraryViewModel: ObservableObject {
         }
     }
 
+    @Published private(set) var accountLists: [LibraryTab: [WatchEntry]] = [:]
+    @Published private(set) var accountErrors: [LibraryTab: String] = [:]
+    @Published private(set) var loadingTabs: Set<LibraryTab> = []
+    private var accountRevision: UInt64?
+
+    func loadAccount(_ tab: LibraryTab, refresh: Bool = false) async {
+        let revision = HongguoAccountVault.shared.snapshot.revision
+        if revision != accountRevision {
+            accountRevision = revision; accountLists = [:]; accountErrors = [:]; loadingTabs = []
+        }
+        guard HongguoAccountModel.shared.loggedIn, !loadingTabs.contains(tab), refresh || accountLists[tab] == nil else { return }
+        loadingTabs.insert(tab); accountErrors[tab] = nil
+        defer { if accountRevision == revision { loadingTabs.remove(tab) } }
+        do {
+            let entries = try await HongguoAccountModel.shared.library(history: tab == .history)
+            guard accountRevision == revision, HongguoAccountVault.shared.snapshot.revision == revision else { return }
+            accountLists[tab] = entries
+        } catch {
+            NSLog("[AccountLibrary] error=%@", (error as? HongguoAccountError)?.localizedDescription ?? "network")
+            guard accountRevision == revision, HongguoAccountVault.shared.snapshot.revision == revision else { return }
+            accountErrors[tab] = "账号列表获取失败，请重试"
+        }
+    }
+
     private let store: LocalStore
     private var cancellables = Set<AnyCancellable>()
 

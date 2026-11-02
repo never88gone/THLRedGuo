@@ -16,6 +16,7 @@ struct HongguoAccountRecord: Codable, Sendable {
     let nickname: String
     var cookies: [HongguoCookie]
     var device: [String: String]? = nil
+    var avatar: String? = nil
 }
 
 final class HongguoAccountVault: @unchecked Sendable {
@@ -151,7 +152,7 @@ final class HongguoAccountModel: ObservableObject {
                             let profile = try await call("profile", owner: owner)
                             try check(owner)
                             guard let id = profile["id"] as? String, !id.isEmpty else { throw HongguoAccountError.invalid }
-                            let record = HongguoAccountRecord(id: id, nickname: profile["nickname"] as? String ?? "红果用户", cookies: cookies, device: profileDevice)
+                            let record = HongguoAccountRecord(id: id, nickname: profile["nickname"] as? String ?? "红果用户", cookies: cookies, device: profileDevice, avatar: profile["avatar"] as? String)
                             try vault.save(record, expectedRevision: revision)
                             trace("saved")
                             account = record; verified = true; qrURL = nil; busy = false; message = "红果账号已登录"
@@ -184,8 +185,41 @@ final class HongguoAccountModel: ObservableObject {
             let profile = try await call("profile", owner: owner, existing: true)
             try check(owner)
             guard profile["id"] as? String == account?.id else { throw HongguoAccountError.invalid }
+            if let current = account {
+                account = HongguoAccountRecord(id: current.id, nickname: profile["nickname"] as? String ?? current.nickname,
+                    cookies: current.cookies, device: current.device, avatar: profile["avatar"] as? String ?? current.avatar)
+            }
             verified = true; message = "红果账号已登录"
         } catch { if owner == attempt { trace(stage, error: error, existing: true); message = "暂时无法确认账号，本机资料已保留" } }
+    }
+    func library(history: Bool) async throws -> [WatchEntry] {
+        guard loggedIn else { throw HongguoAccountError.invalid }
+        let owner = attempt
+        let revision = vault.snapshot.revision
+        let response = try await call(history ? "history" : "favorites", payload: history ? [:] : ["userId": account?.id ?? ""], owner: owner, existing: true)
+        guard let rows = response["items"] as? [[String: Any]] else { throw HongguoAccountError.invalid }
+        var details: [String: [String: Any]] = [:]
+        for offset in stride(from: 0, to: rows.count, by: 50) {
+            let ids = rows.dropFirst(offset).prefix(50).compactMap { $0["id"] as? String }.joined(separator: ",")
+            let response = try await call("libraryDetails", payload: ["ids": ids], owner: owner, existing: true)
+            guard let entries = response["items"] as? [[String: Any]] else { throw HongguoAccountError.invalid }
+            for entry in entries { if let id = entry["id"] as? String { details[id] = entry } }
+        }
+        try check(owner)
+        guard vault.snapshot.revision == revision, loggedIn else { throw HongguoAccountError.cancelled }
+        return rows.compactMap { row in
+            guard let id = row["id"] as? String else { return nil }
+            let detail = details[id] ?? row
+            let title = detail["title"] as? String ?? ""
+            let count = (detail["episodes"] as? NSNumber)?.intValue ?? 0
+            let drama = Drama(id: "hongguo:" + id, sourceId: id, title: title.isEmpty ? "剧集" + id : title,
+                description: detail["description"] as? String ?? "", cover: detail["cover"] as? String ?? "",
+                episodes: count > 0 ? count : (row["episodes"] as? NSNumber)?.intValue ?? 0)
+            return WatchEntry(drama: drama, episode: (row["episode"] as? NSNumber)?.intValue ?? 0,
+                position: ((row["positionMs"] as? NSNumber)?.doubleValue ?? 0) / 1000,
+                duration: ((row["durationMs"] as? NSNumber)?.doubleValue ?? 0) / 1000,
+                updatedAt: Date(timeIntervalSince1970: ((row["updatedAt"] as? NSNumber)?.doubleValue ?? 0) / 1000))
+        }
     }
     func logout() {
         cancel()
@@ -204,7 +238,9 @@ final class HongguoAccountModel: ObservableObject {
             profileDevice = Dictionary(uniqueKeysWithValues: query.filter { ["iid", "device_id", "cdid"].contains($0.name) && $0.value != nil }.map { ($0.name, $0.value!) })
         }
         let body = try await request(url, headers: command["headers"] as? [String: String] ?? [:], owner: owner, existing: existing)
-        let result = try await NativeBridge.shared.accountParse(action, body: body)
+        let result: [String: Any]
+        do { result = try await NativeBridge.shared.accountParse(action, body: body) }
+        catch { trace(action, error: error, existing: existing); throw error }
         if action != "poll" { trace(action, existing: existing) }
         return result
     }

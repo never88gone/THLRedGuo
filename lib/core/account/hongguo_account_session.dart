@@ -111,6 +111,7 @@ class HongguoAccountSession extends ChangeNotifier {
   String? deviceSession;
   String id = '';
   String nickname = '';
+  String avatar = '';
   String? error;
   bool verified = false;
   bool get loggedIn => _cookies?.hasSession == true;
@@ -127,6 +128,7 @@ class HongguoAccountSession extends ChangeNotifier {
     deviceSession = null;
     id = '';
     nickname = '';
+    avatar = '';
     verified = false;
     error = null;
     notifyListeners();
@@ -145,6 +147,7 @@ class HongguoAccountSession extends ChangeNotifier {
       deviceSession = data['device'] as String?;
       id = data['id'] as String;
       nickname = data['nickname'] as String;
+      avatar = data['avatar']?.toString() ?? '';
       error = '登录状态待确认';
       revision++;
     } catch (_) {
@@ -173,6 +176,7 @@ class HongguoAccountSession extends ChangeNotifier {
       'device': device,
       'id': accountId,
       'nickname': account['nickname']?.toString() ?? '红果用户',
+      'avatar': account['avatar']?.toString() ?? '',
     });
     final write = _writes.then((_) => _storage.write(key: key, value: value));
     _writes = write.catchError((Object _) {});
@@ -184,6 +188,7 @@ class HongguoAccountSession extends ChangeNotifier {
     deviceSession = device;
     id = accountId;
     nickname = account['nickname']?.toString() ?? '红果用户';
+    avatar = account['avatar']?.toString() ?? '';
     verified = true;
     error = null;
     revision++;
@@ -195,6 +200,7 @@ class HongguoAccountSession extends ChangeNotifier {
     verified = true;
     error = null;
     nickname = account['nickname']?.toString() ?? nickname;
+    avatar = account['avatar']?.toString() ?? avatar;
     notifyListeners();
   }
 
@@ -204,6 +210,7 @@ class HongguoAccountSession extends ChangeNotifier {
     deviceSession = null;
     id = '';
     nickname = '';
+    avatar = '';
     verified = false;
     error = null;
     revision++;
