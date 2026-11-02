@@ -111,23 +111,40 @@ public final class ICloudSyncService: ObservableObject {
             let remoteSettings = try dictionary(kvStore.string(forKey: Self.keySettings))
             guard isSyncEnabled else { return }
 
+            var remoteDeletedFollows: Set<String> = []
+            if let delDict = followsJSON["deletedFollows"] as? [String: Any] ?? followsJSON["deleted"] as? [String: Any] {
+                remoteDeletedFollows = Set(delDict.keys)
+            } else if let delList = followsJSON["deletedFollows"] as? [String] ?? followsJSON["deleted"] as? [String] {
+                remoteDeletedFollows = Set(delList)
+            }
+
+            var remoteDeletedHistory: Set<String> = []
+            if let delDict = followsJSON["deletedHistory"] as? [String: Any] {
+                remoteDeletedHistory = Set(delDict.keys)
+            } else if let delList = followsJSON["deletedHistory"] as? [String] {
+                remoteDeletedHistory = Set(delList)
+            }
+
+            let allDeletedFollows = store.deletedFollowIds.union(remoteDeletedFollows)
+            let allDeletedHistory = store.deletedHistoryIds.union(remoteDeletedHistory)
+
             var history = Dictionary(store.history.map { ($0.id, $0) }, uniquingKeysWith: { old, new in old.updatedAt > new.updatedAt ? old : new })
             for entry in remoteHistory.0 where history[entry.id] == nil || entry.updatedAt > history[entry.id]!.updatedAt {
-                if store.deletedHistoryIds.contains(entry.id) { continue }
+                if allDeletedHistory.contains(entry.id) { continue }
                 history[entry.id] = entry
             }
-            let mergedHistory = history.values.filter { !store.deletedHistoryIds.contains($0.id) }.sorted {
+            let mergedHistory = history.values.filter { !allDeletedHistory.contains($0.id) }.sorted {
                 $0.updatedAt == $1.updatedAt ? $0.id < $1.id : $0.updatedAt > $1.updatedAt
             }
             var dramas = Dictionary(store.followedDramas.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
             for drama in remoteDramas.0 {
-                if store.deletedFollowIds.contains(drama.id) { continue }
+                if allDeletedFollows.contains(drama.id) { continue }
                 dramas[drama.id] = dramas[drama.id]?.merge(with: drama) ?? drama
             }
             var follows = store.follows
             var remoteFollows: [String: FollowState] = [:]
             for (id, value) in followsJSON["follows"] as? [String: Any] ?? [:] {
-                if store.deletedFollowIds.contains(id) { continue }
+                if allDeletedFollows.contains(id) { continue }
                 let status = (value as? String) ?? (value as? [String: Any])?["status"] as? String ?? ""
                 let state = FollowState.from(string: status)
                 if state != .none {
@@ -135,9 +152,10 @@ public final class ICloudSyncService: ObservableObject {
                     remoteFollows[id] = state
                 }
             }
-            let mergedDramas = dramas.values.filter { !store.deletedFollowIds.contains($0.id) }.sorted { $0.id < $1.id }
-            follows = follows.filter { !store.deletedFollowIds.contains($0.key) }
+            let mergedDramas = dramas.values.filter { !allDeletedFollows.contains($0.id) }.sorted { $0.id < $1.id }
+            follows = follows.filter { !allDeletedFollows.contains($0.key) }
             store.applySyncedData(history: mergedHistory, follows: follows, followedDramas: mergedDramas,
+                                  deletedFollows: allDeletedFollows, deletedHistory: allDeletedHistory,
                                   source: remoteSettings["source"] as? String, danmaku: remoteSettings["danmaku"] as? Bool)
 
             var wrote = false
@@ -152,12 +170,23 @@ public final class ICloudSyncService: ObservableObject {
                 }
                 wrote = setChanged(String(decoding: try encoder.encode(Array(mergedHistory.prefix(Self.maxHistoryCount))), as: UTF8.self), key: Self.keyHistory) || wrote
             }
-            if remoteDramas.1 == 0 && (remoteFollows != follows || Set(remoteDramas.0) != Set(mergedDramas)) {
+            if remoteDramas.1 == 0 && (remoteFollows != follows || Set(remoteDramas.0) != Set(mergedDramas) || remoteDeletedFollows != allDeletedFollows || remoteDeletedHistory != allDeletedHistory) {
                 let dramaData = try JSONEncoder().encode(mergedDramas)
-                wrote = try setChangedJSON([
+                var followsPayload: [String: Any] = [
                     "follows": follows.mapValues(\.rawValue),
                     "dramas": JSONSerialization.jsonObject(with: dramaData)
-                ], key: Self.keyFollows) || wrote
+                ]
+                if !allDeletedFollows.isEmpty {
+                    let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+                    let delMap = Dictionary(uniqueKeysWithValues: allDeletedFollows.map { ($0, nowMs) })
+                    followsPayload["deleted"] = delMap
+                    followsPayload["deletedFollows"] = delMap
+                }
+                if !allDeletedHistory.isEmpty {
+                    let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+                    followsPayload["deletedHistory"] = Dictionary(uniqueKeysWithValues: allDeletedHistory.map { ($0, nowMs) })
+                }
+                wrote = try setChangedJSON(followsPayload, key: Self.keyFollows) || wrote
             }
             var settings = remoteSettings
             settings["source"] = store.currentSourceId
@@ -171,8 +200,6 @@ public final class ICloudSyncService: ObservableObject {
                     return
                 }
             }
-            store.acknowledgeDeletedFollowIds(store.deletedFollowIds)
-            store.acknowledgeDeletedHistoryIds(store.deletedHistoryIds)
             lastSyncDate = Date()
             let skipped = remoteHistory.1 + remoteDramas.1
             let syncedCount = min(mergedHistory.count, Self.maxHistoryCount)

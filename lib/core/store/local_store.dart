@@ -39,6 +39,10 @@ class LocalStore extends ChangeNotifier {
   final Map<String, WatchEntry> _history = {};
   final Map<String, Drama> _favorites = {};
   final Map<String, FollowState> _followStates = {};
+  final Map<String, int> _deletedFollows = {};
+  final Map<String, int> _deletedHistory = {};
+  Map<String, int> get deletedFollows => Map.unmodifiable(_deletedFollows);
+  Map<String, int> get deletedHistory => Map.unmodifiable(_deletedHistory);
   final Map<String, Drama> _seriesCandidates = {};
   final List<String> _feedSeenIds = [];
   final Set<String> _feedSeenSet = {};
@@ -121,6 +125,8 @@ class LocalStore extends ChangeNotifier {
     _history.clear();
     _favorites.clear();
     _followStates.clear();
+    _deletedFollows.clear();
+    _deletedHistory.clear();
     _seriesCandidates.clear();
     _feedSeenIds.clear();
     _feedSeenSet.clear();
@@ -324,6 +330,8 @@ class LocalStore extends ChangeNotifier {
     _history.clear();
     _favorites.clear();
     _followStates.clear();
+    _deletedFollows.clear();
+    _deletedHistory.clear();
     _seriesCandidates.clear();
     _feedSeenIds.clear();
     _feedSeenSet.clear();
@@ -366,6 +374,26 @@ class LocalStore extends ChangeNotifier {
         }
       } catch (_) {}
     }
+    final tombstoneCutoff =
+        DateTime.now().millisecondsSinceEpoch - 30 * 24 * 3600 * 1000;
+    try {
+      final dfMap = jsonDecode(_string(_key('deletedFollows')) ?? '{}') as Map;
+      for (final e in dfMap.entries) {
+        final ts = e.value is int
+            ? e.value as int
+            : int.tryParse(e.value.toString()) ?? 0;
+        if (ts > tombstoneCutoff) _deletedFollows[e.key.toString()] = ts;
+      }
+    } catch (_) {}
+    try {
+      final dhMap = jsonDecode(_string(_key('deletedHistory')) ?? '{}') as Map;
+      for (final e in dhMap.entries) {
+        final ts = e.value is int
+            ? e.value as int
+            : int.tryParse(e.value.toString()) ?? 0;
+        if (ts > tombstoneCutoff) _deletedHistory[e.key.toString()] = ts;
+      }
+    } catch (_) {}
     try {
       final raw = _string(_key('feedSeenDramas'));
       if (raw != null) {
@@ -715,7 +743,9 @@ class LocalStore extends ChangeNotifier {
                 key == _key('history') ||
                 key == _key('followStates') ||
                 key == _key('playback') ||
-                key == _key('source'),
+                key == _key('source') ||
+                key == _key('deletedFollows') ||
+                key == _key('deletedHistory'),
           )) {
         _lanRevision++;
         if (syncUrgent) _lanUrgentRevision++;
@@ -779,19 +809,23 @@ class LocalStore extends ChangeNotifier {
       if (!allowsSource(drama.source) || epoch != _epoch) return;
       final entries = Map.of(_favorites);
       final states = Map.of(_followStates);
+      final deleted = Map.of(_deletedFollows);
       if (entries.containsKey(drama.id)) {
         entries.remove(drama.id);
         states.remove(drama.id);
+        deleted[drama.id] = DateTime.now().millisecondsSinceEpoch;
       } else {
         if (entries.length >= 20000) throw StateError('追剧数量已达上限，请先整理追剧');
         entries[drama.id] = drama;
         states[drama.id] = FollowState.initial(drama, _history[drama.id]);
+        deleted.remove(drama.id);
       }
       await _commit({
         _key('favorites'): jsonEncode(
           entries.values.map((entry) => entry.toJson()).toList(),
         ),
         _key('followStates'): _encodeFollowStates(states),
+        _key('deletedFollows'): jsonEncode(deleted),
       });
       _loadLibrary();
       _notify();
@@ -817,11 +851,14 @@ class LocalStore extends ChangeNotifier {
               .observe(current)
               .withStatus(status);
       final states = Map.of(_followStates)..[drama.id] = state;
+      final deleted = Map.of(_deletedFollows);
+      final hadDeleted = deleted.remove(drama.id) != null;
       await _commit({
         _key('favorites'): jsonEncode(
           entries.values.map((entry) => entry.toJson()).toList(),
         ),
         _key('followStates'): _encodeFollowStates(states),
+        if (hadDeleted) _key('deletedFollows'): jsonEncode(deleted),
       });
       _loadLibrary();
       _notify();
@@ -888,10 +925,13 @@ class LocalStore extends ChangeNotifier {
           current.drama,
         );
       }
+      final deleted = Map.of(_deletedHistory);
+      final hadDeleted = deleted.remove(entry.drama.id) != null;
       await _commit({
         _key('history'): jsonEncode(
           sorted.take(300).map((entry) => entry.toJson()).toList(),
         ),
+        if (hadDeleted) _key('deletedHistory'): jsonEncode(deleted),
         if (following != null) ...{
           _key('followStates'): _encodeFollowStates(states),
           _key('favorites'): jsonEncode(
@@ -949,10 +989,13 @@ class LocalStore extends ChangeNotifier {
       final currentSource = targetSource ?? source;
       final entries = Map.of(_history);
       final removedIds = <String>{};
+      final deleted = Map.of(_deletedHistory);
+      final now = DateTime.now().millisecondsSinceEpoch;
       if (currentSource.isNotEmpty) {
         entries.removeWhere((id, entry) {
           if (_dramaSource(entry.drama) == currentSource) {
             removedIds.add(id);
+            deleted[id] = now;
             return true;
           }
           return false;
@@ -962,12 +1005,18 @@ class LocalStore extends ChangeNotifier {
             _key('history'): jsonEncode(
               entries.values.map((entry) => entry.toJson()).toList(),
             ),
+            _key('deletedHistory'): jsonEncode(deleted),
           },
           clearSyncProgress: {...removedIds, ...lanDocument.records.keys},
         );
       } else {
+        for (final id in _history.keys) {
+          deleted[id] = now;
+        }
         await _commit(
-          {},
+          {
+            _key('deletedHistory'): jsonEncode(deleted),
+          },
           remove: [_key('history')],
           clearSyncProgress: {..._history.keys, ...lanDocument.records.keys},
         );
@@ -982,11 +1031,14 @@ class LocalStore extends ChangeNotifier {
     return _queue(() async {
       if (watched(id) == null || epoch != _epoch) return;
       final entries = Map.of(_history)..remove(id);
+      final deleted = Map.of(_deletedHistory)
+        ..[id] = DateTime.now().millisecondsSinceEpoch;
       await _commit(
         {
           _key('history'): jsonEncode(
             entries.values.map((entry) => entry.toJson()).toList(),
           ),
+          _key('deletedHistory'): jsonEncode(deleted),
         },
         clearSyncProgress: {id},
       );
@@ -1614,6 +1666,8 @@ class LocalStore extends ChangeNotifier {
     required List<WatchEntry> history,
     required Map<String, Drama> favorites,
     required Map<String, FollowState> followStates,
+    Map<String, int>? deletedFollows,
+    Map<String, int>? deletedHistory,
     String? source,
     PlaybackPreferences? playback,
   }) {
@@ -1629,6 +1683,12 @@ class LocalStore extends ChangeNotifier {
         ),
         _key('followStates'): _encodeFollowStates(followStates),
       };
+      if (deletedFollows != null) {
+        changes[_key('deletedFollows')] = jsonEncode(deletedFollows);
+      }
+      if (deletedHistory != null) {
+        changes[_key('deletedHistory')] = jsonEncode(deletedHistory);
+      }
       if (source != null && source.isNotEmpty && allowsSource(source)) {
         changes[_key('source')] = source;
       }

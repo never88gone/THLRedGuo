@@ -275,11 +275,21 @@ public final class LocalStore: ObservableObject {
         cloudUpload(self)
     }
 
-    public func applySyncedData(history: [WatchEntry], follows: [String: FollowState], followedDramas: [Drama], source: String? = nil, danmaku: Bool? = nil) {
+    public func applySyncedData(history: [WatchEntry], follows: [String: FollowState], followedDramas: [Drama],
+                                deletedFollows: Set<String>? = nil, deletedHistory: Set<String>? = nil,
+                                source: String? = nil, danmaku: Bool? = nil) {
         applyingCloudData = true
         defer { applyingCloudData = false }
         if let source, !source.isEmpty { setSource(source) }
         if let danmaku { danmakuEnabled = danmaku }
+        if let delFollows = deletedFollows {
+            self.deletedFollowIds = delFollows
+            defaults.set(Array(self.deletedFollowIds), forKey: deletedFollowIdsKey)
+        }
+        if let delHistory = deletedHistory {
+            self.deletedHistoryIds = delHistory
+            defaults.set(Array(self.deletedHistoryIds), forKey: deletedHistoryIdsKey)
+        }
         self.history = history.filter { !deletedHistoryIds.contains($0.id) }
         // 排除已删除墓碑中的追剧，防止云端旧数据复活覆盖本地删除操作
         self.follows = follows.filter { !deletedFollowIds.contains($0.key) }
