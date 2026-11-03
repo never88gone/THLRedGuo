@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../core/account/hongguo_verification.dart';
+import '../../core/diagnostics/source_diagnostics.dart';
 import '../../core/account/hongguo_verification_sdk.dart';
 
 class HongguoVerificationScreen extends StatefulWidget {
@@ -16,7 +17,8 @@ class _HongguoVerificationScreenState extends State<HongguoVerificationScreen> {
   final pageID = HongguoVerificationChallenge.newPageID();
   bool loading = true, finished = false;
   String? error;
-  Timer? expiry;
+  Timer? expiry, loadProbe;
+  InAppWebViewController? verificationWebView;
   late final Future<String> sdk;
   @override
   void initState() {
@@ -25,6 +27,11 @@ class _HongguoVerificationScreenState extends State<HongguoVerificationScreen> {
     PlatformInAppWebViewController.debugLoggingSettings.enabled = false;
     expiry = Timer(const Duration(minutes: 2), () {
       if (mounted && !finished) {
+        _recordVerificationDiagnostic(
+          '安全验证超时',
+          code: loading ? 'VERIFICATION_LOAD_TIMEOUT' : 'VERIFICATION_EXPIRED',
+        );
+        unawaited(_captureVerificationState());
         setState(() {
           error = '安全验证等待超时，请返回后重新发起';
           loading = false;
@@ -47,7 +54,64 @@ class _HongguoVerificationScreenState extends State<HongguoVerificationScreen> {
   void dispose() {
     finished = true;
     expiry?.cancel();
+    loadProbe?.cancel();
+    verificationWebView = null;
     super.dispose();
+  }
+
+  void _recordVerificationDiagnostic(
+    String stage, {
+    Uri? url,
+    String code = '',
+    String status = '',
+    int httpStatus = 0,
+  }) {
+    if (!mounted) return;
+    SourceDiagnostics.shared.add(
+      SourceDiagnosticEntry(
+        at: DateTime.now(),
+        context: '红果登录',
+        stage: stage,
+        host: url?.host ?? '',
+        errorCode: code,
+        sessionStatus: status,
+        status: httpStatus,
+      ),
+    );
+  }
+
+  Future<void> _captureVerificationState() async {
+    final controller = verificationWebView;
+    if (controller == null || !mounted) return;
+    try {
+      final metadata = await controller.evaluateJavascript(
+        source: """
+(() => {
+ const host = value => {try {return new URL(value, location.href).hostname;} catch (_) {return '';}};
+ return JSON.stringify({
+  state:document.readyState,
+  sdk:!!window.verifySDK,
+  frames:Array.from(document.querySelectorAll('iframe')).slice(0,8).map(frame => ({
+   host:host(frame.src), visible:frame.style.visibility!=='hidden',
+   width:frame.clientWidth, height:frame.clientHeight
+  })),
+  resources:performance.getEntriesByType('resource').filter(entry =>
+   ['iframe','script','fetch','xmlhttprequest'].includes(entry.initiatorType)
+  ).slice(-8).map(entry => ({host:host(entry.name),type:entry.initiatorType,
+   duration:Math.round(entry.duration),status:entry.responseStatus||0}))
+ });
+})()
+""",
+      );
+      if (mounted && metadata is String && metadata.length <= 4096) {
+        _recordVerificationDiagnostic('验证页面加载状态', status: metadata);
+      }
+    } catch (_) {
+      _recordVerificationDiagnostic(
+        '验证页面加载状态',
+        code: 'VERIFICATION_STATE_UNAVAILABLE',
+      );
+    }
   }
 
   void receive(List<dynamic> args) {
@@ -59,6 +123,7 @@ class _HongguoVerificationScreenState extends State<HongguoVerificationScreen> {
     }
     switch (event['event']) {
       case 'ready':
+        loadProbe?.cancel();
         setState(() => loading = false);
       case 'success':
         final fp = event['fp'];
@@ -68,11 +133,18 @@ class _HongguoVerificationScreenState extends State<HongguoVerificationScreen> {
         }
         finished = true;
         expiry?.cancel();
+        _recordVerificationDiagnostic('安全验证完成');
         Navigator.pop(context, fp);
       case 'cancel':
         finished = true;
         Navigator.pop(context);
       case 'error':
+        finished = true;
+        expiry?.cancel();
+        _recordVerificationDiagnostic(
+          '安全验证渲染',
+          code: 'VERIFICATION_RENDER_ERROR',
+        );
         setState(() {
           loading = false;
           error = '红果安全验证加载失败，请检查网络或改用扫码登录';
@@ -106,6 +178,7 @@ class _HongguoVerificationScreenState extends State<HongguoVerificationScreen> {
                 }
                 if (!snapshot.hasData) return const SizedBox.shrink();
                 return InAppWebView(
+                  key: ValueKey(pageID),
                   initialSettings: InAppWebViewSettings(
                     incognito: true,
                     cacheEnabled: false,
@@ -124,12 +197,46 @@ class _HongguoVerificationScreenState extends State<HongguoVerificationScreen> {
                     baseUrl: WebUri(HongguoVerificationChallenge.origin),
                   ),
                   onWebViewCreated: (controller) {
+                    verificationWebView = controller;
+                    loadProbe = Timer(const Duration(seconds: 15), () {
+                      if (mounted && loading && !finished) {
+                        unawaited(_captureVerificationState());
+                      }
+                    });
                     controller.addJavaScriptHandler(
                       handlerName: 'THLVerify',
                       callback: receive,
                     );
                   },
-                  onConsoleMessage: (_, _) {},
+                  onConsoleMessage: (_, message) {
+                    final text = message.message;
+                    if (text.contains('Content Security Policy') ||
+                        text.contains('Content Security directive')) {
+                      final match = RegExp(
+                        r'https://[A-Za-z0-9.-]+',
+                      ).firstMatch(text);
+                      _recordVerificationDiagnostic(
+                        '验证资源策略',
+                        url: Uri.tryParse(match?.group(0) ?? ''),
+                        code: 'VERIFICATION_CSP',
+                      );
+                    }
+                  },
+                  onReceivedError: (_, request, error) =>
+                      _recordVerificationDiagnostic(
+                        '验证资源连接',
+                        url: request.url,
+                        code: 'VERIFICATION_RESOURCE_ERROR',
+                        status:
+                            'mainFrame=${request.isForMainFrame} native=${error.type.toNativeValue()}',
+                      ),
+                  onReceivedHttpError: (_, request, response) =>
+                      _recordVerificationDiagnostic(
+                        '验证资源响应',
+                        url: request.url,
+                        code: 'VERIFICATION_HTTP_ERROR',
+                        httpStatus: response.statusCode ?? 0,
+                      ),
                   shouldOverrideUrlLoading: (_, action) async {
                     final url = action.request.url;
                     final host = url?.host;
@@ -144,6 +251,12 @@ class _HongguoVerificationScreenState extends State<HongguoVerificationScreen> {
                                       'verify.zijieapi.com',
                                       'verify.snssdk.com',
                                     }.contains(host));
+                    _recordVerificationDiagnostic(
+                      '验证页面导航',
+                      url: url,
+                      status:
+                          'mainFrame=${action.isForMainFrame} allowed=$allowed',
+                    );
                     return allowed
                         ? NavigationActionPolicy.ALLOW
                         : NavigationActionPolicy.CANCEL;

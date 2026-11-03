@@ -46,6 +46,7 @@ class HongguoVerificationChallenge extends HongguoAccountFailure {
             'passport_csrf_token',
             'passport_csrf_token_default',
             'reg-store-region',
+            's_v_web_id',
           }.contains(cookie['name']))
             '${cookie['name']}=${cookie['value']}; Path=/; Secure; SameSite=Lax',
       ],
@@ -80,8 +81,9 @@ class HongguoVerificationChallenge extends HongguoAccountFailure {
 const config=$config;
 let completed=false;
 function reply(event,fp){if(completed&&event!=='ready')return;if(event!=='ready')completed=true;const state=document.getElementById('state');if(state)state.textContent=event==='error'?'安全验证加载失败，请返回重试':'';if(window.flutter_inappwebview)window.flutter_inappwebview.callHandler('THLVerify',{id:config.id,event,fp:fp||''});}
-async function start(){try{for(const value of config.cookies)document.cookie=value;const sdk=window.verifySDK;if(!sdk||!sdk.initVerifyOptions||!sdk.getCaptchaWebId||!sdk.autoRender)throw Error('sdk');sdk.initVerifyOptions({commonOptions:{aid:513755,iid:'0',did:'0',repoId:579047},captchaOptions:{logConfig:{sample_rate:0}}});const fp=await sdk.getCaptchaWebId();if(typeof fp!=='string'||!fp)throw Error('fp');reply('ready');sdk.autoRender({verify_data:config.verifyData,captchaOptions:{fp,successCb:async()=>reply('success',await sdk.getCaptchaWebId()),closeCb:()=>reply('cancel'),errorCb:()=>reply('error')}});}catch(_){reply('error');}}
-let launched=false;function load(){if(launched)return;launched=true;const script=document.createElement('script');try{script.textContent=config.sdk;document.head.appendChild(script);start();}catch(_){reply('error');}}if(window.flutter_inappwebview&&window.flutter_inappwebview.callHandler)load();else window.addEventListener('flutterInAppWebViewPlatformReady',load,{once:true});
+function onResize(size){if(size&&size.w>0&&size.h>0)reply('ready');}
+async function start(){try{const sdk=window.verifySDK;if(!sdk||!sdk.initVerifyOptions||!sdk.getCaptchaWebId||!sdk.autoRender)throw Error('sdk');sdk.initVerifyOptions({commonOptions:{aid:513755,iid:'0',did:'0',repoId:579047},captchaOptions:{logConfig:{sample_rate:0}}});sdk.autoRender({verify_data:config.verifyData,captchaOptions:{onResize,successCb:async()=>{try{reply('success',await sdk.getCaptchaWebId());}catch(_){reply('error');}},closeCb:()=>reply('cancel'),errorCb:()=>reply('error')}});}catch(_){reply('error');}}
+let launched=false;function load(){if(launched)return;launched=true;const script=document.createElement('script');try{for(const value of config.cookies)document.cookie=value;script.textContent=config.sdk;document.head.appendChild(script);start();}catch(_){reply('error');}}if(window.flutter_inappwebview&&window.flutter_inappwebview.callHandler)load();else window.addEventListener('flutterInAppWebViewPlatformReady',load,{once:true});
 </script></body></html>''';
   }
 

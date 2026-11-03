@@ -412,6 +412,7 @@ class HongguoAccountService {
       if (!HongguoVerificationChallenge.validFingerprint(fp)) {
         throw const HongguoAccountFailure('安全验证结果无效', 'VERIFICATION_INVALID');
       }
+      _trace('$action 安全验证回调', attempt._cookies);
       attempt._fingerprint = fp;
       attempt._cookies.merge(Uri.parse('https://hongguoduanju.com/'), [
         's_v_web_id=$fp; Path=/; Secure',

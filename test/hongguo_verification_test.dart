@@ -9,6 +9,7 @@ void main() {
       ..merge(Uri.parse(HongguoVerificationChallenge.origin), [
         'sessionid=synthetic-private-account; Path=/; Secure',
         'passport_csrf_token=synthetic-anonymous-csrf; Path=/; Secure',
+        's_v_web_id=verify_synthetic_previous_123456; Path=/; Secure',
       ]);
     Map<String, dynamic> result() => {
       'rejected': true,
@@ -32,6 +33,12 @@ void main() {
       'window.verifySDK={};',
     );
     expect(html, contains('synthetic-anonymous-csrf'));
+    expect(
+      challenge.cookies,
+      contains(
+        's_v_web_id=verify_synthetic_previous_123456; Path=/; Secure; SameSite=Lax',
+      ),
+    );
     expect(html, isNot(contains('synthetic-private-account')));
     expect(html, isNot(contains('</script><script>hostile()')));
     expect(challenge.toString(), isNot(contains('hostile')));
