@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:THLRedLook/core/account/hongguo_account_service.dart';
 import 'package:THLRedLook/core/account/hongguo_account_session.dart';
 import 'package:THLRedLook/core/js/hongguo_guest_session.dart';
+import 'package:THLRedLook/core/account/account_transfer_payload.dart';
 
 class _Reply extends Stream<List<int>> implements HttpClientResponse {
   _Reply(this.payload, [List<String> cookies = const []])
@@ -57,6 +58,9 @@ class _Request implements HttpClientRequest {
   final _Reply Function(Uri, _Headers) respond;
   @override
   final _Headers headers = _Headers();
+  final bodyText = StringBuffer();
+  @override
+  void write(Object? object) => bodyText.write(object);
   @override
   bool followRedirects = true;
   bool aborted = false;
@@ -66,7 +70,13 @@ class _Request implements HttpClientRequest {
   }
 
   @override
-  Future<HttpClientResponse> close() async => respond(uri, headers);
+  Future<HttpClientResponse> close() async {
+    if (bodyText.isNotEmpty) {
+      headers.fields['synthetic-body'] = bodyText.toString();
+    }
+    return respond(uri, headers);
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -110,6 +120,65 @@ void main() {
         'cdid': 'synthetic-device',
       }),
     });
+  });
+  test('传入账号先使用候选设备与轮转Cookie校验，提交前不覆盖当前账号', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('candidate-device');
+    final candidate = AccountTransferPayload.decode(
+      utf8.encode(
+        jsonEncode({
+          'v': 1,
+          'id': '123',
+          'cookies': [
+            {
+              'name': 'sessionid',
+              'value': 'synthetic-before',
+              'domain': 'hongguoduanju.com',
+              'path': '/',
+              'expires': null,
+            },
+          ],
+          'device': {
+            'iid': '7345678901234567999',
+            'device_id': '7345678901234567888',
+            'cdid': 'synthetic-candidate',
+          },
+        }),
+      ),
+    );
+    final service = HongguoAccountService(session: session);
+    addTearDown(service.dispose);
+    await HttpOverrides.runZoned(
+      () async {
+        final proof = await service.prepareTransferred(
+          candidate,
+          isCurrent: () => true,
+        );
+        expect(session.loggedIn, false);
+        await service.commitTransferred(proof, isCurrent: () => true);
+        expect(session.id, '123');
+        expect(
+          jsonDecode(session.deviceSession!)['device_id'],
+          '7345678901234567888',
+        );
+      },
+      createHttpClient: (_) => _Client((uri, headers) {
+        if (uri.path == '/passport/account/info/v2/') {
+          expect(headers.value('Cookie'), 'sessionid=synthetic-before');
+          return _Reply(
+            {'message': 'success', 'data': {}},
+            ['sessionid=synthetic-rotated; Path=/; Secure'],
+          );
+        }
+        expect(uri.path, '/reading/user/info/v1/');
+        expect(uri.queryParameters['device_id'], '7345678901234567888');
+        expect(headers.value('Cookie'), 'sessionid=synthetic-rotated');
+        return _Reply({
+          'code': 0,
+          'data': {'biz_user_id': '123', 'user_name': '合成'},
+        });
+      }),
+    );
   });
   test('轮询状态未到confirmed但已签发会话时完成App账号校验', () async {
     final session = HongguoAccountSession();
@@ -372,5 +441,194 @@ void main() {
       expect(client.pending.headers.value('Cookie'), isNull);
       expect(client.pending.aborted, true);
     }, createHttpClient: (_) => client);
+  });
+  String mix(String value) =>
+      utf8.encode(value).map((v) => (v ^ 5).toRadixString(16)).join();
+  test('验证码和密码使用官方POST协议，不自动注册；取得会话后才确认App账号', () async {
+    for (final password in [false, true]) {
+      final session = HongguoAccountSession();
+      await session.bindProfile('phone-$password');
+      final paths = <String>[];
+      await HttpOverrides.runZoned(
+        () async {
+          final service = HongguoAccountService(session: session);
+          addTearDown(service.dispose);
+          final phone = service.phone('86', '13800138000');
+          if (!password) {
+            expect(await service.sendPhoneCode(phone), 60);
+            expect(session.loggedIn, false);
+            await expectLater(
+              service.sendPhoneCode(phone),
+              throwsA(isA<HongguoAccountFailure>()),
+            );
+          }
+          await service.loginPhone(
+            phone,
+            code: password ? null : '654321',
+            password: password ? 'synthetic-password' : null,
+          );
+          expect(session.loggedIn, true);
+          expect(session.id, '1234567890123456789');
+          expect(session.verified, true);
+          expect(paths.where((p) => p.contains('mobile/register')), isEmpty);
+        },
+        createHttpClient: (_) => _Client((uri, headers) {
+          paths.add(uri.path);
+          if (uri.path.endsWith('/get_qrcode/')) {
+            return _Reply(
+              {
+                'message': 'success',
+                'data': {
+                  'token': 'synthetic-token',
+                  'qrcode_index_url':
+                      'https://reading.snssdk.com/reading_offline/novelread/page/scan-code.html?token=synthetic-token',
+                  'expire_time': 60,
+                },
+              },
+              ['passport_csrf_token=synthetic-csrf; Path=/; Secure'],
+            );
+          }
+          if (uri.path.contains('/passport/web/')) {
+            expect(headers.value('x-tt-passport-csrf-token'), 'synthetic-csrf');
+            final form = Uri.splitQueryString(headers.value('synthetic-body')!);
+            expect(form['mix_mode'], '1');
+            expect(form['fixed_mix_mode'], '1');
+            if (uri.path.endsWith('/send_code/')) {
+              expect(form['mobile'], mix('+86 13800138000'));
+              expect(form['type'], mix('24'));
+              return _Reply({
+                'message': 'success',
+                'data': {'retry_time': 60},
+              });
+            }
+            if (password) {
+              expect(uri.path, '/passport/web/user/login/');
+              expect(form['account'], mix('13800138000'));
+              expect(form['password'], mix('synthetic-password'));
+            } else {
+              expect(uri.path, '/passport/web/sms_login_only/');
+              expect(form['mobile'], mix('+86 13800138000'));
+              expect(form['code'], mix('654321'));
+            }
+            return _Reply(
+              {'message': 'success', 'data': {}},
+              ['sessionid=synthetic-phone-session; Path=/; Secure'],
+            );
+          }
+          if (uri.path == '/passport/account/info/v2/') {
+            return _Reply({'message': 'success', 'data': {}});
+          }
+          expect(headers.value('Cookie'), 'sessionid=synthetic-phone-session');
+          return _Reply({
+            'code': 0,
+            'data': {
+              'biz_user_id': '1234567890123456789',
+              'user_name': 'synthetic',
+            },
+          });
+        }),
+      );
+    }
+  });
+  test('安全验证拒绝不自动重发短信，也不会把发送成功当作登录成功', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('phone-challenge');
+    var sent = 0;
+    await HttpOverrides.runZoned(
+      () async {
+        final service = HongguoAccountService(session: session);
+        addTearDown(service.dispose);
+        await expectLater(
+          service.sendPhoneCode(service.phone('86', '13800138000')),
+          throwsA(
+            isA<HongguoAccountFailure>().having(
+              (v) => v.code,
+              'code',
+              'CHALLENGE_REQUIRED',
+            ),
+          ),
+        );
+        expect(sent, 1);
+        expect(session.loggedIn, false);
+      },
+      createHttpClient: (_) => _Client((uri, _) {
+        if (uri.path.endsWith('/get_qrcode/')) {
+          return _Reply(
+            {
+              'message': 'success',
+              'data': {
+                'token': 'synthetic-token',
+                'qrcode_index_url':
+                    'https://reading.snssdk.com/reading_offline/novelread/page/scan-code.html?token=synthetic-token',
+                'expire_time': 60,
+              },
+            },
+            ['passport_csrf_token=synthetic-csrf; Path=/; Secure'],
+          );
+        }
+        sent++;
+        return _Reply({
+          'message': 'error',
+          'data': {'error_code': 1102, 'verify_center_decision_conf': {}},
+        });
+      }),
+    );
+  });
+  test('二维码到期后的最终确认可接收已授权会话，最多查询一次', () async {
+    for (final confirmed in [false, true]) {
+      final session = HongguoAccountSession();
+      await session.bindProfile('late-$confirmed');
+      var polls = 0;
+      await HttpOverrides.runZoned(
+        () async {
+          final service = HongguoAccountService(session: session);
+          addTearDown(service.dispose);
+          final login = HongguoQrLogin(
+            'synthetic',
+            DateTime.now().subtract(const Duration(seconds: 1)),
+            'synthetic-token',
+            HongguoAccountCookies(),
+            session.revision,
+          );
+          expect(await service.poll(login, finalCheck: true), confirmed);
+          if (!confirmed) {
+            await expectLater(
+              service.poll(login, finalCheck: true),
+              throwsA(
+                isA<HongguoAccountFailure>().having(
+                  (v) => v.code,
+                  'code',
+                  'QR_EXPIRED',
+                ),
+              ),
+            );
+          }
+          expect(polls, 1);
+          expect(session.loggedIn, confirmed);
+        },
+        createHttpClient: (_) => _Client((uri, _) {
+          if (uri.path.endsWith('/check_qrconnect/')) {
+            polls++;
+            return _Reply({
+              'message': 'success',
+              'data': {
+                'status': confirmed ? 'confirmed' : 'new',
+                'redirect_url': '',
+              },
+            }, confirmed ? ['sessionid=synthetic-late; Path=/; Secure'] : []);
+          }
+          if (uri.path == '/passport/account/info/v2/') {
+            return _Reply({'message': 'success', 'data': {}});
+          }
+          return _Reply({
+            'code': 0,
+            'data': {
+              'biz_user_id': '1234567890123456789',
+              'user_name': 'synthetic',
+            },
+          });
+        }),
+      );
+    }
   });
 }

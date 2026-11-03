@@ -388,7 +388,7 @@ jobs:
   release:
     name: Flutter 跨平台产物汇总与 Release 发布
     needs: [android, windows, ios, macos]
-    if: always() && github.event_name != 'pull_request' && (needs.android.result == 'success' || needs.windows.result == 'success' || needs.macos.result == 'success' || needs.ios.result == 'success')
+    if: always() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref_type == 'tag') && (needs.android.result == 'success' || needs.windows.result == 'success' || needs.macos.result == 'success' || needs.ios.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

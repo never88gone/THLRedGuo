@@ -302,6 +302,9 @@ public struct MainTabView: View {
                                 focusCategoryTrigger: libraryTabFocusTrigger,
                                 onRequestFocusTopNav: {
                                     requestFocusSidebar()
+                                },
+                                onRequestFocusContent: {
+                                    enterContentArea(for: .library)
                                 }
                             )
                             .padding(.top, 32)
@@ -569,7 +572,7 @@ public struct MainTabView: View {
                 guard !sourceId.isEmpty else { return }
                 let hasActiveHistory = store.history.contains { $0.drama.source.lowercased() == sourceId.lowercased() }
                 let hasActiveFollows = store.followedDramas.contains { $0.source.lowercased() == sourceId.lowercased() }
-                if !hasActiveHistory || !hasActiveFollows {
+                if (!hasActiveHistory || !hasActiveFollows) && !CommandLine.arguments.contains("-openAccountLogin") {
                     do {
                         let cat = try await NativeRepository.shared.loadCatalog(source: sourceId, page: 1)
                         await MainActor.run {

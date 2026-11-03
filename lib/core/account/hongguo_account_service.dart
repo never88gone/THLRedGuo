@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../js/catpaw_js_runtime.dart';
 import '../diagnostics/source_diagnostics.dart';
 import 'hongguo_account_session.dart';
+import 'account_transfer_payload.dart';
 import '../../models/catalog/models.dart';
 
 class HongguoQrLogin {
@@ -21,7 +22,29 @@ class HongguoQrLogin {
   final HongguoAccountCookies _cookies;
   final int _revision;
   bool cancelled = false;
+  bool finalCheckDone = false;
   bool get confirmed => _cookies.hasSession;
+}
+
+class HongguoPhoneLogin {
+  HongguoPhoneLogin(this.country, this.number, this._revision);
+  final String country, number;
+  final int _revision;
+  final _cookies = HongguoAccountCookies();
+  bool cancelled = false;
+  bool sent = false;
+  DateTime retryAt = DateTime(2000);
+  @override
+  String toString() => 'HongguoPhoneLogin([redacted])';
+}
+
+class VerifiedAccountTransfer {
+  VerifiedAccountTransfer(this.candidate, this.profile, this.revision);
+  final AccountTransferPayload candidate;
+  final Map<String, dynamic> profile;
+  final int revision;
+  @override
+  String toString() => 'VerifiedAccountTransfer([redacted])';
 }
 
 class HongguoAccountService {
@@ -72,8 +95,12 @@ class HongguoAccountService {
       throw const HongguoAccountFailure('账号地址未通过校验');
     }
     _http ??= HttpClient()..connectionTimeout = const Duration(seconds: 12);
+    final method = command['method']?.toString() ?? 'GET';
+    if (!{'GET', 'POST'}.contains(method)) {
+      throw const HongguoAccountFailure('账号请求方式无效');
+    }
     final request = await _http!
-        .openUrl('GET', uri)
+        .openUrl(method, uri)
         .timeout(const Duration(seconds: 15));
     try {
       _check(revision);
@@ -94,6 +121,14 @@ class HongguoAccountService {
     if (cookie.isNotEmpty) request.headers.set('Cookie', cookie);
     if (web && (cookies?.csrf.isNotEmpty ?? false)) {
       request.headers.set('x-tt-passport-csrf-token', cookies!.csrf);
+    }
+    if (method == 'POST') {
+      final body = command['body'];
+      if (body is! String || utf8.encode(body).length > 16 * 1024) {
+        request.abort();
+        throw const HongguoAccountFailure('账号请求格式无效');
+      }
+      request.write(body);
     }
     final response = await request.close().timeout(const Duration(seconds: 15));
     _check(revision);
@@ -218,11 +253,14 @@ class HongguoAccountService {
     );
   }
 
-  Future<bool> poll(HongguoQrLogin login) async {
+  Future<bool> poll(HongguoQrLogin login, {bool finalCheck = false}) async {
     if (_polling || login.cancelled) return false;
     _check(login._revision);
     if (!login.confirmed && !login.expiresAt.isAfter(DateTime.now())) {
-      throw const HongguoAccountFailure('二维码已过期，请刷新', 'QR_EXPIRED');
+      if (!finalCheck || login.finalCheckDone) {
+        throw const HongguoAccountFailure('二维码已过期，请刷新', 'QR_EXPIRED');
+      }
+      login.finalCheckDone = true;
     }
     _polling = true;
     try {
@@ -276,6 +314,7 @@ class HongguoAccountService {
         profile,
         expectedRevision: login._revision,
         device: _profileDevice,
+        isCurrent: () => !_disposed && !login.cancelled,
       );
       login.cancelled = true;
       _trace('saved', login._cookies);
@@ -286,6 +325,140 @@ class HongguoAccountService {
     } finally {
       _polling = false;
     }
+  }
+
+  HongguoPhoneLogin phone(String country, String number) =>
+      HongguoPhoneLogin(country, number, session.revision);
+  void _checkPhone(HongguoPhoneLogin attempt) {
+    _check(attempt._revision);
+    if (attempt.cancelled) {
+      throw const HongguoAccountFailure('登录操作已取消', 'CANCELLED');
+    }
+  }
+
+  Future<void> _preparePhone(HongguoPhoneLogin attempt) async {
+    _checkPhone(attempt);
+    if (attempt._cookies.csrf.isEmpty) {
+      await _call('qr', {}, attempt._cookies, attempt._revision);
+    }
+    _checkPhone(attempt);
+  }
+
+  Future<int> sendPhoneCode(HongguoPhoneLogin attempt) async {
+    _checkPhone(attempt);
+    if (attempt.retryAt.isAfter(DateTime.now())) {
+      throw const HongguoAccountFailure('请等待短信倒计时结束');
+    }
+    await _preparePhone(attempt);
+    final data = await _call(
+      'phoneCode',
+      {'country': attempt.country, 'number': attempt.number},
+      attempt._cookies,
+      attempt._revision,
+    );
+    _checkPhone(attempt);
+    final seconds = (data['retryAfter'] as num).toInt();
+    attempt.sent = true;
+    attempt.retryAt = DateTime.now().add(Duration(seconds: seconds));
+    return seconds;
+  }
+
+  Future<void> loginPhone(
+    HongguoPhoneLogin attempt, {
+    String? code,
+    String? password,
+  }) async {
+    _checkPhone(attempt);
+    if ((code == null) == (password == null)) {
+      throw const HongguoAccountFailure('请选择登录方式');
+    }
+    if (code != null && !attempt.sent) {
+      throw const HongguoAccountFailure('请先获取验证码');
+    }
+    await _preparePhone(attempt);
+    await _call(
+      password == null ? 'phoneSms' : 'phonePassword',
+      {
+        'country': attempt.country,
+        'number': attempt.number,
+        'code': ?code,
+        'password': ?password,
+      },
+      attempt._cookies,
+      attempt._revision,
+    );
+    _checkPhone(attempt);
+    if (!attempt._cookies.hasSession) {
+      throw const HongguoAccountFailure('官方尚未签发有效登录会话');
+    }
+    await _call('webInfo', {}, attempt._cookies, attempt._revision);
+    final profile = await _call(
+      'profile',
+      {},
+      attempt._cookies,
+      attempt._revision,
+    );
+    _checkPhone(attempt);
+    await session.accept(
+      attempt._cookies,
+      profile,
+      expectedRevision: attempt._revision,
+      device: _profileDevice,
+      isCurrent: () => !_disposed && !attempt.cancelled,
+    );
+    attempt.cancelled = true;
+  }
+
+  Future<VerifiedAccountTransfer> prepareTransferred(
+    AccountTransferPayload candidate, {
+    required bool Function() isCurrent,
+    int? expectedRevision,
+  }) async {
+    final revision = expectedRevision ?? session.revision;
+    _check(revision);
+    if (!isCurrent()) throw const HongguoAccountFailure('设备配对已取消', 'CANCELLED');
+    await _call('webInfo', {}, candidate.cookies, revision);
+    final profile = await _call(
+      'profile',
+      {'device': candidate.device},
+      candidate.cookies,
+      revision,
+    );
+    _check(revision);
+    if (profile['id'] != candidate.id || !isCurrent()) {
+      throw const HongguoAccountFailure('传入会话未通过当前账号校验');
+    }
+    return VerifiedAccountTransfer(candidate, profile, revision);
+  }
+
+  Future<void> commitTransferred(
+    VerifiedAccountTransfer verified, {
+    required bool Function() isCurrent,
+  }) async {
+    _check(verified.revision);
+    if (!isCurrent() || verified.profile['id'] != verified.candidate.id) {
+      throw const HongguoAccountFailure('设备配对已取消', 'CANCELLED');
+    }
+    await session.accept(
+      verified.candidate.cookies,
+      verified.profile,
+      expectedRevision: verified.revision,
+      device: verified.candidate.device,
+      isCurrent: () => !_disposed && isCurrent(),
+    );
+  }
+
+  Future<void> importTransferred(
+    AccountTransferPayload candidate, {
+    required bool Function() isCurrent,
+    int? expectedRevision,
+  }) async {
+    final verified = await prepareTransferred(
+      candidate,
+      isCurrent: isCurrent,
+      expectedRevision: expectedRevision,
+    );
+    await commitTransferred(verified, isCurrent: isCurrent);
   }
 
   Future<void> verify() async {

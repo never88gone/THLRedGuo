@@ -19,13 +19,24 @@ struct HongguoAccountRecord: Codable, Sendable {
     var avatar: String? = nil
 }
 
+struct HongguoVerifiedTransfer {
+    let record: HongguoAccountRecord
+    let revision: UInt64
+    let owner: Int
+}
+
+final class HongguoTransientCookies {
+    var values: [HongguoCookie]
+    init(_ values: [HongguoCookie]) { self.values = values }
+}
+
 final class HongguoAccountVault: @unchecked Sendable {
     static let shared = HongguoAccountVault()
     private let lock = NSLock()
     private var value: HongguoAccountRecord?
     private var generation: UInt64 = 0
     private let service = "THLRedLook.hongguo.account"
-    private let credentialNames: Set<String> = ["sessionid", "sessionid_ss", "sid_guard", "sid_tt", "uid_tt", "uid_tt_ss", "sid_ucp_v1", "ssid_ucp_v1", "passport_auth_status", "passport_auth_status_ss"]
+    static let credentialNames: Set<String> = ["sessionid", "sessionid_ss", "sid_guard", "sid_tt", "uid_tt", "uid_tt_ss", "sid_ucp_v1", "ssid_ucp_v1", "passport_auth_status", "passport_auth_status_ss"]
     init() {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
             kSecAttrAccount as String: "default", kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
@@ -44,7 +55,7 @@ final class HongguoAccountVault: @unchecked Sendable {
     func header(for url: URL, record: HongguoAccountRecord? = nil) -> String {
         guard Self.businessURL(url) else { return "" }
         let account = record ?? snapshot.record
-        return account?.cookies.filter { $0.valid && credentialNames.contains($0.name) }
+        return account?.cookies.filter { $0.valid && Self.credentialNames.contains($0.name) }
             .map { "\($0.name)=\($0.value)" }.joined(separator: "; ") ?? ""
     }
     func save(_ record: HongguoAccountRecord, expectedRevision: UInt64) throws {
@@ -72,13 +83,14 @@ final class HongguoAccountVault: @unchecked Sendable {
 }
 
 enum HongguoAccountError: LocalizedError, Equatable {
-    case cancelled, storage, invalid, expired, server(Int), business(Int), preparation(String), network
+    case cancelled, storage, invalid, expired, challenge, server(Int), business(Int), preparation(String), network
     var errorDescription: String? {
         switch self {
         case .cancelled: return "账号操作已取消"
         case .storage: return "账号安全存储暂不可用，请重试"
         case .invalid: return "账号校验失败，请重新扫码或稍后重试"
         case .expired: return "二维码已过期，请刷新"
+        case .challenge: return "红果要求额外安全验证，请使用红果 App 扫码登录"
         case .server(let status): return "账号请求失败（HTTP \(status)）"
         case .business(let code): return "官方登录校验失败（错误码 \(code)）"
         case .preparation(let code): return "账号请求准备失败（\(code)）"
@@ -105,12 +117,15 @@ final class HongguoAccountModel: ObservableObject {
     private var transport: URLSession?
     private var stage = "idle"
     private var lastTrace = ""
+    private var phoneIdentity = ""
+    private var phoneCodeSent = false
+    @Published private(set) var phoneRetryAt = Date.distantPast
     private let vault = HongguoAccountVault.shared
     var loggedIn: Bool { account?.cookies.contains { $0.valid && ["sessionid", "sessionid_ss"].contains($0.name) } == true }
     func cancel() {
         attempt += 1; loginTask?.cancel(); loginTask = nil
         transport?.invalidateAndCancel(); transport = nil
-        qrURL = nil; token = ""; cookies = []; busy = false
+        qrURL = nil; token = ""; cookies = []; busy = false; phoneIdentity = ""; phoneCodeSent = false
     }
     func begin() {
         cancel(); let owner = attempt; let revision = vault.snapshot.revision
@@ -154,8 +169,9 @@ final class HongguoAccountModel: ObservableObject {
                             guard let id = profile["id"] as? String, !id.isEmpty else { throw HongguoAccountError.invalid }
                             let record = HongguoAccountRecord(id: id, nickname: profile["nickname"] as? String ?? "红果用户", cookies: cookies, device: profileDevice, avatar: profile["avatar"] as? String)
                             try vault.save(record, expectedRevision: revision)
-                            trace("saved")
+                            releaseLoginResources()
                             account = record; verified = true; qrURL = nil; busy = false; message = "红果账号已登录"
+                            trace("saved", existing: true)
                             token = ""; cookies = []; return
                         }
                         failures = 0
@@ -176,6 +192,83 @@ final class HongguoAccountModel: ObservableObject {
                 }
             }
         }
+    }
+    private func preparePhone(country: String, number: String) async throws -> Int {
+        let identity = country + ":" + number
+        if phoneIdentity != identity {
+            cancel(); phoneIdentity = identity
+            let config = URLSessionConfiguration.ephemeral
+            config.httpCookieStorage = nil; config.httpShouldSetCookies = false; config.httpCookieAcceptPolicy = .never
+            config.timeoutIntervalForRequest = 12; config.timeoutIntervalForResource = 15
+            transport = URLSession(configuration: config, delegate: HongguoLoginRedirectDelegate(), delegateQueue: nil)
+        }
+        let owner = attempt
+        if !cookies.contains(where: { $0.valid && $0.name == "passport_csrf_token" }) { _ = try await call("qr", owner: owner) }
+        try check(owner)
+        return owner
+    }
+    func sendPhoneCode(country: String, number: String) async throws {
+        guard !busy, phoneRetryAt <= Date() else { throw HongguoAccountError.preparation("SMS_COOLDOWN") }
+        let owner = try await preparePhone(country: country, number: number)
+        busy = true
+        defer { if owner == attempt { busy = false } }
+        do {
+            let data = try await call("phoneCode", payload: ["country": country, "number": number], owner: owner)
+            try check(owner)
+            phoneCodeSent = true
+            phoneRetryAt = Date().addingTimeInterval((data["retryAfter"] as? NSNumber)?.doubleValue ?? 60)
+            message = "验证码已发送"
+        } catch { trace(stage, error: error); throw error }
+    }
+    func loginPhone(country: String, number: String, secret: String, password: Bool) async throws {
+        guard !busy else { throw HongguoAccountError.cancelled }
+        let owner = try await preparePhone(country: country, number: number)
+        if !password && !phoneCodeSent { throw HongguoAccountError.preparation("SMS_REQUIRED") }
+        let revision = vault.snapshot.revision
+        busy = true
+        defer { if owner == attempt { busy = false } }
+        do {
+            _ = try await call(password ? "phonePassword" : "phoneSms",
+                payload: ["country": country, "number": number, password ? "password" : "code": secret], owner: owner)
+            try check(owner)
+            guard cookies.contains(where: { $0.valid && ["sessionid", "sessionid_ss"].contains($0.name) }) else { throw HongguoAccountError.invalid }
+            _ = try await call("webInfo", owner: owner)
+            let profile = try await call("profile", owner: owner)
+            try check(owner)
+            guard let id = profile["id"] as? String else { throw HongguoAccountError.invalid }
+            let record = HongguoAccountRecord(id: id, nickname: profile["nickname"] as? String ?? "红果用户",
+                cookies: cookies, device: profileDevice, avatar: profile["avatar"] as? String)
+            try vault.save(record, expectedRevision: revision)
+            releaseLoginResources()
+            account = record; verified = true; message = "红果账号已登录"
+            trace("saved", existing: true)
+        } catch { trace(stage, error: error); throw error }
+    }
+    func prepareTransferred(_ candidate: HongguoAccountRecord, expectedRevision: UInt64, isCurrent: () -> Bool) async throws -> HongguoVerifiedTransfer {
+        let owner = attempt, revision = expectedRevision
+        guard revision == vault.snapshot.revision else { throw HongguoAccountError.cancelled }
+        let importedCookies = HongguoTransientCookies(candidate.cookies)
+        guard isCurrent() else { throw HongguoAccountError.cancelled }
+        _ = try await call("webInfo", owner: owner, candidateCookies: importedCookies)
+        guard let device = candidate.device,
+            let data = try? JSONSerialization.data(withJSONObject: device), let bound = String(data: data, encoding: .utf8) else { throw HongguoAccountError.invalid }
+        let profile = try await call("profile", payload: ["device": bound], owner: owner, candidateCookies: importedCookies)
+        try check(owner)
+        guard isCurrent(), profile["id"] as? String == candidate.id else { throw HongguoAccountError.invalid }
+        let record = HongguoAccountRecord(id: candidate.id, nickname: profile["nickname"] as? String ?? "红果用户",
+            cookies: importedCookies.values, device: device, avatar: profile["avatar"] as? String)
+        return HongguoVerifiedTransfer(record: record, revision: revision, owner: owner)
+    }
+    func commitTransferred(_ transfer: HongguoVerifiedTransfer, isCurrent: () -> Bool) throws {
+        try check(transfer.owner)
+        guard isCurrent(), vault.snapshot.revision == transfer.revision else { throw HongguoAccountError.cancelled }
+        try vault.save(transfer.record, expectedRevision: transfer.revision)
+        account = transfer.record; verified = true; message = "红果账号已登录"
+    }
+
+    private func releaseLoginResources() {
+        loginTask = nil; transport?.finishTasksAndInvalidate(); transport = nil
+        cookies = []; token = ""; phoneIdentity = ""; phoneCodeSent = false; qrURL = nil
     }
     func verify(force: Bool = false) async {
         guard loggedIn, !busy, force || !verified else { return }
@@ -229,7 +322,7 @@ final class HongguoAccountModel: ObservableObject {
     private func check(_ owner: Int) throws {
         if Task.isCancelled || owner != attempt { throw HongguoAccountError.cancelled }
     }
-    private func call(_ action: String, payload: [String: String] = [:], owner: Int, existing: Bool = false) async throws -> [String: Any] {
+    private func call(_ action: String, payload: [String: String] = [:], owner: Int, existing: Bool = false, candidateCookies: HongguoTransientCookies? = nil) async throws -> [String: Any] {
         try check(owner)
         stage = action
         let command = try await NativeBridge.shared.accountRequest(action, payload: payload)
@@ -237,7 +330,8 @@ final class HongguoAccountModel: ObservableObject {
         if action == "profile", let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems {
             profileDevice = Dictionary(uniqueKeysWithValues: query.filter { ["iid", "device_id", "cdid"].contains($0.name) && $0.value != nil }.map { ($0.name, $0.value!) })
         }
-        let body = try await request(url, headers: command["headers"] as? [String: String] ?? [:], owner: owner, existing: existing)
+        let body = try await request(url, headers: command["headers"] as? [String: String] ?? [:], owner: owner, existing: existing,
+            method: command["method"] as? String ?? "GET", form: command["body"] as? String, candidateCookies: candidateCookies)
         let result: [String: Any]
         do { result = try await NativeBridge.shared.accountParse(action, body: body) }
         catch { trace(action, error: error, existing: existing); throw error }
@@ -253,6 +347,7 @@ final class HongguoAccountModel: ObservableObject {
         case .business(let value): code = "BUSINESS_\(value)"
         case .server(let value): code = "HTTP_\(value)"
         case .expired: code = "QR_EXPIRED"
+        case .challenge: code = "CHALLENGE_REQUIRED"
         case .cancelled: code = "CANCELLED"
         case .storage: code = "STORAGE"
         case .invalid: code = "INVALID_RESPONSE"
@@ -265,17 +360,23 @@ final class HongguoAccountModel: ObservableObject {
         NSLog("[Account] %@", summary)
         SourceDiagnostics.shared.add(SourceDiagnosticEntry(context: "红果登录", stage: phase, errorCode: code, sessionStatus: "status=\(safeStatus) session=\(session)"))
     }
-    private func request(_ url: URL, headers: [String: String], owner: Int, existing: Bool = false) async throws -> String {
+    private func request(_ url: URL, headers: [String: String], owner: Int, existing: Bool = false,
+        method: String = "GET", form: String? = nil, candidateCookies: HongguoTransientCookies? = nil) async throws -> String {
         try check(owner)
         let web = url.scheme == "https" && url.host == "hongguoduanju.com" && url.port == nil
         guard web || HongguoAccountVault.businessURL(url) else { throw HongguoAccountError.invalid }
-        var request = URLRequest(url: url); request.timeoutInterval = 12
+        guard ["GET", "POST"].contains(method) else { throw HongguoAccountError.invalid }
+        var request = URLRequest(url: url); request.timeoutInterval = 12; request.httpMethod = method
+        if method == "POST" {
+            guard let form, form.utf8.count <= 16 * 1024 else { throw HongguoAccountError.invalid }
+            request.httpBody = Data(form.utf8)
+        }
         if web {
             request.setValue("Mozilla/5.0 THLRedLook/1.0.0", forHTTPHeaderField: "User-Agent")
             request.setValue("https://hongguoduanju.com/", forHTTPHeaderField: "Referer")
         }
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-        let active = existing ? account?.cookies ?? [] : cookies
+        let active = candidateCookies?.values ?? (existing ? account?.cookies ?? [] : cookies)
         if web {
             let matched = active.filter { $0.valid && (url.path == $0.path || url.path.hasPrefix($0.path.hasSuffix("/") ? $0.path : $0.path + "/")) }
             request.setValue(matched.map { "\($0.name)=\($0.value)" }.joined(separator: "; "), forHTTPHeaderField: "Cookie")
@@ -290,13 +391,15 @@ final class HongguoAccountModel: ObservableObject {
         guard let response = raw as? HTTPURLResponse, data.count <= 2 * 1024 * 1024 else { throw HongguoAccountError.invalid }
         if web && !existing {
             let fields = response.allHeaderFields.reduce(into: [String: String]()) { result, pair in result[String(describing: pair.key)] = String(describing: pair.value) }
+            var updated = candidateCookies?.values ?? cookies
             for cookie in HTTPCookie.cookies(withResponseHeaderFields: fields, for: url) {
                 let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
                 guard domain == "hongguoduanju.com" else { continue }
-                cookies.removeAll { $0.name == cookie.name && $0.domain == domain && $0.path == cookie.path }
+                updated.removeAll { $0.name == cookie.name && $0.domain == domain && $0.path == cookie.path }
                 let value = HongguoCookie(name: cookie.name, value: cookie.value, domain: domain, path: cookie.path, expires: cookie.expiresDate)
-                if value.valid { cookies.append(value) }
+                if value.valid { updated.append(value) }
             }
+            if let candidateCookies { candidateCookies.values = updated } else { cookies = updated }
         }
         if [301,302,303,307,308].contains(response.statusCode), let next = response.value(forHTTPHeaderField: "Location"), web {
             return "redirect:" + next

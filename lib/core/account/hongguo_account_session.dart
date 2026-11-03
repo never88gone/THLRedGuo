@@ -162,6 +162,7 @@ class HongguoAccountSession extends ChangeNotifier {
     Map<String, dynamic> account, {
     required int expectedRevision,
     String? device,
+    bool Function()? isCurrent,
   }) async {
     if (expectedRevision != revision || !cookies.hasSession) {
       throw const HongguoAccountFailure('登录操作已取消', 'CANCELLED');
@@ -178,21 +179,33 @@ class HongguoAccountSession extends ChangeNotifier {
       'nickname': account['nickname']?.toString() ?? '红果用户',
       'avatar': account['avatar']?.toString() ?? '',
     });
-    final write = _writes.then((_) => _storage.write(key: key, value: value));
+    bool current() =>
+        expectedRevision == revision && (isCurrent?.call() ?? true);
+    final write = _writes.then((_) async {
+      if (!current()) throw const HongguoAccountFailure('登录操作已取消', 'CANCELLED');
+      final previous = await _storage.read(key: key);
+      if (!current()) throw const HongguoAccountFailure('登录操作已取消', 'CANCELLED');
+      await _storage.write(key: key, value: value);
+      if (!current()) {
+        if (previous == null) {
+          await _storage.delete(key: key);
+        } else {
+          await _storage.write(key: key, value: previous);
+        }
+        throw const HongguoAccountFailure('登录操作已取消', 'CANCELLED');
+      }
+      _cookies = cookies;
+      deviceSession = device;
+      id = accountId;
+      nickname = account['nickname']?.toString() ?? '红果用户';
+      avatar = account['avatar']?.toString() ?? '';
+      verified = true;
+      error = null;
+      revision++;
+      notifyListeners();
+    });
     _writes = write.catchError((Object _) {});
     await write;
-    if (expectedRevision != revision) {
-      throw const HongguoAccountFailure('登录操作已取消', 'CANCELLED');
-    }
-    _cookies = cookies;
-    deviceSession = device;
-    id = accountId;
-    nickname = account['nickname']?.toString() ?? '红果用户';
-    avatar = account['avatar']?.toString() ?? '';
-    verified = true;
-    error = null;
-    revision++;
-    notifyListeners();
   }
 
   void confirm(Map<String, dynamic> account, int expectedRevision) {
@@ -218,6 +231,25 @@ class HongguoAccountSession extends ChangeNotifier {
     final write = _writes.then((_) => _storage.delete(key: key));
     _writes = write.catchError((Object _) {});
     await write;
+  }
+
+  List<int> exportForPairing() {
+    if (!loggedIn || !verified || deviceSession == null) {
+      throw const HongguoAccountFailure('请先确认当前红果账号登录有效');
+    }
+    return utf8.encode(
+      jsonEncode({
+        'v': 1,
+        'id': id,
+        'cookies': _cookies!
+            .toJson()
+            .where(
+              (v) => HongguoAccountCookies.credentialNames.contains(v['name']),
+            )
+            .toList(),
+        'device': jsonDecode(deviceSession!),
+      }),
+    );
   }
 
   static bool businessUrl(Uri uri) =>

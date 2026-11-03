@@ -252,6 +252,12 @@ class CatPawJsRuntime {
       'JSON.stringify(spider.accountParse(${jsonEncode(action)}, ${jsonEncode(body)}))',
     );
     if (value.isError) {
+      if (value.stringResult.contains('ACCOUNT_CHALLENGE_REQUIRED')) {
+        throw const HongguoAccountFailure(
+          '红果要求额外安全验证，请使用红果 App 扫码登录',
+          'CHALLENGE_REQUIRED',
+        );
+      }
       final code = RegExp(
         r'ACCOUNT_BUSINESS_(-?[0-9]{1,9})',
       ).firstMatch(value.stringResult)?.group(1);

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C1A3B602F4D3468399B31104 /* AccountPairingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A3B602F4D3468399B31103 /* AccountPairingTests.swift */; };
+		C1A3B602F4D3468399B31102 /* AccountPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A3B602F4D3468399B31101 /* AccountPairing.swift */; };
 		00F6DAC96490A839B6FC75EA /* HongguoApkProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E4F0775CA2B5213DAF9E20 /* HongguoApkProfile.swift */; };
 		12F647818F7F44998727220E /* OverseasSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */; };
 		1F6926DCCD8AAF72AD718D1E /* ApkProfileImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D255715E326D23643B59BC9D /* ApkProfileImportSheet.swift */; };
@@ -106,6 +108,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		C1A3B602F4D3468399B31103 /* AccountPairingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountPairingTests.swift; sourceTree = "<group>"; };
+		C1A3B602F4D3468399B31101 /* AccountPairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountPairing.swift; sourceTree = "<group>"; };
 		041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLook.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D9437790F04A5D01FEC2D84 /* Pods-THLRedLookTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-THLRedLookTests.debug.xcconfig"; path = "Target Support Files/Pods-THLRedLookTests/Pods-THLRedLookTests.debug.xcconfig"; sourceTree = "<group>"; };
 		221C9DFACA76E6DED5DC2B01 /* Pods_THLRedLookTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLookTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -275,6 +279,7 @@
 			isa = PBXGroup;
 			children = (
 				DDF46F916F921E87B28F33AB /* PlaybackTests.swift */,
+				C1A3B602F4D3468399B31103 /* AccountPairingTests.swift */,
 				83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */,
 				9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */,
 				ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */,
@@ -352,6 +357,7 @@
 		G10000032C00000100000001 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				C1A3B602F4D3468399B31101 /* AccountPairing.swift */,
 				E34571822EE6111100000022 /* SourceDiagnostics.swift */,
 				E6E285CB14404C4988A2A1A2 /* NetworkEgressLookup.swift */,
 				98E5CF00A15647D68EF83727 /* DiagnosticsShareServer.swift */,
@@ -707,6 +713,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BC5B31CB27136862380FB32F /* PlaybackTests.swift in Sources */,
+				C1A3B602F4D3468399B31104 /* AccountPairingTests.swift in Sources */,
 				3F654B7E4306B53376917E16 /* CENCDecoderTests.swift in Sources */,
 				CABD071B5C68D672495450B9 /* LocalLibraryTests.swift in Sources */,
 				90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */,
@@ -751,6 +758,7 @@
 				46A67D6BBFE54AF28CD2FBE5 /* PlaybackAssetFactory.swift in Sources */,
 				A10000992C00000100000001 /* PlatformProtocols.swift in Sources */,
 				A10000132C00000100000001 /* LanSyncService.swift in Sources */,
+				C1A3B602F4D3468399B31102 /* AccountPairing.swift in Sources */,
 				A10000142C00000100000001 /* DownloadService.swift in Sources */,
 				A10000152C00000100000001 /* HomeViewModel.swift in Sources */,
 				A10000162C00000100000001 /* SearchViewModel.swift in Sources */,

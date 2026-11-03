@@ -1,0 +1,15 @@
+{
+  "id": "0123456789abcdef0123456789abcdef",
+  "key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "payload": {
+    "action": "hello",
+    "requestId": "abcdef0123456789abcdef0123456789"
+  },
+  "envelope": {
+    "v": 1,
+    "id": "0123456789abcdef0123456789abcdef",
+    "nonce": "AAECAwQFBgcICQoL",
+    "cipher": "EjN-ede-AxwXwx6j2yWJE-jV0IeJg0GSF7XSdFDKuOGYrEHN2jAiHQqMjWkSfYdXUU8nEqS_NJgPA1c0fgV93cw",
+    "tag": "7v_zb4C7eNvq1ClXIYjdrA"
+  }
+}

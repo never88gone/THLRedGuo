@@ -162,7 +162,7 @@ jobs:
   release-tvos:
     name: Apple tvOS 产物自动发布至 GitHub Release
     needs: tvos
-    if: always() && github.event_name != 'pull_request' && needs.tvos.result == 'success'
+    if: always() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref_type == 'tag') && needs.tvos.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

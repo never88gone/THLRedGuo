@@ -34,6 +34,8 @@ void main() {
       return;
     }
     await tester.tap(find.byKey(const Key('hongguo-account-login')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('hongguo-login-qr')));
     await _wait(
       tester,
       () => find.byType(QrImageView).evaluate().isNotEmpty,
@@ -64,6 +66,8 @@ void main() {
       () => find.byType(HongguoQrLoginScreen).evaluate().isEmpty,
       'cancel returns to account',
     );
+    root.navigatorKey!.currentState!.pop();
+    await tester.pumpAndSettle();
     expect(find.byType(AccountScreen), findsOneWidget);
     expect(HongguoAccountSession.shared.loggedIn, false);
     expect(HongguoAccountSession.shared.revision, beforeRevision);

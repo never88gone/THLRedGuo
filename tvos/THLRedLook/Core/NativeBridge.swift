@@ -309,6 +309,7 @@ public actor NativeBridge {
         let expression = try spiderExpression("accountParse", [action, body])
         context.exception = nil
         let result = context.evaluateScript(expression)
+        if context.exception?.toString()?.contains("ACCOUNT_CHALLENGE_REQUIRED") == true { throw HongguoAccountError.challenge }
         if let message = context.exception?.toString(), let range = message.range(of: "ACCOUNT_BUSINESS_-?[0-9]{1,9}", options: .regularExpression),
            let code = Int(message[range].dropFirst("ACCOUNT_BUSINESS_".count)) { throw HongguoAccountError.business(code) }
         guard let result, context.exception == nil,

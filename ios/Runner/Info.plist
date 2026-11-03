@@ -42,15 +42,15 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>用于扫描二维码连接设备、添加剧集订阅或扫码同步播放进度。</string>
+	<string>用于扫描糖葫芦 Haw 设备登录配对码和设备互联二维码。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>用于读取或保存短剧剧照、封面海报以及导出本地缓存视频。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>用于保存短剧海报和下载的视频到系统相册。</string>
+	<string>用于保存登录二维码和用户选择导出的视频到系统相册。</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>用于语音搜索剧集或音视频播放录制功能。</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>用于发现局域网设备、同步追剧进度和推送播放，以及读取设备内播放服务。</string>
+	<string>用于发现局域网设备、同步进度和推送播放，以及在用户确认后加密授权电视或电脑登录。</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_zgj-link._tcp</string>

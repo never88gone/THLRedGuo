@@ -65,11 +65,55 @@ final class RemoteNavigationTests: XCTestCase {
         press(.right)
         press(.up, focus: "hongguo-account-login")
         press(.select)
+        wait("login chooser focused") { self.app.buttons["hongguo-login-qr"].hasFocus }
+        press(.select)
         wait("QR issued", seconds: 30) { self.app.staticTexts["等待手机红果 App 扫码确认"].exists }
+        press(.menu)
+        wait("QR returns to chooser") { self.app.buttons["hongguo-login-qr"].exists }
         press(.menu)
         wait("cancel restores login focus") { self.app.buttons["hongguo-account-login"].hasFocus }
         press(.menu)
         wait("account returns to navigation") { self.app.buttons["nav.library"].hasFocus }
+    }
+
+    func testLoginMethodsInvalidPhoneAndPairCancelPreserveAccount() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "library", "-openAccountLogin"]
+        app.launch()
+        defer { app.terminate() }
+        wait("library sidebar ready", seconds: 30) { self.app.buttons["nav.library"].hasFocus }
+        press(.right)
+        XCTAssertTrue(app.buttons["hongguo-login-qr"].waitForExistence(timeout: 20))
+        print("THL_LOGIN_CHOOSER enabled=\(app.buttons["hongguo-login-qr"].isEnabled) hittable=\(app.buttons["hongguo-login-qr"].isHittable) appState=\(app.state.rawValue)")
+        wait("login chooser starts at official QR", seconds: 30) { self.app.buttons["hongguo-login-qr"].hasFocus }
+        press(.up, focus: "hongguo-login-password")
+        press(.up, focus: "hongguo-login-sms")
+        press(.select)
+        wait("phone field focused") { self.app.textFields["login-phone"].hasFocus }
+        press(.down)
+        press(.down, focus: "phone-send-code")
+        press(.select)
+        XCTAssertTrue(app.staticTexts["手机号格式无效"].waitForExistence(timeout: 5))
+        press(.menu)
+        wait("cancelled SMS returns to chooser") { self.app.buttons["hongguo-login-sms"].exists }
+        press(.down, focus: "hongguo-login-password")
+        press(.select)
+        XCTAssertTrue(app.secureTextFields["login-secret"].waitForExistence(timeout: 5))
+        press(.menu)
+        wait("cancelled password returns to chooser") { self.app.buttons["hongguo-login-password"].exists }
+        press(.down, focus: "hongguo-login-qr")
+        press(.down, focus: "hongguo-login-haw-pair")
+        press(.select)
+        XCTAssertTrue(app.buttons["haw-account-pair-refresh"].waitForExistence(timeout: 10))
+        press(.menu)
+        wait("pair cancel returns to chooser") { self.app.buttons["hongguo-login-haw-pair"].exists }
+        press(.menu)
+        wait("back returns account header") {
+            let account = self.app.buttons["hongguo-account-menu"], guest = self.app.buttons["hongguo-account-login"]
+            return account.exists && account.hasFocus || guest.exists && guest.hasFocus
+        }
+        print("THL_LOGIN_METHODS_TV smsInvalidBlocked=true passwordSecure=true pairingCancel=true remoteReturn=true realSmsSent=false realSessionTransferred=false imagesDisabled=true")
     }
 
     func testDebugSourceSelectedEpisodeAndNaturalNext() throws {

@@ -8,6 +8,54 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:THLRedLook/core/account/hongguo_account_session.dart';
 import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 
+class _InterruptedStorage extends FlutterSecureStorage {
+  final values = <String, String>{};
+  void Function()? onWrite;
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async => values[key];
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (value == null) {
+      values.remove(key);
+    } else {
+      values[key] = value;
+    }
+    final callback = onWrite;
+    onWrite = null;
+    callback?.call();
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    values.remove(key);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
@@ -92,6 +140,31 @@ void main() {
     await session.bindProfile('two');
     await session.bindProfile('one');
     expect(session.loggedIn, isFalse);
+  });
+  test('安全存储写入中取消恢复原值，不发布或残留候选账号', () async {
+    final storage = _InterruptedStorage();
+    final session = HongguoAccountSession(storage: storage);
+    await session.bindProfile('interrupted');
+    await session.accept(cookies(), {
+      'id': '123',
+    }, expectedRevision: session.revision);
+    final previous = Map<String, String>.from(storage.values);
+    var active = true;
+    storage.onWrite = () => active = false;
+    await expectLater(
+      session.accept(
+        cookies(),
+        {'id': '456'},
+        expectedRevision: session.revision,
+        isCurrent: () => active,
+      ),
+      throwsA(isA<HongguoAccountFailure>()),
+    );
+    expect(session.id, '123');
+    expect(storage.values, previous);
+    await session.bindProfile('another');
+    await session.bindProfile('interrupted');
+    expect(session.id, '123');
   });
   test('官方源的扫码契约与大整数账号解析不依赖实际账号', () async {
     final source = await rootBundle.loadString('assets/sources/hongguo.js');

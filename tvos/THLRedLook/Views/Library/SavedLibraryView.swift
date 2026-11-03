@@ -25,10 +25,12 @@ public struct SavedLibraryView: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 28), count: 5)
     public var focusCategoryTrigger: Int = 0
     public var onRequestFocusTopNav: (() -> Void)?
+    public var onRequestFocusContent: (() -> Void)?
 
-    public init(focusCategoryTrigger: Int = 0, onRequestFocusTopNav: (() -> Void)? = nil) {
+    public init(focusCategoryTrigger: Int = 0, onRequestFocusTopNav: (() -> Void)? = nil, onRequestFocusContent: (() -> Void)? = nil) {
         self.focusCategoryTrigger = focusCategoryTrigger
         self.onRequestFocusTopNav = onRequestFocusTopNav
+        self.onRequestFocusContent = onRequestFocusContent
     }
 
     private var entries: [WatchEntry] {
@@ -159,7 +161,11 @@ public struct SavedLibraryView: View {
                 let target = lastOpenedID.flatMap { id in dramas.contains { $0.id == id } ? FocusTarget.card(id) : nil } ?? firstCardTarget
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { focus(target, with: proxy) }
             }) { drama in DramaDetailView(drama: drama) }
-            .fullScreenCover(isPresented: $showingLogin, onDismiss: { account.cancel(); focusedTarget = .account }) { TVQrLoginView() }
+            .fullScreenCover(isPresented: $showingLogin, onDismiss: {
+                if !account.loggedIn || !account.verified { account.cancel() }
+                onRequestFocusContent?()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { focus(.account, with: proxy) }
+            }) { TVLoginOptionsView() }
             .confirmationDialog("红果账号", isPresented: $showingAccountMenu, titleVisibility: .visible) {
                 Button("退出登录", role: .destructive) { account.logout(); focusedTarget = .account }
                 Button("取消", role: .cancel) { focusedTarget = .account }
@@ -173,12 +179,15 @@ public struct SavedLibraryView: View {
                 await viewModel.loadAccount(viewModel.selectedTab)
             }
             .onChange(of: viewModel.selectedTab) { _, tab in Task { await viewModel.loadAccount(tab) } }
-            .onAppear {
+            .onChange(of: focusCategoryTrigger) { _, _ in
+                focus(.mainTab(viewModel.selectedTab), with: proxy)
                 #if DEBUG
-                if !openedDebugLogin && CommandLine.arguments.contains("-openAccountLogin") { openedDebugLogin = true; showingLogin = true }
+                if !openedDebugLogin && CommandLine.arguments.contains("-openAccountLogin") {
+                    openedDebugLogin = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showingLogin = true }
+                }
                 #endif
             }
-            .onChange(of: focusCategoryTrigger) { _, _ in focus(.mainTab(viewModel.selectedTab), with: proxy) }
             .onExitCommand {
                 guard selectedDrama == nil, !showingClearHistory, !showingLogin, !showingAccountMenu, Date().timeIntervalSince(detailDismissedAt) > 0.5 else { return }
                 requestTopNavigation()
