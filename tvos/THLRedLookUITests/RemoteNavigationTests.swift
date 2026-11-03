@@ -2979,6 +2979,88 @@ extension RemoteNavigationTests {
         print("THL_TV_RESET_OFFICIAL_SESSION_VERIFIED resetFocus=true resetSuccess=true noticeShown=true")
         app.terminate()
     }
+
+    /// 截取 2026-11-03 最新 tvOS 版本的高清实机截图
+    func testCaptureLatestTVOSScreenshots20261103() throws {
+        continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots_20261103")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+
+        func saveShot(_ name: String) {
+            let shot = XCUIScreen.main.screenshot()
+            try? shot.pngRepresentation.write(to: shotDir.appendingPathComponent(name))
+            print("THL_SCREENSHOT_SAVED: \(name)")
+        }
+
+        // 1. 剧集详情页截图：未追剧、已追剧、状态菜单（含取消追剧）
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "test_screenshot_drama", "-testDramaTitle", "龙王令：都市至尊", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+
+        wait("detail loaded", seconds: 30) { self.app.buttons["detail.favorite"].exists }
+        wait("detail play focus", seconds: 20) { self.app.buttons["detail.play"].hasFocus }
+        press(.right, focus: "detail.favorite")
+
+        if app.buttons["detail.favorite"].label.contains("已") {
+            press(.select)
+            wait("cleared to unfollowed") { !self.app.buttons["detail.favorite"].label.contains("已") }
+        }
+        // 截图 1：未追剧状态
+        saveShot("01_tvos_detail_unfollowed.png")
+
+        // 点击加入追剧
+        press(.select)
+        wait("followed state active") { self.app.buttons["detail.favorite"].label.contains("已") }
+        // 截图 2：已追剧状态（按钮变为【已追剧】，右侧出现状态菜单）
+        saveShot("02_tvos_detail_followed.png")
+
+        // 导航至状态菜单
+        remote.press(.right)
+        Thread.sleep(forTimeInterval: 1.0)
+        // 截图 3：追剧状态（已追剧与分类状态菜单）
+        saveShot("03_tvos_detail_follow_menu.png")
+        app.terminate()
+
+        // 2. 媒体库页面截图：最近观看、我的追剧
+        app.launchArguments = ["-testPage", "library", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        wait("library history ready", seconds: 30) { self.app.buttons["library.tab.history"].exists }
+        if app.buttons["nav.library"].hasFocus { press(.right, focus: "library.tab.history") }
+        // 截图 4：媒体库 - 最近观看
+        saveShot("04_tvos_library_history.png")
+
+        press(.down, focus: "library.tab.follows")
+        press(.select)
+        wait("library follows ready", seconds: 15) {
+            self.app.buttons["library.filter.all"].exists || self.app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.card.")).count > 0 || self.app.staticTexts["暂无追剧记录"].exists
+        }
+        // 截图 5：媒体库 - 我的追剧
+        saveShot("05_tvos_library_follows.png")
+        app.terminate()
+
+        // 3. 播放器两层居中控制栏与弹幕设置抽屉
+        app.launchArguments = ["-testPage", "controls", "-testEpisode", "5", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        wait("player controls ready", seconds: 30) { self.app.buttons["player.playPause"].exists }
+        // 截图 6：播放器两层居中控制栏（顶部无返回键，大屏对称居中）
+        saveShot("06_tvos_player_centered_controls.png")
+
+        // 导航至第二层并移到弹幕样式按钮并展开抽屉
+        press(.down, focus: "player.speed")
+        if app.buttons["player.quality"].exists {
+            press(.right, focus: "player.quality")
+        }
+        press(.right, focus: "player.danmaku")
+        press(.right, focus: "player.danmakuSettings")
+        press(.select)
+        wait("danmaku settings drawer opened", seconds: 15) { self.app.buttons["danmaku.switch.on"].exists }
+        // 截图 7：弹幕样式设置抽屉
+        saveShot("07_tvos_danmaku_settings_drawer.png")
+        remote.press(.menu)
+        app.terminate()
+
+        print("THL_ALL_NEW_TVOS_SCREENSHOTS_CAPTURED count=7")
+    }
 }
 
 extension RemoteNavigationTests {
