@@ -41,8 +41,8 @@ final class AccountPairingTests: XCTestCase {
     }
     func testPhoneRoutesMixingAndChallengeRemainReadOnly() async throws {
         func mix(_ text: String) -> String { text.utf8.map { String($0 ^ 5, radix: 16) }.joined() }
-        for action in ["phoneCode", "phoneSms", "phonePassword"] {
-            let request = try await NativeBridge.shared.accountRequest(action, payload: ["country": "86", "number": "13800138000", "code": "654321", "password": "synthetic-password"])
+        for action in ["phoneCode", "phoneSms"] {
+            let request = try await NativeBridge.shared.accountRequest(action, payload: ["country": "86", "number": "13800138000", "code": "654321"])
             let url = try XCTUnwrap(URL(string: try XCTUnwrap(request["url"] as? String)))
             XCTAssertEqual(url.host, "hongguoduanju.com")
             XCTAssertEqual(request["method"] as? String, "POST")
@@ -52,9 +52,13 @@ final class AccountPairingTests: XCTestCase {
             switch action {
             case "phoneCode": XCTAssertEqual(url.path, "/passport/web/send_code"); XCTAssertEqual(fields["type"], mix("24"))
             case "phoneSms": XCTAssertEqual(url.path, "/passport/web/sms_login_only"); XCTAssertEqual(fields["code"], mix("654321"))
-            default: XCTAssertEqual(url.path, "/passport/web/user/login"); XCTAssertEqual(fields["account"], mix("13800138000")); XCTAssertEqual(fields["password"], mix("synthetic-password"))
+            default: XCTFail("Unexpected account action")
             }
         }
+        do {
+            _ = try await NativeBridge.shared.accountRequest("phonePassword")
+            XCTFail("Password login must not be available")
+        } catch {}
         do {
             _ = try await NativeBridge.shared.accountParse("phoneCode", body: "{\"message\":\"error\",\"data\":{\"error_code\":1102,\"verify_center_decision_conf\":{}}}")
             XCTFail("Official challenge must remain visible")

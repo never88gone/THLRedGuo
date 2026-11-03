@@ -8,15 +8,16 @@ import 'package:THLRedLook/core/account/hongguo_account_service.dart';
 import 'package:THLRedLook/core/account/hongguo_account_session.dart';
 import 'package:THLRedLook/core/js/hongguo_guest_session.dart';
 import 'package:THLRedLook/core/account/account_transfer_payload.dart';
+import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
 
 class _Reply extends Stream<List<int>> implements HttpClientResponse {
-  _Reply(this.payload, [List<String> cookies = const []])
+  _Reply(this.payload, [List<String> cookies = const [], this.statusCode = 200])
     : headers = _Headers(cookies);
   final Object payload;
   @override
   final HttpHeaders headers;
   @override
-  int get statusCode => 200;
+  final int statusCode;
   @override
   StreamSubscription<List<int>> listen(
     void Function(List<int>)? onData, {
@@ -112,6 +113,7 @@ class _DeferredClient extends _Client {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() {
+    SourceDiagnostics.shared.clear();
     FlutterSecureStorage.setMockInitialValues({});
     SharedPreferences.setMockInitialValues({
       HongguoGuestSession.sessionKey: jsonEncode({
@@ -444,17 +446,20 @@ void main() {
   });
   String mix(String value) =>
       utf8.encode(value).map((v) => (v ^ 5).toRadixString(16)).join();
-  test('验证码和密码使用官方POST协议，不自动注册；取得会话后才确认App账号', () async {
-    for (final password in [false, true]) {
+  test('验证码使用官方POST协议和两种CSRF Cookie，不自动注册；取得会话后才确认App账号', () async {
+    for (final csrfName in [
+      'passport_csrf_token',
+      'passport_csrf_token_default',
+    ]) {
       final session = HongguoAccountSession();
-      await session.bindProfile('phone-$password');
+      await session.bindProfile('phone-$csrfName');
       final paths = <String>[];
       await HttpOverrides.runZoned(
         () async {
           final service = HongguoAccountService(session: session);
           addTearDown(service.dispose);
           final phone = service.phone('86', '13800138000');
-          if (!password) {
+          {
             expect(await service.sendPhoneCode(phone), 60);
             expect(session.loggedIn, false);
             await expectLater(
@@ -462,11 +467,7 @@ void main() {
               throwsA(isA<HongguoAccountFailure>()),
             );
           }
-          await service.loginPhone(
-            phone,
-            code: password ? null : '654321',
-            password: password ? 'synthetic-password' : null,
-          );
+          await service.loginPhone(phone, code: '654321');
           expect(session.loggedIn, true);
           expect(session.id, '1234567890123456789');
           expect(session.verified, true);
@@ -485,7 +486,7 @@ void main() {
                   'expire_time': 60,
                 },
               },
-              ['passport_csrf_token=synthetic-csrf; Path=/; Secure'],
+              ['$csrfName=synthetic-csrf; Path=/; Secure'],
             );
           }
           if (uri.path.contains('/passport/web/')) {
@@ -501,15 +502,10 @@ void main() {
                 'data': {'retry_time': 60},
               });
             }
-            if (password) {
-              expect(uri.path, '/passport/web/user/login/');
-              expect(form['account'], mix('13800138000'));
-              expect(form['password'], mix('synthetic-password'));
-            } else {
-              expect(uri.path, '/passport/web/sms_login_only/');
-              expect(form['mobile'], mix('+86 13800138000'));
-              expect(form['code'], mix('654321'));
-            }
+            expect(uri.path, '/passport/web/sms_login_only/');
+            expect(form['mobile'], mix('+86 13800138000'));
+            expect(form['code'], mix('654321'));
+            expect(form.containsKey('password'), false);
             return _Reply(
               {'message': 'success', 'data': {}},
               ['sessionid=synthetic-phone-session; Path=/; Secure'],
@@ -569,11 +565,189 @@ void main() {
         sent++;
         return _Reply({
           'message': 'error',
-          'data': {'error_code': 1102, 'verify_center_decision_conf': {}},
+          'data': {
+            'error_code': 1102,
+            'verify_center_decision_conf': {
+              'code': 10000,
+              'detail': 'synthetic',
+            },
+          },
         });
       }),
     );
   });
+  _Reply bootstrap() => _Reply(
+    {
+      'message': 'success',
+      'data': {
+        'token': 'synthetic-token',
+        'qrcode_index_url':
+            'https://reading.snssdk.com/reading_offline/novelread/page/scan-code.html?token=synthetic-token',
+        'expire_time': 60,
+      },
+    },
+    ['passport_csrf_token_default=synthetic-csrf; Path=/; Secure'],
+  );
+  _Reply challenge() => _Reply({
+    'message': 'error',
+    'data': {
+      'error_code': 1105,
+      'verify_center_decision_conf': {
+        'code': 10000,
+        'detail': 'synthetic-private-challenge',
+      },
+    },
+  });
+  for (final scenario in ['success', 'cancel', 'repeated', 'stale']) {
+    test('人工安全验证 $scenario：受用户回调和账号版本约束，最多续发一次', () async {
+      final session = HongguoAccountSession();
+      await session.bindProfile('verify-$scenario');
+      var sent = 0, resolved = 0;
+      const fp = 'verify_synthetic_1234567890';
+      await HttpOverrides.runZoned(
+        () async {
+          final service = HongguoAccountService(session: session);
+          addTearDown(service.dispose);
+          final attempt = service.phone('86', '13800138000');
+          final operation = service.sendPhoneCode(
+            attempt,
+            verify: (value) async {
+              resolved++;
+              expect(sent, 1);
+              expect(session.loggedIn, false);
+              expect(value.businessCode, '1105');
+              expect(
+                value.toString(),
+                isNot(contains('synthetic-private-challenge')),
+              );
+              expect(value.cookies, everyElement(isNot(contains('sessionid'))));
+              if (scenario == 'stale') await session.logout();
+              return scenario == 'cancel' ? null : fp;
+            },
+          );
+          if (scenario == 'success') {
+            expect(await operation, 60);
+            expect(attempt.sent, true);
+          } else {
+            await expectLater(
+              operation,
+              throwsA(
+                isA<HongguoAccountFailure>().having(
+                  (v) => v.code,
+                  'code',
+                  scenario == 'repeated'
+                      ? 'VERIFICATION_NOT_ACCEPTED'
+                      : 'CANCELLED',
+                ),
+              ),
+            );
+            expect(attempt.sent, false);
+          }
+          expect(resolved, 1);
+          expect(sent, ['success', 'repeated'].contains(scenario) ? 2 : 1);
+          expect(session.loggedIn, false);
+          final logs = SourceDiagnostics.shared.entries
+              .map((v) => v.toReportBlock())
+              .join();
+          expect(logs, isNot(contains('13800138000')));
+          expect(logs, isNot(contains('synthetic-csrf')));
+          expect(logs, isNot(contains('synthetic-private-challenge')));
+          expect(logs, isNot(contains(fp)));
+        },
+        createHttpClient: (_) => _Client((uri, headers) {
+          if (uri.path.endsWith('/get_qrcode/')) return bootstrap();
+          expect(uri.path, '/passport/web/send_code/');
+          sent++;
+          if (sent == 1) {
+            expect(uri.queryParameters.containsKey('fp'), false);
+            return challenge();
+          }
+          expect(uri.queryParameters['fp'], fp);
+          expect(uri.queryParameters['verifyFp'], fp);
+          expect(headers.value('Cookie'), contains('s_v_web_id=$fp'));
+          expect(headers.value('x-tt-passport-csrf-token'), 'synthetic-csrf');
+          return scenario == 'repeated'
+              ? challenge()
+              : _Reply({
+                  'message': 'success',
+                  'data': {'retry_time': 60},
+                });
+        }),
+      );
+    });
+  }
+  for (final code in [403, 429]) {
+    test('短信HTTP $code记录诊断且不包含手机号和响应正文', () async {
+      final session = HongguoAccountSession();
+      await session.bindProfile('http-$code');
+      await HttpOverrides.runZoned(
+        () async {
+          final service = HongguoAccountService(session: session);
+          addTearDown(service.dispose);
+          await expectLater(
+            service.sendPhoneCode(service.phone('86', '13800138000')),
+            throwsA(
+              isA<HongguoAccountFailure>().having(
+                (v) => v.code,
+                'code',
+                'HTTP_$code',
+              ),
+            ),
+          );
+          final entry = SourceDiagnostics.shared.entries.last;
+          expect(entry.stage, 'phoneCode');
+          expect(entry.errorCode, 'HTTP_$code');
+          expect(
+            entry.toReportBlock(),
+            isNot(contains('synthetic-private-body')),
+          );
+          expect(entry.toReportBlock(), isNot(contains('13800138000')));
+        },
+        createHttpClient: (_) => _Client(
+          (uri, _) => uri.path.endsWith('/get_qrcode/')
+              ? bootstrap()
+              : _Reply('synthetic-private-body', [], code),
+        ),
+      );
+    });
+  }
+  for (final failure in [
+    (TimeoutException('synthetic-private-network'), 'TIMEOUT'),
+    (const HandshakeException('synthetic-private-network'), 'TLS_ERROR'),
+    (const SocketException('synthetic-private-network'), 'NETWORK_ERROR'),
+  ]) {
+    test('短信传输失败 ${failure.$2} 保留安全诊断', () async {
+      final session = HongguoAccountSession();
+      await session.bindProfile('network-${failure.$2}');
+      await HttpOverrides.runZoned(
+        () async {
+          final service = HongguoAccountService(session: session);
+          addTearDown(service.dispose);
+          await expectLater(
+            service.sendPhoneCode(service.phone('86', '13800138000')),
+            throwsA(
+              isA<HongguoAccountFailure>().having(
+                (v) => v.code,
+                'code',
+                failure.$2,
+              ),
+            ),
+          );
+          final entry = SourceDiagnostics.shared.entries.last;
+          expect(entry.stage, 'phoneCode');
+          expect(entry.errorCode, failure.$2);
+          expect(
+            entry.toReportBlock(),
+            isNot(contains('synthetic-private-network')),
+          );
+        },
+        createHttpClient: (_) => _Client((uri, _) {
+          if (uri.path.endsWith('/get_qrcode/')) return bootstrap();
+          throw failure.$1;
+        }),
+      );
+    });
+  }
   test('二维码到期后的最终确认可接收已授权会话，最多查询一次', () async {
     for (final confirmed in [false, true]) {
       final session = HongguoAccountSession();

@@ -119,6 +119,30 @@ void main() {
     expect(jar.hasSession, isFalse);
     expect(jar.websiteHeader(Uri.parse('https://evil.test/')), isEmpty);
   });
+  test('CSRF遵守官方域及路径，主Cookie缺失时使用default', () {
+    final jar = HongguoAccountCookies()
+      ..merge(website, [
+        'passport_csrf_token_default=synthetic-default; Path=/; Secure',
+        'passport_csrf_token=synthetic-main; Path=/passport/web; Secure',
+      ]);
+    expect(jar.csrf, 'synthetic-main');
+    expect(
+      jar.csrfFor(
+        Uri.parse('https://hongguoduanju.com/passport/account/info/'),
+      ),
+      'synthetic-default',
+    );
+    expect(
+      jar.csrfFor(Uri.parse('http://hongguoduanju.com/passport/web/')),
+      isEmpty,
+    );
+    expect(jar.csrfFor(Uri.parse('https://evil.test/passport/web/')), isEmpty);
+    jar.merge(website, [
+      'passport_csrf_token=; Max-Age=0; Path=/passport/web; Secure',
+    ]);
+    expect(jar.csrf, 'synthetic-default');
+    expect(jar.businessHeader, isEmpty);
+  });
   test('不同本地用户隔离，退出后迟到登录不能重新写入', () async {
     final session = HongguoAccountSession();
     await session.bindProfile('one');
@@ -197,6 +221,46 @@ void main() {
           'BUSINESS_1102',
         ),
       ),
+    );
+  });
+  test('短信业务1102不冒充图形验证，二次验证不自动重发', () async {
+    final runtime = CatPawJsRuntime();
+    addTearDown(runtime.dispose);
+    await runtime.init(
+      await rootBundle.loadString('assets/sources/hongguo.js'),
+    );
+    expect(
+      () => runtime.accountParse(
+        'phoneCode',
+        '{"message":"error","data":{"error_code":1102}}',
+      ),
+      throwsA(
+        isA<HongguoAccountFailure>().having(
+          (v) => v.code,
+          'code',
+          'BUSINESS_1102',
+        ),
+      ),
+    );
+    expect(
+      () => runtime.accountParse(
+        'phoneCode',
+        '{"message":"error","data":{"error_code":1105,"verify_center_secondary_decision_conf":{"code":20000}}}',
+      ),
+      throwsA(
+        isA<HongguoAccountFailure>().having(
+          (v) => v.code,
+          'code',
+          'SECONDARY_VERIFICATION_REQUIRED',
+        ),
+      ),
+    );
+    expect(
+      runtime.accountParse(
+        'phoneCode',
+        '{"message":"success","data":{"retry_time":60,"verify_center_decision_conf":{"code":10000}}}',
+      )['verification'],
+      isNull,
     );
   });
   test('仅自报官方源id不能获得账号能力', () async {

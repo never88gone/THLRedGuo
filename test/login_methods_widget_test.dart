@@ -35,9 +35,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('hongguo-login-password')), findsNothing);
     await tester.tap(find.byKey(const Key('hongguo-login-sms')));
     await tester.pumpAndSettle();
     expect(find.byType(HongguoPhoneLoginScreen), findsOneWidget);
+    expect(find.text('密码'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(HongguoLoginScreen), findsOneWidget);

@@ -81,12 +81,24 @@ class HongguoAccountCookies {
       .where((v) => credentialNames.contains(v['name']))
       .map((v) => '${v['name']}=${v['value']}')
       .join('; ');
-  String get csrf =>
-      valid
-          .where((v) => v['name'] == 'passport_csrf_token')
+  String csrfFor(Uri uri) {
+    if (uri.scheme != 'https' || uri.host != 'hongguoduanju.com') return '';
+    for (final name in ['passport_csrf_token', 'passport_csrf_token_default']) {
+      final value = valid
+          .where(
+            (v) =>
+                v['name'] == name &&
+                _pathMatches(uri.path, v['path'] as String? ?? '/'),
+          )
           .map((v) => v['value'] as String)
-          .firstOrNull ??
-      '';
+          .firstOrNull;
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return '';
+  }
+
+  String get csrf =>
+      csrfFor(Uri.parse('https://hongguoduanju.com/passport/web/send_code/'));
   List<Map<String, dynamic>> toJson() =>
       valid.map((v) => Map<String, dynamic>.from(v)).toList();
 }

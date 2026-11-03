@@ -7,7 +7,7 @@
 const meta = {
   id: "hongguo",
   name: "官方免费短剧",
-  version: "1.1.0-dev.17",
+  version: "1.1.0-dev.18",
   description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
   author: "社区开发者",
   type: "video",
@@ -2669,17 +2669,21 @@ spider.danmaku = function (id, startMs, durationMs) {
 spider.accountRequest = async function (action, payload) {
   payload = payload || {};
   if (['profile', 'favorites', 'history', 'libraryDetails'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
-  const paths = { qr: '/passport/web/get_qrcode/', poll: '/passport/web/check_qrconnect/', webInfo: '/passport/account/info/v2/', phoneCode: '/passport/web/send_code/', phoneSms: '/passport/web/sms_login_only/', phonePassword: '/passport/web/user/login/' };
+  const paths = { qr: '/passport/web/get_qrcode/', poll: '/passport/web/check_qrconnect/', webInfo: '/passport/account/info/v2/', phoneCode: '/passport/web/send_code/', phoneSms: '/passport/web/sms_login_only/' };
   if (!Object.prototype.hasOwnProperty.call(paths, action)) throw new Error('不支持的账号操作');
   const params = { aid: '513755', passport_jssdk_version: '3.4.10', passport_jssdk_type: 'normal',
     account_sdk_source: 'web', is_from_ttaccountsdk: '1', language: 'zh' };
   if (action === 'qr' || action === 'poll') params.next = BASE_URL + '/';
+  if (['phoneCode', 'phoneSms'].includes(action) && payload.fingerprint) {
+    if (typeof payload.fingerprint !== 'string' || !/^[A-Za-z0-9_-]{16,256}$/.test(payload.fingerprint)) throw new Error('安全验证结果无效');
+    params.fp = params.verifyFp = payload.fingerprint;
+  }
   if (action === 'poll') {
     if (typeof payload.token !== 'string' || !/^[A-Za-z0-9_.:-]{8,256}$/.test(payload.token)) throw new Error('扫码会话无效');
     params.token = payload.token;
   }
   let form = null;
-  if (['phoneCode', 'phoneSms', 'phonePassword'].includes(action)) {
+  if (['phoneCode', 'phoneSms'].includes(action)) {
     const country = String(payload.country || '86').replace(/^\+/, '');
     const number = String(payload.number || '').replace(/[ ()-]/g, '').replace(country === '86' ? /^$/ : /^0/, '');
     if (!/^[1-9]\d{0,2}$/.test(country) || !/^\d{4,14}$/.test(number) || country.length + number.length > 15 || country === '86' && !/^1\d{10}$/.test(number)) throw new Error('手机号格式无效');
@@ -2691,10 +2695,7 @@ spider.accountRequest = async function (action, payload) {
       if (!/^\d{4,8}$/.test(String(payload.code || ''))) throw new Error('验证码格式无效');
       Object.assign(form, { mobile: mix(mobile), code: mix(payload.code) });
     }
-    if (action === 'phonePassword') {
-      if (typeof payload.password !== 'string' || !payload.password.length || payload.password.length > 128) throw new Error('请输入密码');
-      Object.assign(form, { account: mix(country === '86' ? number : '+' + country + number), password: mix(payload.password) });
-    }
+
   }
   const headers = { 'User-Agent': USER_AGENT, Referer: BASE_URL + '/', Origin: BASE_URL, Accept: 'application/json, text/javascript' };
   if (form) headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
@@ -2752,7 +2753,15 @@ spider.accountParse = function (action, text) {
     if (action !== 'libraryDetails') items.sort((a, b) => b.updatedAt - a.updatedAt);
     return { items };
   }
-  if (data && (data.verify_center_decision_conf || ['phoneCode', 'phoneSms', 'phonePassword'].includes(action) && Number(data.error_code) === 1102)) throw new Error('ACCOUNT_CHALLENGE_REQUIRED');
+  if (response.message === 'error' && data && data.verify_center_secondary_decision_conf) throw new Error('ACCOUNT_SECONDARY_VERIFICATION_REQUIRED');
+  if (response.message === 'error' && data && data.verify_center_decision_conf) {
+    if (!['phoneCode', 'phoneSms'].includes(action)) throw new Error('ACCOUNT_CHALLENGE_REQUIRED');
+    return { rejected: true, errorCode: Number(data.error_code), verification: {
+      kind: 'captcha', data: typeof data.verify_center_decision_conf === 'string' ? data.verify_center_decision_conf : JSON.stringify(data.verify_center_decision_conf),
+      origin: BASE_URL + '/', script: 'https://lf-rc1.yhgfb-cn-static.com/obj/rc-verifycenter/verifycenter/@latest/index.js',
+      aid: '513755', repoId: 579047, userAgent: USER_AGENT
+    } };
+  }
   if (response.message !== 'success' || !data || Number(data.error_code || 0) !== 0) {
     const code = data && Number(data.error_code);
     throw new Error(Number.isFinite(code) ? 'ACCOUNT_BUSINESS_' + code : '官方登录请求失败');
@@ -2763,7 +2772,7 @@ spider.accountParse = function (action, text) {
     return { token: data.token, qrUrl: data.qrcode_index_url, expiresAt: Number(data.expire_time) };
   }
   if (action === 'phoneCode') return { valid: true, retryAfter: Math.min(600, Math.max(1, Number(data.retry_time) || 60)) };
-  if (action === 'phoneSms' || action === 'phonePassword') return { valid: true };
+  if (action === 'phoneSms') return { valid: true };
   if (action === 'poll') return { status: String(data.status || ''), redirect: String(data.redirect_url || '') };
   return { valid: true };
 };

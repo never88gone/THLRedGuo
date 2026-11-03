@@ -203,7 +203,7 @@ final class HongguoAccountModel: ObservableObject {
             transport = URLSession(configuration: config, delegate: HongguoLoginRedirectDelegate(), delegateQueue: nil)
         }
         let owner = attempt
-        if !cookies.contains(where: { $0.valid && $0.name == "passport_csrf_token" }) { _ = try await call("qr", owner: owner) }
+        if !cookies.contains(where: { $0.valid && ["passport_csrf_token", "passport_csrf_token_default"].contains($0.name) }) { _ = try await call("qr", owner: owner) }
         try check(owner)
         return owner
     }
@@ -220,16 +220,16 @@ final class HongguoAccountModel: ObservableObject {
             message = "验证码已发送"
         } catch { trace(stage, error: error); throw error }
     }
-    func loginPhone(country: String, number: String, secret: String, password: Bool) async throws {
+    func loginPhone(country: String, number: String, code: String) async throws {
         guard !busy else { throw HongguoAccountError.cancelled }
         let owner = try await preparePhone(country: country, number: number)
-        if !password && !phoneCodeSent { throw HongguoAccountError.preparation("SMS_REQUIRED") }
+        if !phoneCodeSent { throw HongguoAccountError.preparation("SMS_REQUIRED") }
         let revision = vault.snapshot.revision
         busy = true
         defer { if owner == attempt { busy = false } }
         do {
-            _ = try await call(password ? "phonePassword" : "phoneSms",
-                payload: ["country": country, "number": number, password ? "password" : "code": secret], owner: owner)
+            _ = try await call("phoneSms",
+                payload: ["country": country, "number": number, "code": code], owner: owner)
             try check(owner)
             guard cookies.contains(where: { $0.valid && ["sessionid", "sessionid_ss"].contains($0.name) }) else { throw HongguoAccountError.invalid }
             _ = try await call("webInfo", owner: owner)
@@ -380,7 +380,7 @@ final class HongguoAccountModel: ObservableObject {
         if web {
             let matched = active.filter { $0.valid && (url.path == $0.path || url.path.hasPrefix($0.path.hasSuffix("/") ? $0.path : $0.path + "/")) }
             request.setValue(matched.map { "\($0.name)=\($0.value)" }.joined(separator: "; "), forHTTPHeaderField: "Cookie")
-            if let csrf = matched.first(where: { $0.name == "passport_csrf_token" }) { request.setValue(csrf.value, forHTTPHeaderField: "x-tt-passport-csrf-token") }
+            if let csrf = matched.first(where: { $0.name == "passport_csrf_token" && !$0.value.isEmpty }) ?? matched.first(where: { $0.name == "passport_csrf_token_default" && !$0.value.isEmpty }) { request.setValue(csrf.value, forHTTPHeaderField: "x-tt-passport-csrf-token") }
         } else {
             let record = HongguoAccountRecord(id: "", nickname: "", cookies: active)
             request.setValue(vault.header(for: url, record: record), forHTTPHeaderField: "Cookie")

@@ -63,7 +63,7 @@ void main() {
       );
       debugPrint('THL_LOGIN_STEP chooser');
       expect(find.byKey(const Key('hongguo-login-sms')), findsOneWidget);
-      expect(find.byKey(const Key('hongguo-login-password')), findsOneWidget);
+      expect(find.byKey(const Key('hongguo-login-password')), findsNothing);
       expect(find.byKey(const Key('hongguo-login-qr')), findsOneWidget);
       await tester.tap(find.byKey(const Key('hongguo-login-sms')));
       await wait(
@@ -84,18 +84,13 @@ void main() {
             .length,
         sends,
       );
-      await tester.tap(find.text('密码').last);
-      await tester.pump(const Duration(milliseconds: 500));
       expect(
         tester
             .widget<TextField>(find.byKey(const Key('login-secret')))
-            .obscureText,
-        true,
+            .keyboardType,
+        TextInputType.number,
       );
-      await tester.enterText(
-        find.byKey(const Key('login-secret')),
-        'synthetic-do-not-store',
-      );
+      await tester.enterText(find.byKey(const Key('login-secret')), '654321');
       await tester.ensureVisible(find.byKey(const Key('phone-login-submit')));
       await tester.pump(const Duration(milliseconds: 200));
       await tester.tap(find.byKey(const Key('phone-login-submit')));
@@ -143,7 +138,7 @@ void main() {
         binding.reportData = {
           'loginMethods': true,
           'invalidNumberNoSms': true,
-          'passwordObscured': true,
+          'passwordEntryAbsent': true,
           'qrSavePng': true,
           'pngSize': 1024,
           'galleryMocked': true,

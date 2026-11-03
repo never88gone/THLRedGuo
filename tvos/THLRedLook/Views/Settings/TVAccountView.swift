@@ -51,12 +51,11 @@ struct TVLoginOptionsView: View {
     @State private var method: Method?
     @State private var loginRevision: UInt64?
     @FocusState private var focus: Method?
-    enum Method: String, Identifiable { case sms, password, officialQR, hawQR; var id: String { rawValue } }
+    enum Method: String, Identifiable { case sms, officialQR, hawQR; var id: String { rawValue } }
     var body: some View {
         VStack(spacing: 30) {
             Text("登录红果账号").font(.system(size: 48, weight: .bold))
             Button("手机号与验证码") { method = .sms }.focused($focus, equals: .sms).accessibilityIdentifier("hongguo-login-sms")
-            Button("手机号与密码") { method = .password }.focused($focus, equals: .password).accessibilityIdentifier("hongguo-login-password")
             Button("红果 App 扫码") { method = .officialQR }.focused($focus, equals: .officialQR).accessibilityIdentifier("hongguo-login-qr")
             Button("手机糖葫芦 Haw 扫码") { method = .hawQR }.focused($focus, equals: .hawQR).accessibilityIdentifier("hongguo-login-haw-pair")
             Text("手机糖葫芦 Haw 登录后，可通过同一局域网授权此设备。").font(.system(size: 29)).foregroundStyle(.secondary)
@@ -70,8 +69,7 @@ struct TVLoginOptionsView: View {
         }) { selection in
             switch selection {
             case .officialQR: TVQrLoginView()
-            case .sms: TVPhoneLoginView(passwordMode: false)
-            case .password: TVPhoneLoginView(passwordMode: true)
+            case .sms: TVPhoneLoginView()
             case .hawQR: TVHawPairLoginView()
             }
         }
@@ -81,7 +79,6 @@ struct TVLoginOptionsView: View {
 struct TVPhoneLoginView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var model = HongguoAccountModel.shared
-    @State var passwordMode: Bool
     @State private var country = "86"
     @State private var number = ""
     @State private var secret = ""
@@ -94,12 +91,12 @@ struct TVPhoneLoginView: View {
         let cc = country.replacingOccurrences(of: "+", with: ""), digits = number.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "")
         guard cc.range(of: "^[1-9][0-9]{0,2}$", options: .regularExpression) != nil,
             digits.range(of: cc == "86" ? "^1[0-9]{10}$" : "^[0-9]{4,14}$", options: .regularExpression) != nil else { error = "手机号格式无效"; return }
-        if !sending && (secret.isEmpty || !passwordMode && secret.range(of: "^[0-9]{4,8}$", options: .regularExpression) == nil) { error = passwordMode ? "请输入密码" : "请输入正确的验证码"; return }
+        if !sending && secret.range(of: "^[0-9]{4,8}$", options: .regularExpression) == nil { error = "请输入正确的验证码"; return }
         working = true; error = nil
         Task {
             do {
                 if sending { try await model.sendPhoneCode(country: cc, number: digits); remaining = max(0, Int(ceil(model.phoneRetryAt.timeIntervalSinceNow))) }
-                else { try await model.loginPhone(country: cc, number: digits, secret: secret, password: passwordMode); secret = ""; dismiss() }
+                else { try await model.loginPhone(country: cc, number: digits, code: secret); secret = ""; dismiss() }
             } catch {
                 if let issue = error as? HongguoAccountError { self.error = issue.localizedDescription }
                 else { self.error = "登录请求暂时失败，请稍后再试" }
@@ -109,23 +106,19 @@ struct TVPhoneLoginView: View {
     }
     var body: some View {
         VStack(spacing: 24) {
-            Text(passwordMode ? "手机号与密码登录" : "手机号与验证码登录").font(.system(size: 44, weight: .bold))
+            Text("手机号与验证码登录").font(.system(size: 44, weight: .bold))
             HStack(spacing: 24) {
                 HStack { Text("+"); TextField("区号", text: $country).focused($focus, equals: "country").accessibilityIdentifier("login-country") }.frame(width: 190)
                 TextField("手机号", text: $number).textContentType(.telephoneNumber).focused($focus, equals: "phone").accessibilityIdentifier("login-phone")
             }.disabled(working)
-            if passwordMode { SecureField("密码", text: $secret).textContentType(.password).focused($focus, equals: "secret").accessibilityIdentifier("login-secret").disabled(working) }
-            else { TextField("短信验证码", text: $secret).textContentType(.oneTimeCode).focused($focus, equals: "secret").accessibilityIdentifier("login-secret").disabled(working) }
-            if !passwordMode {
-                Button(remaining > 0 ? "\(remaining)s 后重新获取" : "获取验证码") { run(true) }.disabled(working || remaining > 0).focused($focus, equals: "send").accessibilityIdentifier("phone-send-code")
-            }
+            TextField("短信验证码", text: $secret).textContentType(.oneTimeCode).focused($focus, equals: "secret").accessibilityIdentifier("login-secret").disabled(working)
+            Button(remaining > 0 ? "\(remaining)s 后重新获取" : "获取验证码") { run(true) }.disabled(working || remaining > 0).focused($focus, equals: "send").accessibilityIdentifier("phone-send-code")
             if let error { Text(error).foregroundStyle(.orange).accessibilityIdentifier("phone-login-error") }
             HStack(spacing: 40) {
                 Button(working ? "正在处理" : "登录") { run(false) }.disabled(working).focused($focus, equals: "submit").accessibilityIdentifier("phone-login-submit")
-                Button(passwordMode ? "使用验证码" : "使用密码") { passwordMode.toggle(); secret = ""; error = nil }.disabled(working)
                 Button("返回") { model.cancel(); dismiss() }
             }
-            Text("验证码由你点击后发送。糖葫芦 Haw 不保存密码或验证码。").font(.system(size: 29)).foregroundStyle(.secondary)
+            Text("验证码由你点击后发送。糖葫芦 Haw 不保存验证码。").font(.system(size: 29)).foregroundStyle(.secondary)
         }.font(.system(size: 29)).frame(maxWidth: 1000).padding(60).frame(maxWidth: .infinity, maxHeight: .infinity).background(TVTheme.backgroundGradient)
         .defaultFocus($focus, "phone")
         .onAppear { focus = "phone"; remaining = max(0, Int(ceil(model.phoneRetryAt.timeIntervalSinceNow))) }

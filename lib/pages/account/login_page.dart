@@ -41,15 +41,6 @@ class HongguoLoginScreen extends StatelessWidget {
                   onTap: () => _open(context, const HongguoPhoneLoginScreen()),
                 ),
                 ListTile(
-                  key: const Key('hongguo-login-password'),
-                  leading: const Icon(Icons.password),
-                  title: const Text('手机号与密码'),
-                  onTap: () => _open(
-                    context,
-                    const HongguoPhoneLoginScreen(passwordMode: true),
-                  ),
-                ),
-                ListTile(
                   key: const Key('hongguo-login-qr'),
                   leading: const Icon(Icons.qr_code),
                   title: const Text('红果 App 扫码'),

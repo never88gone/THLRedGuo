@@ -87,7 +87,6 @@ final class RemoteNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["hongguo-login-qr"].waitForExistence(timeout: 20))
         print("THL_LOGIN_CHOOSER enabled=\(app.buttons["hongguo-login-qr"].isEnabled) hittable=\(app.buttons["hongguo-login-qr"].isHittable) appState=\(app.state.rawValue)")
         wait("login chooser starts at official QR", seconds: 30) { self.app.buttons["hongguo-login-qr"].hasFocus }
-        press(.up, focus: "hongguo-login-password")
         press(.up, focus: "hongguo-login-sms")
         press(.select)
         wait("phone field focused") { self.app.textFields["login-phone"].hasFocus }
@@ -97,11 +96,7 @@ final class RemoteNavigationTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["手机号格式无效"].waitForExistence(timeout: 5))
         press(.menu)
         wait("cancelled SMS returns to chooser") { self.app.buttons["hongguo-login-sms"].exists }
-        press(.down, focus: "hongguo-login-password")
-        press(.select)
-        XCTAssertTrue(app.secureTextFields["login-secret"].waitForExistence(timeout: 5))
-        press(.menu)
-        wait("cancelled password returns to chooser") { self.app.buttons["hongguo-login-password"].exists }
+        XCTAssertFalse(app.buttons["hongguo-login-password"].exists)
         press(.down, focus: "hongguo-login-qr")
         press(.down, focus: "hongguo-login-haw-pair")
         press(.select)
@@ -113,7 +108,7 @@ final class RemoteNavigationTests: XCTestCase {
             let account = self.app.buttons["hongguo-account-menu"], guest = self.app.buttons["hongguo-account-login"]
             return account.exists && account.hasFocus || guest.exists && guest.hasFocus
         }
-        print("THL_LOGIN_METHODS_TV smsInvalidBlocked=true passwordSecure=true pairingCancel=true remoteReturn=true realSmsSent=false realSessionTransferred=false imagesDisabled=true")
+        print("THL_LOGIN_METHODS_TV smsInvalidBlocked=true passwordEntryAbsent=true pairingCancel=true remoteReturn=true realSmsSent=false realSessionTransferred=false imagesDisabled=true")
     }
 
     func testDebugSourceSelectedEpisodeAndNaturalNext() throws {

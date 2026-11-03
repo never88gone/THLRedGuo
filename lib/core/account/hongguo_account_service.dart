@@ -6,6 +6,7 @@ import '../js/catpaw_js_runtime.dart';
 import '../diagnostics/source_diagnostics.dart';
 import 'hongguo_account_session.dart';
 import 'account_transfer_payload.dart';
+import 'hongguo_verification.dart';
 import '../../models/catalog/models.dart';
 
 class HongguoQrLogin {
@@ -33,6 +34,8 @@ class HongguoPhoneLogin {
   final _cookies = HongguoAccountCookies();
   bool cancelled = false;
   bool sent = false;
+  bool sendRequested = false;
+  String? _fingerprint;
   DateTime retryAt = DateTime(2000);
   @override
   String toString() => 'HongguoPhoneLogin([redacted])';
@@ -119,8 +122,9 @@ class HongguoAccountService {
         ? cookies?.websiteHeader(uri) ?? ''
         : cookies?.businessHeader ?? session.headerFor(uri);
     if (cookie.isNotEmpty) request.headers.set('Cookie', cookie);
-    if (web && (cookies?.csrf.isNotEmpty ?? false)) {
-      request.headers.set('x-tt-passport-csrf-token', cookies!.csrf);
+    final csrf = web ? cookies?.csrfFor(uri) ?? '' : '';
+    if (csrf.isNotEmpty) {
+      request.headers.set('x-tt-passport-csrf-token', csrf);
     }
     if (method == 'POST') {
       final body = command['body'];
@@ -169,28 +173,67 @@ class HongguoAccountService {
     int revision,
   ) async {
     _stage = action;
-    final engine = await _engine();
-    _check(revision);
-    final command = await engine.accountRequest(action, payload);
-    if (action == 'profile') {
-      final query = Uri.parse(command['url'] as String).queryParameters;
-      _profileDevice = jsonEncode({
-        for (final key in ['iid', 'device_id', 'cdid'])
-          if (query[key] != null) key: query[key],
-      });
-    }
-    final response = await _request(command, cookies, revision);
-    if (response.redirect != null) {
-      throw const HongguoAccountFailure('账号接口发生意外跳转');
-    }
-    _check(revision);
+    var phase = 'prepare';
     try {
+      final engine = await _engine();
+      _check(revision);
+      final command = await engine.accountRequest(action, payload);
+      if (action == 'profile') {
+        final query = Uri.parse(command['url'] as String).queryParameters;
+        _profileDevice = jsonEncode({
+          for (final key in ['iid', 'device_id', 'cdid'])
+            if (query[key] != null) key: query[key],
+        });
+      }
+      phase = 'request';
+      final response = await _request(command, cookies, revision);
+      if (response.redirect != null) {
+        throw const HongguoAccountFailure('账号接口发生意外跳转', 'UNEXPECTED_REDIRECT');
+      }
+      _check(revision);
+      phase = 'parse';
       final result = engine.accountParse(action, response.body);
+      if (result['verification'] != null) {
+        throw HongguoVerificationChallenge.fromResult(result, cookies);
+      }
       if (action != 'poll') _trace(action, cookies);
       return result;
     } on HongguoAccountFailure catch (failure) {
-      _trace(action, cookies, code: failure.code);
+      if (failure.code != 'CANCELLED') {
+        _trace(
+          action,
+          cookies,
+          code: failure.code,
+          businessCode: failure is HongguoVerificationChallenge
+              ? failure.businessCode
+              : '',
+        );
+      }
       rethrow;
+    } on TimeoutException {
+      _check(revision);
+      _trace(action, cookies, code: 'TIMEOUT');
+      throw const HongguoAccountFailure('账号请求超时，请稍后重试', 'TIMEOUT');
+    } on HandshakeException {
+      _check(revision);
+      _trace(action, cookies, code: 'TLS_ERROR');
+      throw const HongguoAccountFailure('账号安全连接失败，请检查网络后重试', 'TLS_ERROR');
+    } on SocketException {
+      _check(revision);
+      _trace(action, cookies, code: 'NETWORK_ERROR');
+      throw const HongguoAccountFailure('账号网络连接失败，请检查网络后重试', 'NETWORK_ERROR');
+    } catch (_) {
+      _check(revision);
+      final code = phase == 'prepare'
+          ? 'PREPARATION_FAILED'
+          : phase == 'parse'
+          ? 'INVALID_RESPONSE'
+          : 'REQUEST_FAILED';
+      _trace(action, cookies, code: code);
+      throw HongguoAccountFailure(
+        phase == 'prepare' ? '账号登录初始化失败，请更新应用或使用扫码登录' : '账号响应暂不可用，请稍后重试',
+        code,
+      );
     }
   }
 
@@ -199,6 +242,7 @@ class HongguoAccountService {
     HongguoAccountCookies? cookies, {
     String status = '',
     String code = '',
+    String businessCode = '',
   }) {
     final safeStatus =
         {
@@ -219,7 +263,7 @@ class HongguoAccountService {
         : 'unknown';
     final summary =
         'status=$safeStatus session=${cookies?.hasSession ?? session.loggedIn}';
-    final trace = '$phase $summary $code';
+    final trace = '$phase $summary $code $businessCode';
     if (_lastTrace == trace) return;
     _lastTrace = trace;
     SourceDiagnostics.shared.add(
@@ -228,6 +272,7 @@ class HongguoAccountService {
         context: '红果登录',
         stage: phase,
         errorCode: code,
+        businessCode: businessCode,
         sessionStatus: summary,
       ),
     );
@@ -344,18 +389,63 @@ class HongguoAccountService {
     _checkPhone(attempt);
   }
 
-  Future<int> sendPhoneCode(HongguoPhoneLogin attempt) async {
+  Future<Map<String, dynamic>> _phoneCall(
+    String action,
+    HongguoPhoneLogin attempt,
+    Map<String, dynamic> payload,
+    HongguoVerificationResolver? verify,
+  ) async {
+    Map<String, dynamic> fields() => {
+      ...payload,
+      'fingerprint': ?attempt._fingerprint,
+    };
+    try {
+      return await _call(action, fields(), attempt._cookies, attempt._revision);
+    } on HongguoVerificationChallenge catch (challenge) {
+      _checkPhone(attempt);
+      if (verify == null) rethrow;
+      final fp = await verify(challenge);
+      _checkPhone(attempt);
+      if (fp == null) {
+        throw const HongguoAccountFailure('安全验证已取消，本次请求未重试', 'CANCELLED');
+      }
+      if (!HongguoVerificationChallenge.validFingerprint(fp)) {
+        throw const HongguoAccountFailure('安全验证结果无效', 'VERIFICATION_INVALID');
+      }
+      attempt._fingerprint = fp;
+      attempt._cookies.merge(Uri.parse('https://hongguoduanju.com/'), [
+        's_v_web_id=$fp; Path=/; Secure',
+      ]);
+      try {
+        return await _call(
+          action,
+          fields(),
+          attempt._cookies,
+          attempt._revision,
+        );
+      } on HongguoVerificationChallenge {
+        throw const HongguoAccountFailure(
+          '官方尚未确认安全验证，请重试或使用红果 App 扫码登录',
+          'VERIFICATION_NOT_ACCEPTED',
+        );
+      }
+    }
+  }
+
+  Future<int> sendPhoneCode(
+    HongguoPhoneLogin attempt, {
+    HongguoVerificationResolver? verify,
+  }) async {
     _checkPhone(attempt);
     if (attempt.retryAt.isAfter(DateTime.now())) {
       throw const HongguoAccountFailure('请等待短信倒计时结束');
     }
     await _preparePhone(attempt);
-    final data = await _call(
-      'phoneCode',
-      {'country': attempt.country, 'number': attempt.number},
-      attempt._cookies,
-      attempt._revision,
-    );
+    attempt.sendRequested = true;
+    final data = await _phoneCall('phoneCode', attempt, {
+      'country': attempt.country,
+      'number': attempt.number,
+    }, verify);
     _checkPhone(attempt);
     final seconds = (data['retryAfter'] as num).toInt();
     attempt.sent = true;
@@ -365,28 +455,22 @@ class HongguoAccountService {
 
   Future<void> loginPhone(
     HongguoPhoneLogin attempt, {
-    String? code,
-    String? password,
+    required String code,
+    HongguoVerificationResolver? verify,
   }) async {
     _checkPhone(attempt);
-    if ((code == null) == (password == null)) {
-      throw const HongguoAccountFailure('请选择登录方式');
+    if (!RegExp(r'^\d{4,8}$').hasMatch(code)) {
+      throw const HongguoAccountFailure('请输入正确的验证码');
     }
-    if (code != null && !attempt.sent) {
+    if (!attempt.sent && !attempt.sendRequested) {
       throw const HongguoAccountFailure('请先获取验证码');
     }
     await _preparePhone(attempt);
-    await _call(
-      password == null ? 'phoneSms' : 'phonePassword',
-      {
-        'country': attempt.country,
-        'number': attempt.number,
-        'code': ?code,
-        'password': ?password,
-      },
-      attempt._cookies,
-      attempt._revision,
-    );
+    await _phoneCall('phoneSms', attempt, {
+      'country': attempt.country,
+      'number': attempt.number,
+      'code': code,
+    }, verify);
     _checkPhone(attempt);
     if (!attempt._cookies.hasSession) {
       throw const HongguoAccountFailure('官方尚未签发有效登录会话');

@@ -36,6 +36,7 @@ dependencies:
   cryptography: ^2.9.0
   mobile_scanner: ^7.5.0
   gal: ^2.3.3
+  flutter_inappwebview: 6.1.5
 
 dev_dependencies:
   flutter_test:

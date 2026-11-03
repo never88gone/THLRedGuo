@@ -252,6 +252,14 @@ class CatPawJsRuntime {
       'JSON.stringify(spider.accountParse(${jsonEncode(action)}, ${jsonEncode(body)}))',
     );
     if (value.isError) {
+      if (value.stringResult.contains(
+        'ACCOUNT_SECONDARY_VERIFICATION_REQUIRED',
+      )) {
+        throw const HongguoAccountFailure(
+          '请在红果 App 完成账号安全验证后使用扫码登录',
+          'SECONDARY_VERIFICATION_REQUIRED',
+        );
+      }
       if (value.stringResult.contains('ACCOUNT_CHALLENGE_REQUIRED')) {
         throw const HongguoAccountFailure(
           '红果要求额外安全验证，请使用红果 App 扫码登录',
