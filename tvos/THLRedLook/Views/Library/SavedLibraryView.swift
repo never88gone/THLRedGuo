@@ -69,20 +69,27 @@ public struct SavedLibraryView: View {
                     }
                 }.padding(.horizontal, 48).padding(.top, 28)
 
-                HStack(alignment: .top, spacing: 28) {
-                    VStack(alignment: .leading, spacing: 24) {
+                HStack(alignment: .top, spacing: 32) {
+                    VStack(alignment: .leading, spacing: 18) {
                         ForEach(LibraryViewModel.LibraryTab.allCases) { tab in
-                            TVCapsuleButton(title: tab == .follows ? "追剧" : "历史记录",
+                            TVCapsuleButton(
+                                title: tab == .follows ? "追剧" : "历史记录",
                                 isSelected: viewModel.selectedTab == tab,
                                 isFocused: focusedTarget == .mainTab(tab),
+                                isCompact: true,
                                 onUpCommand: tab == .history ? requestTopNavigation : nil,
                                 onDownCommand: nil,
-                                onRightCommand: { focus(firstCardTarget, with: proxy) }) { viewModel.selectedTab = tab }
+                                onRightCommand: { focus(firstCardTarget, with: proxy) }
+                            ) { viewModel.selectedTab = tab }
                             .focused($focusedTarget, equals: .mainTab(tab))
                             .accessibilityIdentifier("library.tab.\(tab.rawValue)")
                         }
                         Spacer()
-                    }.frame(width: 230).padding(.leading, 48).focusSection()
+                    }
+                    .frame(width: 140)
+                    .padding(.leading, 48)
+                    .focusSection()
+
                     VStack(spacing: 20) {
                         HStack {
                             Text(account.loggedIn ? "红果账号" : "本机记录").foregroundStyle(.secondary)
@@ -98,24 +105,31 @@ public struct SavedLibraryView: View {
                                     showingClearHistory = true
                                 }.focused($focusedTarget, equals: .clearHistory).accessibilityIdentifier("library.clearHistory")
                             }
-                        }.font(.system(size: 29))
+                        }
+                        .font(.system(size: 24))
+                        .padding(.horizontal, 20)
+
                         if !account.loggedIn && viewModel.selectedTab == .follows {
-                            HStack(spacing: 20) {
+                            HStack(spacing: 16) {
                                 ForEach([FollowState.none, .wishlist, .watching, .watched, .updated]) { state in
-                                    TVCapsuleButton(title: state == .none ? "全部" : state.label,
+                                    TVCapsuleButton(
+                                        title: state == .none ? "全部" : state.label,
                                         isSelected: viewModel.selectedFollowFilter == state,
                                         isFocused: focusedTarget == .followFilter(state),
+                                        isCompact: true,
                                         onUpCommand: { focus(.account, with: proxy) },
-                                        onDownCommand: { focus(firstCardTarget, with: proxy) }) { viewModel.selectedFollowFilter = state }
+                                        onDownCommand: { focus(firstCardTarget, with: proxy) }
+                                    ) { viewModel.selectedFollowFilter = state }
                                     .focused($focusedTarget, equals: .followFilter(state))
                                     .accessibilityIdentifier("library.filter.\(state == .none ? "all" : state.rawValue)")
                                 }
                                 Spacer()
                             }
+                            .padding(.horizontal, 20)
                         }
                         if account.loggedIn && viewModel.loadingTabs.contains(viewModel.selectedTab) { ProgressView("正在获取账号列表") }
                         if account.loggedIn, let error = viewModel.accountErrors[viewModel.selectedTab] {
-                            Text(error).foregroundStyle(.orange).font(.system(size: 29)).accessibilityIdentifier("library.error")
+                            Text(error).foregroundStyle(.orange).font(.system(size: 24)).padding(.horizontal, 20).accessibilityIdentifier("library.error")
                         }
                         ScrollView {
                             if dramas.isEmpty {
@@ -149,7 +163,9 @@ public struct SavedLibraryView: View {
                                             }
                                         }
                                     }
-                                }.padding(.vertical, 24)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 24)
                             }
                         }.focusSection()
                     }.padding(.trailing, 48)

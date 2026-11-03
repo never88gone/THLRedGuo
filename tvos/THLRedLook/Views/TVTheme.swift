@@ -454,6 +454,7 @@ public struct TVCapsuleButton: View {
     public let title: String
     public var isSelected: Bool = false
     public var isFocused: Bool = false
+    public var isCompact: Bool = false
     public var onFocused: (() -> Void)? = nil
     public var onUpCommand: (() -> Void)? = nil
     public var onDownCommand: (() -> Void)? = nil
@@ -465,6 +466,7 @@ public struct TVCapsuleButton: View {
         title: String,
         isSelected: Bool = false,
         isFocused: Bool = false,
+        isCompact: Bool = false,
         isExternalFocused: Bool? = nil,
         onFocused: (() -> Void)? = nil,
         onUpCommand: (() -> Void)? = nil,
@@ -476,6 +478,7 @@ public struct TVCapsuleButton: View {
         self.title = title
         self.isSelected = isSelected
         self.isFocused = isExternalFocused ?? isFocused
+        self.isCompact = isCompact
         self.onFocused = onFocused
         self.onUpCommand = onUpCommand
         self.onDownCommand = onDownCommand
@@ -490,6 +493,7 @@ public struct TVCapsuleButton: View {
                 title: title,
                 isSelected: isSelected,
                 externalFocused: isFocused,
+                isCompact: isCompact,
                 onFocused: onFocused
             )
         }
@@ -515,6 +519,7 @@ private struct TVCapsuleButtonLabel: View {
     let title: String
     let isSelected: Bool
     let externalFocused: Bool
+    let isCompact: Bool
     let onFocused: (() -> Void)?
 
     @Environment(\.isFocused) private var envIsFocused
@@ -525,18 +530,21 @@ private struct TVCapsuleButtonLabel: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: isFocused ? 19 : 17, weight: (isFocused || isSelected) ? .heavy : .medium))
+            .font(.system(
+                size: isCompact ? (isFocused ? 16 : 14) : (isFocused ? 19 : 17),
+                weight: (isFocused || isSelected) ? .heavy : .medium
+            ))
             .foregroundColor(textColor)
-            .padding(.horizontal, isFocused ? 28 : 24)
-            .padding(.vertical, isFocused ? 13 : 11)
+            .padding(.horizontal, isCompact ? (isFocused ? 18 : 14) : (isFocused ? 28 : 24))
+            .padding(.vertical, isCompact ? (isFocused ? 9 : 7) : (isFocused ? 13 : 11))
             .background(backgroundView)
             .clipShape(Capsule())
             .overlay(
                 Capsule()
                     .stroke(borderStrokeColor, lineWidth: borderWidth)
             )
-            .scaleEffect(isFocused ? 1.08 : 1.0)
-            .shadow(color: shadowColor, radius: shadowRadius, y: isFocused ? 4 : 0)
+            .scaleEffect(isFocused ? (isCompact ? 1.05 : 1.08) : 1.0)
+            .shadow(color: shadowColor, radius: isCompact ? (isFocused ? 10 : 0) : shadowRadius, y: isFocused ? (isCompact ? 2 : 4) : 0)
             .animation(TVTheme.focusSpringAnimation, value: isFocused)
             .onChange(of: isFocused) { focused in
                 if focused {

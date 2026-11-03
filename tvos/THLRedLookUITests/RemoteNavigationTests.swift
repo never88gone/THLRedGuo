@@ -3093,14 +3093,21 @@ extension RemoteNavigationTests {
         saveShot("03_tvos_detail_follow_menu.png")
         app.terminate()
 
-        // 2. 媒体库页面截图：最近观看、我的追剧
+        // 2. 媒体库页面截图：最近观看、我的追剧、以及左侧卡片获焦放大效果
         app.launchArguments = ["-testPage", "library", "-thl_icloud_sync_enabled", "NO"]
         app.launch()
         wait("library history ready", seconds: 30) { self.app.buttons["library.tab.history"].exists }
         if app.buttons["nav.library"].hasFocus { press(.right, focus: "library.tab.history") }
-        // 截图 4：媒体库 - 最近观看
+        // 截图 4：媒体库 - 最近观看（小巧紧凑的左侧区域）
         saveShot("04_tvos_library_history.png")
 
+        // 向右聚焦到最左侧第一张卡片，验证卡片放大 1.06 倍后左侧有充足间隙、绝无截断
+        press(.right)
+        Thread.sleep(forTimeInterval: 1.0)
+        saveShot("04b_tvos_library_first_card_focused.png")
+
+        // 返回左侧边栏并切换到追剧
+        press(.left, focus: "library.tab.history")
         press(.down, focus: "library.tab.follows")
         press(.select)
         wait("library follows ready", seconds: 15) {
