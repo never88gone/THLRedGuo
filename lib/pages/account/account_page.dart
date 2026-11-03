@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import '../../utils/screen/app_layout.dart';
+import '../../utils/theme/app_colors.dart';
 import 'login_page.dart';
 import 'account_pairing_page.dart';
 export 'qr_login_page.dart';
@@ -19,22 +20,28 @@ class AccountScreen extends StatefulWidget {
     required this.store,
     required this.localLibraryBuilder,
     required this.onOpen,
-    required this.onOpenSettings,
+    this.onOpenSettings,
     this.initialHistory = true,
+    this.service,
+    this.session,
   });
   final AppRepository repository;
   final LocalStore store;
   final Widget Function(bool) localLibraryBuilder;
   final ValueChanged<Drama> onOpen;
-  final VoidCallback onOpenSettings;
+  final VoidCallback? onOpenSettings;
   final bool initialHistory;
+  final HongguoAccountService? service;
+  final HongguoAccountSession? session;
   @override
   State<AccountScreen> createState() => _AccountScreenState();
 }
 
 class _AccountScreenState extends State<AccountScreen> {
-  final account = HongguoAccountSession.shared;
-  final service = HongguoAccountService();
+  late final HongguoAccountSession account =
+      widget.session ?? HongguoAccountSession.shared;
+  late final HongguoAccountService service =
+      widget.service ?? HongguoAccountService();
   final lists = <bool, List<WatchEntry>>{};
   final errors = <bool, String>{};
   final loading = <bool>{};
@@ -86,7 +93,7 @@ class _AccountScreenState extends State<AccountScreen> {
         setState(() => errors[tab] = '账号列表获取失败，请重试');
       }
     } finally {
-      if (mounted && owner == account.revision) {
+      if (mounted) {
         setState(() => loading.remove(tab));
       }
     }
@@ -100,11 +107,36 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   void dispose() {
     account.removeListener(_accountChanged);
-    service.dispose();
+    if (widget.service == null) {
+      service.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _login() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('账号登录提示'),
+        content: const Text(
+          '登录后将使用短剧平台的接口数据同步追剧与观看记录，原本通过 iCloud 同步的本地记录将被清除。\n\n是否确认登录？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.hongguoRed,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认登录'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     await Navigator.of(
       context,
     ).push<void>(MaterialPageRoute(builder: (_) => const HongguoLoginScreen()));
@@ -140,62 +172,109 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
-  Widget _accountButton() {
-    if (!account.loggedIn) {
-      return TextButton.icon(
-        key: const Key('hongguo-account-login'),
-        onPressed: _login,
-        icon: const Icon(Icons.person_outline),
-        label: const Text('登录'),
-      );
-    }
-    final avatar =
-        !const bool.fromEnvironment('DISABLE_REMOTE_IMAGES') &&
-            Uri.tryParse(account.avatar)?.scheme == 'https'
-        ? NetworkImage(account.avatar)
-        : null;
-    return PopupMenuButton<String>(
-      key: const Key('hongguo-account-menu'),
-      tooltip: '账号菜单',
-      onSelected: (action) {
-        if (action == 'scan') {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const AccountPairingScanScreen(),
-            ),
-          );
-        } else {
-          _logout();
-        }
-      },
-      itemBuilder: (_) => [
-        if ((Platform.isIOS || Platform.isAndroid) &&
-            !AppLayout.isTelevision(context))
-          const PopupMenuItem(value: 'scan', child: Text('扫一扫登录其他设备')),
-        const PopupMenuItem(value: 'logout', child: Text('退出登录')),
-      ],
-      child: Padding(
-        padding: const EdgeInsets.all(8),
+  Widget _buildHeader(BuildContext context) {
+    if (account.loggedIn) {
+      final avatar =
+          !const bool.fromEnvironment('DISABLE_REMOTE_IMAGES') &&
+              Uri.tryParse(account.avatar)?.scheme == 'https'
+          ? NetworkImage(account.avatar)
+          : null;
+      final displayName = account.nickname.isNotEmpty ? account.nickname : '用户';
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             CircleAvatar(
               radius: 18,
               foregroundImage: avatar,
               onForegroundImageError: avatar == null ? null : (_, _) {},
-              child: const Icon(Icons.person),
+              child: const Icon(Icons.person, size: 20),
             ),
-            const SizedBox(width: 8),
-            Flexible(
+            const SizedBox(width: 10),
+            Expanded(
               child: Text(
-                account.nickname,
+                displayName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            const Icon(Icons.arrow_drop_down),
+            PopupMenuButton<String>(
+              key: const Key('hongguo-account-more-menu'),
+              tooltip: '更多',
+              icon: const Icon(Icons.more_horiz_rounded),
+              onSelected: (action) {
+                if (action == 'scan') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AccountPairingScanScreen(),
+                    ),
+                  );
+                } else if (action == 'logout') {
+                  _logout();
+                }
+              },
+              itemBuilder: (_) => [
+                if ((Platform.isIOS || Platform.isAndroid) &&
+                    !AppLayout.isTelevision(context))
+                  const PopupMenuItem(
+                    value: 'scan',
+                    child: Row(
+                      children: [
+                        Icon(Icons.qr_code_scanner_rounded, size: 20),
+                        SizedBox(width: 12),
+                        Text('扫码'),
+                      ],
+                    ),
+                  ),
+                const PopupMenuItem(
+                  value: 'logout',
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout_rounded, size: 20),
+                      SizedBox(width: 12),
+                      Text('退出登录'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          Text(
+            '我的',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Spacer(),
+          FilledButton.icon(
+            key: const Key('hongguo-account-login'),
+            onPressed: _login,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.hongguoRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: const StadiumBorder(),
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.login_rounded, size: 18),
+            label: const Text(
+              '登录',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -204,22 +283,7 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget build(BuildContext context) => SafeArea(
     child: Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: [
-              Text('我的', style: Theme.of(context).textTheme.headlineSmall),
-              IconButton(
-                key: const Key('my-settings'),
-                tooltip: '设置',
-                onPressed: widget.onOpenSettings,
-                icon: const Icon(Icons.settings_outlined),
-              ),
-              const Spacer(),
-              Flexible(child: _accountButton()),
-            ],
-          ),
-        ),
+        _buildHeader(context),
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {

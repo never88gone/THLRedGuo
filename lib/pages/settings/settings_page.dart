@@ -39,10 +39,12 @@ class SettingsScreen extends StatefulWidget {
     super.key,
     required this.repository,
     required this.store,
+    this.embedded = false,
   });
 
   final AppRepository repository;
   final LocalStore store;
+  final bool embedded;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -94,7 +96,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('设置'),
-            centerTitle: true,
+            centerTitle: !widget.embedded,
+            automaticallyImplyLeading: !widget.embedded,
           ),
           body: ListView(
             padding: const EdgeInsets.symmetric(vertical: 12),

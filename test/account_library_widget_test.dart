@@ -81,8 +81,7 @@ void main() {
     await tester.tap(find.byKey(const Key('my-history')));
     await tester.pumpAndSettle();
     expect(find.text('合成历史'), findsWidgets);
-    await tester.tap(find.byKey(const Key('my-settings')));
-    expect(settings, 1);
+    expect(find.byKey(const Key('my-settings')), findsNothing);
     expect(store.favorites.single.id, drama.id);
     expect(store.history.single.episode, 3);
     expect(store.history.single.position, 20);

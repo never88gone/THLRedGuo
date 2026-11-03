@@ -165,12 +165,6 @@ class HomeAppBarView extends StatelessWidget implements PreferredSizeWidget {
               onPressed: onToggleSearch,
             ),
           ],
-          IconButton(
-            key: const ValueKey('home-appbar-settings-button'),
-            tooltip: '设置',
-            icon: const Icon(Icons.settings_rounded),
-            onPressed: () => onMoreAction('settings'),
-          ),
         ],
       ],
     );

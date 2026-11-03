@@ -1228,14 +1228,13 @@ class _HomeScreenState extends State<HomeScreen> {
           (0, Icons.explore_outlined, Icons.explore, '发现'),
           (4, Icons.play_circle_outline, Icons.play_circle, '推荐'),
           (1, Icons.person_outline, Icons.person, '我的'),
-          if (widget.store.canDownload)
-            (3, Icons.download_outlined, Icons.download_rounded, '下载'),
+          (3, Icons.download_outlined, Icons.download_rounded, '下载'),
+          (5, Icons.settings_outlined, Icons.settings_rounded, '设置'),
         ];
         final navIndex = destinations.indexWhere((item) => item.$1 == _tab);
         final scaffold = Scaffold(
-          appBar: _tab == 4 || {1, 2, 5}.contains(_tab)
-              ? null
-              : HomeAppBarView(
+          appBar: _tab == 0
+              ? HomeAppBarView(
                   selectionMode: _selectionMode,
                   selectedEmpty: _selectedDramas.isEmpty,
                   tab: _tab,
@@ -1265,7 +1264,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   onRefreshCatalog: _refreshCatalog,
                   onMoreAction: _handleHomeMoreAction,
                   onOpenSourceSwitcher: _openSourceSwitcher,
-                ),
+                )
+              : null,
           body: Container(
             decoration: BoxDecoration(
               gradient: Theme.of(context).brightness == Brightness.dark
@@ -1296,24 +1296,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   onPressed: () => _onNavSelected(entry.$1),
                                 ),
                               ),
-                            const Spacer(),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: RemoteButton(
-                                key: const ValueKey('tv-nav-settings'),
-                                label: '设置',
-                                icon: Icons.settings_rounded,
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => SettingsScreen(
-                                      repository: widget.repository,
-                                      store: widget.store,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -1326,28 +1308,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           _onNavSelected(destinations[index].$1),
                       labelType: NavigationRailLabelType.all,
                       groupAlignment: -.8,
-                      trailing: Expanded(
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: IconButton(
-                              key: const ValueKey('desktop-nav-settings'),
-                              icon: const Icon(Icons.settings_rounded),
-                              tooltip: '设置',
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute<void>(
-                                  builder: (_) => SettingsScreen(
-                                    repository: widget.repository,
-                                    store: widget.store,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                       destinations: [
                         for (final item in destinations)
                           NavigationRailDestination(
@@ -1376,21 +1336,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                           selectionInBody:
                                               desktop || television,
                                         )
-                                : {1, 2, 5}.contains(_tab)
+                                : {1, 2}.contains(_tab)
                                 ? AccountScreen(
                                     repository: widget.repository,
                                     store: widget.store,
                                     initialHistory: widget.initialTab == 2,
                                     onOpen: _openDrama,
-                                    onOpenSettings: () =>
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute<void>(
-                                            builder: (_) => SettingsScreen(
-                                              repository: widget.repository,
-                                              store: widget.store,
-                                            ),
-                                          ),
-                                        ),
+                                    onOpenSettings: () => _changeTab(5),
                                     localLibraryBuilder: (history) =>
                                         SavedLibrary(
                                           key: ValueKey('my-local-$history'),
@@ -1414,6 +1366,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                   )
                                 : _tab == 3
                                 ? DownloadsScreen(
+                                    repository: widget.repository,
+                                    store: widget.store,
+                                    embedded: true,
+                                  )
+                                : _tab == 5
+                                ? SettingsScreen(
                                     repository: widget.repository,
                                     store: widget.store,
                                     embedded: true,
