@@ -3106,14 +3106,13 @@ extension RemoteNavigationTests {
         Thread.sleep(forTimeInterval: 1.0)
         saveShot("04b_tvos_library_first_card_focused.png")
 
-        // 返回左侧边栏并切换到追剧
+        // 返回左侧边栏并移动焦点到追剧：仅移动焦点，不按 select！验证获取焦点后马上切换数据
         press(.left, focus: "library.tab.history")
         press(.down, focus: "library.tab.follows")
-        press(.select)
-        wait("library follows ready", seconds: 15) {
+        wait("library follows auto switched on focus without select", seconds: 15) {
             self.app.buttons["library.filter.all"].exists || self.app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.card.")).count > 0 || self.app.staticTexts["暂无追剧记录"].exists
         }
-        // 截图 5：媒体库 - 我的追剧
+        // 截图 5：媒体库 - 我的追剧（聚焦即刻自动切换）
         saveShot("05_tvos_library_follows.png")
         app.terminate()
 

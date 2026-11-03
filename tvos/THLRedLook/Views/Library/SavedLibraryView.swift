@@ -77,6 +77,11 @@ public struct SavedLibraryView: View {
                                 isSelected: viewModel.selectedTab == tab,
                                 isFocused: focusedTarget == .mainTab(tab),
                                 isCompact: true,
+                                onFocused: {
+                                    if viewModel.selectedTab != tab {
+                                        viewModel.selectedTab = tab
+                                    }
+                                },
                                 onUpCommand: tab == .history ? requestTopNavigation : nil,
                                 onDownCommand: nil,
                                 onRightCommand: { focus(firstCardTarget, with: proxy) }
@@ -117,6 +122,11 @@ public struct SavedLibraryView: View {
                                         isSelected: viewModel.selectedFollowFilter == state,
                                         isFocused: focusedTarget == .followFilter(state),
                                         isCompact: true,
+                                        onFocused: {
+                                            if viewModel.selectedFollowFilter != state {
+                                                viewModel.selectedFollowFilter = state
+                                            }
+                                        },
                                         onUpCommand: { focus(.account, with: proxy) },
                                         onDownCommand: { focus(firstCardTarget, with: proxy) }
                                     ) { viewModel.selectedFollowFilter = state }
@@ -208,6 +218,18 @@ public struct SavedLibraryView: View {
                 #endif
             }
             .onChange(of: viewModel.selectedTab) { _, tab in Task { await viewModel.loadAccount(tab) } }
+            .onChange(of: focusedTarget) { _, target in
+                if case .mainTab(let tab) = target {
+                    if viewModel.selectedTab != tab {
+                        viewModel.selectedTab = tab
+                    }
+                }
+                if case .followFilter(let state) = target {
+                    if viewModel.selectedFollowFilter != state {
+                        viewModel.selectedFollowFilter = state
+                    }
+                }
+            }
             .onChange(of: focusCategoryTrigger) { _, _ in
                 focus(.mainTab(viewModel.selectedTab), with: proxy)
                 #if DEBUG
