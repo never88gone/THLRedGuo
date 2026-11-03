@@ -605,6 +605,89 @@ class HongguoAccountService {
     }).toList();
   }
 
+  Future<void> setFollowing(Drama drama, bool follow) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    await _call(
+      'favoriteUpdate',
+      {'id': drama.cleanSourceId, 'follow': follow ? '1' : '0'},
+      null,
+      revision,
+    );
+    final result = await _call(
+      'favorites',
+      {'userId': session.id},
+      null,
+      revision,
+    );
+    final found = (result['items'] as List).any(
+      (row) => (row as Map)['id'].toString() == drama.cleanSourceId,
+    );
+    if (found != follow) {
+      throw const HongguoAccountFailure(
+        '官方追剧状态尚未确认，请刷新后重试',
+        'WRITE_NOT_CONFIRMED',
+      );
+    }
+  }
+
+  Future<WatchEntry?> progress(Drama drama) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    Map<String, dynamic> result;
+    try {
+      result = await _call(
+        'progressGet',
+        {'id': drama.cleanSourceId},
+        null,
+        revision,
+      );
+    } on HongguoAccountFailure catch (error) {
+      if (error.code != 'BUSINESS_101112') rethrow;
+      result = await _call('history', {}, null, revision);
+      if (!(result['items'] as List).any(
+        (row) => (row as Map)['id'].toString() == drama.cleanSourceId,
+      )) {
+        rethrow;
+      }
+    }
+    final rows = (result['items'] as List).cast<Map>();
+    final row = rows
+        .where((row) => row['id'].toString() == drama.cleanSourceId)
+        .firstOrNull;
+    if (row == null) return null;
+    return WatchEntry(
+      drama: drama,
+      episode: intValue(row['episode']),
+      position: (row['positionMs'] as num? ?? 0) / 1000,
+      duration: (row['durationMs'] as num? ?? 0) / 1000,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(
+        intValue(row['updatedAt']),
+      ),
+    );
+  }
+
+  Future<void> updateProgress(
+    WatchEntry entry, {
+    required String itemId,
+  }) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    await _call(
+      'progressUpdate',
+      {
+        'id': entry.drama.cleanSourceId,
+        'itemId': itemId,
+        'episode': entry.episode,
+        'positionMs': (entry.position * 1000).round(),
+        'durationMs': (entry.duration * 1000).round(),
+        'episodes': entry.drama.episodes,
+        'updatedAt': entry.updatedAt.millisecondsSinceEpoch,
+      },
+      null,
+      session.revision,
+    );
+  }
+
   void dispose() {
     _disposed = true;
     _http?.close(force: true);

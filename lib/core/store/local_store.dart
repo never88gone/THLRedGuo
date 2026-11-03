@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import '../account/hongguo_account_library.dart';
+import '../account/hongguo_account_session.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,11 +26,15 @@ class LocalStore extends ChangeNotifier {
   LocalStore(
     this.preferences, {
     Future<String> Function(String, String)? pinHasher,
-  }) : _pinHasher = pinHasher ?? hashProfilePin {
+    HongguoAccountLibrary? accountLibrary,
+  }) : _pinHasher = pinHasher ?? hashProfilePin,
+       _accountLibrary = accountLibrary ?? HongguoAccountLibrary.shared {
     _initialize();
+    _accountLibrary.addListener(_notify);
   }
 
   final SharedPreferences preferences;
+  final HongguoAccountLibrary _accountLibrary;
   final Future<String> Function(String pin, String salt) _pinHasher;
   LocalSnapshot? _snapshot;
   LanDocument? _lanDocumentCache;
@@ -458,14 +464,28 @@ class LocalStore extends ChangeNotifier {
       .toList()
       .reversed
       .toList();
+  bool usesAccountLibrary(String id) => _accountLibrary.handles(id);
+
+  Future<void> prepareAccountDrama(Drama drama) =>
+      _accountLibrary.handles(drama.id) && allowsSource(drama.source)
+      ? _accountLibrary.prepare(drama)
+      : Future.value();
+
   WatchEntry? watched(String id) {
+    if (_accountLibrary.handles(id)) {
+      return allowsSource('hongguo') ? _accountLibrary.watched(id) : null;
+    }
+    return localWatched(id);
+  }
+
+  WatchEntry? localWatched(String id) {
     WatchEntry? entry = _history[id];
     if (entry == null && !id.contains(':')) {
       entry = _history.values
           .where((e) => e.drama.id.endsWith(':$id'))
           .firstOrNull;
     }
-    if (entry == null && isFavorite(id)) {
+    if (entry == null && localIsFavorite(id)) {
       try {
         entry = lanDocument.records[id]?.watch;
       } catch (_) {}
@@ -478,6 +498,13 @@ class LocalStore extends ChangeNotifier {
   }
 
   bool isFavorite(String id) {
+    if (_accountLibrary.handles(id)) {
+      return allowsSource('hongguo') && _accountLibrary.following(id);
+    }
+    return localIsFavorite(id);
+  }
+
+  bool localIsFavorite(String id) {
     var drama = _favorites[id];
     if (drama == null && !id.contains(':')) {
       drama = _favorites.values.where((d) => d.id.endsWith(':$id')).firstOrNull;
@@ -486,6 +513,14 @@ class LocalStore extends ChangeNotifier {
   }
 
   FollowState? following(String id) {
+    final library = _accountLibrary;
+    if (library.handles(id)) {
+      if (!allowsSource('hongguo')) return null;
+      final drama = library.favorite(id);
+      return drama == null
+          ? null
+          : FollowState.initial(drama, library.watched(id));
+    }
     if (!isFavorite(id)) return null;
     var state = _followStates[id];
     if (state == null && !id.contains(':')) {
@@ -688,9 +723,9 @@ class LocalStore extends ChangeNotifier {
 
   int stepFeedOffset([int step = 6]) {
     _feedOffset = (_feedOffset + step) % 60;
-    unawaited(_commit({
-      _key('feedOffset'): _feedOffset.toString(),
-    }, trackSync: false));
+    unawaited(
+      _commit({_key('feedOffset'): _feedOffset.toString()}, trackSync: false),
+    );
     return _feedOffset;
   }
 
@@ -700,9 +735,7 @@ class LocalStore extends ChangeNotifier {
       if (locked || epoch != _epoch) return;
       _feedSeenIds.clear();
       _feedSeenSet.clear();
-      await _commit({
-        _key('feedSeenDramas'): jsonEncode([]),
-      }, trackSync: false);
+      await _commit({_key('feedSeenDramas'): jsonEncode([])}, trackSync: false);
     });
   }
 
@@ -803,7 +836,22 @@ class LocalStore extends ChangeNotifier {
     return _setting(_key('downloadPreferences'), jsonEncode(value.toJson()));
   }
 
+  Future<void> setFavorite(Drama drama, bool follow) {
+    if (_accountLibrary.handles(drama.id) && allowsSource(drama.source)) {
+      return _accountLibrary.setFollowing(drama, follow);
+    }
+    return isFavorite(drama.id) == follow
+        ? Future.value()
+        : toggleFavorite(drama);
+  }
+
   Future<void> toggleFavorite(Drama drama) {
+    if (_accountLibrary.handles(drama.id) && allowsSource(drama.source)) {
+      return _accountLibrary.setFollowing(
+        drama,
+        !_accountLibrary.following(drama.id),
+      );
+    }
     final epoch = _epoch;
     return _queue(() async {
       if (!allowsSource(drama.source) || epoch != _epoch) return;
@@ -837,6 +885,12 @@ class LocalStore extends ChangeNotifier {
   });
 
   Future<void> setFollowStatus(Drama drama, FollowStatus status) {
+    if (_accountLibrary.handles(drama.id) && allowsSource(drama.source)) {
+      if (status != FollowStatus.planned) {
+        return Future.error(const HongguoAccountFailure('账号观看状态由实际播放进度决定'));
+      }
+      return _accountLibrary.setFollowing(drama, true);
+    }
     final epoch = _epoch;
     return _queue(() async {
       if (!allowsSource(drama.source) || epoch != _epoch) return;
@@ -866,6 +920,7 @@ class LocalStore extends ChangeNotifier {
   }
 
   Future<void> markUpdatesRead(String id) {
+    if (_accountLibrary.handles(id)) return Future.value();
     final epoch = _epoch;
     return _queue(() async {
       if (!isFavorite(id) || epoch != _epoch) return;
@@ -899,7 +954,16 @@ class LocalStore extends ChangeNotifier {
       entry.position >= 0 &&
       entry.duration > 0;
 
-  Future<void> saveWatch(WatchEntry entry) {
+  Future<void> saveWatch(
+    WatchEntry entry, {
+    String itemId = '',
+    bool force = false,
+  }) {
+    if (_accountLibrary.handles(entry.drama.id) &&
+        allowsSource(entry.drama.source)) {
+      if (!_validWatch(entry)) return Future.value();
+      return _accountLibrary.report(entry, itemId: itemId, force: force);
+    }
     if (!_validWatch(entry)) return Future.value();
     final epoch = _epoch;
     return _queue(() async {
@@ -983,6 +1047,12 @@ class LocalStore extends ChangeNotifier {
   }
 
   Future<void> clearHistory({String? targetSource}) {
+    if (_accountLibrary.active &&
+        (targetSource == null || targetSource == 'hongguo')) {
+      return Future.error(
+        const HongguoAccountFailure('账号历史请在红果 App 管理，本地旧记录会保留'),
+      );
+    }
     final epoch = _epoch;
     return _queue(() async {
       if (locked || epoch != _epoch) return;
@@ -1014,9 +1084,7 @@ class LocalStore extends ChangeNotifier {
           deleted[id] = now;
         }
         await _commit(
-          {
-            _key('deletedHistory'): jsonEncode(deleted),
-          },
+          {_key('deletedHistory'): jsonEncode(deleted)},
           remove: [_key('history')],
           clearSyncProgress: {..._history.keys, ...lanDocument.records.keys},
         );
@@ -1027,6 +1095,11 @@ class LocalStore extends ChangeNotifier {
   }
 
   Future<void> removeHistory(String id) {
+    if (_accountLibrary.handles(id)) {
+      return Future.error(
+        const HongguoAccountFailure('账号历史暂不支持删除，请在红果 App 管理'),
+      );
+    }
     final epoch = _epoch;
     return _queue(() async {
       if (watched(id) == null || epoch != _epoch) return;
@@ -1704,6 +1777,7 @@ class LocalStore extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _accountLibrary.removeListener(_notify);
     super.dispose();
   }
 }

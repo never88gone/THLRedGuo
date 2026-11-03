@@ -95,7 +95,7 @@ final class LocalLibraryTests: XCTestCase {
         let bridges = ["播放", "下一集", "推荐", "弹幕"].enumerated().map { index, context in
             NativeBridge(baseDirectory: root.appendingPathComponent(String(index)), httpSession: session,
                          diagnostics: SourceDiagnostics(), diagnosticContext: context, deviceDefaults: defaults,
-                         playbackProfileLoader: { try profile.load() }, playbackProfileRevision: { profile.revision })
+                         playbackProfileLoader: { try profile.load() }, playbackProfileRevision: { profile.revision }, accountSnapshot: { (nil, 0) })
         }
         let payload: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567000"]]
         for bridge in bridges {
@@ -148,7 +148,7 @@ final class LocalLibraryTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let bridge = NativeBridge(baseDirectory: root, httpSession: session, diagnostics: SourceDiagnostics(), deviceDefaults: defaults,
-                                  playbackProfileLoader: { try profile.load() }, playbackProfileRevision: { profile.revision })
+                                  playbackProfileLoader: { try profile.load() }, playbackProfileRevision: { profile.revision }, accountSnapshot: { (nil, 0) })
         let payload: [String: Any] = ["source": "hongguo", "drama": ["id": "hongguo:7345678901234567000"]]
         _ = try await bridge.request(action: "detail", payload: payload)
         XCTAssertEqual(LocalProfileDetailProtocol.requestCount, 1)

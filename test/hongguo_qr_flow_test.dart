@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:THLRedLook/core/account/hongguo_account_service.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/core/account/hongguo_account_session.dart';
 import 'package:THLRedLook/core/js/hongguo_guest_session.dart';
 import 'package:THLRedLook/core/account/account_transfer_payload.dart';
@@ -122,6 +123,105 @@ void main() {
         'cdid': 'synthetic-device',
       }),
     });
+  });
+  test('官方视频书架写入后回读确认，进度按毫秒上报并按剧读取，携带当前账号', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('synthetic-writeback');
+    final cookies = HongguoAccountCookies()
+      ..merge(Uri.parse('https://hongguoduanju.com/'), [
+        'sessionid=synthetic-writeback; Path=/; Secure',
+      ]);
+    await session.accept(cookies, {
+      'id': '123',
+      'nickname': 'synthetic',
+    }, expectedRevision: session.revision);
+    final drama = Drama(
+      id: 'hongguo:7688558312157088793',
+      source: 'hongguo',
+      sourceId: '7688558312157088793',
+      title: 'synthetic',
+      cover: '',
+      description: '',
+      episodes: 60,
+    );
+    var followed = false, updates = 0, reads = 0;
+    Map<String, dynamic>? saved;
+    await HttpOverrides.runZoned(
+      () async {
+        final service = HongguoAccountService(session: session);
+        addTearDown(service.dispose);
+        await service.setFollowing(drama, true);
+        await service.setFollowing(drama, false);
+        await service.updateProgress(
+          WatchEntry(
+            drama: drama,
+            episode: 4,
+            position: 12.345,
+            duration: 95.678,
+            updatedAt: DateTime.now(),
+          ),
+          itemId: '7688558312157088794',
+        );
+        final progress = await service.progress(drama);
+        expect(progress!.episode, 4);
+        expect(progress.position, 12.345);
+        expect(progress.duration, 95.678);
+        expect(updates, 2);
+        expect(reads, 2);
+      },
+      createHttpClient: (_) => _Client((uri, headers) {
+        expect(
+          headers.value('Cookie'),
+          contains('sessionid=synthetic-writeback'),
+        );
+        if (uri.path.endsWith('/bookshelf/video/update/v1/')) {
+          updates++;
+          final body = jsonDecode(headers.value('synthetic-body')!) as Map;
+          final row =
+              (body['update_bookshelf_video_list'] as List).single as Map;
+          expect(row['book_id'], drama.sourceId);
+          expect(row['book_type'], 2);
+          followed = row['video_shelf_operate_type'] == 0;
+          return _Reply({'code': 0});
+        }
+        if (uri.path.endsWith('/bookshelf/video/list/v1/')) {
+          reads++;
+          return _Reply({
+            'code': 0,
+            'data': {
+              'video_shelf_info': [
+                if (followed) {'book_id': drama.sourceId},
+              ],
+            },
+          });
+        }
+        if (uri.path.endsWith('/read_progress/upload/v1/')) {
+          final body = jsonDecode(headers.value('synthetic-body')!) as Map;
+          expect(body['write_mode'], 1);
+          saved = Map<String, dynamic>.from(
+            (body['books'] as List).single as Map,
+          );
+          expect(saved!['item_id'], '7688558312157088794');
+          expect(saved!['vid_index'], 4);
+          expect(saved!['current_play_time'], 12345);
+          expect(saved!['current_total_time'], 95678);
+          return _Reply({'code': 0});
+        }
+        expect(uri.path, '/reading/bookapi/read_progress/get/v1/');
+        final body = jsonDecode(headers.value('synthetic-body')!) as Map;
+        expect((body['book_ids'] as Map)['2'], [int.parse(drama.sourceId)]);
+        return _Reply({
+          'code': 0,
+          'video_data': [
+            {
+              ...saved!,
+              'vid': saved!['item_id'],
+              'last_watch_time': 1700000000000,
+            },
+          ],
+        });
+      }),
+    );
   });
   test('传入账号先使用候选设备与轮转Cookie校验，提交前不覆盖当前账号', () async {
     final session = HongguoAccountSession();
@@ -400,6 +500,75 @@ void main() {
         ),
       ),
     );
+  });
+  test('单剧进度101112仅使用同一账号历史的匹配进度，缺失或鉴权失败不能伪装成功', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('synthetic-progress-read');
+    final cookies = HongguoAccountCookies()
+      ..merge(Uri.parse('https://hongguoduanju.com/'), [
+        'sessionid=synthetic-progress; Path=/; Secure',
+      ]);
+    await session.accept(cookies, {
+      'id': '123',
+    }, expectedRevision: session.revision);
+    final drama = Drama(
+      id: 'hongguo:7688558312157088793',
+      source: 'hongguo',
+      sourceId: '7688558312157088793',
+      title: 'synthetic',
+      cover: '',
+      description: '',
+      episodes: 60,
+    );
+    for (final scenario in [0, 1, 2]) {
+      final paths = <String>[];
+      final service = HongguoAccountService(session: session);
+      addTearDown(service.dispose);
+      await HttpOverrides.runZoned(
+        () async {
+          if (scenario == 0) {
+            final progress = await service.progress(drama);
+            expect(progress!.episode, 2);
+            expect(progress.position, 12);
+          } else {
+            await expectLater(
+              service.progress(drama),
+              throwsA(
+                isA<HongguoAccountFailure>().having(
+                  (e) => e.code,
+                  'original rejection',
+                  scenario == 1 ? 'BUSINESS_101112' : 'BUSINESS_15',
+                ),
+              ),
+            );
+          }
+        },
+        createHttpClient: (_) => _Client((uri, headers) {
+          expect(headers.value('Cookie'), 'sessionid=synthetic-progress');
+          paths.add(uri.path);
+          if (uri.path.endsWith('/get/v1/')) {
+            return _Reply({'code': scenario == 2 ? 15 : 101112});
+          }
+          expect(uri.path, '/reading/bookapi/read_progress/list/v1/');
+          return _Reply({
+            'code': 0,
+            'video_data': scenario == 0
+                ? [
+                    {
+                      'series_id': drama.cleanSourceId,
+                      'vid': '7688558312157088794',
+                      'vid_index': 2,
+                      'current_play_time': 12000,
+                      'current_total_time': 90000,
+                      'last_watch_time': 1700000000,
+                    },
+                  ]
+                : [],
+          });
+        }),
+      );
+      expect(paths.length, scenario == 2 ? 1 : 2);
+    }
   });
   test('切换账号期间已打开但未发送的请求不能附加新账号Cookie', () async {
     final session = HongguoAccountSession();

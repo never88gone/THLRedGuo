@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/account/hongguo_account_session.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -1297,22 +1298,34 @@ class _PlayerScreenState extends State<PlayerScreen>
     _syncDanmaku();
   }
 
+  final int _watchAccountRevision = HongguoAccountSession.shared.revision;
+
   Future<void> _saveProgress({bool flush = false}) async {
-    if (_openedIndex < 0 || widget.store.profileEpoch != _profileEpoch) {
+    if (_openedIndex < 0 ||
+        widget.store.profileEpoch != _profileEpoch ||
+        _watchAccountRevision != HongguoAccountSession.shared.revision) {
       return;
     }
     final position = _player.state.position.inMilliseconds / 1000;
     final duration = _player.state.duration.inMilliseconds / 1000;
+    final canSaveZero =
+        flush &&
+        (_savedProgressKey?.startsWith(
+              '${widget.mediaId ?? widget.detail.drama.id}:$_openedIndex:',
+            ) ??
+            false);
     if (!position.isFinite ||
         !duration.isFinite ||
-        position < .1 ||
+        (position < .1 && !canSaveZero) ||
         duration <= 0) {
       return;
     }
     final store = widget.store;
     final progressKey =
         '${widget.mediaId ?? widget.detail.drama.id}:$_openedIndex:$position:$duration';
-    if (_savedProgressKey == progressKey && _saveWarning == null) {
+    if (_savedProgressKey == progressKey &&
+        _saveWarning == null &&
+        (!flush || !store.usesAccountLibrary(widget.detail.drama.id))) {
       if (flush && widget.mediaId == null) LanController.current?.flush();
       return;
     }
@@ -1323,11 +1336,17 @@ class _PlayerScreenState extends State<PlayerScreen>
       duration: duration,
       updatedAt: DateTime.now(),
     );
+    final itemId =
+        ((_plan?.danmakuId.isNotEmpty ?? false)
+                ? _plan!.danmakuId
+                : widget.detail.episodes[_openedIndex].id)
+            .split(':')
+            .last;
     try {
       await Future<void>.value();
       if (store.profileEpoch != _profileEpoch) return;
       if (widget.mediaId == null) {
-        await store.saveWatch(entry);
+        await store.saveWatch(entry, itemId: itemId, force: flush);
         if (flush) LanController.current?.flush();
       } else {
         await store.saveMediaWatch(widget.mediaId!, entry);
@@ -1336,9 +1355,13 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (mounted && !_closed && _saveWarning != null) {
         setState(() => _saveWarning = null);
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted && !_closed && _saveWarning == null) {
-        setState(() => _saveWarning = '观看进度尚未保存，请检查存储空间后重试。');
+        setState(
+          () => _saveWarning = error is HongguoAccountFailure
+              ? '账号观看进度尚未同步，请检查网络后重试。'
+              : '观看进度尚未保存，请检查存储空间后重试。',
+        );
       }
     }
   }
@@ -2178,6 +2201,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     return PopScope(
       canPop: _television || pictureInPicture || !fullscreen,
       onPopInvokedWithResult: (didPop, result) {
+        if (didPop && widget.store.usesAccountLibrary(widget.detail.drama.id)) {
+          unawaited(_saveProgress(flush: true));
+        }
         if (!didPop && fullscreen && !_television && !pictureInPicture) {
           _rotate();
         } else if (!didPop && pictureInPicture) {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/account/hongguo_account_library.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import '../../utils/screen/app_layout.dart';
@@ -51,7 +52,19 @@ class _AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     account.addListener(_accountChanged);
+    if (widget.service == null && widget.session == null) {
+      HongguoAccountLibrary.shared.addListener(_libraryChanged);
+    }
     _accountChanged();
+  }
+
+  void _libraryChanged() {
+    if (!mounted || !account.loggedIn) return;
+    setState(() {
+      for (final tab in [true, false]) {
+        lists[tab] = HongguoAccountLibrary.shared.entries(tab);
+      }
+    });
   }
 
   void _accountChanged() {
@@ -85,7 +98,9 @@ class _AccountScreenState extends State<AccountScreen> {
       errors.remove(tab);
     });
     try {
-      final entries = await service.library(history: tab);
+      final entries = widget.service != null || widget.session != null
+          ? await service.library(history: tab)
+          : await HongguoAccountLibrary.shared.load(tab, refresh: refresh);
       if (!mounted || owner != account.revision) return;
       setState(() => lists[tab] = entries);
     } catch (_) {
@@ -107,6 +122,9 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   void dispose() {
     account.removeListener(_accountChanged);
+    if (widget.service == null && widget.session == null) {
+      HongguoAccountLibrary.shared.removeListener(_libraryChanged);
+    }
     if (widget.service == null) {
       service.dispose();
     }
@@ -119,7 +137,7 @@ class _AccountScreenState extends State<AccountScreen> {
       builder: (context) => AlertDialog(
         title: const Text('账号登录提示'),
         content: const Text(
-          '登录后将使用短剧平台的接口数据同步追剧与观看记录，原本通过 iCloud 同步的本地记录将被清除。\n\n是否确认登录？',
+          '登录后将使用短剧平台的接口数据同步追剧与观看记录，原有本地与 iCloud 记录会保留，退出账号后继续使用。\n\n是否确认登录？',
         ),
         actions: [
           TextButton(
@@ -196,9 +214,9 @@ class _AccountScreenState extends State<AccountScreen> {
                 displayName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
             PopupMenuButton<String>(
@@ -252,9 +270,9 @@ class _AccountScreenState extends State<AccountScreen> {
         children: [
           Text(
             '我的',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const Spacer(),
           FilledButton.icon(

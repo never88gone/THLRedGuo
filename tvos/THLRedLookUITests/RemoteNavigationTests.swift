@@ -4,6 +4,78 @@ final class RemoteNavigationTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.never88gone.redlook")
     private let remote = XCUIRemote.shared
 
+    func testOwnerAccountWritebackPlaybackAndResume() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "library", "-noLibraryFixtures"]
+        app.launch()
+        guard app.buttons["hongguo-account-menu"].waitForExistence(timeout: 20) else {
+            throw XCTSkip("Owner simulator requires account login before real writeback verification")
+        }
+        app.terminate()
+        let candidates = [("7689841670413618238", "账号进度验证样本"), ("7695704804978330649", "满院亲戚全是上古大妖第五季"), ("7688558312157088793", "满院亲戚全是上古大妖第四季"), ("7678338044344159256", "满院亲戚全是上古大妖第二季")]
+        var selected = candidates[0], followVerified = false
+        for candidate in candidates {
+            app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:" + candidate.0, "-testDramaTitle", candidate.1]
+            app.launch()
+            XCTAssertTrue(app.buttons["detail.episode.1"].waitForExistence(timeout: 60))
+            if !app.buttons["detail.favorite"].label.contains("已") {
+                selected = candidate
+                yaoDetailPlayFocus()
+                press(.right, focus: "detail.favorite")
+                press(.select)
+                wait("official follow readback", seconds: 30) { self.app.buttons["detail.favorite"].label.contains("已") }
+                press(.select)
+                wait("official unfollow readback", seconds: 30) { !self.app.buttons["detail.favorite"].label.contains("已") }
+                followVerified = true
+                break
+            }
+            selected = candidate
+            app.terminate()
+        }
+        if app.state != .runningForeground {
+            app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:" + selected.0, "-testDramaTitle", selected.1]
+            app.launch()
+            XCTAssertTrue(app.buttons["detail.episode.1"].waitForExistence(timeout: 60))
+        }
+        focusChunk(0)
+        press(.down, focus: "detail.episode.1")
+        press(.select)
+        wait("episode 1 running", seconds: 60) { self.showControls(); return self.app.staticTexts["player.episode"].label.contains("第 1 集") && self.seconds(self.app.staticTexts["player.position"].label) >= 7 }
+        showControls()
+        let saved = seconds(app.staticTexts["player.position"].label)
+        press(.menu, focus: "player.wake")
+        press(.menu)
+        XCTAssertTrue(app.buttons["detail.episode.1"].waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 3)
+        app.terminate()
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:" + selected.0, "-testDramaTitle", selected.1]
+        app.launch()
+        XCTAssertTrue(app.buttons["detail.episode.1"].waitForExistence(timeout: 60))
+        yaoDetailPlayFocus()
+        press(.select)
+        wait("server progress resumes after process restart", seconds: 60) { self.showControls(); return self.seconds(self.app.staticTexts["player.position"].label) >= max(1, saved - 2) }
+        showControls()
+        press(.right, focus: "player.seekForward")
+        let duration = seconds(app.staticTexts["player.duration"].label)
+        let position = seconds(app.staticTexts["player.position"].label)
+        let seeks = max(0, min(40, (duration - position - 3) / 10))
+        for _ in 0..<seeks { remote.press(.select) }
+        wait("continuous next episode", seconds: 90) { self.showControls(); return self.app.staticTexts["player.episode"].label.contains("第 2 集") && self.seconds(self.app.staticTexts["player.position"].label) >= 7 }
+        press(.menu, focus: "player.wake")
+        press(.menu)
+        Thread.sleep(forTimeInterval: 3)
+        app.terminate()
+        app.launchArguments = ["-testPage", "library"]
+        app.launch()
+        XCTAssertTrue(app.buttons["hongguo-account-menu"].waitForExistence(timeout: 20))
+        let card = app.buttons["library.card.hongguo:" + selected.0]
+        XCTAssertTrue(card.waitForExistence(timeout: 45))
+        print("THL_ACCOUNT_WRITEBACK follow=\(followVerified) progressResume=true nextEpisode=2 serverHistoryAfterRestart=true series=\(selected.0)")
+        app.terminate()
+    }
+
     func testAuthenticatedAccountLibraryAndSettings() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
         continueAfterFailure = false

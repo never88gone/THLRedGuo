@@ -271,6 +271,7 @@ class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
           if (old == null || ts > old) mergedDeletedFollows[id] = ts;
         }
       }
+
       store.deletedFollows.forEach(addFollowTombstone);
       remoteDeletedFollows.forEach(addFollowTombstone);
 
@@ -281,6 +282,7 @@ class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
           if (old == null || ts > old) mergedDeletedHistory[id] = ts;
         }
       }
+
       store.deletedHistory.forEach(addHistoryTombstone);
       remoteDeletedHistory.forEach(addHistoryTombstone);
 
@@ -346,7 +348,7 @@ class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
           mergedStates[id] =
               localState ??
               remoteState ??
-              FollowState.initial(mergedFavorites[id]!, store.watched(id));
+              FollowState.initial(mergedFavorites[id]!, store.localWatched(id));
         }
       }
 

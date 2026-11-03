@@ -242,7 +242,7 @@ public final class PlayerViewModel: ObservableObject {
             }
             preloadedEpisode = nil
         }
-        saveCurrentProgress()
+        saveCurrentProgress(force: true)
         progressSaveTimer?.invalidate()
         progressSaveTimer = nil
         controlsHideTimer?.invalidate()
@@ -321,7 +321,7 @@ public final class PlayerViewModel: ObservableObject {
         preloadedPlan: PlaybackPlan? = nil
     ) async {
         guard !closed else { return }
-        saveCurrentProgress()
+        saveCurrentProgress(force: true)
         playbackRequestSequence += 1
         playbackGeneration += 1
 
@@ -357,7 +357,7 @@ public final class PlayerViewModel: ObservableObject {
         guard !closed, episodeIndex > 0, seekTo.isFinite else { return }
         playbackRequestSequence += 1
         let request = playbackRequestSequence
-        saveCurrentProgress()
+        saveCurrentProgress(force: true)
         preparationTask?.cancel()
         recoveryTask?.cancel()
         recoveryTask = nil
@@ -936,13 +936,11 @@ public final class PlayerViewModel: ObservableObject {
 
     public func nextEpisode() async {
         guard currentEpisodeIndex < allEpisodes.count else { return }
-        saveCurrentProgress()
         await preparePlayback(episodeIndex: currentEpisodeIndex + 1, seekTo: 0)
     }
 
     public func previousEpisode() async {
         guard currentEpisodeIndex > 1 else { return }
-        saveCurrentProgress()
         await preparePlayback(episodeIndex: currentEpisodeIndex - 1, seekTo: 0)
     }
 
@@ -950,7 +948,6 @@ public final class PlayerViewModel: ObservableObject {
         NSLog("🎬 [PlayerVM] selectEpisode 调用: 目标第%d集, 当前第%d集", number, currentEpisodeIndex)
         isEpisodeDrawerVisible = false
         guard number != currentEpisodeIndex else { return }
-        saveCurrentProgress()
         await preparePlayback(episodeIndex: number, seekTo: 0)
     }
 
@@ -1000,7 +997,7 @@ public final class PlayerViewModel: ObservableObject {
             player?.pause()
             isPlaying = false
             isBuffering = false
-            saveCurrentProgress()
+            saveCurrentProgress(force: true)
         }
         samplePlaybackClock()
         updateActiveDanmakus()
@@ -1097,12 +1094,12 @@ public final class PlayerViewModel: ObservableObject {
     // MARK: - 连播与进度持久化
     private func handlePlayEnded() async {
         currentTime = duration
-        saveCurrentProgress()
         nextEpisodeCountdown = nil
         if currentEpisodeIndex < allEpisodes.count {
             isSeamlessTransitioning = true
             await nextEpisode()
         } else {
+            saveCurrentProgress(force: true)
             reachedEnd = true
             playIntent = false
             resumeAfterInterruption = false
@@ -1121,9 +1118,12 @@ public final class PlayerViewModel: ObservableObject {
         }
     }
 
-    public func saveCurrentProgress() {
+    private let watchAccountRevision = HongguoAccountVault.shared.snapshot.revision
+
+    public func saveCurrentProgress(force: Bool = false) {
+        guard watchAccountRevision == HongguoAccountVault.shared.snapshot.revision else { return }
         guard duration > 0, duration.isFinite else { return }
         samplePlaybackClock()
-        store.recordWatch(drama: drama, episode: currentEpisodeIndex, position: currentTime, duration: duration)
+        store.recordWatch(drama: drama, episode: currentEpisodeIndex, position: currentTime, duration: duration, itemId: (plan?.danmakuId ?? "").split(separator: ":").last.map(String.init) ?? "", force: force)
     }
 }

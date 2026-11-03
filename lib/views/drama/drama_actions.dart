@@ -19,9 +19,9 @@ Future<void> showDramaActions(
 }) async {
   final epoch = store.profileEpoch;
   final following = store.following(drama.id);
-    final vaultController = PrivacyVaultController(store.preferences);
-    final inVault = vaultController.isInVault(drama.id);
-    final choices = <(String, String, IconData)>[
+  final vaultController = PrivacyVaultController(store.preferences);
+  final inVault = vaultController.isInVault(drama.id);
+  final choices = <(String, String, IconData)>[
     if (onContinue != null && store.watched(drama.id) != null)
       ('continue', '继续观看', Icons.play_arrow_rounded),
     ('favorite', following == null ? '加入追剧' : '取消追剧', Icons.bookmark_outline),
@@ -30,7 +30,9 @@ Future<void> showDramaActions(
       inVault ? '移出隐私短剧库' : '加入隐私短剧库',
       inVault ? Icons.lock_open_rounded : Icons.shield_outlined,
     ),
-    for (final status in FollowStatus.values)
+    for (final status in FollowStatus.values.where(
+      (_) => !store.usesAccountLibrary(drama.id),
+    ))
       (
         'status:${status.name}',
         '标记${status.label}',
@@ -46,7 +48,9 @@ Future<void> showDramaActions(
       ('download', '下载选集', Icons.download_outlined),
     if (onSelect != null && store.canDownload)
       ('select', '多选下载', Icons.checklist_rounded),
-    if (history && store.watched(drama.id) != null)
+    if (history &&
+        !store.usesAccountLibrary(drama.id) &&
+        store.watched(drama.id) != null)
       ('removeHistory', '删除这条观看记录', Icons.history_toggle_off),
   ];
   final choice = await showDialog<String>(
@@ -94,7 +98,10 @@ Future<void> showDramaActions(
     case 'continue':
       onContinue?.call();
     case 'favorite':
-      await saveUserChange(context, () => store.toggleFavorite(drama));
+      await saveUserChange(
+        context,
+        () => store.setFavorite(drama, following == null),
+      );
     case 'read':
       await saveUserChange(context, () => store.markUpdatesRead(drama.id));
     case 'download':
@@ -105,9 +112,9 @@ Future<void> showDramaActions(
       if (inVault) {
         await vaultController.removeFromVault(drama.id);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('已将《${drama.title}》移出隐私短剧库')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('已将《${drama.title}》移出隐私短剧库')));
         }
       } else {
         if (!vaultController.hasPassword) {
@@ -119,9 +126,9 @@ Future<void> showDramaActions(
         }
         await vaultController.addToVault(drama);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('已将《${drama.title}》加入隐私短剧库')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('已将《${drama.title}》加入隐私短剧库')));
         }
       }
     case 'removeHistory':

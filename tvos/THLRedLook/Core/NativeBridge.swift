@@ -64,6 +64,7 @@ public actor NativeBridge {
     private let diagnosticContext: String
     private let persistentDeviceSession: Bool
     private let deviceDefaults: UserDefaults
+    private let accountSnapshot: @Sendable () -> (record: HongguoAccountRecord?, revision: UInt64)
     private let httpTrace = HttpTraceHolder()
     private var successfulPlaybackResolves = 0
     private var lastSuccessfulPlaybackAt: TimeInterval?
@@ -93,7 +94,7 @@ public actor NativeBridge {
         lastSuccessfulPlaybackAt = nil
     }
 
-    init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用", persistentDeviceSession: Bool = true, deviceDefaults: UserDefaults = .standard, timeProvider: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 }, playbackProfileLoader: @escaping @Sendable () throws -> HongguoApkProfile? = { try HongguoPlaybackProfileVault.load() }, playbackProfileRevision: @escaping @Sendable () -> UInt64 = { HongguoPlaybackProfileVault.revision }) {
+    init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用", persistentDeviceSession: Bool = true, deviceDefaults: UserDefaults = .standard, timeProvider: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 }, playbackProfileLoader: @escaping @Sendable () throws -> HongguoApkProfile? = { try HongguoPlaybackProfileVault.load() }, playbackProfileRevision: @escaping @Sendable () -> UInt64 = { HongguoPlaybackProfileVault.revision }, accountSnapshot: @escaping @Sendable () -> (record: HongguoAccountRecord?, revision: UInt64) = { HongguoAccountVault.shared.snapshot }) {
         if let httpSession {
             self.httpSession = httpSession
         } else {
@@ -113,6 +114,7 @@ public actor NativeBridge {
         self.diagnosticContext = diagnosticContext
         self.persistentDeviceSession = persistentDeviceSession
         self.deviceDefaults = deviceDefaults
+        self.accountSnapshot = accountSnapshot
         self.timeProvider = timeProvider
         self.playbackProfileLoader = playbackProfileLoader
         self.playbackProfileRevision = playbackProfileRevision
@@ -319,7 +321,7 @@ public actor NativeBridge {
     }
 
     private func getOrCreateContext(sourceId: String) -> JSContext? {
-        let revision = HongguoAccountVault.shared.snapshot.revision
+        let revision = accountSnapshot().revision
         if revision != accountRevision { jsContexts.removeAll(); accountRevision = revision }
 
         if sourceId == "hongguo", jsContexts[sourceId]?.evaluateScript("globalThis.__hongguoHasBuiltInSigning === true")?.toBool() != true {
@@ -374,7 +376,9 @@ public actor NativeBridge {
         }
         context.setObject(saveDeviceBlock, forKeyedSubscript: "__native_save_device" as NSString)
 
-        let accountDevice = (script == BuiltInHongguoJSContent ? HongguoAccountVault.shared.snapshot.record?.device : nil).flatMap { try? JSONSerialization.data(withJSONObject: $0) }.map { String(decoding: $0, as: UTF8.self) }
+        let accountSnapshot = self.accountSnapshot
+        let account = accountSnapshot().record
+        let accountDevice = (script == BuiltInHongguoJSContent && account?.hasSession == true ? account?.device : nil).flatMap { try? JSONSerialization.data(withJSONObject: $0) }.map { String(decoding: $0, as: UTF8.self) }
         if let cachedDevice = accountDevice ?? (persistentDeviceSession ? deviceDefaults.string(forKey: "thl_tv_hongguo_device_session") : nil), SavedGuestSession.valid(cachedDevice) {
             trace.recordGuest(json: cachedDevice, createdAt: deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at"))
             context.evaluateScript("""
@@ -387,8 +391,12 @@ public actor NativeBridge {
 
         // 2. 注入原生高性能 HTTP 请求桥接
         let trustedAccountSource = script == BuiltInHongguoJSContent
-        let expectedAccountRevision = HongguoAccountVault.shared.snapshot.revision
-        context.evaluateScript("globalThis.__hongguoAccountActive = \(trustedAccountSource && HongguoAccountVault.shared.snapshot.record != nil);")
+        let expectedAccountRevision = accountSnapshot().revision
+        let accountActive: @convention(block) () -> Bool = {
+            trustedAccountSource && accountSnapshot().record?.hasSession == true
+        }
+        context.setObject(accountActive, forKeyedSubscript: "__native_account_active" as NSString)
+        context.evaluateScript("Object.defineProperty(globalThis, '__hongguoAccountActive', {get: function(){return !!__native_account_active();}});")
         let session = httpSession
         let recorder = diagnostics
         let diagnosticContext = diagnosticContext
@@ -419,15 +427,15 @@ public actor NativeBridge {
             }
             let accountBusiness = HongguoAccountVault.businessURL(url)
             if accountBusiness {
-                let account = HongguoAccountVault.shared.snapshot
+                let account = accountSnapshot()
                 guard expectedAccountRevision == account.revision else {
                     return ["status": 0, "headers": [:], "body": "", "error": "CANCELLED"]
                 }
-                if account.record != nil {
+                if account.record?.hasSession == true {
                     guard trustedAccountSource else {
                         return ["status": 0, "headers": [:], "body": "", "error": "ACCOUNT_SOURCE_UNTRUSTED"]
                     }
-                    let cookie = HongguoAccountVault.shared.header(for: url)
+                    let cookie = HongguoAccountVault.shared.header(for: url, record: account.record)
                     guard !cookie.isEmpty else { return ["status": 0, "headers": [:], "body": "", "error": "ACCOUNT_EXPIRED"] }
                     req.setValue(cookie, forHTTPHeaderField: "Cookie")
                 }
@@ -447,7 +455,7 @@ public actor NativeBridge {
             let timedOut = semaphore.wait(timeout: .now() + timeout) == .timedOut
             if timedOut { task.cancel() }
             let response = result.snapshot(timedOut: timedOut)
-            if accountBusiness && expectedAccountRevision != HongguoAccountVault.shared.snapshot.revision {
+            if accountBusiness && expectedAccountRevision != accountSnapshot().revision {
                 return ["status": 0, "headers": [:], "body": "", "error": "CANCELLED"]
             }
 
@@ -669,7 +677,8 @@ public actor NativeBridge {
     }
 
     private func synchronizeGuestSession(_ context: JSContext, sourceId: String) {
-        if HongguoAccountVault.shared.snapshot.record?.device != nil { return }
+        let account = accountSnapshot().record
+        if account?.hasSession == true && account?.device != nil { return }
         guard persistentDeviceSession, sourceId == "hongguo",
               let latest = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"),
               SavedGuestSession.valid(latest) else { return }
@@ -703,7 +712,7 @@ public actor NativeBridge {
 
     /// 在 JS 运行时中异步评估 Promise 并等待结果
     private func evalAsync(context: JSContext, scriptExpr: String) -> [String: Any]? {
-        let expectedAccountRevision = HongguoAccountVault.shared.snapshot.revision
+        let expectedAccountRevision = accountSnapshot().revision
         let sem = DispatchSemaphore(value: 0)
         var resultData: [String: Any]? = nil
 
@@ -743,7 +752,7 @@ public actor NativeBridge {
         _ = sem.wait(timeout: .now() + 60.0)
         context.setObject(nil, forKeyedSubscript: doneKey as NSString)
 
-        guard expectedAccountRevision == HongguoAccountVault.shared.snapshot.revision else { return nil }
+        guard expectedAccountRevision == accountSnapshot().revision else { return nil }
         return resultData
     }
 

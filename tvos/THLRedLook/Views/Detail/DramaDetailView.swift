@@ -10,6 +10,7 @@ public struct EpisodeWrapper: Identifiable {
 }
 
 public struct DramaDetailView: View {
+    @ObservedObject private var accountLibrary = HongguoAccountModel.shared
     @StateObject private var viewModel: DetailViewModel
     @Environment(\.presentationMode) var presentationMode
 
@@ -55,6 +56,12 @@ public struct DramaDetailView: View {
     }
 
     public var body: some View {
+        detailBody.onChange(of: accountLibrary.libraryVersion) { _, _ in viewModel.refreshWatchHistory() }.overlay(alignment: .top) {
+            if let error = accountLibrary.libraryWriteError { Text(error).font(.system(size: 29)).foregroundStyle(.orange).padding(24).background(.black.opacity(0.8)) }
+        }
+    }
+
+    private var detailBody: some View {
         ZStack {
             // 背景沉浸式深邃氛围底色（受 GeometryReader 严格限制，杜绝图片撑大溢出）
             GeometryReader { geo in
@@ -188,7 +195,7 @@ public struct DramaDetailView: View {
                                         .accessibilityIdentifier("detail.favorite")
                                         .accessibilityLabel(viewModel.followState == .none ? "追剧" : "已追剧(已收藏)")
 
-                                        if viewModel.followState != .none {
+                                        if viewModel.followState != .none && !accountLibrary.loggedIn {
                                             Menu {
                                                 ForEach([FollowState.wishlist, .watching, .watched, .updated]) { state in
                                                     Button(state.label) { viewModel.setFollowState(state) }

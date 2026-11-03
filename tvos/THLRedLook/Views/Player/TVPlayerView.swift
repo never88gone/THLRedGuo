@@ -8,6 +8,7 @@ private enum PlayerWakeFocusArea: Hashable {
 }
 
 public struct TVPlayerView: View {
+    @ObservedObject private var accountLibrary = HongguoAccountModel.shared
     @StateObject private var viewModel: PlayerViewModel
     @Environment(\.presentationMode) var presentationMode
     @Environment(\.scenePhase) private var scenePhase
@@ -88,6 +89,9 @@ public struct TVPlayerView: View {
             wakeButtonView
             controlsOverlayView
             drawersOverlayView
+            if viewModel.isControlsVisible, let error = accountLibrary.libraryWriteError {
+                VStack { Text(error).font(.system(size: 29)).foregroundStyle(.orange).padding(24).background(.black.opacity(0.8)); Spacer() }.padding(.top, 50)
+            }
         }
         .focusSection()
         .defaultFocus($activeWakeFocus, isInteractive ? .centerWake : nil)

@@ -44,6 +44,7 @@ public final class LocalStore: ObservableObject {
     public private(set) var deletedFollowIds: Set<String> = []
     public private(set) var deletedHistoryIds: Set<String> = []
 
+    private let usesOfficialAccount: Bool
     private let defaults: UserDefaults
     private let cloudUpload: (LocalStore) -> Void
     private var applyingCloudData = false
@@ -62,6 +63,7 @@ public final class LocalStore: ObservableObject {
     private let cachedHomeDramasKey = "thl_tv_cached_home_dramas"
 
     public init(defaults: UserDefaults = .standard, cloudUpload: @escaping (LocalStore) -> Void = { ICloudSyncService.shared.scheduleUpload(store: $0) }) {
+        self.usesOfficialAccount = defaults === UserDefaults.standard
         self.defaults = defaults
         self.cloudUpload = cloudUpload
         loadFromStorage()
@@ -171,7 +173,18 @@ public final class LocalStore: ObservableObject {
     }
 
     // MARK: - Watch History
-    public func recordWatch(drama: Drama, episode: Int, position: Double, duration: Double) {
+    public func recordWatch(drama: Drama, episode: Int, position: Double, duration: Double, itemId: String = "", force: Bool = false) {
+        if usesOfficialAccount && HongguoAccountLibraryCache.shared.handles(drama.id) {
+            guard position.isFinite, duration.isFinite, position >= 0, duration > 0, episode > 0 else { return }
+            let entry = WatchEntry(drama: drama, episode: episode, position: min(position, duration), duration: duration, updatedAt: Date())
+            let revision = HongguoAccountVault.shared.snapshot.revision
+            Task { @MainActor in
+                guard HongguoAccountVault.shared.snapshot.revision == revision else { return }
+                do { try await HongguoAccountModel.shared.uploadProgress(entry, itemId: itemId, force: force) }
+                catch { NSLog("[AccountLibrary] progress upload failed") }
+            }
+            return
+        }
         guard !drama.id.isEmpty, episode > 0, position.isFinite, duration.isFinite,
               position >= 0, duration > 0 else { return }
         let previous = history.first { $0.drama.id == drama.id }?.drama
@@ -192,7 +205,8 @@ public final class LocalStore: ObservableObject {
     }
 
     public func getWatchEntry(dramaId: String) -> WatchEntry? {
-        history.first { $0.drama.id == dramaId }
+        if usesOfficialAccount && HongguoAccountLibraryCache.shared.handles(dramaId) { return HongguoAccountLibraryCache.shared.watch(dramaId) }
+        return history.first { $0.drama.id == dramaId }
     }
 
     public func clearHistory(for source: String? = nil) {
@@ -233,6 +247,15 @@ public final class LocalStore: ObservableObject {
 
     // MARK: - Follow State
     public func setFollowState(drama: Drama, state: FollowState) {
+        if usesOfficialAccount && HongguoAccountLibraryCache.shared.handles(drama.id) {
+            let revision = HongguoAccountVault.shared.snapshot.revision
+            Task { @MainActor in
+                guard HongguoAccountVault.shared.snapshot.revision == revision else { return }
+                do { try await HongguoAccountModel.shared.setFollowing(drama, add: state != .none) }
+                catch { NSLog("[AccountLibrary] follow update failed") }
+            }
+            return
+        }
         guard !drama.id.isEmpty else { return }
         if state == .none {
             follows.removeValue(forKey: drama.id)
@@ -253,6 +276,10 @@ public final class LocalStore: ObservableObject {
     }
 
     public func removeFollow(dramaId: String) {
+        if usesOfficialAccount && HongguoAccountLibraryCache.shared.handles(dramaId) {
+            if let entry = HongguoAccountLibraryCache.shared.entries(history: false).first(where: { $0.drama.id == dramaId }) { setFollowState(drama: entry.drama, state: .none) }
+            return
+        }
         guard !dramaId.isEmpty else { return }
         follows.removeValue(forKey: dramaId)
         followedDramas.removeAll { $0.id == dramaId }
@@ -261,7 +288,12 @@ public final class LocalStore: ObservableObject {
     }
 
     public func followState(for dramaId: String) -> FollowState {
-        follows[dramaId] ?? .none
+        if usesOfficialAccount && HongguoAccountLibraryCache.shared.handles(dramaId) {
+            guard HongguoAccountLibraryCache.shared.followed(dramaId) else { return .none }
+            guard let watch = HongguoAccountLibraryCache.shared.watch(dramaId) else { return .wishlist }
+            return watch.finished && watch.drama.episodes > 0 && watch.episode >= watch.drama.episodes ? .watched : .watching
+        }
+        return follows[dramaId] ?? .none
     }
 
     public func acknowledgeDeletedFollowIds(_ ids: Set<String>) {

@@ -270,7 +270,7 @@ class CatPawJsRuntime {
         r'ACCOUNT_BUSINESS_(-?[0-9]{1,9})',
       ).firstMatch(value.stringResult)?.group(1);
       if (code != null) {
-        throw HongguoAccountFailure('官方登录校验失败（错误码 $code）', 'BUSINESS_$code');
+        throw HongguoAccountFailure('官方账号请求失败（错误码 $code）', 'BUSINESS_$code');
       }
       throw const HongguoAccountFailure('账号校验失败，请重新扫码或稍后重试');
     }

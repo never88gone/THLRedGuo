@@ -17,6 +17,7 @@ struct HongguoAccountRecord: Codable, Sendable {
     var cookies: [HongguoCookie]
     var device: [String: String]? = nil
     var avatar: String? = nil
+    var hasSession: Bool { cookies.contains { $0.valid && ["sessionid", "sessionid_ss"].contains($0.name) } }
 }
 
 struct HongguoVerifiedTransfer {
@@ -55,6 +56,7 @@ final class HongguoAccountVault: @unchecked Sendable {
     func header(for url: URL, record: HongguoAccountRecord? = nil) -> String {
         guard Self.businessURL(url) else { return "" }
         let account = record ?? snapshot.record
+        guard account?.hasSession == true else { return "" }
         return account?.cookies.filter { $0.valid && Self.credentialNames.contains($0.name) }
             .map { "\($0.name)=\($0.value)" }.joined(separator: "; ") ?? ""
     }
@@ -92,10 +94,52 @@ enum HongguoAccountError: LocalizedError, Equatable {
         case .expired: return "二维码已过期，请刷新"
         case .challenge: return "红果要求额外安全验证，请使用红果 App 扫码登录"
         case .server(let status): return "账号请求失败（HTTP \(status)）"
-        case .business(let code): return "官方登录校验失败（错误码 \(code)）"
+        case .business(let code): return "官方账号请求失败（错误码 \(code)）"
         case .preparation(let code): return "账号请求准备失败（\(code)）"
         case .network: return "账号网络请求失败，请稍后重试"
         }
+    }
+}
+
+final class HongguoAccountLibraryCache: @unchecked Sendable {
+    static let shared = HongguoAccountLibraryCache()
+    private let lock = NSLock()
+    private var revision: UInt64 = .max
+    private var watches: [String: WatchEntry] = [:]
+    private var historyIds: Set<String> = []
+    private var favorites: [String: Drama] = [:]
+    private var favoriteOrder: [String] = []
+    static func id(_ value: String) -> String { value.hasPrefix("hongguo:") ? String(value.dropFirst(8)) : value }
+    func handles(_ id: String) -> Bool {
+        let record = HongguoAccountVault.shared.snapshot.record
+        return record?.hasSession == true &&
+            (id.hasPrefix("hongguo:") || id.range(of: "^\\d{10,30}$", options: .regularExpression) != nil)
+    }
+    private func resetIfNeeded() {
+        let current = HongguoAccountVault.shared.snapshot.revision
+        if revision != current { revision = current; watches = [:]; favorites = [:]; historyIds = []; favoriteOrder = [] }
+    }
+    func watch(_ id: String) -> WatchEntry? { lock.withLock { resetIfNeeded(); return watches[Self.id(id)] } }
+    func followed(_ id: String) -> Bool { lock.withLock { resetIfNeeded(); return favorites[Self.id(id)] != nil } }
+    func entries(history: Bool) -> [WatchEntry] {
+        lock.withLock {
+            resetIfNeeded()
+            if history { return historyIds.compactMap { watches[$0] }.sorted { $0.updatedAt > $1.updatedAt } }
+            return favoriteOrder.compactMap { favorites[$0] }.map { WatchEntry(drama: $0, episode: 0, position: 0, duration: 0, updatedAt: Date(timeIntervalSince1970: 0)) }
+        }
+    }
+    func update(_ rows: [WatchEntry], history: Bool, owner: UInt64, preserving: Set<String> = []) {
+        lock.withLock {
+            resetIfNeeded(); guard revision == owner else { return }
+            if history { historyIds = Set(rows.map { Self.id($0.drama.id) }).union(preserving); for row in rows { let key = Self.id(row.drama.id); if watches[key] == nil || watches[key]!.updatedAt <= row.updatedAt { watches[key] = row } } }
+            else { favoriteOrder = rows.map { Self.id($0.drama.id) }; favorites = Dictionary(rows.map { (Self.id($0.drama.id), $0.drama) }, uniquingKeysWith: { _, last in last }) }
+        }
+    }
+    func progress(_ entry: WatchEntry?, id: String, owner: UInt64, recordHistory: Bool = false) {
+        lock.withLock { resetIfNeeded(); guard revision == owner else { return }; watches[Self.id(id)] = entry; if entry == nil { historyIds.remove(Self.id(id)) } else if recordHistory { historyIds.insert(Self.id(id)) } }
+    }
+    func follow(_ drama: Drama, add: Bool, owner: UInt64) {
+        lock.withLock { resetIfNeeded(); guard revision == owner else { return }; favorites[Self.id(drama.id)] = add ? drama : nil; favoriteOrder.removeAll { $0 == Self.id(drama.id) }; if add { favoriteOrder.insert(Self.id(drama.id), at: 0) } }
     }
 }
 
@@ -108,6 +152,13 @@ final class HongguoAccountModel: ObservableObject {
     @Published private(set) var remaining = 0
     @Published private(set) var busy = false
     @Published private(set) var message = ""
+    @Published private(set) var libraryVersion = 0
+    @Published private(set) var libraryWriteError: String?
+    private var accountWrites: Task<Void, Error>?
+    private var reportedAt: [String: Date] = [:]
+    private var favoriteGeneration: UInt64 = 0
+    private var progressGeneration: [String: UInt64] = [:]
+    private var favoriteRevision: UInt64?
     private var attempt = 0
     private var token = ""
     private var expiresAt = Date.distantPast
@@ -121,7 +172,7 @@ final class HongguoAccountModel: ObservableObject {
     private var phoneCodeSent = false
     @Published private(set) var phoneRetryAt = Date.distantPast
     private let vault = HongguoAccountVault.shared
-    var loggedIn: Bool { account?.cookies.contains { $0.valid && ["sessionid", "sessionid_ss"].contains($0.name) } == true }
+    var loggedIn: Bool { account?.hasSession == true }
     func cancel() {
         attempt += 1; loginTask?.cancel(); loginTask = nil
         transport?.invalidateAndCancel(); transport = nil
@@ -289,6 +340,7 @@ final class HongguoAccountModel: ObservableObject {
         guard loggedIn else { throw HongguoAccountError.invalid }
         let owner = attempt
         let revision = vault.snapshot.revision
+        let generation = favoriteGeneration, progressSnapshot = progressGeneration
         let response = try await call(history ? "history" : "favorites", payload: history ? [:] : ["userId": account?.id ?? ""], owner: owner, existing: true)
         guard let rows = response["items"] as? [[String: Any]] else { throw HongguoAccountError.invalid }
         var details: [String: [String: Any]] = [:]
@@ -300,7 +352,7 @@ final class HongguoAccountModel: ObservableObject {
         }
         try check(owner)
         guard vault.snapshot.revision == revision, loggedIn else { throw HongguoAccountError.cancelled }
-        return rows.compactMap { row in
+        let entries: [WatchEntry] = rows.compactMap { row in
             guard let id = row["id"] as? String else { return nil }
             let detail = details[id] ?? row
             let title = detail["title"] as? String ?? ""
@@ -312,6 +364,93 @@ final class HongguoAccountModel: ObservableObject {
                 position: ((row["positionMs"] as? NSNumber)?.doubleValue ?? 0) / 1000,
                 duration: ((row["durationMs"] as? NSNumber)?.doubleValue ?? 0) / 1000,
                 updatedAt: Date(timeIntervalSince1970: ((row["updatedAt"] as? NSNumber)?.doubleValue ?? 0) / 1000))
+        }
+        if history || generation == favoriteGeneration {
+            HongguoAccountLibraryCache.shared.update(entries, history: history, owner: revision, preserving: Set(progressGeneration.filter { $0.value > (progressSnapshot[$0.key] ?? 0) }.keys.map(HongguoAccountLibraryCache.id)))
+            if !history { favoriteRevision = revision }
+            publishLibraryChange()
+        }
+        return HongguoAccountLibraryCache.shared.entries(history: history)
+    }
+    private func publishLibraryChange() {
+        libraryVersion += 1
+        LocalStore.shared.objectWillChange.send()
+    }
+    func prepareLibrary(_ drama: Drama) async throws {
+        guard HongguoAccountLibraryCache.shared.handles(drama.id) else { return }
+        if favoriteRevision != vault.snapshot.revision { _ = try await library(history: false) }
+        _ = try await progress(drama)
+    }
+    func progress(_ drama: Drama) async throws -> WatchEntry? {
+        let owner = attempt, revision = vault.snapshot.revision, generation = progressGeneration[drama.id] ?? 0
+        guard loggedIn else { throw HongguoAccountError.invalid }
+        let rows = try await Self.progressRows(id: drama.cleanSourceId) { action, payload in
+            try await self.call(action, payload: payload, owner: owner, existing: true)
+        }
+        guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+        let row = rows.first { $0["id"] as? String == drama.cleanSourceId }
+        let entry = row.map { row in WatchEntry(drama: drama,
+            episode: (row["episode"] as? NSNumber)?.intValue ?? 0,
+            position: ((row["positionMs"] as? NSNumber)?.doubleValue ?? 0) / 1000,
+            duration: ((row["durationMs"] as? NSNumber)?.doubleValue ?? 0) / 1000,
+            updatedAt: Date(timeIntervalSince1970: ((row["updatedAt"] as? NSNumber)?.doubleValue ?? 0) / 1000)) }
+        if generation == progressGeneration[drama.id] ?? 0 {
+            HongguoAccountLibraryCache.shared.progress(entry, id: drama.id, owner: revision)
+            publishLibraryChange()
+        }
+        return HongguoAccountLibraryCache.shared.watch(drama.id)
+    }
+    static func progressRows(id: String, request: (String, [String: String]) async throws -> [String: Any]) async throws -> [[String: Any]] {
+        do {
+            let response = try await request("progressGet", ["id": id])
+            guard let rows = response["items"] as? [[String: Any]] else { throw HongguoAccountError.invalid }
+            return rows
+        } catch HongguoAccountError.business(101112) {
+            let response = try await request("history", [:])
+            guard let rows = response["items"] as? [[String: Any]], rows.contains(where: { $0["id"] as? String == id }) else { throw HongguoAccountError.business(101112) }
+            return rows
+        }
+    }
+    private func enqueueWrite(_ operation: @escaping @MainActor () async throws -> Void) async throws {
+        let revision = vault.snapshot.revision, previous = accountWrites
+        let task = Task { @MainActor in
+            _ = await previous?.result
+            guard self.loggedIn, self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+            try await operation()
+            guard self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+        }
+        accountWrites = task
+        do { try await task.value; libraryWriteError = nil }
+        catch { if vault.snapshot.revision == revision { libraryWriteError = "账号同步失败，请检查网络后重试" }; throw error }
+    }
+    func setFollowing(_ drama: Drama, add: Bool?) async throws {
+        let revision = vault.snapshot.revision
+        try await enqueueWrite {
+            let follow = add ?? !HongguoAccountLibraryCache.shared.followed(drama.id)
+            let owner = self.attempt
+            _ = try await self.call("favoriteUpdate", payload: ["id": drama.cleanSourceId, "follow": follow ? "1" : "0"], owner: owner, existing: true)
+            let check = try await self.call("favorites", payload: ["userId": self.account?.id ?? ""], owner: owner, existing: true)
+            guard let rows = check["items"] as? [[String: Any]], rows.contains(where: { $0["id"] as? String == drama.cleanSourceId }) == follow,
+                self.vault.snapshot.revision == revision else { throw HongguoAccountError.invalid }
+            self.favoriteGeneration += 1
+            HongguoAccountLibraryCache.shared.follow(drama, add: follow, owner: revision)
+            self.publishLibraryChange()
+        }
+    }
+    func uploadProgress(_ entry: WatchEntry, itemId: String, force: Bool) async throws {
+        let revision = vault.snapshot.revision
+        let key = "\(revision):\(entry.drama.id):\(entry.episode)"
+        if !force, Date().timeIntervalSince(reportedAt[key] ?? .distantPast) < 30 { return }
+        reportedAt[key] = Date()
+        try await enqueueWrite {
+            _ = try await self.call("progressUpdate", payload: ["id": entry.drama.cleanSourceId, "itemId": itemId,
+                "episode": String(entry.episode), "positionMs": String(Int(entry.position * 1000)),
+                "durationMs": String(Int(entry.duration * 1000)), "episodes": String(entry.drama.episodes),
+                "updatedAt": String(Int(entry.updatedAt.timeIntervalSince1970 * 1000))], owner: self.attempt, existing: true)
+            guard self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+            self.progressGeneration[entry.drama.id] = (self.progressGeneration[entry.drama.id] ?? 0) + 1
+            HongguoAccountLibraryCache.shared.progress(entry, id: entry.drama.id, owner: revision, recordHistory: true)
+            self.publishLibraryChange()
         }
     }
     func logout() {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/account/hongguo_account_session.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,11 +19,17 @@ Future<void> saveUserChange(
 ) async {
   try {
     await action();
-  } catch (_) {
+  } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('未能保存，请检查存储空间和权限后重试。')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is HongguoAccountFailure
+                ? error.message
+                : '未能保存，请检查存储空间和权限后重试。',
+          ),
+        ),
+      );
     }
   }
 }

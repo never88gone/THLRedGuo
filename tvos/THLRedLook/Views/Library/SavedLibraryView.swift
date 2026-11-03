@@ -34,7 +34,7 @@ public struct SavedLibraryView: View {
     }
 
     private var entries: [WatchEntry] {
-        account.loggedIn ? viewModel.accountLists[viewModel.selectedTab] ?? [] : viewModel.historyList
+        account.loggedIn ? HongguoAccountLibraryCache.shared.entries(history: viewModel.selectedTab == .history) : viewModel.historyList
     }
     private var dramas: [Drama] {
         account.loggedIn || viewModel.selectedTab == .history ? entries.map(\.drama) : viewModel.followedList
@@ -165,7 +165,14 @@ public struct SavedLibraryView: View {
                 if !account.loggedIn || !account.verified { account.cancel() }
                 onRequestFocusContent?()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { focus(.account, with: proxy) }
-            }) { TVLoginOptionsView() }
+            }) {
+                #if DEBUG
+                if CommandLine.arguments.contains("-openOfficialQr") { TVQrLoginView() }
+                else { TVLoginOptionsView() }
+                #else
+                TVLoginOptionsView()
+                #endif
+            }
             .confirmationDialog("红果账号", isPresented: $showingAccountMenu, titleVisibility: .visible) {
                 Button("退出登录", role: .destructive) { account.logout(); focusedTarget = .account }
                 Button("取消", role: .cancel) { focusedTarget = .account }
@@ -177,6 +184,12 @@ public struct SavedLibraryView: View {
             .task(id: HongguoAccountVault.shared.snapshot.revision) {
                 await account.verify()
                 await viewModel.loadAccount(viewModel.selectedTab)
+                #if DEBUG
+                if !openedDebugLogin && !account.loggedIn && CommandLine.arguments.contains("-openAccountLogin") {
+                    openedDebugLogin = true
+                    showingLogin = true
+                }
+                #endif
             }
             .onChange(of: viewModel.selectedTab) { _, tab in Task { await viewModel.loadAccount(tab) } }
             .onChange(of: focusCategoryTrigger) { _, _ in

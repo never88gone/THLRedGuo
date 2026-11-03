@@ -1,9 +1,103 @@
 import XCTest
 import CryptoKit
+import Security
 @testable import THLRedLook
 
 @MainActor
 final class AccountPairingTests: XCTestCase {
+    func testProgressReadUsesMatchingServerHistoryAfterSpecificRejection() async throws {
+        for matching in [true, false] {
+            var actions: [String] = []
+            do {
+                let rows = try await HongguoAccountModel.progressRows(id: "123") { action, _ in
+                    actions.append(action)
+                    if action == "progressGet" { throw HongguoAccountError.business(101112) }
+                    return ["items": [["id": matching ? "123" : "456", "episode": 2, "positionMs": 12000]]]
+                }
+                XCTAssertTrue(matching)
+                XCTAssertEqual(rows.first?["positionMs"] as? Int, 12000)
+            } catch { XCTAssertFalse(matching); XCTAssertEqual(error as? HongguoAccountError, .business(101112)) }
+            XCTAssertEqual(actions, ["progressGet", "history"])
+        }
+        var actions: [String] = []
+        do {
+            _ = try await HongguoAccountModel.progressRows(id: "123") { action, _ in
+                actions.append(action)
+                throw HongguoAccountError.business(15)
+            }
+            XCTFail("Authentication errors must remain failures")
+        } catch { XCTAssertEqual(error as? HongguoAccountError, .business(15)) }
+        XCTAssertEqual(actions, ["progressGet"])
+    }
+
+    func testAccountKeychainRoundTrip() throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "THLAccountStorageTest.\(UUID().uuidString)",
+            kSecAttrAccount as String: "synthetic"
+        ]
+        defer { SecItemDelete(query as CFDictionary) }
+        let data = Data("synthetic-test-record".utf8)
+        var item = query
+        item[kSecValueData as String] = data
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        XCTAssertEqual(SecItemAdd(item as CFDictionary, nil), errSecSuccess)
+        var lookup = query
+        lookup[kSecReturnData as String] = true
+        var result: CFTypeRef?
+        XCTAssertEqual(SecItemCopyMatching(lookup as CFDictionary, &result), errSecSuccess)
+        XCTAssertEqual(result as? Data, data)
+    }
+
+    func testAccountWritebackSignedJsonContractsWithoutNetwork() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "THLWritebackProtocol.\(UUID().uuidString)"))
+        defaults.set("{\"iid\":\"7345678901234567200\",\"device_id\":\"7345678901234567100\",\"cdid\":\"synthetic-device\"}", forKey: "thl_tv_hongguo_device_session")
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [WritebackBlockedProtocol.self]
+        let bridge = NativeBridge(httpSession: URLSession(configuration: config), deviceDefaults: defaults)
+        let id = "7688558312157088793"
+        let follow = try await bridge.accountRequest("favoriteUpdate", payload: ["id": id, "follow": "1"])
+        XCTAssertEqual(follow["method"] as? String, "POST")
+        let body = try XCTUnwrap(follow["body"] as? String)
+        let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])
+        let row = try XCTUnwrap((parsed["update_bookshelf_video_list"] as? [[String: Any]])?.first)
+        XCTAssertEqual(row["book_id"] as? String, id)
+        XCTAssertEqual(row["video_shelf_operate_type"] as? Int, 0)
+        let request = try await bridge.accountRequest("progressUpdate", payload: ["id":id,"itemId":"7688558312157088794","episode":"4","positionMs":"12345","durationMs":"95678","episodes":"60","updatedAt":"1700000000000"])
+        let progressBody = try XCTUnwrap(request["body"] as? String)
+        let progress = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(progressBody.utf8)) as? [String: Any])
+        XCTAssertEqual(progress["write_mode"] as? Int, 1)
+        let book = try XCTUnwrap((progress["books"] as? [[String: Any]])?.first)
+        XCTAssertEqual(book["current_play_time"] as? Int, 12345)
+        XCTAssertEqual(book["vid_index"] as? Int, 4)
+        let lookup = try await bridge.accountRequest("progressGet", payload: ["id":id])
+        XCTAssertEqual(lookup["method"] as? String, "POST")
+        let readBody = try XCTUnwrap(lookup["body"] as? String)
+        let read = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(readBody.utf8)) as? [String: Any])
+        XCTAssertEqual((read["book_ids"] as? [String: [NSNumber]])?["2"]?.first?.stringValue, id)
+        let accepted = try await bridge.accountParse("progressUpdate", body: "{\"code\":0}")
+        XCTAssertEqual(accepted["valid"] as? Bool, true)
+    }
+    func testExpiredAccountDoesNotExposeTrackingCookiesOrAppearLoggedIn() async throws {
+        let expired = HongguoAccountRecord(id: "123", nickname: "synthetic", cookies: [
+            HongguoCookie(name: "sessionid", value: "synthetic-expired", domain: "hongguoduanju.com", path: "/", expires: .distantPast),
+            HongguoCookie(name: "uid_tt", value: "synthetic-tracking", domain: "hongguoduanju.com", path: "/", expires: nil)
+        ], device: ["device_id": "7345678901234567999", "iid": "7345678901234567998", "cdid": "expired-synthetic"])
+        XCTAssertFalse(expired.hasSession)
+        let url = try XCTUnwrap(URL(string: "https://api5-normal-sinfonlinea.fqnovel.com/reading/user/info/v1/"))
+        XCTAssertEqual(HongguoAccountVault.shared.header(for: url, record: expired), "")
+        let name = "THLExpiredAccount.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set("{\"iid\":\"7345678901234567200\",\"device_id\":\"7345678901234567100\",\"cdid\":\"synthetic-device\"}", forKey: "thl_tv_hongguo_device_session")
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [WritebackBlockedProtocol.self]
+        let bridge = NativeBridge(httpSession: URLSession(configuration: config), deviceDefaults: defaults, accountSnapshot: { (expired, 0) })
+        let command = try await bridge.accountRequest("progressGet", payload: ["id": "7688558312157088793"])
+        let query = try XCTUnwrap(URLComponents(string: command["url"] as? String ?? "")?.queryItems)
+        XCTAssertEqual(query.first(where: { $0.name == "device_id" })?.value, "7345678901234567100")
+    }
+
     private func vector() throws -> [String: Any] {
         let root = URL(fileURLWithPath: #file).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let data = try Data(contentsOf: root.appendingPathComponent("test/fixtures/account_pairing_vector.json"))
@@ -119,4 +213,11 @@ final class AccountPairingTests: XCTestCase {
         XCTAssertTrue(HongguoAccountVault.shared.snapshot.record?.id == original.record?.id)
         XCTAssertEqual(HongguoAccountVault.shared.snapshot.revision, original.revision)
     }
+}
+
+private final class WritebackBlockedProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() { client?.urlProtocol(self, didFailWithError: URLError(.cancelled)) }
+    override func stopLoading() {}
 }
