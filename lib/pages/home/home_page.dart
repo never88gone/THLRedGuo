@@ -1224,6 +1224,13 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, constraints) {
         final television = AppLayout.isTelevision(context);
         final desktop = constraints.maxWidth >= 840;
+        final aspectRatio = constraints.maxHeight > 0
+            ? constraints.maxWidth / constraints.maxHeight
+            : 0.0;
+        final sideRailRight = !television &&
+            !desktop &&
+            (aspectRatio >= 0.65 ||
+                (constraints.maxWidth >= 600 && constraints.maxWidth < 840));
         final destinations = [
           (0, Icons.explore_outlined, Icons.explore, '发现'),
           (4, Icons.play_circle_outline, Icons.play_circle, '推荐'),
@@ -1395,11 +1402,29 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
+                  if (sideRailRight) ...[
+                    const VerticalDivider(width: 1, thickness: 1),
+                    NavigationRail(
+                      selectedIndex: navIndex,
+                      onDestinationSelected: (index) =>
+                          _onNavSelected(destinations[index].$1),
+                      labelType: NavigationRailLabelType.all,
+                      groupAlignment: -.8,
+                      destinations: [
+                        for (final item in destinations)
+                          NavigationRailDestination(
+                            icon: Icon(item.$2),
+                            selectedIcon: Icon(item.$3),
+                            label: Text(item.$4),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
-          bottomNavigationBar: desktop || television
+          bottomNavigationBar: desktop || television || sideRailRight
               ? null
               : _selectionMode
               ? _selectionBar()
