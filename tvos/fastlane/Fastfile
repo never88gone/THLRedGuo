@@ -171,6 +171,11 @@ platform :tvos do
     beta(options)
   end
 
+  desc "上传 tvOS 屏幕快照到 App Store Connect"
+  lane :upload_screenshots do |options|
+    sh("ruby #{File.expand_path('../../scripts/upload_tvos_screenshots.rb', __dir__)}")
+  end
+
   desc "发布 tvOS 到 TestFlight (别名)"
   lane :upload_testflight do |options|
     beta(options)

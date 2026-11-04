@@ -3139,6 +3139,86 @@ extension RemoteNavigationTests {
 
         print("THL_ALL_NEW_TVOS_SCREENSHOTS_CAPTURED count=7")
     }
+
+    /// 截取用于提交 App Store 的 4K（3840x2160）全高清应用展示图
+    func testCaptureAppStoreScreenshots() throws {
+        continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Volumes/MacintoshData/Work/MY/Project/Product/THLRedGuo/tvos/fastlane/screenshots/zh-Hans")
+        let artifactDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/appstore_screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: artifactDir, withIntermediateDirectories: true)
+
+        func saveShot(_ name: String) {
+            let shot = XCUIScreen.main.screenshot()
+            try? shot.pngRepresentation.write(to: shotDir.appendingPathComponent(name))
+            try? shot.pngRepresentation.write(to: artifactDir.appendingPathComponent(name))
+            print("THL_APPSTORE_SCREENSHOT_SAVED: \(name)")
+        }
+
+        // 1. 首页探索 (Home / Catalog)
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "catalog", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        wait("catalog ready", seconds: 35) { self.app.buttons["nav.catalog"].exists }
+        if app.buttons["nav.catalog"].hasFocus {
+            remote.press(.right)
+        }
+        Thread.sleep(forTimeInterval: 1.5)
+        saveShot("01_home.png")
+        app.terminate()
+
+        // 2. 热门榜单 (Rankings)
+        app.launchArguments = ["-testPage", "rankings", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        wait("rankings ready", seconds: 35) { self.app.buttons["nav.rankings"].exists }
+        if app.buttons["nav.rankings"].hasFocus {
+            remote.press(.right)
+        }
+        Thread.sleep(forTimeInterval: 1.5)
+        saveShot("02_rankings.png")
+        app.terminate()
+
+        // 3. 剧集详情 (Detail)
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "test_screenshot_drama", "-testDramaTitle", "龙王令：都市至尊", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        wait("detail loaded", seconds: 35) { self.app.buttons["detail.favorite"].exists }
+        wait("detail play focus", seconds: 20) { self.app.buttons["detail.play"].hasFocus }
+        Thread.sleep(forTimeInterval: 1.0)
+        saveShot("03_detail.png")
+        app.terminate()
+
+        // 4. 播放器两层居中控制栏 (Player Controls)
+        app.launchArguments = ["-testPage", "controls", "-testEpisode", "5", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        wait("player controls ready", seconds: 35) { self.app.buttons["player.playPause"].exists }
+        Thread.sleep(forTimeInterval: 1.0)
+        saveShot("04_player.png")
+
+        // 5. 弹幕样式设置抽屉 (Danmaku Settings)
+        press(.down, focus: "player.speed")
+        if app.buttons["player.quality"].exists {
+            press(.right, focus: "player.quality")
+        }
+        press(.right, focus: "player.danmaku")
+        press(.right, focus: "player.danmakuSettings")
+        press(.select)
+        wait("danmaku settings drawer opened", seconds: 15) { self.app.buttons["danmaku.switch.on"].exists }
+        Thread.sleep(forTimeInterval: 1.0)
+        saveShot("05_danmaku.png")
+        remote.press(.menu)
+        app.terminate()
+
+        // 6. 媒体库 (Library / My)
+        app.launchArguments = ["-testPage", "library", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        wait("library history ready", seconds: 35) { self.app.buttons["library.tab.history"].exists }
+        if app.buttons["nav.library"].hasFocus { press(.right, focus: "library.tab.history") }
+        Thread.sleep(forTimeInterval: 1.0)
+        saveShot("06_library.png")
+        app.terminate()
+
+        print("THL_APPSTORE_SCREENSHOTS_CAPTURED count=6")
+    }
 }
 
 extension RemoteNavigationTests {
