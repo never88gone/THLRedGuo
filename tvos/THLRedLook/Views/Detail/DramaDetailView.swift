@@ -28,6 +28,7 @@ public struct DramaDetailView: View {
         case play
         case favorite
         case followState
+        case download
         case season(Int)
         case chunk(Int)
         case episode(Int)
@@ -215,12 +216,28 @@ public struct DramaDetailView: View {
                                         }
 
                                         // 下载按钮
-                                        TVButton(title: "缓存全剧", icon: "arrow.down.circle") {
+                                        TVButton(
+                                            title: "缓存全剧",
+                                            icon: "arrow.down.circle",
+                                            isExternalFocused: focusedTarget == .download,
+                                            onDownCommand: {
+                                                if viewModel.seasonItems.count > 1 {
+                                                    focus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0), with: scrollProxy)
+                                                } else if detail.episodeChunks.count > 1 {
+                                                    focus(.chunk(viewModel.selectedChunkIndex), with: scrollProxy)
+                                                } else if let firstEp = detail.episodes.first {
+                                                    focus(.episode(firstEp.number), with: scrollProxy)
+                                                }
+                                            }
+                                        ) {
                                             viewModel.downloadAllEpisodes()
                                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                                 showingDownloadSuccess = true
                                             }
                                         }
+                                        .focused($focusedTarget, equals: .download)
+                                        .id("detail_download")
+                                        .accessibilityIdentifier("detail.download")
                                     }
                                     .padding(.top, 16)
                                     .padding(.leading, 6)
@@ -556,6 +573,7 @@ public struct DramaDetailView: View {
         case .play: identifier = "detail_play"
         case .favorite: identifier = "detail_favorite"
         case .followState: identifier = "detail_follow_state"
+        case .download: identifier = "detail_download"
         case .season(let index): identifier = "season_card_\(index)"
         case .chunk(let index): identifier = "detail_chunk_\(index)"
         case .episode(let number): identifier = "detail_episode_\(number)"

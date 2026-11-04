@@ -43,9 +43,12 @@ public struct DownloadsView: View {
                             TVButton(title: "全部继续", icon: "play.fill", isProminent: false) {
                                 viewModel.resumeAll()
                             }
+                            .accessibilityIdentifier("downloads.resumeAll")
+
                             TVButton(title: "清空任务", icon: "trash", isProminent: false) {
                                 viewModel.clearAll()
                             }
+                            .accessibilityIdentifier("downloads.clearAll")
                         }
                     }
                     .padding(.horizontal, 48)
@@ -145,19 +148,23 @@ public struct DownloadsView: View {
                                                 TVButton(title: "播放", icon: "play.fill", isProminent: true) {
                                                     playingLocalJob = job
                                                 }
+                                                .accessibilityIdentifier("downloads.job.play.\(job.id)")
                                             } else if job.state == "downloading" {
                                                 TVButton(title: "暂停", icon: "pause.fill") {
                                                     viewModel.pauseJob(job.id)
                                                 }
+                                                .accessibilityIdentifier("downloads.job.pause.\(job.id)")
                                             } else {
                                                 TVButton(title: "继续", icon: "play.fill") {
                                                     viewModel.resumeJob(job.id)
                                                 }
+                                                .accessibilityIdentifier("downloads.job.resume.\(job.id)")
                                             }
 
                                             TVButton(title: "删除", icon: "trash") {
                                                 viewModel.deleteJob(job.id)
                                             }
+                                            .accessibilityIdentifier("downloads.job.delete.\(job.id)")
                                         }
                                         .padding(.trailing, 6)
                                     }

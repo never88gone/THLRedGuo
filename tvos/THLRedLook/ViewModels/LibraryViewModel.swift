@@ -111,13 +111,14 @@ public final class DownloadsViewModel: ObservableObject {
 
     public var currentSource: String {
         let src = !JSSourceService.shared.activeSourceId.isEmpty ? JSSourceService.shared.activeSourceId : LocalStore.shared.currentSourceId
-        return src
+        return src.isEmpty ? "hongguo" : src
     }
 
     public var jobs: [DownloadJob] {
-        guard !currentSource.isEmpty else { return [] }
         let target = currentSource.lowercased()
-        return downloadService.jobs.filter { $0.drama.source.lowercased() == target }
+        return downloadService.jobs.filter {
+            $0.drama.source.isEmpty || $0.drama.source.lowercased() == target
+        }
     }
 
     public func pauseJob(_ id: String) {

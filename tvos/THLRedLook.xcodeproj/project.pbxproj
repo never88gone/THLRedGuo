@@ -11,6 +11,7 @@
 		C1A3B602F4D3468399B31102 /* AccountPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A3B602F4D3468399B31101 /* AccountPairing.swift */; };
 		00F6DAC96490A839B6FC75EA /* HongguoApkProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E4F0775CA2B5213DAF9E20 /* HongguoApkProfile.swift */; };
 		12F647818F7F44998727220E /* OverseasSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */; };
+		D1D000002C00000100000001 /* DownloadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D000002C00000100000002 /* DownloadServiceTests.swift */; };
 		1F6926DCCD8AAF72AD718D1E /* ApkProfileImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D255715E326D23643B59BC9D /* ApkProfileImportSheet.swift */; };
 		25C440231CE2B2DA7D759FBF /* TVAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90236F9F822D5D6ADD2A01CC /* TVAccountView.swift */; };
 		308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */; };
@@ -121,6 +122,7 @@
 		66E4F0775CA2B5213DAF9E20 /* HongguoApkProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HongguoApkProfile.swift; path = ../shared/apple/HongguoApkProfile.swift; sourceTree = "<group>"; };
 		6A9AED8C8EB9E35575961261 /* THLRedLookTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = THLRedLookTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverseasSearchTests.swift; sourceTree = "<group>"; };
+		D1D000002C00000100000002 /* DownloadServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DownloadServiceTests.swift; sourceTree = "<group>"; };
 		83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CENCDecoderTests.swift; sourceTree = "<group>"; };
 		8916276259AF5B77E0B0DE40 /* HongguoAccount.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HongguoAccount.swift; path = THLRedLook/Core/HongguoAccount.swift; sourceTree = SOURCE_ROOT; };
 		8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ICloudSyncTests.swift; sourceTree = "<group>"; };
@@ -286,6 +288,7 @@
 				8A05A2DA4811816BFC444CF4 /* ICloudSyncTests.swift */,
 				E546AAF2A007402D961770A4 /* StartupPerformanceTests.swift */,
 				6D65F6E5782B4A27B4F2B7C1 /* OverseasSearchTests.swift */,
+				D1D000002C00000100000002 /* DownloadServiceTests.swift */,
 			);
 			path = THLRedLookTests;
 			sourceTree = "<group>";
@@ -720,6 +723,7 @@
 				81C7FE1DA08787168F35C136 /* ICloudSyncTests.swift in Sources */,
 				7689C3C1BE0A477888B3828B /* StartupPerformanceTests.swift in Sources */,
 				12F647818F7F44998727220E /* OverseasSearchTests.swift in Sources */,
+				D1D000002C00000100000001 /* DownloadServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

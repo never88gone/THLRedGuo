@@ -3263,4 +3263,96 @@ extension RemoteNavigationTests {
         wait("return to final episode focus") { self.app.buttons["detail.episode.127"].hasFocus }
         print("THL_LONG_SERIES_REMOTE episode101=true next102=true last127=true returnFocus=true")
     }
+
+    /// 8. 专项验证：剧集详情页发起下载 -> 下载管理页面展示任务列表 -> 批量清空管理完整闭环
+    func testDetailDownloadAndDownloadsManagementFlow() throws {
+        continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/download_verification_screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+
+        // 阶段一：进入详情页，验证并点击「缓存全剧」按钮
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7695704804978330649", "-testDramaTitle", "满院亲戚全是上古大妖第五季"]
+        app.launch()
+
+        wait("detail view ready", seconds: 60) {
+            self.app.buttons["detail.play"].exists && self.app.buttons["detail.download"].exists
+        }
+        XCTAssertTrue(app.buttons["detail.download"].exists, "剧集详情页成功加载并展示「缓存全剧」按钮")
+
+        if !app.buttons["detail.download"].hasFocus {
+            press(.right)
+            if !app.buttons["detail.download"].hasFocus {
+                press(.right)
+            }
+        }
+        wait("detail download focused", seconds: 15) {
+            self.app.buttons["detail.download"].hasFocus
+        }
+        XCTAssertTrue(app.buttons["detail.download"].hasFocus, "焦点精准移动至「缓存全剧」按钮")
+
+        // 截图 1：详情页「缓存全剧」获焦
+        let shot1 = XCUIScreen.main.screenshot()
+        try? shot1.pngRepresentation.write(to: shotDir.appendingPathComponent("01_detail_download_button_focused.png"))
+
+        // 点击「缓存全剧」触发全剧离线入队
+        press(.select)
+        sleep(2)
+
+        // 截图 2：详情页触发下载后
+        let shot2 = XCUIScreen.main.screenshot()
+        try? shot2.pngRepresentation.write(to: shotDir.appendingPathComponent("02_detail_download_triggered.png"))
+        app.terminate()
+
+        // 阶段二：进入下载管理页面，验证离线任务列表、任务项与控制按钮
+        app.launchArguments = ["-testPage", "downloads"]
+        app.launch()
+
+        wait("downloads nav focused", seconds: 30) {
+            self.app.buttons["nav.downloads"].hasFocus
+        }
+        // 按 Select 收起侧边栏并进入下载内容区
+        press(.select)
+        wait("downloads view entered", seconds: 20) {
+            !self.app.buttons["nav.downloads"].exists && self.app.staticTexts["下载与离线管理"].exists
+        }
+        XCTAssertTrue(app.staticTexts["下载与离线管理"].exists, "成功进入下载与离线管理页面")
+
+        wait("downloads task list populated", seconds: 20) {
+            self.app.buttons["downloads.clearAll"].exists
+        }
+        XCTAssertTrue(app.buttons["downloads.clearAll"].exists, "存在批量「清空任务」按钮")
+
+        // 截图 3：下载管理页中任务列表与进度展示
+        let shot3 = XCUIScreen.main.screenshot()
+        try? shot3.pngRepresentation.write(to: shotDir.appendingPathComponent("03_downloads_queue_populated.png"))
+
+        // 阶段三：执行清空任务，验证平滑恢复沉浸式空状态卡片
+        if !app.buttons["downloads.clearAll"].hasFocus {
+            for _ in 0..<3 {
+                if self.app.buttons["downloads.clearAll"].hasFocus { break }
+                press(.up)
+            }
+            if !self.app.buttons["downloads.clearAll"].hasFocus {
+                press(.right)
+            }
+        }
+        wait("clear all focused", seconds: 15) {
+            self.app.buttons["downloads.clearAll"].hasFocus
+        }
+        press(.select) // 清空全部任务
+        sleep(2)
+
+        wait("downloads cleared to empty state", seconds: 20) {
+            self.app.buttons["downloads.explore"].exists && !self.app.buttons["downloads.clearAll"].exists
+        }
+        XCTAssertTrue(app.buttons["downloads.explore"].exists, "清空任务后恢复全屏沉浸空状态，展示「去浏览短剧」")
+
+        // 截图 4：清空后的沉浸式空状态
+        let shot4 = XCUIScreen.main.screenshot()
+        try? shot4.pngRepresentation.write(to: shotDir.appendingPathComponent("04_downloads_cleared_empty_state.png"))
+
+        app.terminate()
+        print("THL_DOWNLOAD_E2E_VERIFICATION_COMPLETE detailEnqueue=true listPopulated=true clearAllSucceeded=true emptyStateRestored=true")
+    }
 }
