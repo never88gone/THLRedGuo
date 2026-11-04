@@ -566,7 +566,7 @@ class DownloadJob {
       Map<String, dynamic>.from(value['chapter'] as Map),
       intValue(value['index']),
     ),
-    state: value['state'] as String? ?? 'failed',
+    state: (value['state'] ?? value['status']) as String? ?? 'failed',
     bytes: intValue(value['bytes']),
     total: intValue(value['total']),
     progress: ((value['progress'] as num?)?.toDouble() ?? 0).clamp(0, 1),

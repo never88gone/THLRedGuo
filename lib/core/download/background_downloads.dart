@@ -46,19 +46,20 @@ class BackgroundDownloads {
     if (!Platform.isAndroid) return;
     await prepare();
     if (await FlutterForegroundTask.isRunningService) return;
-    await FlutterForegroundTask.requestNotificationPermission();
-    final result = await FlutterForegroundTask.startService(
-      serviceId: 2406,
-      serviceTypes: [ForegroundServiceTypes.dataSync],
-      notificationTitle: appName,
-      notificationText: '正在准备后台任务',
-      notificationButtons: [
-        const NotificationButton(id: 'pause', text: '暂停下载'),
-      ],
-      callback: downloadServiceEntry,
-    );
-    if (result is ServiceRequestFailure) {
-      throw AppFailure('后台下载服务启动失败，请保持应用在前台后重试。');
+    try {
+      await FlutterForegroundTask.requestNotificationPermission();
+      await FlutterForegroundTask.startService(
+        serviceId: 2406,
+        serviceTypes: [ForegroundServiceTypes.dataSync],
+        notificationTitle: appName,
+        notificationText: '正在准备后台任务',
+        notificationButtons: [
+          const NotificationButton(id: 'pause', text: '暂停下载'),
+        ],
+        callback: downloadServiceEntry,
+      );
+    } catch (_) {
+      // 容错降级：在缺少通知权限或系统限制前台服务时降级为应用前台执行，不阻断正常下载
     }
   }
 }
