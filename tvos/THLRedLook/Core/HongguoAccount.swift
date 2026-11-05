@@ -85,7 +85,7 @@ final class HongguoAccountVault: @unchecked Sendable {
 }
 
 enum HongguoAccountError: LocalizedError, Equatable {
-    case cancelled, storage, invalid, expired, challenge, writeNotConfirmed, interactionInvalid, server(Int), business(Int), preparation(String), network
+    case cancelled, storage, invalid, expired, challenge, followSecurity, writeNotConfirmed, interactionInvalid, server(Int), business(Int), preparation(String), network
     var errorDescription: String? {
         switch self {
         case .cancelled: return "账号操作已取消"
@@ -95,6 +95,7 @@ enum HongguoAccountError: LocalizedError, Equatable {
         case .invalid: return "账号校验失败，请重新扫码或稍后重试"
         case .expired: return "二维码已过期，请刷新"
         case .challenge: return "红果要求额外安全验证，请使用红果 App 扫码登录"
+        case .followSecurity: return "红果安全校验未通过（103012），请稍后重试"
         case .server(let status): return "账号请求失败（HTTP \(status)）"
         case .business(let code): return "官方账号请求失败（错误码 \(code)）"
         case .preparation(let code): return "账号请求准备失败（\(code)）"
@@ -586,7 +587,7 @@ final class HongguoAccountModel: ObservableObject {
             profileDevice = Dictionary(uniqueKeysWithValues: query.filter { ["iid", "device_id", "cdid"].contains($0.name) && $0.value != nil }.map { ($0.name, $0.value!) })
         }
         let body = try await request(url, headers: command["headers"] as? [String: String] ?? [:], owner: owner, existing: existing,
-            method: command["method"] as? String ?? "GET", form: command["body"] as? String, candidateCookies: candidateCookies)
+            method: command["method"] as? String ?? "GET", form: command["body"] as? String, candidateCookies: candidateCookies, diagnosticAction: action)
         guard !existing || vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
         let result: [String: Any]
         do { result = try await NativeBridge.shared.accountParse(action, body: body) }
@@ -602,6 +603,7 @@ final class HongguoAccountModel: ObservableObject {
         let code: String
         switch issue {
         case .business(let value): code = "BUSINESS_\(value)"
+        case .followSecurity: code = "BUSINESS_103012"
         case .server(let value): code = "HTTP_\(value)"
         case .expired: code = "QR_EXPIRED"
         case .challenge: code = "CHALLENGE_REQUIRED"
@@ -615,11 +617,12 @@ final class HongguoAccountModel: ObservableObject {
         guard summary != lastTrace else { return }
         lastTrace = summary
         NSLog("[Account] %@", summary)
-        SourceDiagnostics.shared.add(SourceDiagnosticEntry(context: "红果登录", stage: phase, errorCode: code, sessionStatus: "status=\(safeStatus) session=\(session)"))
+        SourceDiagnostics.shared.add(SourceDiagnosticEntry(context: phase == "creatorFollow" ? "红果作者关注" : "红果登录", stage: phase, errorCode: code, sessionStatus: "status=\(safeStatus) session=\(session)"))
     }
     private func request(_ url: URL, headers: [String: String], owner: Int, existing: Bool = false,
-        method: String = "GET", form: String? = nil, candidateCookies: HongguoTransientCookies? = nil) async throws -> String {
+        method: String = "GET", form: String? = nil, candidateCookies: HongguoTransientCookies? = nil, diagnosticAction: String? = nil) async throws -> String {
         try check(owner)
+        let started = ProcessInfo.processInfo.systemUptime
         let web = url.scheme == "https" && url.host == "hongguoduanju.com" && url.port == nil
         guard web || HongguoAccountVault.businessURL(url) else { throw HongguoAccountError.invalid }
         guard ["GET", "POST"].contains(method) else { throw HongguoAccountError.invalid }
@@ -646,6 +649,22 @@ final class HongguoAccountModel: ObservableObject {
         let (data, raw) = try await session.data(for: request)
         try check(owner)
         guard let response = raw as? HTTPURLResponse, data.count <= 2 * 1024 * 1024 else { throw HongguoAccountError.invalid }
+        if diagnosticAction == "creatorFollow", url.path == "/novel/commentapi/comment/do_action/v1/" {
+            let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let rawCode = SourceDiagnostics.safeCode(parsed?["code"])
+            let business = rawCode.range(of: "^-?[0-9]{1,9}$", options: .regularExpression) != nil ? rawCode : ""
+            let risk = response.statusCode == 200 && business == "103012"
+            let logId = response.value(forHTTPHeaderField: "x-tt-logid") ?? ""
+            let gateway = response.value(forHTTPHeaderField: "x-tt-agw-login") ?? ""
+            let location = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            let endpoint = (location?.scheme ?? "https") + "://" + (location?.host ?? "") + (location?.path ?? "")
+            let errorCode = response.statusCode != 200 ? "HTTP_\(response.statusCode)" : business.isEmpty ? "INVALID_RESPONSE" : business != "0" ? "BUSINESS_\(business)" : ""
+            let sessionState = "session=\(loggedIn) verified=\(verified) boundDevice=\(account?.device != nil)" + (["0", "1"].contains(gateway) ? " gatewayLogin=\(gateway)" : "")
+            SourceDiagnostics.shared.add(SourceDiagnosticEntry(context: "红果作者关注", stage: "creatorFollow", host: url.host ?? "", url: endpoint,
+                method: method, logId: logId.range(of: "^[0-9A-Fa-f]{16,64}$", options: .regularExpression) != nil ? logId : "", status: response.statusCode,
+                businessCode: business, errorCode: errorCode, elapsedMs: Int(max(0, (ProcessInfo.processInfo.systemUptime - started) * 1000)),
+                category: risk ? .businessRejected : .unknown, errorDetail: risk ? "官方评论接口返回 HitSharkRule，具体触发条件未提供" : "", sessionStatus: sessionState))
+        }
         if web && !existing {
             let fields = response.allHeaderFields.reduce(into: [String: String]()) { result, pair in result[String(describing: pair.key)] = String(describing: pair.value) }
             var updated = candidateCookies?.values ?? cookies

@@ -44,7 +44,12 @@ class _Headers implements HttpHeaders {
   List<String>? operator [](String name) =>
       name == HttpHeaders.setCookieHeader ? cookies : null;
   @override
-  String? value(String name) => fields[name]?.toString();
+  String? value(String name) {
+    final value = fields[name];
+    if (value is Exception) throw value;
+    return value?.toString();
+  }
+
   @override
   void set(String name, Object value, {bool preserveHeaderCase = false}) {
     fields[name] = value;
@@ -556,7 +561,11 @@ void main() {
       episodes: 12,
     );
     var liked = false, followed = false, writes = 0, mismatch = false;
-    var rejectCreator = false;
+    var rejectCreator = false,
+        untrustedLogId = false,
+        duplicateLogId = false,
+        rejectLike = false,
+        malformedCreatorCode = false;
     final service = HongguoAccountService(session: session);
     addTearDown(service.dispose);
     await HttpOverrides.runZoned(
@@ -621,15 +630,83 @@ void main() {
         await expectLater(
           service.setCreatorFollowing(drama, initial.creators.single, true),
           throwsA(
-            isA<HongguoAccountFailure>().having(
-              (failure) => failure.code,
-              'official rejection',
-              'BUSINESS_103012',
-            ),
+            isA<HongguoAccountFailure>()
+                .having(
+                  (failure) => failure.code,
+                  'official rejection',
+                  'BUSINESS_103012',
+                )
+                .having(
+                  (failure) => failure.message,
+                  'comment API risk classification',
+                  contains('安全校验未通过'),
+                ),
           ),
         );
         expect(followed, isFalse);
         expect(writes, 6);
+        SourceDiagnosticEntry lastResponse() =>
+            SourceDiagnostics.shared.entries.lastWhere(
+              (entry) => entry.stage == 'creatorFollow' && entry.status == 200,
+            );
+        final record = lastResponse();
+        expect(record.context, '红果作者关注');
+        expect(record.businessCode, '103012');
+        expect(record.errorCategory, 'upstream_security');
+        expect(record.logId, 'ABCDEF0123456789ABCDEF0123456789');
+        expect(record.sessionStatus, contains('gatewayLogin=1'));
+        expect(record.url, endsWith('/novel/commentapi/comment/do_action/v1/'));
+        expect(record.url, isNot(contains('?')));
+        for (final sensitive in [
+          'synthetic-social',
+          'opaque-account-value',
+          'private-sdk-details',
+          '7688558312157088794',
+        ]) {
+          expect(record.toReportBlock(), isNot(contains(sensitive)));
+        }
+        untrustedLogId = true;
+        await expectLater(
+          service.setCreatorFollowing(drama, initial.creators.single, true),
+          throwsA(isA<HongguoAccountFailure>()),
+        );
+        expect(lastResponse().logId, isEmpty);
+        duplicateLogId = true;
+        await expectLater(
+          service.setCreatorFollowing(drama, initial.creators.single, true),
+          throwsA(
+            isA<HongguoAccountFailure>().having(
+              (failure) => failure.code,
+              'diagnostic header error preserves business failure',
+              'BUSINESS_103012',
+            ),
+          ),
+        );
+        expect(lastResponse().logId, isEmpty);
+        rejectLike = true;
+        await expectLater(
+          service.setLiked(drama, initial.episode(1)!, true),
+          throwsA(
+            isA<HongguoAccountFailure>().having(
+              (failure) => failure.message,
+              'scope classification to comment follow API',
+              isNot(contains('安全校验未通过')),
+            ),
+          ),
+        );
+        expect(session.loggedIn, isTrue);
+        expect(session.id, '123');
+        malformedCreatorCode = true;
+        await expectLater(
+          service.setCreatorFollowing(drama, initial.creators.single, true),
+          throwsA(isA<HongguoAccountFailure>()),
+        );
+        expect(lastResponse().businessCode, isEmpty);
+        expect(lastResponse().errorCode, 'INVALID_RESPONSE');
+        expect(
+          lastResponse().toReportBlock(),
+          isNot(contains('opaque-account-value')),
+        );
       },
       createHttpClient: (_) => _Client((uri, headers) {
         expect(headers.value('Cookie'), 'sessionid=synthetic-social');
@@ -684,6 +761,7 @@ void main() {
           expect(body['object_type'], 6);
           expect(body['action_category'], 1);
           expect([3, 4], contains(body['action_type']));
+          if (rejectLike) return _Reply({'code': 103012});
           liked = body['action_type'] == 3;
         } else {
           expect(uri.path, '/novel/commentapi/comment/do_action/v1/');
@@ -695,7 +773,21 @@ void main() {
           expect(body.containsKey('relative_type'), isFalse);
           expect([25, 26], contains(body['action_type']));
           if (rejectCreator) {
-            return _Reply({'code': 103012, 'message': '关注失败，请稍后再试'});
+            final reply = _Reply({
+              'code': malformedCreatorCode ? 'opaque-account-value' : 103012,
+              'message': '关注失败，请稍后再试',
+              'debug_info': 'private-sdk-details',
+            });
+            (reply.headers as _Headers).fields.addAll({
+              'x-tt-logid': duplicateLogId
+                  ? const HttpException('synthetic repeated header')
+                  : untrustedLogId
+                  ? 'sessionid=opaque-account-value'
+                  : 'ABCDEF0123456789ABCDEF0123456789',
+              'x-tt-agw-login': '1',
+              'x-tt-token': 'opaque-account-value',
+            });
+            return reply;
           }
           followed = body['action_type'] == 25;
         }

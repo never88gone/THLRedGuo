@@ -87,9 +87,11 @@ class HongguoAccountService {
   Future<({String body, Uri? redirect})> _request(
     Map<String, dynamic> command,
     HongguoAccountCookies? cookies,
-    int revision,
-  ) async {
+    int revision, {
+    String? diagnosticAction,
+  }) async {
     _check(revision);
+    final elapsed = Stopwatch()..start();
     final uri = Uri.parse(command['url'] as String);
     final web =
         uri.scheme == 'https' &&
@@ -148,6 +150,14 @@ class HongguoAccountService {
     }
     if (response.statusCode != 200) {
       await response.drain<void>();
+      _recordCreatorResponse(
+        diagnosticAction,
+        uri,
+        method,
+        response,
+        '',
+        elapsed,
+      );
       throw HongguoAccountFailure(
         '账号请求失败（HTTP ${response.statusCode}）',
         'HTTP_${response.statusCode}',
@@ -164,7 +174,74 @@ class HongguoAccountService {
     if (bytes.isEmpty) {
       throw const HongguoAccountFailure('账号接口返回空正文', 'EMPTY_RESPONSE');
     }
-    return (body: utf8.decode(bytes), redirect: null);
+    final body = utf8.decode(bytes);
+    _recordCreatorResponse(
+      diagnosticAction,
+      uri,
+      method,
+      response,
+      body,
+      elapsed,
+    );
+    return (body: body, redirect: null);
+  }
+
+  void _recordCreatorResponse(
+    String? action,
+    Uri uri,
+    String method,
+    HttpClientResponse response,
+    String body,
+    Stopwatch elapsed,
+  ) {
+    if (action != 'creatorFollow' ||
+        uri.path != '/novel/commentapi/comment/do_action/v1/') {
+      return;
+    }
+    Object? parsed;
+    try {
+      parsed = jsonDecode(body);
+    } catch (_) {}
+    final rawCode = parsed is Map ? parsed['code']?.toString() ?? '' : '';
+    final business = RegExp(r'^-?\d{1,9}$').hasMatch(rawCode) ? rawCode : '';
+    final risk = response.statusCode == 200 && business == '103012';
+    String header(String name) {
+      try {
+        return response.headers.value(name) ?? '';
+      } catch (_) {
+        return '';
+      }
+    }
+
+    final logId = header('x-tt-logid');
+    final gatewayLogin = header('x-tt-agw-login');
+    SourceDiagnostics.shared.add(
+      SourceDiagnosticEntry(
+        at: DateTime.now(),
+        context: '红果作者关注',
+        stage: 'creatorFollow',
+        host: uri.host,
+        url: Uri(scheme: uri.scheme, host: uri.host, path: uri.path).toString(),
+        method: method,
+        status: response.statusCode,
+        businessCode: business,
+        errorCode: response.statusCode != 200
+            ? 'HTTP_${response.statusCode}'
+            : business.isEmpty
+            ? 'INVALID_RESPONSE'
+            : business != '0'
+            ? 'BUSINESS_$business'
+            : '',
+        logId: RegExp(r'^[0-9A-Fa-f]{16,64}$').hasMatch(logId) ? logId : '',
+        elapsedMs: elapsed.elapsedMilliseconds,
+        errorCategory: risk ? 'upstream_security' : '',
+        errorTitle: risk ? '红果安全校验未通过' : '',
+        errorMessage: risk ? '官方评论接口返回 HitSharkRule，具体触发条件未提供' : '',
+        sessionStatus:
+            'session=${session.loggedIn} verified=${session.verified} boundDevice=${session.deviceSession != null}'
+            '${{'0', '1'}.contains(gatewayLogin) ? ' gatewayLogin=$gatewayLogin' : ''}',
+      ),
+    );
   }
 
   Future<Map<String, dynamic>> _call(
@@ -187,7 +264,12 @@ class HongguoAccountService {
         });
       }
       phase = 'request';
-      final response = await _request(command, cookies, revision);
+      final response = await _request(
+        command,
+        cookies,
+        revision,
+        diagnosticAction: action,
+      );
       if (response.redirect != null) {
         throw const HongguoAccountFailure('账号接口发生意外跳转', 'UNEXPECTED_REDIRECT');
       }
@@ -270,7 +352,7 @@ class HongguoAccountService {
     SourceDiagnostics.shared.add(
       SourceDiagnosticEntry(
         at: DateTime.now(),
-        context: '红果登录',
+        context: phase == 'creatorFollow' ? '红果作者关注' : '红果登录',
         stage: phase,
         errorCode: code,
         businessCode: businessCode,

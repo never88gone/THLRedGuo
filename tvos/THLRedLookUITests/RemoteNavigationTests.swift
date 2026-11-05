@@ -4,6 +4,51 @@ final class RemoteNavigationTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.never88gone.redlook")
     private let remote = XCUIRemote.shared
 
+    func testOwnerCreatorOutcomeAndRemoteReturn() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7638987534483082265", "-testDramaTitle", "创作者关注验证"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["account.social.open"].waitForExistence(timeout: 60))
+        yaoDetailPlayFocus()
+        press(.right, focus: "detail.favorite")
+        press(.right, focus: "account.social.open")
+        press(.select)
+        let creator = app.buttons["account.creator.639230362271212"]
+        XCTAssertTrue(creator.waitForExistence(timeout: 45))
+        XCTAssertEqual(creator.label, "关注")
+        for _ in 0..<12 {
+            if creator.hasFocus { break }
+            press(.down)
+        }
+        XCTAssertTrue(creator.hasFocus)
+        press(.select)
+        let error = app.staticTexts["account.social.error"]
+        wait("creator response", seconds: 30) { error.exists || creator.label == "取消关注" }
+        let accepted = creator.label == "取消关注"
+        if accepted {
+            wait("confirmed creator focus") { creator.isEnabled && creator.hasFocus }
+            press(.select)
+            wait("new creator follow removed", seconds: 30) { creator.isEnabled && creator.label == "关注" }
+            XCTAssertFalse(error.exists)
+        } else {
+            XCTAssertTrue(error.label.contains("安全校验未通过"))
+            XCTAssertTrue(error.label.contains("103012"))
+            XCTAssertEqual(creator.label, "关注")
+            wait("rejected creator focus restored") { creator.isEnabled && creator.hasFocus }
+        }
+        press(.menu)
+        wait("creator result returns focus") { self.app.buttons["account.social.open"].hasFocus }
+        press(.select)
+        XCTAssertTrue(creator.waitForExistence(timeout: 45))
+        XCTAssertEqual(creator.label, "关注")
+        press(.menu)
+        wait("fresh creator read returns focus") { self.app.buttons["account.social.open"].hasFocus }
+        print("THL_CREATOR_OUTCOME accepted=\(accepted) originalStateRestored=true remoteReturn=true")
+    }
+
     func testOwnerAccountLikeAndShelfWithRemote() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
         continueAfterFailure = false

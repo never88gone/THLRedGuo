@@ -313,7 +313,10 @@ public actor NativeBridge {
         let result = context.evaluateScript(expression)
         if context.exception?.toString()?.contains("ACCOUNT_CHALLENGE_REQUIRED") == true || context.exception?.toString()?.contains("ACCOUNT_SECONDARY_VERIFICATION_REQUIRED") == true { throw HongguoAccountError.challenge }
         if let message = context.exception?.toString(), let range = message.range(of: "ACCOUNT_BUSINESS_-?[0-9]{1,9}", options: .regularExpression),
-           let code = Int(message[range].dropFirst("ACCOUNT_BUSINESS_".count)) { throw HongguoAccountError.business(code) }
+           let code = Int(message[range].dropFirst("ACCOUNT_BUSINESS_".count)) {
+            if action == "creatorFollow" && code == 103012 { throw HongguoAccountError.followSecurity }
+            throw HongguoAccountError.business(code)
+        }
         guard let result, context.exception == nil,
               let data = result.toDictionary() as? [String: Any] else {
             throw ["socialDetail", "creatorList", "likeUpdate", "creatorFollow"].contains(action) ? HongguoAccountError.interactionInvalid : HongguoAccountError.invalid

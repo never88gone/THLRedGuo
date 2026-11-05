@@ -270,6 +270,12 @@ class CatPawJsRuntime {
         r'ACCOUNT_BUSINESS_(-?[0-9]{1,9})',
       ).firstMatch(value.stringResult)?.group(1);
       if (code != null) {
+        if (action == 'creatorFollow' && code == '103012') {
+          throw const HongguoAccountFailure(
+            '红果安全校验未通过（103012），请稍后重试',
+            'BUSINESS_103012',
+          );
+        }
         throw HongguoAccountFailure('官方账号请求失败（错误码 $code）', 'BUSINESS_$code');
       }
       if (const {
