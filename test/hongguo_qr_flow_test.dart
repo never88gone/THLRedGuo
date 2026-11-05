@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:THLRedLook/core/account/hongguo_account_service.dart';
+import 'package:THLRedLook/core/account/hongguo_social_models.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/core/account/hongguo_account_session.dart';
 import 'package:THLRedLook/core/js/hongguo_guest_session.dart';
@@ -469,6 +470,153 @@ void main() {
     await session.logout();
     expect(session.avatar, isEmpty);
   });
+  test('官方分集点赞和作者关注使用独立接口、当前账号并回读确认', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('synthetic-social');
+    final jar = HongguoAccountCookies()
+      ..merge(Uri.parse('https://hongguoduanju.com/'), [
+        'sessionid=synthetic-social; Path=/; Secure',
+      ]);
+    await session.accept(jar, {
+      'id': '123',
+    }, expectedRevision: session.revision);
+    final drama = Drama(
+      id: 'hongguo:7688558312157088793',
+      source: 'hongguo',
+      sourceId: '7688558312157088793',
+      title: 'synthetic',
+      cover: '',
+      description: '',
+      episodes: 12,
+    );
+    var liked = false, followed = false, writes = 0, mismatch = false;
+    final service = HongguoAccountService(session: session);
+    addTearDown(service.dispose);
+    await HttpOverrides.runZoned(
+      () async {
+        final initial = await service.social(drama);
+        expect(initial.episode(1)!.liked, false);
+        expect(initial.creators.single.id, '7688558312157088794');
+        expect(initial.creators.single.relativeType, 3);
+        final like = await service.setLiked(drama, initial.episode(1)!, true);
+        expect(like.episode(1)!.liked, true);
+        expect(like.episode(1)!.count, 11);
+        final rows = await service.setCreatorFollowing(
+          drama,
+          initial.creators.single,
+          true,
+        );
+        expect(rows.single.following, true);
+        final removed = await service.setCreatorFollowing(
+          drama,
+          rows.single,
+          false,
+        );
+        expect(removed.single.following, false);
+        await service.setLiked(drama, like.episode(1)!, false);
+        expect(writes, 4);
+        mismatch = true;
+        await expectLater(
+          service.setLiked(drama, initial.episode(1)!, true),
+          throwsA(
+            isA<HongguoAccountFailure>().having(
+              (e) => e.code,
+              'readback',
+              'WRITE_NOT_CONFIRMED',
+            ),
+          ),
+        );
+        expect(writes, 5);
+        await expectLater(
+          service.setCreatorFollowing(
+            drama,
+            const HongguoCreator(
+              '7688558312157088794',
+              'unknown',
+              2,
+              null,
+              true,
+            ),
+            true,
+          ),
+          throwsA(isA<HongguoAccountFailure>()),
+        );
+        await expectLater(
+          service.setCreatorFollowing(
+            drama,
+            const HongguoCreator('123', 'self', 2, false, true),
+            true,
+          ),
+          throwsA(isA<HongguoAccountFailure>()),
+        );
+        expect(writes, 5);
+      },
+      createHttpClient: (_) => _Client((uri, headers) {
+        expect(headers.value('Cookie'), 'sessionid=synthetic-social');
+        if (uri.path == '/novel/player/video_detail/v1/') {
+          final body = jsonDecode(headers.value('synthetic-body')!) as Map;
+          expect(body['series_id'], drama.cleanSourceId);
+          return _Reply({
+            'code': 0,
+            'data': {
+              'video_data': {
+                'series_id_str': drama.cleanSourceId,
+                'video_list': [
+                  {
+                    'vid': '7688558312157088795',
+                    'vid_index': 1,
+                    'user_digg': mismatch ? false : liked,
+                    'digged_count': liked ? 11 : 10,
+                  },
+                ],
+              },
+            },
+          });
+        }
+        if (uri.path == '/reading/user/celebrity/list/v1/') {
+          expect(uri.queryParameters['list_type'], '3');
+          return _Reply({
+            'code': 0,
+            'data': {
+              'main_creator_user_list': [
+                {
+                  'group_type': 'author',
+                  'ugc_user_infos': [
+                    {
+                      'user_id': '7688558312157088794',
+                      'base_info': {'user_name': '合成作者'},
+                      'user_tag': {'is_author': true},
+                      'user_relation': {
+                        'relation_type': followed ? 2 : 1,
+                        'can_follow': true,
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          });
+        }
+        final body = jsonDecode(headers.value('synthetic-body')!) as Map;
+        writes++;
+        if (uri.path == '/reading/ugc/action/set/v1/') {
+          expect(body['object_id'], '7688558312157088795');
+          expect(body['object_type'], 6);
+          expect(body['action_category'], 1);
+          expect([3, 4], contains(body['action_type']));
+          liked = body['action_type'] == 3;
+        } else {
+          expect(uri.path, '/reading/ugc/general/follow/v1/');
+          expect(body['relative_id'], '7688558312157088794');
+          expect(body['relative_type'], 3);
+          expect([0, 1], contains(body['action_type']));
+          followed = body['action_type'] == 1;
+        }
+        return _Reply({'code': 0});
+      }),
+    );
+  });
+
   test('账号列表格式改变和业务拒绝不能变成成功空列表', () async {
     final session = HongguoAccountSession();
     await session.bindProfile('synthetic-invalid-library');

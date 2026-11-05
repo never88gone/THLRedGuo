@@ -196,6 +196,8 @@ public struct DramaDetailView: View {
                                         .accessibilityIdentifier("detail.favorite")
                                         .accessibilityLabel(viewModel.followState == .none ? "追剧" : "已追剧(已收藏)")
 
+                                        TVAccountSocialButton(drama: viewModel.drama, episode: viewModel.lastWatchEntry?.episode ?? selectedEpisodeNumber)
+
                                         if viewModel.followState != .none && !accountLibrary.loggedIn {
                                             Menu {
                                                 ForEach([FollowState.wishlist, .watching, .watched, .updated]) { state in

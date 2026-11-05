@@ -85,10 +85,12 @@ final class HongguoAccountVault: @unchecked Sendable {
 }
 
 enum HongguoAccountError: LocalizedError, Equatable {
-    case cancelled, storage, invalid, expired, challenge, server(Int), business(Int), preparation(String), network
+    case cancelled, storage, invalid, expired, challenge, writeNotConfirmed, interactionInvalid, server(Int), business(Int), preparation(String), network
     var errorDescription: String? {
         switch self {
         case .cancelled: return "账号操作已取消"
+        case .interactionInvalid: return "官方互动数据暂不可用，请刷新后重试"
+        case .writeNotConfirmed: return "官方互动状态尚未确认，请刷新后重试"
         case .storage: return "账号安全存储暂不可用，请重试"
         case .invalid: return "账号校验失败，请重新扫码或稍后重试"
         case .expired: return "二维码已过期，请刷新"
@@ -99,6 +101,37 @@ enum HongguoAccountError: LocalizedError, Equatable {
         case .network: return "账号网络请求失败，请稍后重试"
         }
     }
+}
+
+struct HongguoEpisodeLike {
+    let id: String
+    let number: Int
+    let liked: Bool
+    let count: Int
+    init?(_ row: [String: Any]) {
+        guard let id = row["id"] as? String, let number = row["number"] as? Int, let liked = row["liked"] as? Bool else { return nil }
+        self.id = id; self.number = number; self.liked = liked; self.count = row["count"] as? Int ?? 0
+    }
+}
+
+struct HongguoCreator: Identifiable {
+    let id: String
+    let name: String
+    let relativeType: Int
+    let following: Bool?
+    let canFollow: Bool
+    init?(_ row: [String: Any]) {
+        guard let id = row["id"] as? String, let name = row["name"] as? String, let type = row["relativeType"] as? Int else { return nil }
+        self.id = id; self.name = name; self.relativeType = type
+        self.following = row["following"] as? Bool; self.canFollow = row["canFollow"] as? Bool == true
+    }
+}
+
+struct HongguoSocialSnapshot {
+    let episodes: [HongguoEpisodeLike]
+    let creators: [HongguoCreator]
+    var creatorError: String? = nil
+    func episode(_ number: Int) -> HongguoEpisodeLike? { episodes.first { $0.number == number } }
 }
 
 final class HongguoAccountLibraryCache: @unchecked Sendable {
@@ -154,7 +187,12 @@ final class HongguoAccountModel: ObservableObject {
     @Published private(set) var message = ""
     @Published private(set) var libraryVersion = 0
     @Published private(set) var libraryWriteError: String?
+    @Published private(set) var socialStates: [String: HongguoSocialSnapshot] = [:]
+    @Published private(set) var socialBusy: Set<String> = []
+    private var socialOwner: UInt64 = .max
+    private var socialGeneration: [String: UInt64] = [:]
     private var accountWrites: Task<Void, Error>?
+    private var socialWrites: Task<Void, Error>?
     private var reportedAt: [String: Date] = [:]
     private var favoriteGeneration: UInt64 = 0
     private var progressGeneration: [String: UInt64] = [:]
@@ -453,8 +491,84 @@ final class HongguoAccountModel: ObservableObject {
             self.publishLibraryChange()
         }
     }
+    private func enqueueSocialWrite(_ operation: @escaping @MainActor () async throws -> Void) async throws {
+        let revision = vault.snapshot.revision, previous = socialWrites
+        let task = Task { @MainActor in
+            _ = await previous?.result
+            guard self.loggedIn, self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+            try await operation()
+            guard self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+        }
+        socialWrites = task
+        try await task.value
+    }
+    func socialState(_ drama: Drama) -> HongguoSocialSnapshot? {
+        guard loggedIn, socialOwner == vault.snapshot.revision else { return nil }
+        return socialStates[drama.cleanSourceId]
+    }
+    private func prepareSocialOwner() {
+        if socialOwner != vault.snapshot.revision {
+            socialOwner = vault.snapshot.revision; socialStates = [:]; socialGeneration = [:]; socialBusy = []
+        }
+    }
+    private func readCreators(_ drama: Drama, owner: Int) async throws -> [HongguoCreator] {
+        let result = try await call("creatorList", payload: ["id": drama.cleanSourceId], owner: owner, existing: true)
+        guard let rows = result["creators"] as? [[String: Any]] else { throw HongguoAccountError.invalid }
+        return rows.compactMap(HongguoCreator.init)
+    }
+    private func readSocial(_ drama: Drama, owner: Int) async throws -> HongguoSocialSnapshot {
+        let revision = vault.snapshot.revision
+        let result = try await call("socialDetail", payload: ["id": drama.cleanSourceId], owner: owner, existing: true)
+        guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+        guard result["id"] as? String == drama.cleanSourceId, let rows = result["episodes"] as? [[String: Any]] else { throw HongguoAccountError.invalid }
+        var creators: [HongguoCreator] = [], creatorError: String?
+        do { creators = try await readCreators(drama, owner: owner) }
+        catch { try check(owner); creatorError = error.localizedDescription }
+        return HongguoSocialSnapshot(episodes: rows.compactMap(HongguoEpisodeLike.init), creators: creators, creatorError: creatorError)
+    }
+    func loadSocial(_ drama: Drama) async throws {
+        guard loggedIn else { throw HongguoAccountError.invalid }
+        prepareSocialOwner()
+        let revision = vault.snapshot.revision, id = drama.cleanSourceId, generation = socialGeneration[drama.cleanSourceId] ?? 0
+        let result = try await readSocial(drama, owner: attempt)
+        guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+        if socialGeneration[id] ?? 0 == generation { socialStates[id] = result }
+    }
+    func setLiked(_ drama: Drama, episode: HongguoEpisodeLike, liked: Bool) async throws {
+        guard loggedIn else { throw HongguoAccountError.invalid }
+        prepareSocialOwner()
+        let revision = vault.snapshot.revision, id = drama.cleanSourceId
+        guard !socialBusy.contains(id) else { return }
+        socialBusy.insert(id)
+        defer { if vault.snapshot.revision == revision { socialBusy.remove(id) } }
+        try await enqueueSocialWrite {
+            _ = try await self.call("likeUpdate", payload: ["itemId": episode.id, "like": liked ? "1" : "0"], owner: self.attempt, existing: true)
+            guard self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+            let result = try await self.readSocial(drama, owner: self.attempt)
+            guard self.vault.snapshot.revision == revision, let row = result.episode(episode.number), row.id == episode.id, row.liked == liked else { throw HongguoAccountError.writeNotConfirmed }
+            self.socialGeneration[id] = (self.socialGeneration[id] ?? 0) + 1
+            self.socialStates[id] = result
+        }
+    }
+    func setCreatorFollowing(_ drama: Drama, creator: HongguoCreator, follow: Bool) async throws {
+        guard loggedIn, creator.following != nil, creator.canFollow || !follow, creator.id != account?.id else { throw HongguoAccountError.invalid }
+        prepareSocialOwner()
+        let revision = vault.snapshot.revision, id = drama.cleanSourceId
+        guard !socialBusy.contains(id) else { return }
+        socialBusy.insert(id)
+        defer { if vault.snapshot.revision == revision { socialBusy.remove(id) } }
+        try await enqueueSocialWrite {
+            _ = try await self.call("creatorFollow", payload: ["userId": creator.id, "relativeType": String(creator.relativeType), "follow": follow ? "1" : "0"], owner: self.attempt, existing: true)
+            guard self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+            let rows = try await self.readCreators(drama, owner: self.attempt)
+            guard self.vault.snapshot.revision == revision, let row = rows.first(where: { $0.id == creator.id && $0.relativeType == creator.relativeType }), row.following == follow else { throw HongguoAccountError.writeNotConfirmed }
+            self.socialGeneration[id] = (self.socialGeneration[id] ?? 0) + 1
+            self.socialStates[id] = HongguoSocialSnapshot(episodes: self.socialStates[id]?.episodes ?? [], creators: rows)
+        }
+    }
     func logout() {
         cancel()
+        socialStates = [:]; socialBusy = []; socialGeneration = [:]
         do { try vault.logout(); account = nil; verified = false; message = "已退出红果账号" }
         catch { account = nil; verified = false; message = "当前会话已退出，安全存储清理失败，请重试" }
     }
@@ -464,16 +578,20 @@ final class HongguoAccountModel: ObservableObject {
     private func call(_ action: String, payload: [String: String] = [:], owner: Int, existing: Bool = false, candidateCookies: HongguoTransientCookies? = nil) async throws -> [String: Any] {
         try check(owner)
         stage = action
+        let revision = vault.snapshot.revision
         let command = try await NativeBridge.shared.accountRequest(action, payload: payload)
+        guard !existing || vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
         guard let value = command["url"] as? String, let url = URL(string: value) else { throw HongguoAccountError.invalid }
         if action == "profile", let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems {
             profileDevice = Dictionary(uniqueKeysWithValues: query.filter { ["iid", "device_id", "cdid"].contains($0.name) && $0.value != nil }.map { ($0.name, $0.value!) })
         }
         let body = try await request(url, headers: command["headers"] as? [String: String] ?? [:], owner: owner, existing: existing,
             method: command["method"] as? String ?? "GET", form: command["body"] as? String, candidateCookies: candidateCookies)
+        guard !existing || vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
         let result: [String: Any]
         do { result = try await NativeBridge.shared.accountParse(action, body: body) }
         catch { trace(action, error: error, existing: existing); throw error }
+        guard !existing || vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
         if action != "poll" { trace(action, existing: existing) }
         return result
     }
@@ -489,7 +607,7 @@ final class HongguoAccountModel: ObservableObject {
         case .challenge: code = "CHALLENGE_REQUIRED"
         case .cancelled: code = "CANCELLED"
         case .storage: code = "STORAGE"
-        case .invalid: code = "INVALID_RESPONSE"
+        case .invalid, .interactionInvalid: code = "INVALID_RESPONSE"
         case .preparation(let value): code = value
         default: code = error == nil ? "" : "NETWORK"
         }

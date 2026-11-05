@@ -1,3 +1,4 @@
+import '../account/hongguo_social_dialog.dart';
 import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
@@ -155,6 +156,18 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
           ),
           const SizedBox(height: 10),
           _mobileFollowControl(drama),
+          HongguoSocialButton(
+            drama: drama,
+            episode: widget.detail.episodes.isEmpty
+                ? 1
+                : widget
+                      .detail
+                      .episodes[widget.currentIndex.clamp(
+                        0,
+                        widget.detail.episodes.length - 1,
+                      )]
+                      .number,
+          ),
           const SizedBox(height: 12),
           Text(body, style: const TextStyle(height: 1.5, fontSize: 13)),
         ],
@@ -171,7 +184,7 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
         if (value == 'remove') {
           await saveUserChange(
             context,
-            () => widget.store.toggleFavorite(drama),
+            () => widget.store.setFavorite(drama, false),
           );
         } else {
           final status = FollowStatus.values.firstWhere(

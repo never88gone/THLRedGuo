@@ -176,3 +176,82 @@ struct TVHawPairLoginView: View {
         .onExitCommand { completeReplacement(false); server.stop(); dismiss() }
     }
 }
+
+struct TVAccountSocialButton: View {
+    @ObservedObject private var account = HongguoAccountModel.shared
+    let drama: Drama
+    var episode = 1
+    @State private var showing = false
+    var body: some View {
+        if account.loggedIn && drama.source == "hongguo" {
+            Button { showing = true } label: { Label("点赞与关注", systemImage: "heart") }
+                .accessibilityIdentifier("account.social.open")
+                .sheet(isPresented: $showing) { TVAccountSocialSheet(drama: drama, episode: episode) }
+        }
+    }
+}
+
+struct TVAccountSocialSheet: View {
+    @ObservedObject private var model = HongguoAccountModel.shared
+    @Environment(\.dismiss) private var dismiss
+    let drama: Drama
+    var episode = 1
+    @State private var error: String?
+    @State private var loading = false
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                Text("点赞与关注").font(.system(size: 48, weight: .bold))
+                Text(drama.title).font(.system(size: 31))
+                if !model.loggedIn { Text("请先登录红果账号") }
+                else {
+                    if loading { ProgressView("正在读取官方账号状态") }
+                    if let error { Text(error).foregroundStyle(.orange) }
+                    if let data = model.socialState(drama) {
+                        if let like = data.episode(episode) {
+                            Button {
+                                run { try await model.setLiked(drama, episode: like, liked: !like.liked) }
+                            } label: {
+                                Label("第 \(like.number) 集 · \(like.liked ? "取消点赞" : "点赞") · \(like.count)", systemImage: like.liked ? "heart.fill" : "heart")
+                            }
+                            .accessibilityIdentifier("account.episode.like")
+                            .disabled(loading || model.socialBusy.contains(drama.cleanSourceId))
+                        } else { Text("第 \(episode) 集暂未提供点赞状态") }
+                        Text("创作者／演员").font(.system(size: 35, weight: .bold))
+                        if let issue = data.creatorError { Text("关注列表获取失败：\(issue)").foregroundStyle(.orange) }
+                        else if data.creators.isEmpty { Text("本剧暂无可关注的创作者账号") }
+                        ForEach(data.creators) { creator in
+                            HStack {
+                                Text(creator.name)
+                                Spacer()
+                                Button(creator.following == nil ? "状态不可用" : creator.following! ? "取消关注" : "关注") {
+                                    run { try await model.setCreatorFollowing(drama, creator: creator, follow: creator.following != true) }
+                                }
+                                .accessibilityIdentifier("account.creator.\(creator.id)")
+                                .disabled(loading || model.socialBusy.contains(drama.cleanSourceId) || creator.following == nil || (!creator.canFollow && creator.following != true) || creator.id == model.account?.id)
+                            }
+                        }
+                    }
+                }
+                HStack(spacing: 36) {
+                    Button("刷新") { load() }.disabled(loading || model.socialBusy.contains(drama.cleanSourceId) || !model.loggedIn)
+                    Button("关闭") { dismiss() }
+                }
+            }
+            .font(.system(size: 29))
+            .padding(70)
+            .frame(maxWidth: 1200, alignment: .leading)
+        }
+        .task(id: drama.id) { load() }
+        .onExitCommand { dismiss() }
+    }
+    private func load() {
+        loading = true
+        Task { await perform { try await model.loadSocial(drama) }; loading = false }
+    }
+    private func run(_ action: @escaping () async throws -> Void) { Task { await perform(action) } }
+    private func perform(_ action: () async throws -> Void) async {
+        do { try await action(); error = nil }
+        catch { self.error = error.localizedDescription }
+    }
+}

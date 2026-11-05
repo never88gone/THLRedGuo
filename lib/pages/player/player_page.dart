@@ -1,3 +1,4 @@
+import '../../views/account/hongguo_social_dialog.dart';
 import 'dart:async';
 import '../../core/account/hongguo_account_session.dart';
 import 'dart:io';
@@ -2375,6 +2376,15 @@ class _PlayerScreenState extends State<PlayerScreen>
               ),
             ),
           ),
+          onSocial: widget.store.usesAccountLibrary(widget.detail.drama.id)
+              ? () => unawaited(
+                  showHongguoSocialDialog(
+                    context,
+                    widget.detail.drama,
+                    widget.detail.episodes[_index].number,
+                  ),
+                )
+              : null,
           onFavorite: () => unawaited(
             saveUserChange(
               context,

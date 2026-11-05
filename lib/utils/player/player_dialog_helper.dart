@@ -1,3 +1,4 @@
+import '../../views/account/hongguo_social_dialog.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
@@ -105,6 +106,17 @@ class PlayerDialogHelper {
           data: menuTheme,
           child: PlayerMenu(
             section: section,
+            accountActions: HongguoSocialButton(
+              drama: detail.drama,
+              episode: detail.episodes.isEmpty
+                  ? 1
+                  : detail
+                        .episodes[currentIndex.clamp(
+                          0,
+                          detail.episodes.length - 1,
+                        )]
+                        .number,
+            ),
             episodes: detail.episodes,
             currentIndex: currentIndex,
             preferences: preferences,

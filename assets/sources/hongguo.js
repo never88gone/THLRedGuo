@@ -7,7 +7,7 @@
 const meta = {
   id: "hongguo",
   name: "官方免费短剧",
-  version: "1.1.0-dev.19",
+  version: "1.1.0-dev.20",
   description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
   author: "社区开发者",
   type: "video",
@@ -1093,7 +1093,7 @@ function ln(model, videoId, downloadQuality) {
   const r = model, e = videoId, t = downloadQuality, n = entries;
 let i,o=[],a=new Set;for(let c of n)try{let s=c.item.spade_a||c.item.encrypt_info?.spade_a,u=s?no(s):null;for(let f of[c.item.main_url,c.item.backup_url,c.item.backup_url_1,c.item.backup_url_2,c.item.backup_url_3,...Array.isArray(c.item.backup_url_list)?c.item.backup_url_list:[]])if(!(typeof f!="string"||!f))try{let h=r.key_seed?io(f,S.from(r.key_seed,"base64")):/^https:\/\//i.test(cn(f))?cn(f):S.from(f,"base64").toString("utf8"),d=lt(h,["qznovelvod.com","fqnovelvod.com","douyinvod.com"]),x=u?u.toString("hex"):null,y=`${d}:${x||""}`;if(a.has(y))continue;a.add(y),o.push({url:d,contentKey:x,codec:c.codec==="bytevc1"?"hevc":c.codec||"auto",source:"app",vid:e,expiresAt:appModelExpiry(r),userAgent:dt,referer:"https://novelquickapp.com/",mediaBytes:Math.max(0,Number(c.item.size||c.item.video_meta?.size||0)),quality:c.quality,width:c.width,height:c.height})}catch(h){i=h}}catch(s){i=s}if(o.length)return o;throw i?.code==="SECURITY_BLOCKED"?i:Object.assign(new Error("\u672C\u96C6\u7247\u6E90\u5730\u5740\u6216\u5BC6\u94A5\u65E0\u6CD5\u89E3\u6790"),{code:"INVALID_RESPONSE"})}
 var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code:"73932",update_version_code:"73932",pv_player:"73932"},Ae;function ao(){let r=K.randomBytes(16);r[6]=r[6]&15|64,r[8]=r[8]&63|128;let e=r.toString("hex");return[e.slice(0,8),e.slice(8,12),e.slice(12,16),e.slice(16,20),e.slice(20)].join("-")}async function Ot(r=1/0){if(globalThis.__hongguoCachedDevice&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.iid))&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.device_id))){globalThis.__hongguoCachedDevice={...globalThis.__hongguoCachedDevice,...he,iid:fe(globalThis.__hongguoCachedDevice.iid),device_id:fe(globalThis.__hongguoCachedDevice.device_id),cdid:fe(globalThis.__hongguoCachedDevice.cdid)||ao()};return globalThis.__hongguoCachedDevice;}return Ae||(Ae=(async()=>{let e=ao(),t={aid:8662,app_name:"novelread",package:"com.phoenix.read",app_version:he.version_name,version_code:73932,update_version_code:73932,manifest_version_code:73932,sdk_version:"6.18.0",device_platform:"android",os:"Android",os_version:he.os_version,os_api:Number(he.os_api),device_model:he.device_type,device_brand:he.device_brand,device_manufacturer:"Xiaomi",density_dpi:Number(he.dpi),display_density:"mdpi",resolution:he.resolution.replace("*","x"),language:"zh",timezone:8,access:"wifi",channel:he.channel,cdid:e,openudid:K.randomBytes(8).toString("hex")},n=await Pe("https://log.snssdk.com/service/2/device_register/?aid=8662&app_name=novelread",{method:"POST",headers:{"Content-Type":"application/json; charset=utf-8","User-Agent":dt},data:JSON.stringify({magic_tag:"ss_app_log",header:t,_gen_time:Date.now()})},Math.min(Date.now()+12e3,r)),i=fe(n.install_id_str),o=fe(n.device_id_str);if(!/^\d{10,24}$/.test(i)||!/^\d{10,24}$/.test(o))throw Object.assign(new Error("\u65E0\u6CD5\u521D\u59CB\u5316\u5B98\u65B9\u4F1A\u8BDD"),{code:"GUEST_REGISTRATION_FAILED"});let dev={...he,iid:i,device_id:o,cdid:e};globalThis.__hongguoCachedDevice=dev;if(typeof __native_save_device==="function"){try{__native_save_device(JSON.stringify(dev));}catch(_){}}return dev;})().catch(e=>{throw Ae=null,e})),Ae}async function co(r,e={},t=!1){t&&!globalThis.__hongguoAccountActive&&(Ae=null,delete globalThis.__hongguoCachedDevice);let deadline=Math.min(Date.now()+12e3,e.deadline||1/0),n=await Ot(deadline),i={query:r,count:0,offset:e.offset||0,tab_type:e.fallbackToGeneral?11:29,tab_name:e.fallbackToGeneral?"":"feed",search_source:1,use_correct:!1,use_lynx:!1,user_is_login:globalThis.__hongguoAccountActive?1:0,bookshelf_search_plan:4,bookstore_tab:16,is_first_enter_search:!e.offset};e.passback&&(i.passback=e.passback),e.searchId&&(i.search_id=e.searchId);let o=Ht(null,"https://reading.snssdk.com/reading/bookapi/search/tab/v",i,n),a=await Pe(o.url,{headers:{...o.headers,lc:"101"}},deadline);if(Number(a.code)!==0||!Array.isArray(a.search_tabs))throw Object.assign(new Error("\u5B98\u65B9\u641C\u7D22\u672A\u8FD4\u56DE\u6709\u6548\u7ED3\u679C"),{code:"SEARCH_REJECTED",category:"business_reject"});return a}async function so({seriesId:r,videoId:e,startMs:t=0,durationMs:n,cursor:i=""}){if(!/^\d{10,30}$/.test(String(r))||!/^\d{10,30}$/.test(String(e)))throw new Error("\u5F39\u5E55\u5206\u96C6\u7F16\u53F7\u65E0\u6548");let o={comment_source:601,server_channel:1e3,group_id:String(e),group_type:30,comment_type:20,sort:1,business_param:{book_id:String(r),start_offset_time:t,playlet_item_duration:n},count:90,cursor:String(i),aid:8662,compliance_status:0},a=await Ot(),c=Ht(JSON.stringify(o),"https://reading.snssdk.com/novel/commentapi/comment/list/"+e+"/v1/",{},a);return Pe(c.url,{method:"POST",headers:{...c.headers,lc:"101"},data:c.body},Date.now()+5e3)}mn.exports={buildAccountRequest:async function(action="profile",payload={}) {
-  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/"};
+  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/reading/ugc/general/follow/v1/"};
   if(!Object.prototype.hasOwnProperty.call(routes,action))throw new Error("不支持的账号操作");
   const identity=value=>{const id=String(value||"");if(!/^[1-9]\d{0,29}$/.test(id))throw new Error("账号剧集编号无效");return id;};
   const integer=value=>{const n=Number(value);if(!Number.isSafeInteger(n)||n<0)throw new Error("账号进度参数无效");return n;};
@@ -1117,6 +1117,17 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     const duration=integer(payload.durationMs),position=Math.min(integer(payload.positionMs),duration),episode=integer(payload.episode),count=integer(payload.episodes);
     if(!duration||!episode||count&&episode>count)throw new Error("账号进度参数无效");
     body={books:[{book_id:identity(payload.id),item_id:identity(payload.itemId),vid_index:episode,current_play_time:position,current_total_time:duration,episode_count:count,read_timestamp_ms:integer(payload.updatedAt),book_type:2,progress_rate:String(position/duration)}],write_mode:1};
+  }
+  if(action==="socialDetail")body={series_id:identity(payload.id)};
+  if(action==="creatorList")Object.assign(params,{series_id:identity(payload.id),list_type:3,count:50,offset:0});
+  if(action==="likeUpdate") {
+    if(!["0","1"].includes(String(payload.like)))throw new Error("点赞状态无效");
+    body={object_id:identity(payload.itemId),object_type:6,action_type:String(payload.like)==="1"?3:4,action_category:1};
+  }
+  if(action==="creatorFollow") {
+    const type=integer(payload.relativeType);
+    if(![2,3].includes(type)||!["0","1"].includes(String(payload.follow)))throw new Error("关注参数无效");
+    body={relative_id:identity(payload.userId),relative_type:type,action_type:String(payload.follow)==="1"?1:0,is_cancelled:false};
   }
   let dev;
   if(action==="profile"&&payload.device) {
@@ -2703,7 +2714,7 @@ spider.danmaku = function (id, startMs, durationMs) {
 
 spider.accountRequest = async function (action, payload) {
   payload = payload || {};
-  if (['profile', 'favorites', 'history', 'libraryDetails', 'favoriteUpdate', 'progressGet', 'progressUpdate'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
+  if (['profile', 'favorites', 'history', 'libraryDetails', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
   const paths = { qr: '/passport/web/get_qrcode/', poll: '/passport/web/check_qrconnect/', webInfo: '/passport/account/info/v2/', phoneCode: '/passport/web/send_code/', phoneSms: '/passport/web/sms_login_only/' };
   if (!Object.prototype.hasOwnProperty.call(paths, action)) throw new Error('不支持的账号操作');
   const params = { aid: '513755', passport_jssdk_version: '3.4.10', passport_jssdk_type: 'normal',
@@ -2750,9 +2761,39 @@ spider.accountParse = function (action, text) {
     return { id, nickname: String(data.user_name || '红果用户').slice(0, 80),
       avatar: typeof data.avatar_url === 'string' && /^https:\/\//.test(data.avatar_url) ? data.avatar_url : '' };
   }
-  if (['favoriteUpdate', 'progressUpdate'].includes(action)) {
-    if (Number(response.code) !== 0) throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+  if (['favoriteUpdate', 'progressUpdate', 'likeUpdate', 'creatorFollow'].includes(action)) {
+    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
     return { valid: true };
+  }
+  if (action === 'socialDetail' || action === 'creatorList') {
+    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    const identity = value => /^[1-9]\d{0,29}$/.test(String(value || '')) ? String(value) : '';
+    if (action === 'socialDetail') {
+      const video = data && data.video_data;
+      if (!video || typeof video !== 'object' || !Array.isArray(video.video_list)) throw new Error('账号互动详情格式已变化');
+      const episodes = video.video_list.filter(item => item && identity(item.vid) && typeof item.user_digg === 'boolean').map(item => ({
+        id: identity(item.vid), number: Number(item.vid_index), liked: item.user_digg,
+        count: Math.max(0, Number(item.digged_count) || 0)
+      })).filter(item => Number.isSafeInteger(item.number) && item.number > 0);
+      const id = identity(video.series_id_str || video.series_id);
+      if (!id) throw new Error('账号互动剧集编号无效');
+      return { id, episodes };
+    }
+    if (!data || typeof data !== 'object' || !['main_creator_user_list','hot_celebrity_user_list','celebrity_map_list'].some(key => key in data)) throw new Error('创作者列表格式已变化');
+    const groups = Array.isArray(data.main_creator_user_list) ? data.main_creator_user_list : [];
+    const rows = [...groups.flatMap(group => Array.isArray(group && group.ugc_user_infos) ? group.ugc_user_infos : []), ...(Array.isArray(data.hot_celebrity_user_list) ? data.hot_celebrity_user_list : [])];
+    const seen = new Set();
+    return { creators: rows.flatMap(row => {
+      if (!row || typeof row !== 'object') return [];
+      const base = row.base_info || {}, relation = row.user_relation || {};
+      const id = identity(row.user_id || base.user_id || base.biz_user_id), name = String(base.user_name || '').trim();
+      const state = Number(relation.relation_type), relativeType = row.user_tag && row.user_tag.is_author === true ? 3 : 2;
+      if (!id || !name || seen.has(id)) return [];
+      seen.add(id);
+      return [{ id, name: name.slice(0,80), relativeType,
+        following: [1,2,3,4].includes(state) ? state === 2 || state === 4 : null,
+        canFollow: relation.can_follow === true && base.is_cancelled !== true }];
+    }) };
   }
   if (['favorites', 'history', 'progressGet', 'libraryDetails'].includes(action)) {
     if (Number(response.code) !== 0) throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));

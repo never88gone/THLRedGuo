@@ -22,6 +22,7 @@ class FeedPlayerOverlay extends StatelessWidget {
     required this.onDetail,
     required this.onDanmaku,
     required this.onSettings,
+    this.onSocial,
   });
 
   final String title;
@@ -40,6 +41,7 @@ class FeedPlayerOverlay extends StatelessWidget {
   final VoidCallback onDetail;
   final VoidCallback onDanmaku;
   final VoidCallback onSettings;
+  final VoidCallback? onSocial;
 
   Widget _action(String id, IconData icon, String label, VoidCallback action) =>
       IconButton(
@@ -59,6 +61,8 @@ class FeedPlayerOverlay extends StatelessWidget {
     builder: (context, constraints) {
       final compact = constraints.maxHeight < 480;
       final actions = [
+        if (onSocial != null)
+          _action('social', Icons.favorite_border, '点赞与关注', onSocial!),
         _action(
           'favorite',
           following ? Icons.bookmark : Icons.bookmark_border,
@@ -260,8 +264,9 @@ class _FeedProgressState extends State<_FeedProgress> {
                 ? (d) => _updateSeek(d.localPosition.dx, width)
                 : null,
             onTapUp: isInteractive ? (_) => _finishSeek() : null,
-            onTapCancel:
-                isInteractive ? () => setState(() => _dragging = null) : null,
+            onTapCancel: isInteractive
+                ? () => setState(() => _dragging = null)
+                : null,
             onHorizontalDragStart: isInteractive
                 ? (d) => _updateSeek(d.localPosition.dx, width)
                 : null,
@@ -269,8 +274,9 @@ class _FeedProgressState extends State<_FeedProgress> {
                 ? (d) => _updateSeek(d.localPosition.dx, width)
                 : null,
             onHorizontalDragEnd: isInteractive ? (_) => _finishSeek() : null,
-            onHorizontalDragCancel:
-                isInteractive ? () => setState(() => _dragging = null) : null,
+            onHorizontalDragCancel: isInteractive
+                ? () => setState(() => _dragging = null)
+                : null,
             child: SizedBox(
               height: 20,
               width: width,
@@ -305,8 +311,7 @@ class _FeedProgressState extends State<_FeedProgress> {
                             boxShadow: isDragging
                                 ? [
                                     BoxShadow(
-                                      color:
-                                          AppColors.hongguoRedWithAlpha(0.6),
+                                      color: AppColors.hongguoRedWithAlpha(0.6),
                                       blurRadius: 6,
                                       spreadRadius: 1,
                                     ),

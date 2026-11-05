@@ -9,6 +9,7 @@ private enum PlayerWakeFocusArea: Hashable {
 
 public struct TVPlayerView: View {
     @ObservedObject private var accountLibrary = HongguoAccountModel.shared
+    @State private var showingAccountSocial = false
     @StateObject private var viewModel: PlayerViewModel
     @Environment(\.presentationMode) var presentationMode
     @Environment(\.scenePhase) private var scenePhase
@@ -98,6 +99,9 @@ public struct TVPlayerView: View {
 
         let withEvents = applyEventHandlers(to: content)
         return applyStateListeners(to: withEvents)
+            .sheet(isPresented: $showingAccountSocial, onDismiss: { viewModel.showControls() }) {
+                TVAccountSocialSheet(drama: viewModel.drama, episode: viewModel.currentEpisodeIndex)
+            }
     }
 
     // MARK: - 子视图组件拆解（消除复杂泛型嵌套，避免 Release 编译类型推断耗时超标）
@@ -387,7 +391,7 @@ public struct TVPlayerView: View {
     @ViewBuilder
     private var controlsOverlayView: some View {
         if viewModel.isControlsVisible && (viewModel.errorMessage == nil || viewModel.keepControlsVisible) && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible && !viewModel.isQualitySheetVisible {
-            TVPlayerControlsOverlay(viewModel: viewModel, forceFocusPlayButton: viewModel.keepControlsVisible, feedActions: playerFeedActions) {
+            TVPlayerControlsOverlay(viewModel: viewModel, forceFocusPlayButton: viewModel.keepControlsVisible, feedActions: playerFeedActions, onSocial: HongguoAccountModel.shared.loggedIn && viewModel.drama.source == "hongguo" ? { showingAccountSocial = true } : nil) {
                 handleExit()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -34,8 +34,10 @@ class PlayerMenu extends StatefulWidget {
     this.preloadStatus = '',
     this.enhancement,
     this.onCompareEnhancement,
+    this.accountActions,
   });
 
+  final Widget? accountActions;
   final PlayerMenuSection section;
   final List<Episode> episodes;
   final int currentIndex;
@@ -173,7 +175,9 @@ class _PlayerMenuState extends State<PlayerMenu> {
       color: colors.onSurfaceVariant,
       height: 1.5,
     );
-    final available = widget.qualities.isNotEmpty ? widget.qualities : const [1080, 720, 360];
+    final available = widget.qualities.isNotEmpty
+        ? widget.qualities
+        : const [1080, 720, 360];
     final qualities = {
       0,
       1080,
@@ -207,9 +211,7 @@ class _PlayerMenuState extends State<PlayerMenu> {
                           setState(() {
                             _preferences = _preferences.copyWith(speed: speed);
                           });
-                          _run(
-                            () => widget.onPreferences(_preferences),
-                          );
+                          _run(() => widget.onPreferences(_preferences));
                         },
                 ),
             ],
@@ -241,11 +243,11 @@ class _PlayerMenuState extends State<PlayerMenu> {
                       ? null
                       : (_) {
                           setState(() {
-                            _preferences = _preferences.copyWith(quality: quality);
+                            _preferences = _preferences.copyWith(
+                              quality: quality,
+                            );
                           });
-                          _run(
-                            () => widget.onPreferences(_preferences),
-                          );
+                          _run(() => widget.onPreferences(_preferences));
                         },
                 ),
             ],
@@ -269,9 +271,7 @@ class _PlayerMenuState extends State<PlayerMenu> {
               setState(() {
                 _preferences = _preferences.copyWith(enhancement: enhancement);
               });
-              _run(
-                () => widget.onPreferences(_preferences),
-              );
+              _run(() => widget.onPreferences(_preferences));
             },
             onCompare: widget.onCompareEnhancement ?? () {},
           ),
@@ -288,9 +288,7 @@ class _PlayerMenuState extends State<PlayerMenu> {
                     setState(() {
                       _preferences = _preferences.copyWith(danmaku: value);
                     });
-                    _run(
-                      () => widget.onPreferences(_preferences),
-                    );
+                    _run(() => widget.onPreferences(_preferences));
                   },
           ),
           if (preferences.danmaku) ...[
@@ -335,13 +333,16 @@ class _PlayerMenuState extends State<PlayerMenu> {
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
-                        selected: (preferences.danmakuStyle.opacity - op).abs() < 0.05,
+                        selected:
+                            (preferences.danmakuStyle.opacity - op).abs() <
+                            0.05,
                         onSelected: _busy
                             ? null
                             : (_) {
                                 setState(() {
                                   _preferences = _preferences.copyWith(
-                                    danmakuStyle: preferences.danmakuStyle.copyWith(opacity: op),
+                                    danmakuStyle: preferences.danmakuStyle
+                                        .copyWith(opacity: op),
                                   );
                                 });
                                 _run(() => widget.onPreferences(_preferences));
@@ -390,10 +391,8 @@ class _PlayerMenuState extends State<PlayerMenu> {
               underline: const SizedBox.shrink(),
               items: PlaybackDecoderMode.values
                   .map(
-                    (mode) => DropdownMenuItem(
-                      value: mode,
-                      child: Text(mode.label),
-                    ),
+                    (mode) =>
+                        DropdownMenuItem(value: mode, child: Text(mode.label)),
                   )
                   .toList(),
               onChanged: _busy
@@ -420,9 +419,7 @@ class _PlayerMenuState extends State<PlayerMenu> {
                     setState(() {
                       _preferences = _preferences.copyWith(preload: value);
                     });
-                    _run(
-                      () => widget.onPreferences(_preferences),
-                    );
+                    _run(() => widget.onPreferences(_preferences));
                   },
           ),
           const SizedBox(height: 8),
@@ -438,9 +435,7 @@ class _PlayerMenuState extends State<PlayerMenu> {
                     setState(() {
                       _preferences = _preferences.copyWith(autoAdvance: value);
                     });
-                    _run(
-                      () => widget.onPreferences(_preferences),
-                    );
+                    _run(() => widget.onPreferences(_preferences));
                   },
           ),
           const SizedBox(height: 8),
@@ -454,6 +449,7 @@ class _PlayerMenuState extends State<PlayerMenu> {
             ),
             label: Text(widget.favorite ? '取消追剧' : '加入追剧'),
           ),
+          if (widget.accountActions != null) widget.accountActions!,
           const SizedBox(height: 12),
           OutlinedButton.icon(
             key: const ValueKey('player-diary-btn'),

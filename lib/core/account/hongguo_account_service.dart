@@ -1,3 +1,4 @@
+import 'hongguo_social_models.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -686,6 +687,119 @@ class HongguoAccountService {
       null,
       session.revision,
     );
+  }
+
+  Future<List<HongguoCreator>> creators(Drama drama) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final result = await _call(
+      'creatorList',
+      {'id': drama.cleanSourceId},
+      null,
+      session.revision,
+    );
+    return (result['creators'] as List)
+        .map(
+          (row) =>
+              HongguoCreator.fromJson(Map<String, dynamic>.from(row as Map)),
+        )
+        .toList();
+  }
+
+  Future<HongguoSocialSnapshot> social(Drama drama) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    final result = await _call(
+      'socialDetail',
+      {'id': drama.cleanSourceId},
+      null,
+      revision,
+    );
+    if (result['id'] != drama.cleanSourceId) {
+      throw const HongguoAccountFailure('互动状态的剧集编号不匹配');
+    }
+    final episodes = (result['episodes'] as List)
+        .map(
+          (row) => HongguoEpisodeLike.fromJson(
+            Map<String, dynamic>.from(row as Map),
+          ),
+        )
+        .toList();
+    List<HongguoCreator> people = [];
+    String? error;
+    try {
+      people = await creators(drama);
+    } on HongguoAccountFailure catch (issue) {
+      error = issue.message;
+    }
+    _check(revision);
+    return HongguoSocialSnapshot(episodes, people, creatorError: error);
+  }
+
+  Future<HongguoSocialSnapshot> setLiked(
+    Drama drama,
+    HongguoEpisodeLike episode,
+    bool liked,
+  ) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    await _call(
+      'likeUpdate',
+      {'itemId': episode.id, 'like': liked ? '1' : '0'},
+      null,
+      revision,
+    );
+    _check(revision);
+    final result = await social(drama);
+    _check(revision);
+    final readback = result.episode(episode.number);
+    if (readback?.id != episode.id || readback?.liked != liked) {
+      throw const HongguoAccountFailure(
+        '官方点赞状态尚未确认，请刷新后重试',
+        'WRITE_NOT_CONFIRMED',
+      );
+    }
+    return result;
+  }
+
+  Future<List<HongguoCreator>> setCreatorFollowing(
+    Drama drama,
+    HongguoCreator creator,
+    bool follow,
+  ) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    if ((!creator.canFollow && follow) ||
+        creator.following == null ||
+        creator.id == session.id) {
+      throw const HongguoAccountFailure('当前创作者暂不可关注');
+    }
+    final revision = session.revision;
+    await _call(
+      'creatorFollow',
+      {
+        'userId': creator.id,
+        'relativeType': creator.relativeType,
+        'follow': follow ? '1' : '0',
+      },
+      null,
+      revision,
+    );
+    _check(revision);
+    final rows = await creators(drama);
+    _check(revision);
+    final row = rows
+        .where(
+          (item) =>
+              item.id == creator.id &&
+              item.relativeType == creator.relativeType,
+        )
+        .firstOrNull;
+    if (row?.following != follow) {
+      throw const HongguoAccountFailure(
+        '官方关注状态尚未确认，请刷新后重试',
+        'WRITE_NOT_CONFIRMED',
+      );
+    }
+    return rows;
   }
 
   void dispose() {

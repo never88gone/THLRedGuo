@@ -272,6 +272,17 @@ class CatPawJsRuntime {
       if (code != null) {
         throw HongguoAccountFailure('官方账号请求失败（错误码 $code）', 'BUSINESS_$code');
       }
+      if (const {
+        'socialDetail',
+        'creatorList',
+        'likeUpdate',
+        'creatorFollow',
+      }.contains(action)) {
+        throw const HongguoAccountFailure(
+          '官方互动数据暂不可用，请刷新后重试',
+          'INVALID_RESPONSE',
+        );
+      }
       throw const HongguoAccountFailure('账号校验失败，请重新扫码或稍后重试');
     }
     return Map<String, dynamic>.from(jsonDecode(value.stringResult) as Map);
