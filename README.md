@@ -168,11 +168,27 @@
 
 ```bash
 # 获取依赖
-flutter pub get
+fvm flutter pub get
 
 # 启动运行
-flutter run
+fvm flutter run
 ```
+
+项目通过 `.fvmrc` 固定 Flutter 版本。首次使用时执行 `fvm install`，Windows 开发环境需安装 Visual Studio 的“使用 C++ 的桌面开发”工作负载和 Windows SDK。
+
+```bash
+# 检查环境与源码
+fvm flutter doctor -v
+fvm flutter analyze
+
+# 启动 Windows 桌面版
+fvm flutter run -d windows
+
+# 构建 Windows x64 发布目录
+fvm flutter build windows --release
+```
+
+Windows 产物位于 `build/windows/x64/runner/Release/`，分发时需保留整个目录中的 DLL、`data` 和其他运行依赖。首次构建会下载并校验固定版本的 libmpv 和 ANGLE，需要能够访问 GitHub Releases。
 
 ---
 

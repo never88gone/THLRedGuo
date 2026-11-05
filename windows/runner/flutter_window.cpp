@@ -5,6 +5,10 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
+namespace {
+constexpr UINT kPackageSmokeExitMessage = WM_APP + 0x544;
+}
+
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
 
@@ -26,13 +30,28 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  HMODULE ffmpeg_runtime = nullptr;
+  GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, L"libffmpegkit.dll",
+                     &ffmpeg_runtime);
   device_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), "duanju/device",
           &flutter::StandardMethodCodec::GetInstance());
   device_channel_->SetMethodCallHandler(
-      [](const flutter::MethodCall<flutter::EncodableValue>& call,
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == "finishPackageSmoke") {
+          const auto* code = call.arguments()
+                                 ? std::get_if<int32_t>(call.arguments())
+                                 : nullptr;
+          if (!code || *code < 0 || *code > 255) {
+            result->Error("INVALID_EXIT_CODE", "Invalid package smoke exit code.");
+            return;
+          }
+          PostMessage(GetHandle(), kPackageSmokeExitMessage, *code, 0);
+          result->Success();
+          return;
+        }
         if (call.method_name() != "playbackPower") {
           result->NotImplemented();
           return;
@@ -78,6 +97,12 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == kPackageSmokeExitMessage) {
+    SetQuitOnClose(false);
+    Destroy();
+    PostQuitMessage(static_cast<int>(wparam));
+    return 0;
+  }
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

@@ -54,3 +54,6 @@ test_driver/
 integration_test/
 PRD/
 AGENTS.md
+
+# FVM Version Cache
+.fvm/
