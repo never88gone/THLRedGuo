@@ -16,6 +16,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_preferences.dart';
+import 'package:THLRedLook/core/enhancement/video_enhancement_mpv.dart';
 import 'package:THLRedLook/core/js/js_source_models.dart';
 import 'package:THLRedLook/core/js/js_source_service.dart';
 import 'package:THLRedLook/core/media/media_pipeline.dart';
@@ -156,15 +157,26 @@ void main() {
   final executor = FFmpegExecutor();
   late File video;
   const key = '00112233445566778899aabbccddeeff';
-  Future<void> capture(String name) async {
+  Future<({int width, int height, Uint8List pixels})> capture(
+    String name, {
+    GlobalKey? boundaryKey,
+  }) async {
     final boundary =
-        paintKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        (boundaryKey ?? paintKey).currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
     final image = await boundary.toImage();
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     await File(
       '${output.path}/$name.png',
     ).writeAsBytes(bytes!.buffer.asUint8List());
+    final frame = (
+      width: image.width,
+      height: image.height,
+      pixels: rgba!.buffer.asUint8List(),
+    );
     image.dispose();
+    return frame;
   }
 
   Future<void> show(WidgetTester tester, Widget home) async {
@@ -227,6 +239,352 @@ void main() {
     ).writeAsString(const JsonEncoder.withIndent('  ').convert(results));
   });
 
+  testWidgets('Windows rendered color hardware decoder and shader comparison', (
+    tester,
+  ) async {
+    final bars = File('${output.path}/synthetic-bars.mp4');
+    await executor.run([
+      '-f',
+      'lavfi',
+      '-i',
+      'smptebars=size=320x180:rate=24',
+      '-t',
+      '4',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-color_primaries',
+      'bt709',
+      '-color_trc',
+      'bt709',
+      '-colorspace',
+      'smpte170m',
+      bars.path,
+    ]);
+    final colorKey = GlobalKey();
+    final rows = <Map<String, Object?>>[];
+    List<List<int>> samples(
+      ({int width, int height, Uint8List pixels}) frame,
+    ) => [
+      for (var bar = 0; bar < 7; bar++)
+        [
+          for (var channel = 0; channel < 3; channel++)
+            frame.pixels[((frame.height * .2).floor() * frame.width +
+                        ((bar + .5) * frame.width / 7).floor()) *
+                    4 +
+                channel],
+        ],
+    ];
+    void expectBars(List<List<int>> actual) {
+      const expected = [
+        [191, 191, 191],
+        [191, 191, 0],
+        [0, 191, 191],
+        [0, 191, 0],
+        [191, 0, 191],
+        [191, 0, 0],
+        [0, 0, 191],
+      ];
+      for (var bar = 0; bar < 7; bar++) {
+        for (var channel = 0; channel < 3; channel++) {
+          expect(
+            actual[bar][channel],
+            closeTo(expected[bar][channel], 35),
+            reason: 'Rendered bar $bar channel $channel',
+          );
+        }
+      }
+    }
+
+    double difference(Uint8List first, Uint8List second) {
+      expect(first.length, second.length);
+      var sum = 0;
+      for (var i = 0; i < first.length; i++) {
+        sum += (first[i] - second[i]).abs();
+      }
+      return sum / first.length;
+    }
+
+    for (final hardware in [true, false]) {
+      final player = Player(
+        configuration: const PlayerConfiguration(
+          muted: true,
+          logLevel: MPVLogLevel.v,
+        ),
+      );
+      final controller = VideoController(
+        player,
+        configuration: VideoControllerConfiguration(
+          enableHardwareAcceleration: hardware,
+          hwdec: hardware ? 'auto-copy-safe' : 'no',
+        ),
+      );
+      final native = VideoEnhancementMpv(player.platform as NativePlayer);
+      final enhancement = VideoEnhancementController(
+        player: player,
+        video: controller,
+        preferences: const VideoEnhancementPreferences(),
+        category: '合成彩条',
+        tags: const [],
+      );
+      try {
+        await show(
+          tester,
+          Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 640,
+                height: 360,
+                child: RepaintBoundary(
+                  key: colorKey,
+                  child: Video(controller: controller, fit: BoxFit.fill),
+                ),
+              ),
+            ),
+          ),
+        );
+        await enhancement.beforeMedia();
+        await player.open(Media(bars.path), play: false);
+        await _until(
+          tester,
+          () =>
+              player.state.width == 320 &&
+              (controller.rect.value?.width ?? 0) > 10,
+        );
+        await tester.pump(const Duration(milliseconds: 500));
+        final original = await capture(
+          hardware ? 'bars-original' : 'bars-software',
+          boundaryKey: colorKey,
+        );
+        final originalSamples = samples(original);
+        expectBars(originalSamples);
+        final row = <String, Object?>{
+          'hardwareRequested': hardware,
+          'hwdec': native.read('hwdec-current'),
+          'samples': originalSamples,
+        };
+        if (hardware) {
+          expect(row['hwdec'], 'd3d11va-copy');
+          await player.setPlaylistMode(PlaylistMode.loop);
+          await player.play();
+          enhancement.setViewport(const Size(640, 360), television: false);
+          enhancement.mediaReady();
+          enhancement.setPreferences(
+            const VideoEnhancementPreferences(
+              mode: VideoEnhancementMode.quality,
+            ),
+          );
+          try {
+            await _until(
+              tester,
+              () => enhancement.status == '通用神经超分',
+              seconds: 25,
+            );
+          } finally {
+            await File(
+              '${output.path}/color-enhancement-state.json',
+            ).writeAsString(
+              const JsonEncoder.withIndent('  ').convert({
+                'status': enhancement.status,
+                'detail': enhancement.detail,
+                'params': native.read('video-params'),
+                'passes': native.read('vo-passes'),
+              }),
+            );
+          }
+          await player.pause();
+          await tester.pump(const Duration(milliseconds: 300));
+          final enhanced = await capture(
+            'bars-enhanced',
+            boundaryKey: colorKey,
+          );
+          expectBars(samples(enhanced));
+          final passes = native.read('vo-passes');
+          final descriptions =
+              (passes is Map ? passes['fresh'] as List : const [])
+                  .whereType<Map>()
+                  .map((item) => item['desc'].toString())
+                  .toList();
+          expect(
+            descriptions.any((item) => item.contains('feature map')),
+            true,
+          );
+          expect(
+            descriptions.any((item) => item.contains('aggregation')),
+            true,
+          );
+          expect(
+            difference(original.pixels, enhanced.pixels),
+            greaterThan(.01),
+          );
+          await enhancement.toggleCompare();
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(enhancement.status, '原画对比中');
+          final compare = await capture('bars-compare', boundaryKey: colorKey);
+          expectBars(samples(compare));
+          expect(difference(enhanced.pixels, compare.pixels), greaterThan(.01));
+          await enhancement.toggleCompare();
+          await _until(tester, () => enhancement.status == '通用神经超分');
+          await tester.pump(const Duration(milliseconds: 300));
+          final restored = await capture(
+            'bars-restored',
+            boundaryKey: colorKey,
+          );
+          expect(difference(enhanced.pixels, restored.pixels), lessThan(2));
+          row.addAll({
+            'enhancement': enhancement.status,
+            'passes': descriptions,
+            'output': '${controller.rect.value}',
+            'originalEnhancedMeanDifference': difference(
+              original.pixels,
+              enhanced.pixels,
+            ),
+            'compareMeanDifference': difference(
+              enhanced.pixels,
+              compare.pixels,
+            ),
+            'restoredMeanDifference': difference(
+              enhanced.pixels,
+              restored.pixels,
+            ),
+          });
+          if (const bool.fromEnvironment('WINDOWS_AUDIT_VISUAL')) {
+            await File('${output.path}/visual-ready.json').writeAsString(
+              jsonEncode({
+                'ready': true,
+                'time': DateTime.now().toUtc().toIso8601String(),
+                'display': 'hardware-copy-enhanced-bars',
+              }),
+            );
+            final continueFile = File('${output.path}/visual-continue.json');
+            for (
+              var wait = 0;
+              wait < 1200 && !await continueFile.exists();
+              wait++
+            ) {
+              await tester.pump(const Duration(milliseconds: 100));
+            }
+          }
+        } else {
+          expect(row['hwdec'], anyOf('no', isNull, ''));
+        }
+        rows.add(row);
+        await File(
+          '${output.path}/color-decoder-enhancement.json',
+        ).writeAsString(const JsonEncoder.withIndent('  ').convert(rows));
+      } finally {
+        await enhancement.close();
+        await tester.pumpWidget(const SizedBox());
+        await player.dispose();
+      }
+    }
+    results['colorsDecodersAndEnhancement'] = rows;
+  });
+
+  testWidgets('Windows native lifetime stress and renderer evidence', (
+    tester,
+  ) async {
+    const cycles = int.fromEnvironment(
+      'WINDOWS_AUDIT_CYCLES',
+      defaultValue: 12,
+    );
+    final evidence = <Map<String, Object?>>[];
+    for (var cycle = 0; cycle < cycles; cycle++) {
+      final player = Player(
+        configuration: const PlayerConfiguration(
+          muted: true,
+          logLevel: MPVLogLevel.debug,
+        ),
+      );
+      final controller = VideoController(
+        player,
+        configuration: const VideoControllerConfiguration(
+          hwdec: String.fromEnvironment(
+            'WINDOWS_AUDIT_HWDEC',
+            defaultValue: 'auto-copy-safe',
+          ),
+        ),
+      );
+      final native = VideoEnhancementMpv(player.platform as NativePlayer);
+      final logs = File('${output.path}/native-cycle-$cycle.log').openWrite();
+      final subscription = player.stream.log.listen(
+        (event) => logs.writeln('${event.prefix} ${event.level} ${event.text}'),
+      );
+      final enhancement = VideoEnhancementController(
+        player: player,
+        video: controller,
+        preferences: const VideoEnhancementPreferences(
+          mode: VideoEnhancementMode.quality,
+        ),
+        category: '合成测试',
+        tags: const [],
+      );
+      try {
+        await show(tester, Scaffold(body: Video(controller: controller)));
+        await enhancement.beforeMedia();
+        await player.setPlaylistMode(PlaylistMode.loop);
+        await player.open(Media(video.path));
+        await _until(
+          tester,
+          () =>
+              player.state.width == 320 &&
+              player.state.position.inMilliseconds > 300,
+        );
+        for (final size in [
+          const Size(480, 270),
+          const Size(800, 450),
+          const Size(320, 180),
+        ]) {
+          await controller.setSize(
+            width: size.width.toInt(),
+            height: size.height.toInt(),
+          );
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        enhancement.setViewport(const Size(960, 540), television: false);
+        enhancement.mediaReady();
+        await tester.pump(
+          cycle % 10 == 0
+              ? const Duration(seconds: 3)
+              : const Duration(milliseconds: 250),
+        );
+        final row = <String, Object?>{
+          'cycle': cycle,
+          'enhancement': enhancement.status,
+          'detail': enhancement.detail,
+        };
+        for (final property in [
+          'mpv-version',
+          'current-vo',
+          'hwdec-current',
+          'hwdec-interop',
+          'video-params',
+          'video-out-params',
+          'vo-passes',
+          'osd-dimensions',
+        ]) {
+          row[property] = native.read(property);
+        }
+        evidence.add(row);
+        await File(
+          '${output.path}/renderer-evidence.json',
+        ).writeAsString(const JsonEncoder.withIndent('  ').convert(evidence));
+        if (cycle == 0) {
+          await capture('stress-rendered-texture');
+        }
+        await player.pause();
+      } finally {
+        await enhancement.close();
+        await tester.pumpWidget(const SizedBox());
+        await player.dispose();
+        await subscription.cancel();
+        await logs.close();
+      }
+    }
+    results['stress'] = {'cycles': cycles, 'completed': true};
+  });
+
   testWidgets(
     'Windows real GPU video, pause seek speed fullscreen and CENC cache',
     (tester) async {
@@ -236,7 +594,12 @@ void main() {
           logLevel: MPVLogLevel.error,
         ),
       );
-      final controller = VideoController(player);
+      final controller = VideoController(
+        player,
+        configuration: const VideoControllerConfiguration(
+          hwdec: 'auto-copy-safe',
+        ),
+      );
       final enhancement = VideoEnhancementController(
         player: player,
         video: controller,

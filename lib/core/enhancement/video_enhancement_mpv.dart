@@ -51,6 +51,22 @@ class VideoEnhancementMpv {
     }
   }
 
+  String? readString(String property) {
+    _available();
+    final name = property.toNativeUtf8();
+    try {
+      final value = player.mpv.mpv_get_property_string(player.ctx, name.cast());
+      if (value == nullptr) return null;
+      try {
+        return value.cast<Utf8>().toDartString();
+      } finally {
+        player.mpv.mpv_free(value.cast());
+      }
+    } finally {
+      calloc.free(name);
+    }
+  }
+
   Object? _decode(mpv.mpv_node node, int depth) {
     if (depth > 10) return null;
     switch (node.format) {

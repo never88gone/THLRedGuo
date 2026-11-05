@@ -226,9 +226,11 @@ class _PlayerScreenState extends State<PlayerScreen>
         ((Platform.isAndroid || Platform.isIOS)
             ? LunaExoPlayer()
             : Player(
-                configuration: const PlayerConfiguration(
+                configuration: PlayerConfiguration(
                   bufferSize: 32 * 1024 * 1024,
-                  logLevel: MPVLogLevel.error,
+                  logLevel: Platform.isWindows
+                      ? MPVLogLevel.v
+                      : MPVLogLevel.error,
                 ),
               ));
     if (_player is LunaExoPlayer) {
@@ -242,7 +244,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                   !Platform.isIOS &&
                   preferences.decoderMode == PlaybackDecoderMode.hardware,
               hwdec: preferences.decoderMode == PlaybackDecoderMode.hardware
-                  ? 'auto-safe'
+                  ? (Platform.isWindows ? 'auto-copy-safe' : 'auto-safe')
                   : 'no',
             ),
           )
@@ -1818,7 +1820,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         await native.setProperty(
           'hwdec',
           nextPreferences.decoderMode == PlaybackDecoderMode.hardware
-              ? 'auto-safe'
+              ? 'auto-copy-safe'
               : 'no',
         );
       }

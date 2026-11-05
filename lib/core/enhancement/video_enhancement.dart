@@ -22,7 +22,10 @@ class VideoEnhancementController extends ChangeNotifier {
     required List<String> tags,
   }) : _animationHint = videoHasAnimationTags(category, tags) {
     final native = player.platform;
-    supported = video != null && native is NativePlayer && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+    supported =
+        video != null &&
+        native is NativePlayer &&
+        (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
     if (!supported) {
       _status = '当前平台暂不支持画质增强';
       return;
@@ -346,16 +349,10 @@ class VideoEnhancementController extends ChangeNotifier {
     }
   }
 
-  String _optionValue(Object? value) => switch (value) {
-    bool flag => flag ? 'yes' : 'no',
-    null => '',
-    _ => value.toString(),
-  };
-
   void _setOption(String key, String value) {
-    final original = _mpv!.read(key);
+    final original = _mpv!.readString(key);
     if (original == null) throw VideoEnhancementFailure(key);
-    _originalOptions.putIfAbsent(key, () => _optionValue(original));
+    _originalOptions.putIfAbsent(key, () => original);
     _mpv!.set(key, value);
     _appliedOptions[key] = value;
   }
@@ -393,7 +390,7 @@ class VideoEnhancementController extends ChangeNotifier {
     }
     for (final entry in _appliedOptions.entries.toList().reversed) {
       try {
-        if (_optionValue(_mpv!.read(entry.key)) == entry.value) {
+        if (_mpv!.readString(entry.key) == entry.value) {
           _mpv!.set(entry.key, _originalOptions[entry.key]!);
         }
         _appliedOptions.remove(entry.key);
@@ -532,6 +529,9 @@ class VideoEnhancementController extends ChangeNotifier {
 
   void _failBackend(Object error, {VideoEnhancementBackend? backend}) {
     if (_closed || _circuitOpen) return;
+    debugPrint(
+      'Video enhancement failed: ${error is VideoEnhancementFailure ? error : error.runtimeType}',
+    );
     final failed = backend ?? _applyingBackend ?? _applied?.backend;
     _failureCount++;
     _applyingBackend = null;
@@ -606,7 +606,10 @@ class VideoEnhancementController extends ChangeNotifier {
   Future<void> _monitor() async {
     try {
       await _readPower();
-      if (_closed || !_initialized || _circuitOpen || _applyingBackend != null) {
+      if (_closed ||
+          !_initialized ||
+          _circuitOpen ||
+          _applyingBackend != null) {
         return;
       }
       final oldCapabilities = (_gpu, _luma, _hardware, _opaque8Bit);
