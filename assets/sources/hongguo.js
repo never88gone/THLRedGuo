@@ -7,7 +7,7 @@
 const meta = {
   id: "hongguo",
   name: "官方免费短剧",
-  version: "1.1.0-dev.21",
+  version: "1.1.0-dev.22",
   description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
   author: "社区开发者",
   type: "video",
@@ -2786,7 +2786,7 @@ spider.accountParse = function (action, text) {
     return { creators: rows.flatMap(row => {
       if (!row || typeof row !== 'object') return [];
       const base = row.base_info || {}, relation = row.user_relation || {};
-      const id = identity(row.user_id || base.user_id || base.biz_user_id), name = String(base.user_name || '').trim();
+      const id = identity(row.user_id) || identity(base.user_id), name = String(base.user_name || '').trim();
       const state = Number(relation.relation_type), relativeType = row.user_tag && row.user_tag.is_author === true ? 3 : 2;
       if (!id || !name || seen.has(id)) return [];
       seen.add(id);

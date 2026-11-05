@@ -470,6 +470,72 @@ void main() {
     await session.logout();
     expect(session.avatar, isEmpty);
   });
+  test('创作者关注只接受用户 ID，不把展示用红果号作为关注目标', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('synthetic-creator-identity');
+    final jar = HongguoAccountCookies()
+      ..merge(Uri.parse('https://hongguoduanju.com/'), [
+        'sessionid=synthetic-creator-identity; Path=/; Secure',
+      ]);
+    await session.accept(jar, {
+      'id': '123',
+    }, expectedRevision: session.revision);
+    final service = HongguoAccountService(session: session);
+    addTearDown(service.dispose);
+    final drama = Drama(
+      id: 'hongguo:7688558312157088793',
+      source: 'hongguo',
+      sourceId: '7688558312157088793',
+      title: 'synthetic',
+      cover: '',
+      description: '',
+      episodes: 1,
+    );
+    await HttpOverrides.runZoned(
+      () async {
+        final rows = await service.creators(drama);
+        expect(rows.map((row) => row.id), [
+          '7688558312157088794',
+          '7688558312157088795',
+        ]);
+        expect(rows.map((row) => row.name), ['根用户编号', '基础用户编号']);
+      },
+      createHttpClient: (_) => _Client((uri, headers) {
+        expect(uri.path, '/reading/user/celebrity/list/v1/');
+        expect(headers.value('Cookie'), 'sessionid=synthetic-creator-identity');
+        return _Reply({
+          'code': 0,
+          'data': {
+            'hot_celebrity_user_list': [
+              {
+                'user_id': '7688558312157088794',
+                'base_info': {
+                  'user_id': '7688558312157088796',
+                  'biz_user_id': '10001',
+                  'user_name': '根用户编号',
+                },
+              },
+              {
+                'user_id': 'invalid',
+                'base_info': {
+                  'user_id': '7688558312157088795',
+                  'biz_user_id': '10002',
+                  'user_name': '基础用户编号',
+                },
+              },
+              {
+                'base_info': {'biz_user_id': '10003', 'user_name': '只有红果号'},
+              },
+              {
+                'user_id': '7688558312157088794',
+                'base_info': {'user_name': '重复'},
+              },
+            ],
+          },
+        });
+      }),
+    );
+  });
   test('官方分集点赞和作者关注使用独立接口、当前账号并回读确认', () async {
     final session = HongguoAccountSession();
     await session.bindProfile('synthetic-social');
