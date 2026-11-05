@@ -490,6 +490,7 @@ void main() {
       episodes: 12,
     );
     var liked = false, followed = false, writes = 0, mismatch = false;
+    var rejectCreator = false;
     final service = HongguoAccountService(session: session);
     addTearDown(service.dispose);
     await HttpOverrides.runZoned(
@@ -550,6 +551,19 @@ void main() {
           throwsA(isA<HongguoAccountFailure>()),
         );
         expect(writes, 5);
+        rejectCreator = true;
+        await expectLater(
+          service.setCreatorFollowing(drama, initial.creators.single, true),
+          throwsA(
+            isA<HongguoAccountFailure>().having(
+              (failure) => failure.code,
+              'official rejection',
+              'BUSINESS_103012',
+            ),
+          ),
+        );
+        expect(followed, isFalse);
+        expect(writes, 6);
       },
       createHttpClient: (_) => _Client((uri, headers) {
         expect(headers.value('Cookie'), 'sessionid=synthetic-social');
@@ -606,11 +620,18 @@ void main() {
           expect([3, 4], contains(body['action_type']));
           liked = body['action_type'] == 3;
         } else {
-          expect(uri.path, '/reading/ugc/general/follow/v1/');
-          expect(body['relative_id'], '7688558312157088794');
-          expect(body['relative_type'], 3);
-          expect([0, 1], contains(body['action_type']));
-          followed = body['action_type'] == 1;
+          expect(uri.path, '/novel/commentapi/comment/do_action/v1/');
+          expect(body['object_id'], '7688558312157088794');
+          expect(body['object_type'], 1);
+          expect(body['aid'], 8662);
+          expect(body['business_param'], {'shark_param': <String, dynamic>{}});
+          expect(body.containsKey('relative_id'), isFalse);
+          expect(body.containsKey('relative_type'), isFalse);
+          expect([25, 26], contains(body['action_type']));
+          if (rejectCreator) {
+            return _Reply({'code': 103012, 'message': '关注失败，请稍后再试'});
+          }
+          followed = body['action_type'] == 25;
         }
         return _Reply({'code': 0});
       }),

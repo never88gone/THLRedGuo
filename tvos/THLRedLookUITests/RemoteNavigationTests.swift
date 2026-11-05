@@ -4,6 +4,159 @@ final class RemoteNavigationTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.never88gone.redlook")
     private let remote = XCUIRemote.shared
 
+    func testOwnerAccountLikeAndShelfWithRemote() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7638987534483082265", "-testDramaTitle", "账号点赞追剧验证"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["account.social.open"].waitForExistence(timeout: 60))
+        let shelf = app.buttons["detail.favorite"]
+        XCTAssertFalse(shelf.label.contains("已"))
+        yaoDetailPlayFocus()
+        press(.right, focus: "detail.favorite")
+        press(.select)
+        wait("shelf added", seconds: 30) { shelf.label.contains("已") }
+        press(.select)
+        wait("new shelf entry removed", seconds: 30) { !shelf.label.contains("已") }
+        press(.right, focus: "account.social.open")
+        press(.select)
+        let like = app.buttons["account.episode.like"]
+        XCTAssertTrue(like.waitForExistence(timeout: 45))
+        wait("initial like focus") { like.hasFocus }
+        XCTAssertFalse(like.label.contains("取消点赞"))
+        press(.select)
+        wait("like added and focus restored", seconds: 30) { like.isEnabled && like.hasFocus && like.label.contains("取消点赞") }
+        press(.menu)
+        wait("return to detail social") { self.app.buttons["account.social.open"].hasFocus }
+        press(.select)
+        XCTAssertTrue(like.waitForExistence(timeout: 45))
+        wait("fresh like is confirmed and focused") { like.hasFocus && like.label.contains("取消点赞") }
+        press(.select)
+        wait("new like removed and focus restored", seconds: 30) { like.isEnabled && like.hasFocus && !like.label.contains("取消点赞") }
+        press(.menu)
+        wait("final return to detail social") { self.app.buttons["account.social.open"].hasFocus }
+        print("THL_SOCIAL_LIKE_SHELF like=true unlike=true shelfAddRemove=true officialReopenReadback=true operationFocusRestored=true initialStatesRestored=true creatorAcceptance=false")
+    }
+
+    func testOwnerAccountSocialReadAndRemoteTraversal() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7638987534483082265", "-testDramaTitle", "账号互动焦点验证"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["account.social.open"].waitForExistence(timeout: 60))
+        yaoDetailPlayFocus()
+        press(.right, focus: "detail.favorite")
+        press(.right, focus: "account.social.open")
+        press(.select)
+        let like = app.buttons["account.episode.like"]
+        XCTAssertTrue(like.waitForExistence(timeout: 45))
+        for _ in 0..<12 {
+            if like.hasFocus { break }
+            press(.up)
+        }
+        XCTAssertTrue(like.hasFocus)
+        let creators = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'account.creator.'")).allElementsBoundByIndex.filter { $0.isEnabled }
+        XCTAssertFalse(creators.isEmpty)
+        for creator in creators { press(.down, focus: creator.identifier) }
+        let refresh = app.buttons["account.social.refresh"], close = app.buttons["account.social.close"]
+        press(.down)
+        if close.hasFocus { press(.left, focus: "account.social.refresh") }
+        XCTAssertTrue(refresh.hasFocus)
+        press(.select)
+        wait("official social refresh ends", seconds: 45) { refresh.isEnabled && like.isEnabled }
+        if refresh.hasFocus { press(.right, focus: "account.social.close") }
+        XCTAssertTrue(close.hasFocus)
+        press(.select)
+        wait("close restores detail social focus") { self.app.buttons["account.social.open"].hasFocus }
+        press(.select)
+        XCTAssertTrue(like.waitForExistence(timeout: 45))
+        press(.menu)
+        wait("Menu restores detail social focus") { self.app.buttons["account.social.open"].hasFocus }
+        press(.left, focus: "detail.favorite")
+        press(.left, focus: "detail.play")
+        print("THL_SOCIAL_FOCUS creators=\(creators.count) allButtonsReachable=true refresh=true close=true menu=true detailFocusRestored=true mutations=false")
+    }
+
+    func testOwnerAccountSocialActionsAndRemoteFocus() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
+        continueAfterFailure = false
+        let series = ProcessInfo.processInfo.environment["THL_SOCIAL_SERIES"] ?? "7638987534483082265"
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:" + series, "-testDramaTitle", "账号互动验证"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["account.social.open"].waitForExistence(timeout: 60), "Owner login must be retained")
+        let shelf = app.buttons["detail.favorite"]
+        let wasFollowed = shelf.label.contains("已")
+        XCTAssertFalse(wasFollowed, "Use an unfollowed fixture to preserve existing account records")
+        yaoDetailPlayFocus()
+        press(.right, focus: "detail.favorite")
+        press(.select)
+        wait("shelf write confirmed", seconds: 30) { shelf.label.contains("已") != wasFollowed }
+        press(.select)
+        wait("shelf original state restored", seconds: 30) { shelf.label.contains("已") == wasFollowed }
+        press(.right, focus: "account.social.open")
+        press(.select)
+        let like = app.buttons["account.episode.like"]
+        XCTAssertTrue(like.waitForExistence(timeout: 60), "Official episode state must load")
+        let wasLiked = like.label.contains("取消点赞")
+        XCTAssertFalse(wasLiked, "Use an unliked fixture to preserve existing account records")
+        func focusLike() {
+            for _ in 0..<12 {
+                if like.hasFocus { return }
+                press(.up)
+            }
+            wait("like can receive remote focus") { like.hasFocus }
+        }
+        focusLike()
+        press(.select)
+        wait("like write confirmed", seconds: 30) { like.isEnabled && like.label.contains("取消点赞") != wasLiked }
+        press(.menu)
+        wait("sheet menu returns to social button") { self.app.buttons["account.social.open"].hasFocus }
+        press(.select)
+        XCTAssertTrue(like.waitForExistence(timeout: 60))
+        XCTAssertEqual(like.label.contains("取消点赞"), !wasLiked, "Reopened sheet must read official state")
+        focusLike()
+        press(.select)
+        wait("like original state restored", seconds: 30) { like.isEnabled && like.label.contains("取消点赞") == wasLiked }
+        let people = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'account.creator.'"))
+        let creator = try XCTUnwrap(people.allElementsBoundByIndex.first { $0.isEnabled && $0.label == "关注" }, "Need an unfollowed bound official creator account")
+        let creatorID = creator.identifier
+        let wasCreatorFollowed = creator.label == "取消关注"
+        func focusCreator() {
+            focusLike()
+            for _ in 0..<12 {
+                if self.app.buttons[creatorID].hasFocus { return }
+                press(.down)
+            }
+            wait("creator can receive remote focus") { self.app.buttons[creatorID].hasFocus }
+        }
+        focusCreator()
+        press(.select)
+        wait("creator write confirmed", seconds: 30) {
+            self.app.buttons[creatorID].isEnabled && (self.app.buttons[creatorID].label == "取消关注") != wasCreatorFollowed
+        }
+        press(.menu)
+        wait("creator sheet menu returns focus") { self.app.buttons["account.social.open"].hasFocus }
+        press(.select)
+        XCTAssertTrue(app.buttons[creatorID].waitForExistence(timeout: 60))
+        XCTAssertEqual(app.buttons[creatorID].label == "取消关注", !wasCreatorFollowed)
+        focusCreator()
+        press(.select)
+        wait("creator original state restored", seconds: 30) {
+            self.app.buttons[creatorID].isEnabled && (self.app.buttons[creatorID].label == "取消关注") == wasCreatorFollowed
+        }
+        press(.menu)
+        wait("social final focus restored") { self.app.buttons["account.social.open"].hasFocus }
+        press(.left, focus: "detail.favorite")
+        press(.left, focus: "detail.play")
+        print("THL_SOCIAL_TV series=\(series) likeUnlike=true creatorFollowUnfollow=true shelfToggle=true originalStatesRestored=true remoteFocus=true menuReturn=true")
+    }
+
     func testOwnerAccountWritebackPlaybackAndResume() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
         continueAfterFailure = false

@@ -97,6 +97,7 @@ class _SocialDialogState extends State<_SocialDialog> {
                   if (error != null)
                     Text(
                       error!,
+                      key: const ValueKey('account-social-error'),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),
