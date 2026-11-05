@@ -1,0 +1,15 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/home/HomePage",
+    "pages/detail/DramaDetailPage",
+    "pages/player/PlayerPage",
+    "pages/search/SearchPage",
+    "pages/rankings/RankingsPage",
+    "pages/feed/VideoFeedPage",
+    "pages/account/AccountPage",
+    "pages/account/LoginPage",
+    "pages/downloads/DownloadsPage",
+    "pages/settings/SettingsPage"
+  ]
+}

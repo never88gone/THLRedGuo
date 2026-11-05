@@ -1,0 +1,17 @@
+{
+  "name": "thlredlook_harmonyos",
+  "version": "1.0.0",
+  "description": "糖葫芦Haw 原生鸿蒙 (HarmonyOS NEXT) 客户端",
+  "main": "",
+  "scripts": {},
+  "author": "never88gone",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@ohos/hvigor": "5.0.0"
+  },
+  "devDependencies": {
+    "@ohos/hvigor-ohos-plugin": "5.0.0",
+    "@ohos/hypium": "1.0.18",
+    "typescript": "~4.9.5"
+  }
+}

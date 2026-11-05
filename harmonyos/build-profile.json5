@@ -1,0 +1,56 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "thl.p12",
+          "storePassword": "00000019D8981228EC62F8C93D371FA276F16CC6FA4E45A10858D8B24377CEB40A91D124AA07339812",
+          "keyAlias": "thl",
+          "keyPassword": "0000001970DFA45266A408A7A796482963A1958413F96B9A82739EA2EAD46D9ADEB5CC403C056F17F8",
+          "signAlg": "SHA256withECDSA",
+          "profile": "airdrop_devDebug.p7b",
+          "certpath": "开发证书.cer"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "26.0.0",
+        "compatibleSdkVersion": "6.1.0(23)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

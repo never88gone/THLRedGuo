@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "糖葫芦Haw Entry Module",
+  "main": "",
+  "author": "never88gone",
+  "license": "Apache-2.0",
+  "dependencies": {}
+}

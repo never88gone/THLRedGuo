@@ -37,6 +37,7 @@ ios/Flutter/flutter_export_environment.sh
 **/*.xcframework/
 **/xcuserdata/
 .agents
+agents/
 *.mobileprovision
 *.provisionprofile
 *.pem

@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "糖葫芦Haw 鸿蒙原生客户端主模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "糖葫芦Haw 原生 Ability"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "糖葫芦Haw"
+    }
+  ]
+}
