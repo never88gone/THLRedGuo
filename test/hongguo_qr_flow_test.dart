@@ -1,3 +1,4 @@
+import 'test_helpers/official_source_fixture.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -118,6 +119,7 @@ class _DeferredClient extends _Client {
 }
 
 void main() {
+  setUp(installSyntheticOfficialAsset);
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() {
     SourceDiagnostics.shared.clear();

@@ -25,9 +25,9 @@ class ResourceSettings {
       ResourceSettings(
         proxyMode: data['proxyMode'] as String? ?? 'auto',
         proxyUrl: data['proxyUrl'] as String? ?? '',
-        catalogConcurrency: intValue(data['catalogConcurrency']),
-        catalogIntervalMs: intValue(data['catalogIntervalMs']),
-        downloadConcurrency: intValue(data['downloadConcurrency']),
+        catalogConcurrency: intValue(data['catalogConcurrency'] ?? 3),
+        catalogIntervalMs: intValue(data['catalogIntervalMs'] ?? 250),
+        downloadConcurrency: intValue(data['downloadConcurrency'] ?? 2),
         downloadBySource: data['downloadBySource'] == true,
         warning: data['warning'] as String? ?? '',
         systemProxyStatus: data['systemProxyStatus'] as String? ?? '',

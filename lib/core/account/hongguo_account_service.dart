@@ -75,7 +75,7 @@ class HongguoAccountService {
         throw const HongguoAccountFailure('账号操作已取消', 'CANCELLED');
       }
       return _runtime = runtime;
-    }();
+    }().whenComplete(() => _initializing = null);
   }
 
   void _check(int revision) {

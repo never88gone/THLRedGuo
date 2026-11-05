@@ -56,7 +56,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         : _jobs.where((job) {
             final jobSource = job.drama.source.isNotEmpty
                 ? job.drama.source
-                : (job.drama.id.contains(':') ? job.drama.id.split(':').first : '');
+                : (job.drama.id.contains(':')
+                      ? job.drama.id.split(':').first
+                      : '');
             return jobSource == currentSource;
           }).toList();
     return downloadCollections(
@@ -74,8 +76,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     _updater = DownloadCollectionUpdater(widget.repository, widget.store)
       ..addListener(_changed);
     widget.store.addListener(_changed);
-    _refresh();
-    _timer = Timer.periodic(const Duration(seconds: 2), (_) => _refresh());
+    if (widget.repository.supportsDownloads) {
+      _refresh();
+      _timer = Timer.periodic(const Duration(seconds: 2), (_) => _refresh());
+    } else {
+      _loading = false;
+    }
   }
 
   void _changed() {
@@ -589,14 +595,18 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                           key: ValueKey('pause-${job.id}'),
                           tooltip: '暂停',
                           icon: const Icon(Icons.pause_circle_outline_rounded),
-                          onPressed: _busy ? null : () => _batch('pause', [job]),
+                          onPressed: _busy
+                              ? null
+                              : () => _batch('pause', [job]),
                         ),
                       if (job.resumable)
                         IconButton(
                           key: ValueKey('resume-${job.id}'),
                           tooltip: '继续 / 重试',
                           icon: const Icon(Icons.play_circle_outline_rounded),
-                          onPressed: _busy ? null : () => _batch('resume', [job]),
+                          onPressed: _busy
+                              ? null
+                              : () => _batch('resume', [job]),
                         ),
                       IconButton(
                         key: ValueKey('remove-${job.id}'),
@@ -616,9 +626,15 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                         },
                         itemBuilder: (_) => [
                           if (job.completed)
-                            const PopupMenuItem(value: 'play', child: Text('本地播放')),
+                            const PopupMenuItem(
+                              value: 'play',
+                              child: Text('本地播放'),
+                            ),
                           if (job.active)
-                            const PopupMenuItem(value: 'pause', child: Text('暂停')),
+                            const PopupMenuItem(
+                              value: 'pause',
+                              child: Text('暂停'),
+                            ),
                           if (job.resumable)
                             const PopupMenuItem(
                               value: 'resume',
@@ -716,6 +732,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.repository.supportsDownloads) {
+      return const StatusPanel(
+        title: '当前版本尚未提供下载',
+        message: '下载传输、断点续传与离线播放服务尚未接入，可继续使用在线播放。',
+      );
+    }
     if (!_allowed) {
       return const StatusPanel(title: '当前用户无权访问下载', message: '请返回后重新操作。');
     }

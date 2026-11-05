@@ -24,16 +24,26 @@ Future<void> main(List<String> arguments) async {
     final helper = File.fromUri(
       Platform.script.resolve('prepare_local_debug_source.py'),
     );
-    final result = await Process.run(
-      Platform.isWindows ? 'python' : 'python3',
-      [helper.path, '--input', input.path, '--output', output.path],
+    try {
+      final result = await Process.run(
+        Platform.isWindows ? 'python' : 'python3',
+        [helper.path, '--input', input.path, '--output', output.path],
+      );
+      stdout.write(result.stdout);
+      stderr.write(result.stderr);
+      if (result.exitCode == 0 &&
+          await output.exists() &&
+          await output.length() > 0) {
+        return;
+      }
+    } on ProcessException {
+      stderr.writeln('Local debug source preparation requires Python 3.');
+    }
+    await output.parent.create(recursive: true);
+    await output.writeAsBytes(data);
+    stderr.writeln(
+      'Local signing is unavailable; the public source template was preserved.',
     );
-    stdout.write(result.stdout);
-    stderr.write(result.stderr);
-    exitCode = result.exitCode;
-  } on ProcessException {
-    stderr.writeln('Local debug source preparation requires Python 3.');
-    exitCode = 1;
   } on FileSystemException {
     stderr.writeln('Local debug source input or output is unavailable.');
     exitCode = 1;

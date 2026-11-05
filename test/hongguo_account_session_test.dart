@@ -1,3 +1,4 @@
+import 'test_helpers/official_source_fixture.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -57,6 +58,7 @@ class _InterruptedStorage extends FlutterSecureStorage {
 }
 
 void main() {
+  setUp(installSyntheticOfficialAsset);
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   final website = Uri.parse(

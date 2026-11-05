@@ -128,6 +128,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   int _generation = 0;
   int _seasonSwitchTicket = 0;
   int _requestedQuality = 0;
+  PlaybackDecoderMode _decoderMode = PlaybackDecoderMode.hardware;
   bool _loading = true;
   bool _forceOnline = false;
   bool _localFailure = false;
@@ -180,6 +181,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     speed: _speed,
     quality: _requestedQuality,
     autoAdvance: _autoAdvance,
+    pictureInPicture: widget.store.playbackPreferences.pictureInPicture,
+    decoderMode: _decoderMode,
     danmaku: _danmakuEnabled,
     danmakuStyle: _danmakuStyle,
     preload: _preloadEnabled,
@@ -208,6 +211,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     final preferences = widget.store.playbackPreferences;
     _speed = preferences.speed;
     _requestedQuality = preferences.quality;
+    _decoderMode = preferences.decoderMode;
     _autoAdvance = preferences.autoAdvance;
     _danmakuEnabled = preferences.danmaku;
     _danmakuStyle = preferences.danmakuStyle;
@@ -234,7 +238,12 @@ class _PlayerScreenState extends State<PlayerScreen>
         ? VideoController(
             _player,
             configuration: VideoControllerConfiguration(
-              enableHardwareAcceleration: !Platform.isIOS,
+              enableHardwareAcceleration:
+                  !Platform.isIOS &&
+                  preferences.decoderMode == PlaybackDecoderMode.hardware,
+              hwdec: preferences.decoderMode == PlaybackDecoderMode.hardware
+                  ? 'auto-safe'
+                  : 'no',
             ),
           )
         : null;
@@ -1803,11 +1812,22 @@ class _PlayerScreenState extends State<PlayerScreen>
         nextPreferences.decoderMode != _preferences.decoderMode;
     if (_player is LunaExoPlayer) {
       _player.setDecoderMode(nextPreferences.decoderMode);
+    } else if (decoderChanged && Platform.isWindows) {
+      final native = _player.platform;
+      if (native is NativePlayer) {
+        await native.setProperty(
+          'hwdec',
+          nextPreferences.decoderMode == PlaybackDecoderMode.hardware
+              ? 'auto-safe'
+              : 'no',
+        );
+      }
     }
     _enhancement.setPreferences(nextPreferences.enhancement);
     setState(() {
       _speed = nextPreferences.speed;
       _requestedQuality = nextPreferences.quality;
+      _decoderMode = nextPreferences.decoderMode;
       _autoAdvance = nextPreferences.autoAdvance;
       _danmakuEnabled = nextPreferences.danmaku;
       _danmakuStyle = nextPreferences.danmakuStyle;

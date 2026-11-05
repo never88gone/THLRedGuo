@@ -108,6 +108,10 @@
 | **Windows** | 基于 `media_kit` / libmpv 硬件解码，集成专属 Shader 画质增强滤镜 | 独立免安装绿色包 / 便携目录（含完整 DLL 与运行环境） |
 | **Apple tvOS** | 独立原生工程（`tvos/`），纯 SwiftUI + Siri Remote 焦点引擎 + AVKit 原生渲染打造，具备完整客厅大屏交互与原生影院体验 | 独立 Xcode 工程，输出 tvOS IPA；支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装 |
 
+Windows 当前提供浏览、搜索、详情、选集、播放、追剧历史、设置与本地备份入口，需要有效的官方数据源配置。Windows 加密视频需完成本地缓存后起播；系统画中画和 iCloud 同步不在 Windows 提供。
+
+当前 Flutter 客户端尚未实现下载传输、断点续传、下载目录迁移、设备互联传输、站源批量更新任务及代理和并发调度设置。下载入口会显示功能尚未提供，相关操作会明确提示未实现；现有媒体合并与导出组件不代表下载到离线播放的完整流程已经可用。手机扫码传递账号使用独立的账号配对服务。
+
 ---
 
 ## 核心功能介绍

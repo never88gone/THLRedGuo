@@ -184,12 +184,12 @@ class AccountPairingReceiver extends ChangeNotifier {
           'requestId': requestID,
           'status': 'accepted',
         }, response: true);
+        accepted = true;
+        message = '红果账号已登录';
+        _expiry?.cancel();
         response.write(jsonEncode(reply));
         await response.close();
         if (!_closed) {
-          accepted = true;
-          message = '红果账号已登录';
-          _expiry?.cancel();
           await _server?.close();
           _server = null;
           notifyListeners();

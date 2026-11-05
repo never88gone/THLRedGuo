@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/core/storage/app_storage.dart';
 import 'package:THLRedLook/views/settings/settings_group_view.dart';
 
 String storageSize(int bytes) {
@@ -80,51 +81,15 @@ class _StorageScreenState extends State<StorageScreen> {
     }
   }
 
-  Future<int> _calculateCacheSize() async {
-    int total = 0;
-    final Set<String> visitedPaths = {};
-
-    try {
-      final tempDir = await getTemporaryDirectory();
-      if (await tempDir.exists() && visitedPaths.add(tempDir.path)) {
-        total += await _calcDirSize(tempDir);
-      }
-    } catch (_) {}
-
-    try {
-      final cacheDir = await getApplicationCacheDirectory();
-      if (await cacheDir.exists() && visitedPaths.add(cacheDir.path)) {
-        total += await _calcDirSize(cacheDir);
-      }
-    } catch (_) {}
-
-    return total;
-  }
-
-  Future<int> _calcDirSize(Directory dir) async {
-    int size = 0;
-    try {
-      if (!dir.existsSync()) return 0;
-      final entities = dir.listSync(recursive: true, followLinks: false);
-      for (final entity in entities) {
-        if (entity is File) {
-          try {
-            size += entity.lengthSync();
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
-    return size;
-  }
+  Future<int> _calculateCacheSize() async =>
+      AppCacheStorage(await getApplicationCacheDirectory()).size();
 
   Future<void> _handleClearCache() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('清理应用缓存？'),
-        content: const Text(
-          '将清理临时运行数据、海报图片缓存与网络分片。已下载的离线短剧及追剧记录不受影响。',
-        ),
+        content: const Text('仅清理可重新生成的海报缓存。数据源插件、下载内容、播放缓存与追剧记录不受影响。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -141,28 +106,12 @@ class _StorageScreenState extends State<StorageScreen> {
     if (confirmed != true || !mounted) return;
 
     setState(() => _isClearingCache = true);
-    final freedBytes = _cacheBytes;
-
     try {
+      final freedBytes = await AppCacheStorage(
+        await getApplicationCacheDirectory(),
+      ).clear();
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
-
-      final Set<String> cleanedPaths = {};
-
-      try {
-        final tempDir = await getTemporaryDirectory();
-        if (await tempDir.exists() && cleanedPaths.add(tempDir.path)) {
-          _cleanDirContents(tempDir);
-        }
-      } catch (_) {}
-
-      try {
-        final cacheDir = await getApplicationCacheDirectory();
-        if (await cacheDir.exists() && cleanedPaths.add(cacheDir.path)) {
-          _cleanDirContents(cacheDir);
-        }
-      } catch (_) {}
-
       await _loadCacheSize();
 
       if (mounted) {
@@ -189,22 +138,6 @@ class _StorageScreenState extends State<StorageScreen> {
     } finally {
       if (mounted) setState(() => _isClearingCache = false);
     }
-  }
-
-  void _cleanDirContents(Directory dir) {
-    try {
-      if (!dir.existsSync()) return;
-      final entities = dir.listSync(followLinks: false);
-      for (final entity in entities) {
-        try {
-          if (entity is File || entity is Link) {
-            entity.deleteSync();
-          } else if (entity is Directory) {
-            entity.deleteSync(recursive: true);
-          }
-        } catch (_) {}
-      }
-    } catch (_) {}
   }
 
   Future<void> _move() async {
@@ -366,9 +299,7 @@ class _StorageScreenState extends State<StorageScreen> {
                           ] else ...[
                             const SizedBox(
                               height: 24,
-                              child: Center(
-                                child: Text('正在获取存储信息…'),
-                              ),
+                              child: Center(child: Text('正在获取存储信息…')),
                             ),
                           ],
                         ],
@@ -392,12 +323,16 @@ class _StorageScreenState extends State<StorageScreen> {
                       ),
                       trailing: FilledButton.tonal(
                         key: const ValueKey('storage-clear-cache-button'),
-                        onPressed: (_busy || _isClearingCache) ? null : _handleClearCache,
+                        onPressed: (_busy || _isClearingCache)
+                            ? null
+                            : _handleClearCache,
                         child: _isClearingCache
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Text('清理缓存'),
                       ),
@@ -431,7 +366,9 @@ class _StorageScreenState extends State<StorageScreen> {
                             ),
                             const SizedBox(height: 6),
                             SelectableText(
-                              _formatDisplayDirectory(_info!['directory'] as String? ?? ''),
+                              _formatDisplayDirectory(
+                                _info!['directory'] as String? ?? '',
+                              ),
                               style: theme.textTheme.bodyMedium,
                             ),
                           ],
@@ -456,7 +393,8 @@ class _StorageScreenState extends State<StorageScreen> {
                           );
                         },
                       ),
-                      if (widget.store.profile.admin)
+                      if (widget.store.profile.admin &&
+                          widget.repository.supportsDownloads)
                         ListTile(
                           leading: const Icon(Icons.drive_file_move_outlined),
                           title: const Text('更改并迁移目录'),

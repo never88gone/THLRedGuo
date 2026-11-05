@@ -40,10 +40,8 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
   @override
   void initState() {
     super.initState();
-    _metadata = Future.wait<void>([
-      _loadMetadata(),
-      recorder.refreshNetworkEgress(),
-    ]).then((_) {});
+    _metadata = _loadMetadata();
+    recorder.refreshNetworkEgress().ignore();
   }
 
   Future<void> _loadMetadata() async {

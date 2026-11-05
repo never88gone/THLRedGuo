@@ -111,7 +111,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     key: const ValueKey('settings-display-mode-entry'),
                     leading: const Icon(Icons.devices_rounded),
                     title: const Text('页面模式'),
-                    subtitle: Text('当前：${_displayModeLabel(widget.store.displayMode)} · 电视、手机或电脑适配'),
+                    subtitle: Text(
+                      '当前：${_displayModeLabel(widget.store.displayMode)} · 电视、手机或电脑适配',
+                    ),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,
@@ -124,7 +126,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     key: const ValueKey('settings-theme-entry'),
                     leading: const Icon(Icons.palette_outlined),
                     title: const Text('外观与主题'),
-                    subtitle: Text('当前：${AppTheme.label(widget.store.themeMode)} · 深色模式与品牌色彩'),
+                    subtitle: Text(
+                      '当前：${AppTheme.label(widget.store.themeMode)} · 深色模式与品牌色彩',
+                    ),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,
@@ -146,13 +150,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     leading: const Icon(Icons.tune_rounded),
                     title: const Text('播放设置'),
                     subtitle: Text(
-                      '默认 $qualityLabel · ${playPrefs.speed}x · 弹幕${playPrefs.danmaku ? "开启" : "关闭"}${playPrefs.pictureInPicture ? " · 画中画开启" : ""}',
+                      '默认 $qualityLabel · ${playPrefs.speed}x · 弹幕${playPrefs.danmaku ? "开启" : "关闭"}${playPrefs.pictureInPicture && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS) ? " · 画中画开启" : ""}',
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute<void>(
-                        builder: (_) => PlaybackSettingsPage(store: widget.store),
+                        builder: (_) =>
+                            PlaybackSettingsPage(store: widget.store),
                       ),
                     ),
                   ),
@@ -161,7 +166,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const Divider(height: 1, indent: 56),
                     SwitchListTile.adaptive(
                       key: const ValueKey('settings-main-pip-switch'),
-                      secondary: const Icon(Icons.picture_in_picture_alt_rounded),
+                      secondary: const Icon(
+                        Icons.picture_in_picture_alt_rounded,
+                      ),
                       title: const Text('画中画模式'),
                       subtitle: Text(
                         playPrefs.pictureInPicture
@@ -172,7 +179,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       activeThumbColor: AppColors.white,
                       activeTrackColor: AppColors.hongguoRed,
                       onChanged: (val) async {
-                        final updated = playPrefs.copyWith(pictureInPicture: val);
+                        final updated = playPrefs.copyWith(
+                          pictureInPicture: val,
+                        );
                         await saveUserChange(
                           context,
                           () => widget.store.setPlaybackPreferences(updated),
@@ -192,13 +201,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     key: const ValueKey('settings-switch-source'),
                     leading: const Icon(Icons.swap_horiz_rounded),
                     title: const Text('切换当前数据源'),
-                    subtitle: Text('当前正在使用：${SourceSite.byId(widget.store.source).name} · 轻触切换可用站源'),
+                    subtitle: Text(
+                      '当前正在使用：${SourceSite.byId(widget.store.source).name} · 轻触切换可用站源',
+                    ),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => showSourceSwitcherSheet(
                       context,
                       store: widget.store,
                       onSelect: (site) {
-                        saveUserChange(context, () => widget.store.setSource(site.id));
+                        saveUserChange(
+                          context,
+                          () => widget.store.setSource(site.id),
+                        );
                       },
                     ),
                   ),
@@ -232,7 +246,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   if (widget.repository.supportsSourceManagement &&
-                      (widget.store.isZhenguojianActivated || widget.store.sources.length > 1))
+                      (widget.store.isZhenguojianActivated ||
+                          widget.store.sources.length > 1))
                     ListTile(
                       leading: const Icon(Icons.speed_rounded),
                       title: const Text('站源管理'),
@@ -260,12 +275,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ListTile(
                       leading: const Icon(Icons.video_settings_rounded),
                       title: const Text('离线下载偏好'),
-                      subtitle: Text('清晰度：${widget.store.downloadPreferences.qualityLabel}'),
+                      subtitle: Text(
+                        '清晰度：${widget.store.downloadPreferences.qualityLabel}',
+                      ),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute<void>(
-                          builder: (_) => DownloadPreferencesScreen(store: widget.store),
+                          builder: (_) =>
+                              DownloadPreferencesScreen(store: widget.store),
                         ),
                       ),
                     ),
@@ -298,7 +316,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       leading: const Icon(Icons.cloud_sync_rounded),
                       title: const Text('iCloud 云端同步'),
                       subtitle: Text(
-                        ICloudSyncService.instance.isSyncEnabled(widget.store.preferences)
+                        ICloudSyncService.instance.isSyncEnabled(
+                              widget.store.preferences,
+                            )
                             ? '已开启 · 自动在 iOS、macOS 与 Apple TV 间同步'
                             : '已停用 · 轻触开启苹果生态多端同步',
                       ),
@@ -353,7 +373,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context,
                         MaterialPageRoute<void>(
                           builder: (_) => PrivacySettingsPage(
-                            controller: PrivacyLockController(widget.store.preferences),
+                            controller: PrivacyLockController(
+                              widget.store.preferences,
+                            ),
                             repository: widget.repository,
                             store: widget.store,
                           ),

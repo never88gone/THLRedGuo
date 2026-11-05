@@ -10,6 +10,9 @@ import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 import 'package:THLRedLook/core/js/js_source_models.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/utils/media/cover_decoder.dart';
+import 'package:THLRedLook/core/storage/app_storage.dart';
+import 'package:THLRedLook/utils/settings/resource_settings.dart';
+import 'package:THLRedLook/utils/build/app_build.dart';
 
 /// 纯 Dart 核心调度引擎：
 /// 承担数据源解析、分类目录、短剧详情、分集列表、播放直链、
@@ -37,13 +40,7 @@ class DartCoreEngine {
   final Map<String, String> _sourceScripts = {};
   String _activeSourceId = 'hongguo';
 
-  // 资源与代理配置
-  int _concurrency = 3;
-  int _intervalMs = 250;
-  String systemProxy = '';
-
-  // 下载任务队列与状态
-  final Map<String, Map<String, dynamic>> _downloadJobs = {};
+  final Map<String, int> _workLeases = {};
 
   // 内存目录缓存
   final Map<String, Map<String, dynamic>> _catalogCache = {};
@@ -52,11 +49,12 @@ class DartCoreEngine {
   Future<void> _ensureDirectories() async {
     if (_baseDir.isEmpty) {
       try {
-        final cache = await getApplicationCacheDirectory()
-            .timeout(const Duration(milliseconds: 300));
+        final cache = await getApplicationCacheDirectory().timeout(
+          const Duration(milliseconds: 300),
+        );
         _baseDir = p.join(cache.path, 'pure_core');
       } catch (_) {
-        _baseDir = p.join(Directory.systemTemp.path, 'pure_core');
+        _baseDir = p.join(Directory.systemTemp.path, appSlug, 'pure_core');
       }
     }
     _sourcesDir = p.join(_baseDir, 'sources');
@@ -64,12 +62,10 @@ class DartCoreEngine {
     _downloadsDir = p.join(_baseDir, 'downloads');
     _storageDir = p.join(_baseDir, 'source_storage');
 
-    try {
-      Directory(_sourcesDir).createSync(recursive: true);
-      Directory(_coversDir).createSync(recursive: true);
-      Directory(_downloadsDir).createSync(recursive: true);
-      Directory(_storageDir).createSync(recursive: true);
-    } catch (_) {}
+    await Directory(_sourcesDir).create(recursive: true);
+    await Directory(_coversDir).create(recursive: true);
+    await Directory(_downloadsDir).create(recursive: true);
+    await Directory(_storageDir).create(recursive: true);
   }
 
   String _scopeFor(String action, Map<String, dynamic> input) =>
@@ -172,16 +168,14 @@ class DartCoreEngine {
         _allSourcesActivated = true;
         return {'ok': true, 'allSources': true};
       case 'updateSystemProxy':
-        systemProxy = input['systemProxy'] as String? ?? '';
-        return true;
+        throw UnsupportedError('当前版本尚未接入系统代理设置');
       case 'resourceSettings':
-        return {'concurrency': _concurrency, 'intervalMs': _intervalMs};
+        return {
+          ...const ResourceSettings().toJson(),
+          'warning': '当前版本尚未接入代理、请求并发和下载调度设置。',
+        };
       case 'saveResourceSettings':
-        final settings = input['settings'] as Map? ?? {};
-        _concurrency =
-            (settings['concurrency'] as num?)?.toInt() ?? _concurrency;
-        _intervalMs = (settings['intervalMs'] as num?)?.toInt() ?? _intervalMs;
-        return {'concurrency': _concurrency, 'intervalMs': _intervalMs};
+        throw UnsupportedError('当前版本尚未接入代理、请求并发和下载调度设置');
 
       // JS 数据源插件管理
       case 'jsSource.list':
@@ -214,71 +208,66 @@ class DartCoreEngine {
       case 'jsSource.saveAndLoad':
         final script = input['script'] as String? ?? '';
         final fileName = input['fileName'] as String? ?? 'custom.js';
+        if (fileName.isEmpty ||
+            fileName.length > 180 ||
+            p.posix.basename(fileName) != fileName ||
+            p.windows.basename(fileName) != fileName ||
+            RegExp(r'[<>:"|?*\x00-\x1F]').hasMatch(fileName) ||
+            !fileName.toLowerCase().endsWith('.js')) {
+          throw const FormatException('数据源文件名无效');
+        }
         final meta = _parseScriptMeta(script, fileName);
         if (meta != null) {
           final isSameScript = _sourceScripts[meta.id] == script;
-          if (!isSameScript) {
-            _spiderPool.remove(meta.id);
-            await _ensureDirectories();
-            final targetFile = File(p.join(_sourcesDir, fileName));
+          await _ensureDirectories();
+          final targetFile = File(p.join(_sourcesDir, fileName));
+          if (!await targetFile.exists() ||
+              await targetFile.readAsString() != script) {
             await targetFile.writeAsString(script);
-            _installedSources[meta.id] = meta;
-            _sourceScripts[meta.id] = script;
           }
+          if (!isSameScript) _spiderPool.remove(meta.id);
+          _installedSources[meta.id] = meta;
+          _sourceScripts[meta.id] = script;
           if (_activeSourceId.isEmpty) _activeSourceId = meta.id;
           return {'ok': true, 'meta': meta.toJson()};
         }
         throw Exception('插件保存与校验失败');
       case 'jsSource.remove':
         final source = input['source'] as String? ?? '';
+        await _ensureDirectories();
+        await for (final entity in Directory(
+          _sourcesDir,
+        ).list(followLinks: false)) {
+          if (entity is! File || !entity.path.endsWith('.js')) continue;
+          final meta = _parseScriptMeta(
+            await entity.readAsString(),
+            p.basename(entity.path),
+          );
+          if (p.basenameWithoutExtension(entity.path) == source ||
+              meta?.id == source) {
+            await entity.delete();
+          }
+        }
         _spiderPool.remove(source);
         _installedSources.remove(source);
         _sourceScripts.remove(source);
         if (_activeSourceId == source) {
-          _activeSourceId = _installedSources.isNotEmpty
-              ? _installedSources.keys.first
-              : '';
+          _activeSourceId = _installedSources.keys.firstOrNull ?? '';
         }
-        try {
-          final dir = Directory(_sourcesDir);
-          if (dir.existsSync()) {
-            final files = dir.listSync().whereType<File>().where(
-              (f) => f.path.endsWith('.js'),
-            );
-            for (final file in files) {
-              try {
-                final base = p.basenameWithoutExtension(file.path);
-                if (base == source) {
-                  file.deleteSync();
-                } else {
-                  final content = file.readAsStringSync();
-                  final meta = _parseScriptMeta(content, p.basename(file.path));
-                  if (meta?.id == source) {
-                    file.deleteSync();
-                  }
-                }
-              } catch (_) {}
-            }
-          }
-        } catch (_) {}
         return {'ok': true};
       case 'jsSource.clearAll':
+        await _ensureDirectories();
+        await for (final entity in Directory(
+          _sourcesDir,
+        ).list(followLinks: false)) {
+          if (entity is File && entity.path.endsWith('.js')) {
+            await entity.delete();
+          }
+        }
         _spiderPool.clear();
         _installedSources.clear();
         _sourceScripts.clear();
         _activeSourceId = '';
-        try {
-          final dir = Directory(_sourcesDir);
-          if (dir.existsSync()) {
-            for (final f in dir.listSync()) {
-              if (f is File && f.path.endsWith('.js')) {
-                try {
-                  f.deleteSync();
-                } catch (_) {}
-              }
-            }
-          }
-        } catch (_) {}
         return {'ok': true};
       case 'jsSource.scan':
         await _scanSources();
@@ -287,22 +276,17 @@ class DartCoreEngine {
       // 站源状态与任务
       case 'sourceStatus':
         final source = input['source'] as String? ?? '';
+        final installed = _installedSources.containsKey(source);
         return {
           'source': source,
-          'ready': true,
-          'stage': '就绪',
+          'ready': installed,
+          'stage': installed ? '已加载' : '尚未导入数据源',
           'running': false,
           'finishedAt': DateTime.now().toIso8601String(),
         };
       case 'sourceJob':
       case 'cancelSourceJob':
-        final source = input['source'] as String? ?? '';
-        return {
-          'source': source,
-          'ready': true,
-          'stage': '已完成',
-          'running': false,
-        };
+        throw UnsupportedError('当前版本尚未实现站源批量更新任务');
 
       // 分类与目录浏览
       case 'categories':
@@ -338,9 +322,6 @@ class DartCoreEngine {
         return await _getDetail(Map<String, dynamic>.from(drama));
       case 'metadata':
         final drama = Map<String, dynamic>.from(input['drama'] as Map? ?? {});
-        drama['onlineDate'] ??= '2024-01-01';
-        drama['heat'] ??= '98.5万';
-        drama['vipStatus'] ??= false;
         return {'drama': drama};
 
       // 播放地址解析与切换
@@ -391,27 +372,12 @@ class DartCoreEngine {
           'heic': false,
         };
 
-      // 下载管理
       case 'downloads':
-        await _ensureDirectories();
-        return {'jobs': _downloadJobs.values.toList()};
+        return {'jobs': <Map<String, dynamic>>[]};
       case 'enqueueDownloads':
-        await _ensureDirectories();
-        return _enqueueDownloads(input);
       case 'controlDownloads':
-        final cmd = input['command'] as String? ?? '';
-        final jobId = input['jobId'] as String? ?? '';
-        _controlDownload(jobId, cmd);
-        return true;
       case 'controlDownloadBatch':
-        final cmd = input['command'] as String? ?? '';
-        final jobIds = (input['jobIds'] as List? ?? []).cast<String>();
-        final completed = <String>[];
-        for (final id in jobIds) {
-          _controlDownload(id, cmd);
-          completed.add(id);
-        }
-        return {'completed': completed, 'failures': {}};
+        throw UnsupportedError('当前版本尚未实现下载传输与断点续传');
       case 'downloadDirectory':
         await _ensureDirectories();
         return {'directory': _downloadsDir};
@@ -419,48 +385,13 @@ class DartCoreEngine {
         await _ensureDirectories();
         return {
           'directory': _downloadsDir,
-          'usedBytes': 1024 * 1024 * 50,
-          'freeBytes': 1024 * 1024 * 1024 * 50,
+          'usedBytes': await directoryBytes(Directory(_downloadsDir)),
+          'freeBytes': availableDiskBytes(_downloadsDir),
         };
       case 'moveDownloads':
-        final newDir = input['directory'] as String? ?? '';
-        if (newDir.isNotEmpty) {
-          _downloadsDir = newDir;
-        }
-        return true;
+        throw UnsupportedError('当前版本尚未实现下载目录迁移');
       case 'localPlayback':
-        final drama = input['drama'] as Map? ?? {};
-        final index = (input['index'] as num?)?.toInt() ?? 1;
-        final dramaId = drama['id'] as String? ?? '';
-        final localJob = _downloadJobs.values.firstWhere(
-          (j) =>
-              (j['drama'] as Map)['id'] == dramaId &&
-              j['index'] == index &&
-              (j['state'] == 'completed' || j['status'] == 'completed'),
-          orElse: () => {},
-        );
-        if (localJob.isNotEmpty &&
-            (localJob['path'] as String? ?? '').isNotEmpty) {
-          final filePath = localJob['path'] as String;
-          final file = File(filePath);
-          if (!file.existsSync()) {
-            _ensureDownloadedMediaFile(
-              filePath,
-              localJob['drama'] as Map? ?? {},
-              localJob['chapter'] as Map? ?? {},
-              index,
-            );
-          }
-          return {
-            'url': filePath,
-            'session': 'local_${DateTime.now().millisecondsSinceEpoch}',
-            'headers': <String, String>{},
-            'quality': 0,
-            'local': true,
-          };
-        }
         return {'url': ''};
-
       // 弹幕支持
       case 'danmaku':
         final episodeId = input['episodeId'] as String? ?? '';
@@ -477,12 +408,29 @@ class DartCoreEngine {
 
       // 设备互联与任务租约
       case 'lan':
-        return {'ok': true};
+        throw UnsupportedError('当前版本尚未实现设备互联传输服务');
       case 'workLease':
-        return {'count': 0};
+        final id = input['jobId'] as String? ?? '';
+        final command = input['command'] as String? ?? '';
+        if (id.isEmpty || !{'start', 'end'}.contains(command)) {
+          throw const FormatException('任务租约参数无效');
+        }
+        if (command == 'start') {
+          _workLeases[id] = (_workLeases[id] ?? 0) + 1;
+        } else {
+          final count = _workLeases[id] ?? 0;
+          if (count <= 1) {
+            _workLeases.remove(id);
+          } else {
+            _workLeases[id] = count - 1;
+          }
+        }
+        return {
+          'count': _workLeases.values.fold<int>(0, (sum, count) => sum + count),
+        };
 
       default:
-        return {'ok': true};
+        throw UnsupportedError('当前版本尚未实现操作：$action');
     }
   }
 
@@ -496,7 +444,7 @@ class DartCoreEngine {
 
     isInitialized = true;
     return {
-      'version': '1.0.1',
+      'version': '1.0.0',
       'standalone': true,
       'allSources': _allSourcesActivated,
     };
@@ -669,9 +617,7 @@ class DartCoreEngine {
     final fullId = rawId.contains(':') ? rawId : '$source:$rawId';
     final remarks = vod['vod_remarks']?.toString() ?? '';
     final epMatch = RegExp(r'(\d+)').firstMatch(remarks);
-    final episodes = epMatch != null
-        ? int.tryParse(epMatch.group(1)!) ?? 60
-        : 60;
+    final episodes = epMatch != null ? int.tryParse(epMatch.group(1)!) ?? 0 : 0;
 
     final tags = <String>[];
     final rawTags = vod['vod_tag'] ?? vod['tags'];
@@ -683,9 +629,6 @@ class DartCoreEngine {
       tags.addAll(
         rawTags.map((e) => e.toString().trim()).where((s) => s.isNotEmpty),
       );
-    }
-    if (tags.isEmpty) {
-      tags.addAll(['热播', '精选']);
     }
 
     final rawTitle = (vod['vod_name']?.toString() ?? '').trim();
@@ -717,7 +660,7 @@ class DartCoreEngine {
       'category': dramaCategoryLabel(
         vod['vod_category']?.toString() ?? category,
       ),
-      'tags': cleanTags.isEmpty ? ['热播', '精选'] : cleanTags,
+      'tags': cleanTags,
       'releaseStatus': vod['vod_release_status']?.toString() ?? '',
       'vip': isHongguo ? false : (vod['vip'] == true),
     };
@@ -929,17 +872,17 @@ class DartCoreEngine {
     }
     final sourceId = rawSourceId.trim();
 
-    Map<String, dynamic>? spiderVod;
+    late final Map<String, dynamic> spiderVod;
     final rt = await _getSpiderRuntime(
       source,
       scope: 'detail',
       detailId: sourceId,
     );
     if (rt != null && sourceId.isNotEmpty) {
-      try {
-        final detailRes = await rt.detail(sourceId);
-        spiderVod = detailRes.vod;
-      } catch (_) {}
+      final detailRes = await rt.detail(sourceId);
+      spiderVod = detailRes.vod;
+    } else {
+      throw StateError('详情数据源不可用');
     }
 
     final fullDrama = Map<String, dynamic>.from(drama);
@@ -948,7 +891,7 @@ class DartCoreEngine {
     fullDrama['id'] = dramaId.contains(':') ? dramaId : '$source:$sourceId';
 
     final chapters = <Map<String, dynamic>>[];
-    if (spiderVod != null && spiderVod.isNotEmpty) {
+    if (spiderVod.isNotEmpty) {
       if ((spiderVod['vod_name']?.toString() ?? '').isNotEmpty) {
         fullDrama['title'] = spiderVod['vod_name'].toString();
       }
@@ -963,25 +906,13 @@ class DartCoreEngine {
     }
 
     if (chapters.isEmpty) {
-      final knownEpisodes = (drama['episodes'] as num?)?.toInt() ?? 0;
-      final fallbackCount = knownEpisodes > 0 ? knownEpisodes : 0;
-      if (fallbackCount > 0) {
-        final episodePrefix = sourceId.isNotEmpty ? '${sourceId}_' : '';
-        for (var i = 1; i <= fallbackCount; i++) {
-          chapters.add({
-            'id': '$episodePrefix$i',
-            'title': '第 $i 集',
-            'index': i,
-            'raw': '$episodePrefix$i',
-          });
-        }
-      }
+      throw CatPawSourceFailure.playback('MISSING_EPISODE');
     }
 
     final accessibleCount =
-        (spiderVod?['accessible_count'] as num?)?.toInt() ??
-        (spiderVod?['accessible_episode_cnt'] as num?)?.toInt() ??
-        (spiderVod?['accessibleCount'] as num?)?.toInt() ??
+        (spiderVod['accessible_count'] as num?)?.toInt() ??
+        (spiderVod['accessible_episode_cnt'] as num?)?.toInt() ??
+        (spiderVod['accessibleCount'] as num?)?.toInt() ??
         0;
 
     // 红果官方短剧全集均可直接解析直连播放，不设试看门槛与虚假 VIP 标签；
@@ -1213,123 +1144,5 @@ class DartCoreEngine {
 
   Map<String, dynamic> _fallbackPlayback(Map<String, dynamic> input) {
     throw StateError('无备用播放流');
-  }
-
-  void _ensureDownloadedMediaFile(
-    String targetPath,
-    Map drama,
-    Map entry,
-    int index,
-  ) {
-    try {
-      final file = File(targetPath);
-      if (file.existsSync() && file.lengthSync() > 0) return;
-      file.parent.createSync(recursive: true);
-
-      // 写入标准 MP4 基础封装，确保离线模式本地播放器与媒体探测器可正常识别
-      final dummyMp4 = <int>[
-        0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
-        0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00,
-        0x69, 0x73, 0x6f, 0x6d, 0x69, 0x73, 0x6f, 0x32,
-        0x61, 0x76, 0x63, 0x31, 0x6d, 0x70, 0x34, 0x31,
-      ];
-      file.writeAsBytesSync(dummyMp4, flush: true);
-    } catch (_) {}
-  }
-
-  Map<String, dynamic> _enqueueDownloads(Map<String, dynamic> input) {
-    final drama = input['drama'] as Map? ?? {};
-    final entries = (input['entries'] as List? ?? []).cast<Map>();
-    final quality = (input['quality'] as num?)?.toInt() ?? 0;
-    final dramaId =
-        drama['id'] as String? ??
-        'drama_${DateTime.now().millisecondsSinceEpoch}';
-
-    var added = 0;
-    for (final entry in entries) {
-      final index = (entry['index'] as num?)?.toInt() ?? 1;
-      final jobId = '$dramaId:$index';
-      if (!_downloadJobs.containsKey(jobId)) {
-        final safeDramaDir = dramaId.replaceAll(RegExp(r'[:/\\?*"<>|]'), '_');
-        final targetPath = p.join(_downloadsDir, safeDramaDir, '$index.mp4');
-        _ensureDownloadedMediaFile(targetPath, drama, entry, index);
-
-        _downloadJobs[jobId] = {
-          'id': jobId,
-          'drama': drama,
-          'chapter': entry,
-          'index': index,
-          'quality': quality,
-          'actualQuality': quality > 0 ? quality : 1080,
-          'state': 'completed',
-          'status': 'completed',
-          'progress': 1.0,
-          'speed': 0,
-          'directory': _downloadsDir,
-          'path': targetPath,
-          'bytes': 1024 * 1024 * 15,
-          'size': 1024 * 1024 * 15,
-          'total': 1024 * 1024 * 15,
-          'created': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          'createdAt': DateTime.now().toIso8601String(),
-          'archived': false,
-        };
-        added++;
-      }
-    }
-    return {'added': added};
-  }
-
-  void _controlDownload(String jobId, String command) {
-    if (command == 'cleanup') {
-      _downloadJobs.removeWhere(
-        (k, v) => v['state'] == 'completed' || v['status'] == 'completed',
-      );
-      return;
-    }
-    if (command == 'remove' || command == 'delete') {
-      final job = _downloadJobs.remove(jobId);
-      if (job != null && job['path'] != null) {
-        try {
-          final file = File(job['path'] as String);
-          if (file.existsSync()) file.deleteSync();
-        } catch (_) {}
-      }
-      return;
-    }
-    if (command == 'archive') {
-      final job = _downloadJobs[jobId];
-      if (job != null) {
-        job['archived'] = true;
-      }
-      return;
-    }
-    if (jobId.isEmpty) {
-      if (command == 'pauseAll') {
-        for (final job in _downloadJobs.values) {
-          job['state'] = 'paused';
-          job['status'] = 'paused';
-        }
-      } else if (command == 'resumeAll') {
-        for (final job in _downloadJobs.values) {
-          job['state'] = 'completed';
-          job['status'] = 'completed';
-          job['progress'] = 1.0;
-        }
-      }
-      return;
-    }
-
-    final job = _downloadJobs[jobId];
-    if (job == null) return;
-
-    if (command == 'pause') {
-      job['state'] = 'paused';
-      job['status'] = 'paused';
-    } else if (command == 'resume') {
-      job['state'] = 'completed';
-      job['status'] = 'completed';
-      job['progress'] = 1.0;
-    }
   }
 }

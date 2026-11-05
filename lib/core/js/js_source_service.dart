@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,218 +17,181 @@ class JsSourceService extends ChangeNotifier {
   }
 
   static JsSourceService? current;
+  static const _activeSourceKey = 'active_js_source_id';
   final AppRepository _repository;
   SharedPreferences? _preferences;
-
-  static const String _activeSourceKey = 'active_js_source_id';
-
   List<JsSourceMeta> _sources = [];
   String _activeSourceId = '';
   bool _initialized = false;
-  bool _loading = false;
+  bool _disposed = false;
+  int _pendingOperations = 0;
+  Future<void>? _initializing;
 
   List<JsSourceMeta> get sources => List.unmodifiable(_sources);
   String get activeSourceId => _activeSourceId;
   bool get initialized => _initialized;
-  bool get loading => _loading;
+  bool get loading => _pendingOperations > 0;
+  JsSourceMeta? get activeSource =>
+      _sources.where((source) => source.id == _activeSourceId).firstOrNull ??
+      _sources.firstOrNull;
 
-  JsSourceMeta? get activeSource {
-    for (final src in _sources) {
-      if (src.id == _activeSourceId) {
-        return src;
-      }
+  Future<T> _withLoading<T>(Future<T> Function() operation) async {
+    if (_disposed) throw StateError('数据源管理已关闭');
+    _pendingOperations++;
+    notifyListeners();
+    try {
+      return await operation();
+    } finally {
+      _pendingOperations--;
+      if (!_disposed) notifyListeners();
     }
-    return _sources.isNotEmpty ? _sources.first : null;
   }
 
-  Future<void> initialize() async {
-    if (_initialized) return;
-    _loading = true;
-    notifyListeners();
-
-    try {
+  Future<void> initialize() {
+    if (_initialized) return Future.value();
+    return _initializing ??= _withLoading(() async {
       unawaited(CatPawJsRuntime.preloadDeviceSession());
-      // 扫描本地已导入的 sources 目录
       await _repository.jsSourceScan();
-
-      // 3. 读取所有已加载的源列表
       _sources = await _repository.jsSourceList();
-
       for (final preset in kPresetJsSources) {
         final script = await preset.loadScript();
-        final installed = _sources.where((source) => source.id == preset.id);
-        if (installed.any(
-          (source) => JsSourceMeta.isVersionNewer(
-            source.version,
-            JsSourceMeta.scriptVersion(script),
-          ),
+        if (_sources.any(
+          (source) =>
+              source.id == preset.id &&
+              JsSourceMeta.isVersionNewer(
+                source.version,
+                JsSourceMeta.scriptVersion(script),
+              ),
         )) {
           continue;
         }
-        await _repository.jsSourceSaveAndLoad(script, preset.fileName);
-      }
-      _sources = await _repository.jsSourceList();
-
-      // 4. 读取用户保存的活跃源偏好
-      _preferences ??= await SharedPreferences.getInstance();
-      var savedActiveId = _preferences?.getString(_activeSourceKey) ?? '';
-
-      // 验证 savedActiveId 是否依然存在
-      if (savedActiveId.isEmpty ||
-          !_sources.any((s) => s.id == savedActiveId)) {
-        if (_sources.isNotEmpty) {
-          savedActiveId = _sources.first.id;
+        if (!await _repository.jsSourceSaveAndLoad(script, preset.fileName)) {
+          throw StateError('内置数据源导入失败，请重试');
         }
       }
-
-      if (savedActiveId.isNotEmpty) {
-        await _repository.jsSourceSetActive(savedActiveId);
-        _activeSourceId = savedActiveId;
+      _sources = await _repository.jsSourceList();
+      _preferences ??= await SharedPreferences.getInstance();
+      var saved = _preferences?.getString(_activeSourceKey) ?? '';
+      if (!_sources.any((source) => source.id == saved)) {
+        saved = _sources.firstOrNull?.id ?? '';
       }
-    } catch (e) {
-      debugPrint('初始化 JsSourceService 异常: $e');
-    } finally {
+      if (saved.isNotEmpty && !await _repository.jsSourceSetActive(saved)) {
+        throw StateError('数据源启用失败，请重试');
+      }
+      _activeSourceId = saved;
       _initialized = true;
-      _loading = false;
-      notifyListeners();
-    }
+    }).whenComplete(() => _initializing = null);
   }
 
   Future<bool> switchSource(String sourceId) async {
     if (_activeSourceId == sourceId) return true;
-    if (!_sources.any((s) => s.id == sourceId)) return false;
-
-    _loading = true;
-    notifyListeners();
-
-    final ok = await _repository.jsSourceSetActive(sourceId);
-    if (ok) {
-      _activeSourceId = sourceId;
-      try {
+    if (!_sources.any((source) => source.id == sourceId)) return false;
+    return _withLoading(() async {
+      final ok = await _repository.jsSourceSetActive(sourceId);
+      if (ok) {
+        _activeSourceId = sourceId;
         _preferences ??= await SharedPreferences.getInstance();
         await _preferences?.setString(_activeSourceKey, sourceId);
-      } catch (_) {}
-    }
-
-    _loading = false;
-    notifyListeners();
-    return ok;
-  }
-
-  Future<bool> importScript(String script, String fileName) async {
-    _loading = true;
-    notifyListeners();
-
-    final ok = await _repository.jsSourceSaveAndLoad(script, fileName);
-    if (ok) {
-      _sources = await _repository.jsSourceList();
-      if (_sources.isNotEmpty &&
-          (_activeSourceId.isEmpty ||
-              !_sources.any((s) => s.id == _activeSourceId))) {
-        await switchSource(_sources.first.id);
       }
-    }
-
-    _loading = false;
-    notifyListeners();
-    return ok;
+      return ok;
+    });
   }
 
-  Future<bool> importFromUrl(String url) async {
-    final cleanUrl = url.trim();
-    if (cleanUrl.isEmpty) return false;
+  Future<bool> importScript(String script, String fileName) =>
+      _withLoading(() async {
+        final ok = await _repository.jsSourceSaveAndLoad(script, fileName);
+        if (ok) {
+          _sources = await _repository.jsSourceList();
+          if (!_sources.any((source) => source.id == _activeSourceId) &&
+              _sources.isNotEmpty) {
+            await switchSource(_sources.first.id);
+          }
+        }
+        return ok;
+      });
 
-    _loading = true;
-    notifyListeners();
-
+  Future<bool> importFromUrl(String url) => _withLoading(() async {
     HttpClient? client;
     try {
-      final uri = Uri.parse(cleanUrl);
-      client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
-      final request = await client.getUrl(uri);
-      request.headers.set('User-Agent', 'Mozilla/5.0 THLRedLook/1.0.1');
-      final response = await request.close();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      final uri = Uri.parse(url.trim());
+      if (!{'http', 'https'}.contains(uri.scheme) ||
+          uri.host.isEmpty ||
+          uri.userInfo.isNotEmpty) {
         return false;
       }
-      final script = await response.transform(utf8.decoder).join();
-      if (script.trim().isEmpty) return false;
-
-      var fileName = uri.pathSegments.isNotEmpty
-          ? uri.pathSegments.last
-          : 'remote_source.js';
-      if (!fileName.endsWith('.js')) {
-        fileName = '$fileName.js';
+      client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+      final request = await client.getUrl(uri);
+      request.headers.set('User-Agent', 'Mozilla/5.0 THLRedLook/1.0.0');
+      final response = await request.close().timeout(
+        const Duration(seconds: 15),
+      );
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300 ||
+          response.contentLength > 4 * 1024 * 1024) {
+        return false;
       }
-
+      final bytes = BytesBuilder(copy: false);
+      await for (final chunk in response.timeout(const Duration(seconds: 15))) {
+        if (bytes.length + chunk.length > 4 * 1024 * 1024) {
+          throw const FormatException('数据源脚本超过大小限制');
+        }
+        bytes.add(chunk);
+      }
+      final script = utf8.decode(bytes.takeBytes());
+      if (script.trim().isEmpty) return false;
+      var fileName = uri.pathSegments.lastOrNull ?? 'remote_source.js';
+      if (!fileName.toLowerCase().endsWith('.js')) fileName = '$fileName.js';
       return await importScript(script, fileName);
-    } catch (e) {
-      debugPrint('网络导入插件失败 ($url): $e');
+    } on Exception {
       return false;
     } finally {
       client?.close(force: true);
-      _loading = false;
-      notifyListeners();
     }
-  }
+  });
 
-  Future<bool> removeSource(String sourceId) async {
+  Future<bool> removeSource(String sourceId) => _withLoading(() async {
     if (_activeSourceId == sourceId) {
-      final other = _sources.firstWhere(
-        (s) => s.id != sourceId,
-        orElse: () => const JsSourceMeta(id: '', name: ''),
-      );
-      if (other.id.isNotEmpty) {
-        await switchSource(other.id);
-      }
+      final other = _sources
+          .where((source) => source.id != sourceId)
+          .firstOrNull;
+      if (other != null) await switchSource(other.id);
     }
-
-    _loading = true;
-    notifyListeners();
-
     final ok = await _repository.jsSourceRemove(sourceId);
     if (ok) {
       _sources = await _repository.jsSourceList();
-      if (!_sources.any((s) => s.id == _activeSourceId)) {
-        _activeSourceId = _sources.isNotEmpty ? _sources.first.id : '';
-        try {
-          _preferences ??= await SharedPreferences.getInstance();
-          if (_activeSourceId.isNotEmpty) {
-            await _preferences?.setString(_activeSourceKey, _activeSourceId);
-          } else {
-            await _preferences?.remove(_activeSourceKey);
-          }
-        } catch (_) {}
+      if (!_sources.any((source) => source.id == _activeSourceId)) {
+        _activeSourceId = _sources.firstOrNull?.id ?? '';
+        _preferences ??= await SharedPreferences.getInstance();
+        if (_activeSourceId.isEmpty) {
+          await _preferences?.remove(_activeSourceKey);
+        } else {
+          await _preferences?.setString(_activeSourceKey, _activeSourceId);
+        }
       }
     }
-
-    _loading = false;
-    notifyListeners();
     return ok;
-  }
+  });
 
-  Future<void> reload() async {
-    _loading = true;
-    notifyListeners();
-
+  Future<void> reload() => _withLoading(() async {
     await _repository.jsSourceScan();
     _sources = await _repository.jsSourceList();
     _activeSourceId = await _repository.jsSourceGetActive();
+  });
 
-    _loading = false;
-    notifyListeners();
-  }
-
-  Future<void> clearAll() async {
-    _loading = true;
-    notifyListeners();
-
-    await _repository.jsSourceClearAll();
+  Future<void> clearAll() => _withLoading(() async {
+    if (!await _repository.jsSourceClearAll()) {
+      throw StateError('数据源清理失败，请重试');
+    }
     _sources = [];
     _activeSourceId = '';
+    _preferences ??= await SharedPreferences.getInstance();
     await _preferences?.remove(_activeSourceKey);
+  });
 
-    _loading = false;
-    notifyListeners();
+  @override
+  void dispose() {
+    _disposed = true;
+    if (identical(current, this)) current = null;
+    super.dispose();
   }
 }

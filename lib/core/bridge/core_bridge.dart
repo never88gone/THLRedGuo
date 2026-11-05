@@ -929,7 +929,7 @@ class NativeRepository extends AppRepository {
   }
 
   @override
-  bool get supportsDownloads => access?.canDownload ?? true;
+  bool get supportsDownloads => false;
 
   @override
   Future<List<DownloadJob>> downloads() async {

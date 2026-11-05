@@ -2386,15 +2386,8 @@ spider.danmaku = function (id, startMs, durationMs) {
       return { page, pagecount: page, hasMore: false, list: [], updatedText: state.updatedText || '' };
     }
 
-    try {
-      const response = await api('/reading/bookapi/bookmall/cell/change/v', { ...cursor, limit: 40, change_type: 1 });
-      return await savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
-    } catch (err) {
-      if (state && state.pages.size > 0) {
-        return { page, pagecount: page, hasMore: false, list: [], updatedText: state.updatedText || '' };
-      }
-      throw err;
-    }
+    const response = await api('/reading/bookapi/bookmall/cell/change/v', { ...cursor, limit: 40, change_type: 1 });
+    return await savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
   }
 
   const legacyHome = spider.home;

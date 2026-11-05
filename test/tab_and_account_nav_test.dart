@@ -70,7 +70,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // 验证导航栏不再包含设置按钮
-      expect(find.byKey(const ValueKey('home-appbar-settings-button')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('home-appbar-settings-button')),
+        findsNothing,
+      );
       expect(find.byIcon(Icons.settings_rounded), findsNothing);
     });
 
@@ -105,10 +108,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('账号登录提示'), findsOneWidget);
-      expect(
-        find.textContaining('登录后将使用短剧平台的接口数据同步追剧与观看记录，原本通过 iCloud 同步的本地记录将被清除'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('原有本地与 iCloud 记录会保留'), findsOneWidget);
       expect(find.text('取消'), findsOneWidget);
       expect(find.text('确认登录'), findsOneWidget);
 
@@ -133,11 +133,7 @@ void main() {
             'path': '/',
           },
         ]),
-        {
-          'id': '123456789',
-          'nickname': '红果VIP短剧迷',
-          'avatar': '',
-        },
+        {'id': '123456789', 'nickname': '红果VIP短剧迷', 'avatar': ''},
         expectedRevision: session.revision,
       );
       final store = LocalStore(await SharedPreferences.getInstance());
@@ -164,7 +160,10 @@ void main() {
       expect(find.byKey(const Key('my-settings')), findsNothing);
 
       // 2. 验证右边展示更多按钮
-      expect(find.byKey(const Key('hongguo-account-more-menu')), findsOneWidget);
+      expect(
+        find.byKey(const Key('hongguo-account-more-menu')),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('hongguo-account-more-menu')));
       await tester.pump();

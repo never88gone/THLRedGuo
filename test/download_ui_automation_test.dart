@@ -18,9 +18,9 @@ void main() {
   setUpAll(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-      const MethodChannel('plugins.flutter.io/path_provider'),
-      (MethodCall methodCall) async => Directory.systemTemp.path,
-    );
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (MethodCall methodCall) async => Directory.systemTemp.path,
+        );
   });
 
   setUp(() async {
@@ -57,13 +57,14 @@ void main() {
               builder: (context) => ElevatedButton(
                 key: const ValueKey('open-picker'),
                 onPressed: () async {
-                  submittedSelection = await showModalBottomSheet<DownloadSelection>(
-                    context: context,
-                    builder: (_) => DownloadPicker(
-                      detail: testDetail,
-                      preferences: store.downloadPreferences,
-                    ),
-                  );
+                  submittedSelection =
+                      await showModalBottomSheet<DownloadSelection>(
+                        context: context,
+                        builder: (_) => DownloadPicker(
+                          detail: testDetail,
+                          preferences: store.downloadPreferences,
+                        ),
+                      );
                 },
                 child: const Text('打开选集'),
               ),
@@ -109,99 +110,41 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('2. DownloadsScreen 下载任务状态渲染与消除“下载失败”验证', (tester) async {
-      // 预先加入 2 集下载
-      final added = await repository.enqueueDownloads(
-        testDetail,
-        [testEpisodes[0], testEpisodes[1]],
-        quality: 720,
-      );
-      expect(added, 2);
-
-      // 渲染 DownloadsScreen
-      await tester.pumpWidget(
-        MaterialApp(
-          home: DownloadsScreen(
-            repository: repository,
-            store: store,
+    test('2. 未接入传输时不能伪造下载成功或离线文件', () async {
+      expect(repository.supportsDownloads, isFalse);
+      await expectLater(
+        repository.enqueueDownloads(testDetail, testEpisodes),
+        throwsA(
+          isA<AppFailure>().having(
+            (error) => error.message,
+            'message',
+            contains('尚未实现'),
           ),
         ),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      // 验证标题展示
-      expect(find.text('重生之都市神医'), findsOneWidget);
-
-      // 关键核心断言：必须显示“2/2 集已下载”，绝不包含“失败”或“项失败”
-      expect(find.textContaining('2/2 集已下载'), findsOneWidget);
-      expect(find.textContaining('项失败'), findsNothing);
-      expect(find.byIcon(Icons.error_outline), findsNothing);
-
-      await tester.pumpWidget(const SizedBox());
-      await tester.pump();
+      expect(await repository.downloads(), isEmpty);
     });
-
-    testWidgets('3. DownloadsScreen 展开合集、分集离线图标及本地文件完整性验证', (tester) async {
-      // 预先加入任务
-      await repository.enqueueDownloads(
-        testDetail,
-        [testEpisodes[0], testEpisodes[1]],
-        quality: 1080,
-      );
-
+    testWidgets('3. Windows 下载入口明确显示尚未提供', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: DownloadsScreen(
-            repository: repository,
-            store: store,
+          home: Scaffold(
+            body: DownloadsScreen(repository: repository, store: store),
           ),
         ),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      // 单合集时默认展开分集列表，应展示单集信息
-      expect(find.text('第 1 集'), findsOneWidget);
-      expect(find.text('第 2 集'), findsOneWidget);
-
-      // 验证分集图标显示为已下载完成状态（不再是 error 失败图标）
-      expect(find.byIcon(Icons.offline_pin_outlined), findsNWidgets(2));
-      expect(find.byIcon(Icons.error_outline), findsNothing);
-      expect(find.textContaining('已下载'), findsWidgets);
-
-      // 验证本地播放端点与真实文件存在性
-      final playbackPlan = await repository.localPlayback(testDrama, testEpisodes[0]);
-      expect(playbackPlan, isNotNull);
-      expect(playbackPlan!.local, isTrue);
-      expect(playbackPlan.url, isNotEmpty);
-
-      final file = File(playbackPlan.url);
-      expect(file.existsSync(), isTrue, reason: '本地视频文件必须真实落地磁盘');
-      expect(file.lengthSync(), greaterThan(0), reason: '本地视频文件大小必须大于0');
-
+      await tester.pumpAndSettle();
+      expect(find.text('当前版本尚未提供下载'), findsOneWidget);
+      expect(find.text('下载完成'), findsNothing);
       await tester.pumpWidget(const SizedBox());
-      await tester.pump();
     });
-
-    testWidgets('4. 批量控制（全部暂停 / 全部继续）状态流转自动化测试', (tester) async {
-      await repository.enqueueDownloads(
-        testDetail,
-        [testEpisodes[0]],
-        quality: 720,
-      );
-
-      // 全部暂停
-      await repository.controlDownloads('pauseAll');
-      var jobs = await repository.downloads();
-      expect(jobs.first.state, 'paused');
-      expect(jobs.first.stateLabel, '已暂停');
-
-      // 全部继续 / 恢复
-      await repository.controlDownloads('resumeAll');
-      jobs = await repository.downloads();
-      expect(jobs.first.state, 'completed');
-      expect(jobs.first.stateLabel, '已下载');
+    test('4. 暂停与继续不能伪造任务状态流转', () async {
+      for (final command in ['pauseAll', 'resumeAll']) {
+        await expectLater(
+          repository.controlDownloads(command),
+          throwsA(isA<AppFailure>()),
+        );
+        expect(await repository.downloads(), isEmpty);
+      }
     });
   });
 }
