@@ -336,10 +336,8 @@ final class RemoteNavigationTests: XCTestCase {
         press(.up, focus: "hongguo-account-login")
         press(.select)
         wait("login chooser focused") { self.app.buttons["hongguo-login-qr"].hasFocus }
-        press(.select)
-        wait("QR issued", seconds: 30) { self.app.staticTexts["等待手机红果 App 扫码确认"].exists }
-        press(.menu)
-        wait("QR returns to chooser") { self.app.buttons["hongguo-login-qr"].exists }
+        // 一体化大屏扫码中心：打开即展示官方扫码二维码，无需二次跳转
+        XCTAssertTrue(app.images["登录二维码"].waitForExistence(timeout: 25) || app.staticTexts["请使用手机红果 App 扫码登录"].exists)
         press(.menu)
         wait("cancel restores login focus") { self.app.buttons["hongguo-account-login"].hasFocus }
         press(.menu)
@@ -349,36 +347,47 @@ final class RemoteNavigationTests: XCTestCase {
     func testLoginMethodsInvalidPhoneAndPairCancelPreserveAccount() throws {
         continueAfterFailure = false
         app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
-        app.launchArguments = ["-testPage", "library", "-openAccountLogin"]
+        app.launchArguments = ["-testPage", "library"]
         app.launch()
         defer { app.terminate() }
-        wait("library sidebar ready", seconds: 30) { self.app.buttons["nav.library"].hasFocus }
+        try XCTSkipIf(app.buttons["hongguo-account-menu"].waitForExistence(timeout: 3), "保留已有真实账号会话")
+
+        wait("account navigation ready", seconds: 30) { self.app.buttons["nav.library"].exists || self.app.buttons["hongguo-account-login"].exists }
+        if app.buttons["nav.library"].hasFocus { remote.press(.right) }
+        wait("library sidebar focused") { self.app.buttons["library.tab.history"].hasFocus }
         press(.right)
-        XCTAssertTrue(app.buttons["hongguo-login-qr"].waitForExistence(timeout: 20))
-        print("THL_LOGIN_CHOOSER enabled=\(app.buttons["hongguo-login-qr"].isEnabled) hittable=\(app.buttons["hongguo-login-qr"].isHittable) appState=\(app.state.rawValue)")
-        wait("login chooser starts at official QR", seconds: 30) { self.app.buttons["hongguo-login-qr"].hasFocus }
-        press(.up, focus: "hongguo-login-sms")
+        press(.up, focus: "hongguo-account-login")
         press(.select)
-        wait("phone field focused") { self.app.textFields["login-phone"].hasFocus }
-        press(.down)
-        press(.down, focus: "phone-send-code")
-        press(.select)
-        XCTAssertTrue(app.staticTexts["手机号格式无效"].waitForExistence(timeout: 5))
-        press(.menu)
-        wait("cancelled SMS returns to chooser") { self.app.buttons["hongguo-login-sms"].exists }
-        XCTAssertFalse(app.buttons["hongguo-login-password"].exists)
-        press(.down, focus: "hongguo-login-qr")
-        press(.down, focus: "hongguo-login-haw-pair")
-        press(.select)
-        XCTAssertTrue(app.buttons["haw-account-pair-refresh"].waitForExistence(timeout: 10))
-        press(.menu)
-        wait("pair cancel returns to chooser") { self.app.buttons["hongguo-login-haw-pair"].exists }
-        press(.menu)
-        wait("back returns account header") {
-            let account = self.app.buttons["hongguo-account-menu"], guest = self.app.buttons["hongguo-account-login"]
-            return account.exists && account.hasFocus || guest.exists && guest.hasFocus
+
+        wait("login chooser starts at official QR", seconds: 30) {
+            self.app.buttons["hongguo-login-qr"].exists && self.app.buttons["hongguo-login-qr"].hasFocus
         }
-        print("THL_LOGIN_METHODS_TV smsInvalidBlocked=true passwordEntryAbsent=true pairingCancel=true remoteReturn=true realSmsSent=false realSessionTransferred=false imagesDisabled=true")
+        XCTAssertTrue(app.buttons["hongguo-login-qr"].exists)
+        print("THL_LOGIN_CHOOSER enabled=\(app.buttons["hongguo-login-qr"].isEnabled) hittable=\(app.buttons["hongguo-login-qr"].isHittable) appState=\(app.state.rawValue)")
+
+        // 验证：tvOS 大屏端彻底移除手机号/短信验证码与账号密码输入框，纯化为大屏扫码
+        XCTAssertFalse(app.buttons["hongguo-login-sms"].exists, "tvOS 端无手机号与验证码登录")
+        XCTAssertFalse(app.buttons["hongguo-login-password"].exists, "tvOS 端无账号密码输入")
+
+        // 截图记录全新大屏扫码登录中心（官方 App 扫码获焦态）
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+        let shotOfficial = XCUIScreen.main.screenshot()
+        try? shotOfficial.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_login_unified_official_qr.png"))
+
+        // 向下导航切换到手机 Haw 扫码模式
+        press(.down, focus: "hongguo-login-haw-pair")
+        press(.select) // 切换为 Haw 局域网配对模式
+        wait("haw pair mode activated", seconds: 15) { self.app.buttons["haw-account-pair-refresh"].exists }
+        XCTAssertTrue(app.buttons["haw-account-pair-refresh"].exists, "Haw 局域网配对模式下提供刷新配对码按钮")
+
+        // 截图记录 Haw 配对码模式
+        let shotHaw = XCUIScreen.main.screenshot()
+        try? shotHaw.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_login_unified_haw_pair.png"))
+
+        press(.menu)
+        wait("cancel restores login focus") { self.app.buttons["hongguo-account-login"].hasFocus }
+        print("THL_LOGIN_METHODS_TV passwordEntryAbsent=true smsInputAbsent=true unifiedQRCenter=true pairingSwitch=true remoteReturn=true imagesDisabled=true")
     }
 
     func testDebugSourceSelectedEpisodeAndNaturalNext() throws {

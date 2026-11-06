@@ -7,6 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		15E1590AD319F20DCB1BDF37 /* TVColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 874AE06158F32CB25E160D95 /* TVColors.swift */; };
+		9399E26E09919ADFEA5D0C7E /* TVZeroHighlightButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA44D7567E364464CF47FE29 /* TVZeroHighlightButtonStyle.swift */; };
+		847DAAB634475D8A4EA728A9 /* TvButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E092BC4CA7A31AA0D0C43FD /* TvButtonStyle.swift */; };
+		2C7F3D7D0C9A7894B208AD04 /* TvTransparentButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40E1ACB089BD523D5EEAE7CB /* TvTransparentButtonStyle.swift */; };
+		DADDB8BF90F092169CD64184 /* TVFocusBorderModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A133B03385C86C4F16F6B956 /* TVFocusBorderModifier.swift */; };
+		B0421BBD346B39843444D82E /* TVCapsuleFocusModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE77853D5CFA81B0E55BD00 /* TVCapsuleFocusModifier.swift */; };
+		570B6570585ECB6462D558A0 /* TVCircleFocusModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D674BE1A1862AA6EF75432 /* TVCircleFocusModifier.swift */; };
+		49BD3AF6D291CC10E7EA0FB9 /* TVButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE61D2ACADE76BEDFAD2FAA /* TVButton.swift */; };
+		3F11833CDC7F67EF6A0C7F2C /* TVCapsuleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A1D645CD751330387CBC9A /* TVCapsuleButton.swift */; };
+		A1A848459C6F2407999FB80E /* TVPlayerCircleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B778D83882584B36874D0F86 /* TVPlayerCircleButton.swift */; };
+		A1F3125D4F9B2375B62BD1C1 /* TVEpisodeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF3E592B7136C8B435A368F /* TVEpisodeButton.swift */; };
+		3DE0E597BED6C44D94B9AF97 /* TVRankingBoardButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DAE012AC6642C7566AE4D0 /* TVRankingBoardButton.swift */; };
+		A0AC9A496B8F9A53F88967C1 /* TVLoginMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF50CA6B97812315B8A1294F /* TVLoginMode.swift */; };
+		D780DA17134925C9190C33C6 /* TVLoginOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE96486354C4E56ECD47668F /* TVLoginOptionsView.swift */; };
+		296080AC9B0B1C5E6EC79AA5 /* TVQrLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB7C46567287395C3189210 /* TVQrLoginView.swift */; };
+		A1A02318F98675D491B0CDF6 /* TVHawPairLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B2C6745432C49EB03D3107A /* TVHawPairLoginView.swift */; };
+		1E8815BFE4E2FFAD7E32A3BF /* TVAccountSocialButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AED4EDC6F34238637A53DCD /* TVAccountSocialButton.swift */; };
+		B33026D082DBB0E270CE945B /* TVAccountSocialSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82DFFFC7083B20DA031AF5C4 /* TVAccountSocialSheet.swift */; };
+		630220B6320BEFECD410BD91 /* TVPlannedDanmaku.swift in Sources */ = {isa = PBXBuildFile; fileRef = 052BF7B8B5280F620C4F141C /* TVPlannedDanmaku.swift */; };
+		5F15DDDAA5BCBD324A6C6E07 /* TVEpisodeDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E790808A689367BB25362F1C /* TVEpisodeDrawer.swift */; };
+		8B105937E66163792CA3FC33 /* TVDanmakuSettingsDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DBE0D019403ABD4603EA61E /* TVDanmakuSettingsDrawer.swift */; };
+		4A6CD2A8CC15F08231850C04 /* TVSpeedSelectionDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44AE1079C7928E7084467350 /* TVSpeedSelectionDrawer.swift */; };
 		C1A3B602F4D3468399B31104 /* AccountPairingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A3B602F4D3468399B31103 /* AccountPairingTests.swift */; };
 		C1A3B602F4D3468399B31102 /* AccountPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A3B602F4D3468399B31101 /* AccountPairing.swift */; };
 		00F6DAC96490A839B6FC75EA /* HongguoApkProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E4F0775CA2B5213DAF9E20 /* HongguoApkProfile.swift */; };
@@ -109,6 +131,28 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		874AE06158F32CB25E160D95 /* TVColors.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVColors.swift; path = THLRedLook/Views/TVColors.swift; sourceTree = SOURCE_ROOT; };
+		DA44D7567E364464CF47FE29 /* TVZeroHighlightButtonStyle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVZeroHighlightButtonStyle.swift; path = THLRedLook/Views/Components/TVZeroHighlightButtonStyle.swift; sourceTree = SOURCE_ROOT; };
+		3E092BC4CA7A31AA0D0C43FD /* TvButtonStyle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TvButtonStyle.swift; path = THLRedLook/Views/Components/TvButtonStyle.swift; sourceTree = SOURCE_ROOT; };
+		40E1ACB089BD523D5EEAE7CB /* TvTransparentButtonStyle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TvTransparentButtonStyle.swift; path = THLRedLook/Views/Components/TvTransparentButtonStyle.swift; sourceTree = SOURCE_ROOT; };
+		A133B03385C86C4F16F6B956 /* TVFocusBorderModifier.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVFocusBorderModifier.swift; path = THLRedLook/Views/Components/TVFocusBorderModifier.swift; sourceTree = SOURCE_ROOT; };
+		ADE77853D5CFA81B0E55BD00 /* TVCapsuleFocusModifier.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVCapsuleFocusModifier.swift; path = THLRedLook/Views/Components/TVCapsuleFocusModifier.swift; sourceTree = SOURCE_ROOT; };
+		76D674BE1A1862AA6EF75432 /* TVCircleFocusModifier.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVCircleFocusModifier.swift; path = THLRedLook/Views/Components/TVCircleFocusModifier.swift; sourceTree = SOURCE_ROOT; };
+		FFE61D2ACADE76BEDFAD2FAA /* TVButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVButton.swift; path = THLRedLook/Views/Components/TVButton.swift; sourceTree = SOURCE_ROOT; };
+		57A1D645CD751330387CBC9A /* TVCapsuleButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVCapsuleButton.swift; path = THLRedLook/Views/Components/TVCapsuleButton.swift; sourceTree = SOURCE_ROOT; };
+		B778D83882584B36874D0F86 /* TVPlayerCircleButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVPlayerCircleButton.swift; path = THLRedLook/Views/Components/TVPlayerCircleButton.swift; sourceTree = SOURCE_ROOT; };
+		2EF3E592B7136C8B435A368F /* TVEpisodeButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVEpisodeButton.swift; path = THLRedLook/Views/Components/TVEpisodeButton.swift; sourceTree = SOURCE_ROOT; };
+		B2DAE012AC6642C7566AE4D0 /* TVRankingBoardButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVRankingBoardButton.swift; path = THLRedLook/Views/Components/TVRankingBoardButton.swift; sourceTree = SOURCE_ROOT; };
+		AF50CA6B97812315B8A1294F /* TVLoginMode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVLoginMode.swift; path = THLRedLook/Views/Settings/TVLoginMode.swift; sourceTree = SOURCE_ROOT; };
+		EE96486354C4E56ECD47668F /* TVLoginOptionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVLoginOptionsView.swift; path = THLRedLook/Views/Settings/TVLoginOptionsView.swift; sourceTree = SOURCE_ROOT; };
+		3AB7C46567287395C3189210 /* TVQrLoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVQrLoginView.swift; path = THLRedLook/Views/Settings/TVQrLoginView.swift; sourceTree = SOURCE_ROOT; };
+		7B2C6745432C49EB03D3107A /* TVHawPairLoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVHawPairLoginView.swift; path = THLRedLook/Views/Settings/TVHawPairLoginView.swift; sourceTree = SOURCE_ROOT; };
+		2AED4EDC6F34238637A53DCD /* TVAccountSocialButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVAccountSocialButton.swift; path = THLRedLook/Views/Settings/TVAccountSocialButton.swift; sourceTree = SOURCE_ROOT; };
+		82DFFFC7083B20DA031AF5C4 /* TVAccountSocialSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVAccountSocialSheet.swift; path = THLRedLook/Views/Settings/TVAccountSocialSheet.swift; sourceTree = SOURCE_ROOT; };
+		052BF7B8B5280F620C4F141C /* TVPlannedDanmaku.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVPlannedDanmaku.swift; path = THLRedLook/Views/Player/TVPlannedDanmaku.swift; sourceTree = SOURCE_ROOT; };
+		E790808A689367BB25362F1C /* TVEpisodeDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVEpisodeDrawer.swift; path = THLRedLook/Views/Player/TVEpisodeDrawer.swift; sourceTree = SOURCE_ROOT; };
+		1DBE0D019403ABD4603EA61E /* TVDanmakuSettingsDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVDanmakuSettingsDrawer.swift; path = THLRedLook/Views/Player/TVDanmakuSettingsDrawer.swift; sourceTree = SOURCE_ROOT; };
+		44AE1079C7928E7084467350 /* TVSpeedSelectionDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVSpeedSelectionDrawer.swift; path = THLRedLook/Views/Player/TVSpeedSelectionDrawer.swift; sourceTree = SOURCE_ROOT; };
 		C1A3B602F4D3468399B31103 /* AccountPairingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountPairingTests.swift; sourceTree = "<group>"; };
 		C1A3B602F4D3468399B31101 /* AccountPairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountPairing.swift; sourceTree = "<group>"; };
 		041C7B5549D0E24FBE7D25F6 /* Pods_THLRedLook.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_THLRedLook.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -325,6 +369,7 @@
 		D10000032C00000100000001 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				874AE06158F32CB25E160D95 /* TVColors.swift */,
 				B10000002C00000100000001 /* THLRedLook.app */,
 				6A9AED8C8EB9E35575961261 /* THLRedLookTests.xctest */,
 				5DEF076423A4DDD1829FFF47 /* THLRedLookUITests.xctest */,
@@ -419,6 +464,27 @@
 		G10000072C00000100000001 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				052BF7B8B5280F620C4F141C /* TVPlannedDanmaku.swift */,
+				E790808A689367BB25362F1C /* TVEpisodeDrawer.swift */,
+				1DBE0D019403ABD4603EA61E /* TVDanmakuSettingsDrawer.swift */,
+				44AE1079C7928E7084467350 /* TVSpeedSelectionDrawer.swift */,
+				AF50CA6B97812315B8A1294F /* TVLoginMode.swift */,
+				EE96486354C4E56ECD47668F /* TVLoginOptionsView.swift */,
+				3AB7C46567287395C3189210 /* TVQrLoginView.swift */,
+				7B2C6745432C49EB03D3107A /* TVHawPairLoginView.swift */,
+				2AED4EDC6F34238637A53DCD /* TVAccountSocialButton.swift */,
+				82DFFFC7083B20DA031AF5C4 /* TVAccountSocialSheet.swift */,
+				DA44D7567E364464CF47FE29 /* TVZeroHighlightButtonStyle.swift */,
+				3E092BC4CA7A31AA0D0C43FD /* TvButtonStyle.swift */,
+				40E1ACB089BD523D5EEAE7CB /* TvTransparentButtonStyle.swift */,
+				A133B03385C86C4F16F6B956 /* TVFocusBorderModifier.swift */,
+				ADE77853D5CFA81B0E55BD00 /* TVCapsuleFocusModifier.swift */,
+				76D674BE1A1862AA6EF75432 /* TVCircleFocusModifier.swift */,
+				FFE61D2ACADE76BEDFAD2FAA /* TVButton.swift */,
+				57A1D645CD751330387CBC9A /* TVCapsuleButton.swift */,
+				B778D83882584B36874D0F86 /* TVPlayerCircleButton.swift */,
+				2EF3E592B7136C8B435A368F /* TVEpisodeButton.swift */,
+				B2DAE012AC6642C7566AE4D0 /* TVRankingBoardButton.swift */,
 				B10000212C00000100000001 /* DramaCardView.swift */,
 				B10000452C00000100000001 /* TVBlankStateView.swift */,
 			);
@@ -739,6 +805,28 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				15E1590AD319F20DCB1BDF37 /* TVColors.swift in Sources */,
+				9399E26E09919ADFEA5D0C7E /* TVZeroHighlightButtonStyle.swift in Sources */,
+				847DAAB634475D8A4EA728A9 /* TvButtonStyle.swift in Sources */,
+				2C7F3D7D0C9A7894B208AD04 /* TvTransparentButtonStyle.swift in Sources */,
+				DADDB8BF90F092169CD64184 /* TVFocusBorderModifier.swift in Sources */,
+				B0421BBD346B39843444D82E /* TVCapsuleFocusModifier.swift in Sources */,
+				570B6570585ECB6462D558A0 /* TVCircleFocusModifier.swift in Sources */,
+				49BD3AF6D291CC10E7EA0FB9 /* TVButton.swift in Sources */,
+				3F11833CDC7F67EF6A0C7F2C /* TVCapsuleButton.swift in Sources */,
+				A1A848459C6F2407999FB80E /* TVPlayerCircleButton.swift in Sources */,
+				A1F3125D4F9B2375B62BD1C1 /* TVEpisodeButton.swift in Sources */,
+				3DE0E597BED6C44D94B9AF97 /* TVRankingBoardButton.swift in Sources */,
+				A0AC9A496B8F9A53F88967C1 /* TVLoginMode.swift in Sources */,
+				D780DA17134925C9190C33C6 /* TVLoginOptionsView.swift in Sources */,
+				296080AC9B0B1C5E6EC79AA5 /* TVQrLoginView.swift in Sources */,
+				A1A02318F98675D491B0CDF6 /* TVHawPairLoginView.swift in Sources */,
+				1E8815BFE4E2FFAD7E32A3BF /* TVAccountSocialButton.swift in Sources */,
+				B33026D082DBB0E270CE945B /* TVAccountSocialSheet.swift in Sources */,
+				630220B6320BEFECD410BD91 /* TVPlannedDanmaku.swift in Sources */,
+				5F15DDDAA5BCBD324A6C6E07 /* TVEpisodeDrawer.swift in Sources */,
+				8B105937E66163792CA3FC33 /* TVDanmakuSettingsDrawer.swift in Sources */,
+				4A6CD2A8CC15F08231850C04 /* TVSpeedSelectionDrawer.swift in Sources */,
 				A10000012C00000100000001 /* THLRedLookApp.swift in Sources */,
 				A10000022C00000100000001 /* SourceSite.swift in Sources */,
 				A10000032C00000100000001 /* Drama.swift in Sources */,
