@@ -718,6 +718,7 @@ public final class SourceDiagnostics: ObservableObject {
     private func saveReportToSandbox(_ content: String) {
         Task.detached(priority: .background) {
             guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return }
+            try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
             let logFile = cacheDir.appendingPathComponent("diagnostics_latest.log")
             try? content.write(to: logFile, atomically: true, encoding: .utf8)
         }
