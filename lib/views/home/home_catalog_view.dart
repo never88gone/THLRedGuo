@@ -20,6 +20,7 @@ class HomeCatalogView extends StatelessWidget {
     required this.sourcesCount,
     required this.canLoadMore,
     required this.gridKey,
+    this.tvGridKey,
     required this.onRetryLoad,
     required this.onLoadMore,
     this.onPrefetch,
@@ -43,6 +44,7 @@ class HomeCatalogView extends StatelessWidget {
   final int sourcesCount;
   final bool canLoadMore;
   final String gridKey;
+  final String? tvGridKey;
   final VoidCallback onRetryLoad;
   final VoidCallback onLoadMore;
   final VoidCallback? onPrefetch;
@@ -158,7 +160,7 @@ class HomeCatalogView extends StatelessWidget {
                         (constraints.maxWidth - 36 - (columns - 1) * 14) /
                         columns;
                     return RemoteGrid(
-                      key: ValueKey('tv-grid-$gridKey'),
+                      key: tvGridKey != null ? ValueKey('tv-grid-$tvGridKey') : null,
                       itemKeys: items.map((item) => item.id).toList(),
                       columns: columns,
                       itemExtent:

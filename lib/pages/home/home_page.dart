@@ -258,7 +258,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _search.clear();
         _submittedQuery = '';
       }
-      _items = [];
       _hasMore = true;
       _error = null;
     });
@@ -1575,6 +1574,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _search.text.isEmpty ||
                       _group.sources.any((source) => source.pagedSearch)),
               gridKey: 'catalog-${_group.id}-$_category-$_submittedQuery',
+              tvGridKey: _group.id,
               loadingMessage: _search.text.trim().isNotEmpty
                   ? '正在搜索相关短剧...'
                   : (_category.isNotEmpty ? '正在获取分类短剧...' : '正在加载精选短剧...'),

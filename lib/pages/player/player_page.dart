@@ -2100,6 +2100,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   void _back() {
     if (_showFullscreen && !_television) {
       _rotate();
+    } else if (_television) {
+      Navigator.of(context).pop();
     } else {
       Navigator.of(context).maybePop();
     }
@@ -2200,7 +2202,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     final fullscreen = _showFullscreen;
     final pictureInPicture = _pictureInPictureVisible;
     return PopScope(
-      canPop: _television || pictureInPicture || !fullscreen,
+      canPop: !_television && (pictureInPicture || !fullscreen),
       onPopInvokedWithResult: (didPop, result) {
         if (didPop && widget.store.usesAccountLibrary(widget.detail.drama.id)) {
           unawaited(_saveProgress(flush: true));
@@ -2251,7 +2253,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                     ],
                   ),
             body: pictureInPicture
-                ? _videoPane(context)
+                ? _videoPane(context, topPadding: MediaQuery.paddingOf(context).top)
                 : SafeArea(
                     top: false,
                     bottom: !fullscreen,
