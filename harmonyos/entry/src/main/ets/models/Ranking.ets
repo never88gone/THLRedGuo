@@ -29,4 +29,12 @@ export interface RankingBoard {
   title: string;
   subTitle?: string;
   items: RankingItem[];
+  page?: number;
+  hasMore?: boolean;
+}
+
+export interface RankingPageResult {
+  items: RankingItem[];
+  page: number;
+  hasMore: boolean;
 }

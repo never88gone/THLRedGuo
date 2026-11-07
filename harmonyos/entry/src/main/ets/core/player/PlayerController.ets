@@ -66,6 +66,9 @@ export class PlayerController {
           if (this.surfaceId) {
             this.avPlayer!.surfaceId = this.surfaceId;
           }
+          try {
+            this.avPlayer!.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+          } catch (_) {}
           await this.avPlayer!.prepare();
           break;
         case 'prepared':
@@ -108,6 +111,16 @@ export class PlayerController {
     this.avPlayer.on('timeUpdate', (time: number) => {
       this.currentState.currentPosition = time;
       this.notify();
+    });
+
+    this.avPlayer.on('videoSizeChange', (width: number, height: number) => {
+      hilog.info(DOMAIN, TAG, 'videoSizeChange: width=%{public}d, height=%{public}d', width, height);
+      if (width > 0 && height > 0) {
+        this.currentState.videoWidth = width;
+        this.currentState.videoHeight = height;
+        this.currentState.aspectRatio = width / height;
+        this.notify();
+      }
     });
 
     this.avPlayer.on('error', (err) => {
@@ -221,7 +234,10 @@ export class PlayerController {
         isPlaying: this.currentState.isPlaying,
         isBuffering: this.currentState.isBuffering,
         speed: this.currentState.speed,
-        autoAdvance: this.currentState.autoAdvance
+        autoAdvance: this.currentState.autoAdvance,
+        videoWidth: this.currentState.videoWidth,
+        videoHeight: this.currentState.videoHeight,
+        aspectRatio: this.currentState.aspectRatio
       });
     }
   }

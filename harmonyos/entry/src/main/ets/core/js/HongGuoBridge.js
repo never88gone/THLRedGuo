@@ -82,7 +82,11 @@ export async function bridgeDetail(id) {
 export async function bridgePlay(flag, id, flags) {
   if (!isBridgeReady()) return { url: '', parse: 0, header: {} };
   try {
-    return await spider.play(flag, id, flags || []);
+    const res = await spider.play(flag, id, flags || []);
+    if (!res || !res.url) {
+      hilog.warn(DOMAIN, TAG, 'bridgePlay returned no url, res: %{public}s', JSON.stringify(res));
+    }
+    return res;
   } catch (e) {
     hilog.error(DOMAIN, TAG, 'bridgePlay error: %{public}s', JSON.stringify(e));
     return { url: '', parse: 0, header: {} };

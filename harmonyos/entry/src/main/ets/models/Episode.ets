@@ -23,4 +23,7 @@ export interface PlaybackState {
   isBuffering: boolean;
   speed: number;                        // 播放倍速 (1.0, 1.25, 1.5, 2.0)
   autoAdvance: boolean;                 // 自动连播下一集
+  videoWidth?: number;                  // 视频宽度
+  videoHeight?: number;                 // 视频高度
+  aspectRatio?: number;                 // 宽高比 (width / height)
 }

@@ -88,7 +88,7 @@ export struct DownloadsPage {
           })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 8 })
+      .padding({ left: 16, right: 16, top: 38, bottom: 8 })
 
       // 存储空间状态条
       Row() {

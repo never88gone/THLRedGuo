@@ -145,7 +145,7 @@ export struct SettingsPage {
         Blank()
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 8 })
+      .padding({ left: 16, right: 16, top: 38, bottom: 8 })
 
       Scroll() {
         Column({ space: 16 }) {

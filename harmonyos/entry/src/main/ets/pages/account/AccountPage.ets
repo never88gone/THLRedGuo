@@ -5,7 +5,6 @@ import { DramaItem } from '../../models/Drama';
 import { UserProfile } from '../../models/Account';
 import { WatchHistoryItem, LocalStore } from '../../core/store/LocalStore';
 import { AccountService } from '../../core/account/AccountService';
-import { Constants } from '../../common/Constants';
 
 @Entry
 @Component
@@ -17,10 +16,9 @@ export struct AccountPage {
     isLoggedIn: false
   };
 
-  @State currentTab: number = 0; // 0: 历史记录, 1: 追剧收藏
+  @State currentTab: number = 0; // 0: 追剧, 1: 历史记录
   @State historyList: WatchHistoryItem[] = [];
   @State favoriteList: DramaItem[] = [];
-  @State cacheSizeText: string = '12.8 MB';
 
   aboutToAppear(): void {
     this.refreshData();
@@ -37,13 +35,24 @@ export struct AccountPage {
   }
 
   goToLogin(): void {
-    router.pushUrl({ url: 'pages/account/LoginPage' });
+    promptAction.showDialog({
+      title: '账号登录提示',
+      message: '登录后将使用短剧平台的接口数据同步追剧与观看记录，原有本地记录会保留。\n\n是否确认登录？',
+      buttons: [
+        { text: '取消', color: AppColors.textSecondaryDark },
+        { text: '确认登录', color: AppColors.hongguoRed }
+      ]
+    }).then(res => {
+      if (res.index === 1) {
+        router.pushUrl({ url: 'pages/account/LoginPage' });
+      }
+    });
   }
 
   async logout(): Promise<void> {
     await AccountService.getInstance().logout();
     this.user = AccountService.getInstance().getCurrentUser();
-    promptAction.showToast({ message: '已安全退出登录' });
+    promptAction.showToast({ message: '已退出登录' });
   }
 
   playFromHistory(item: WatchHistoryItem): void {
@@ -63,12 +72,19 @@ export struct AccountPage {
       url: 'pages/detail/DramaDetailPage',
       params: {
         dramaId: drama.id,
-        dramaTitle: drama.title
+        dramaTitle: drama.title,
+        coverUrl: drama.coverUrl
       }
     });
   }
 
-  async clearHistory(): Promise<void> {
+  async removeHistory(dramaId: string): Promise<void> {
+    await LocalStore.getInstance().removeHistory(dramaId);
+    this.historyList = await LocalStore.getInstance().getHistory();
+    promptAction.showToast({ message: '已移除观看记录' });
+  }
+
+  async clearAllHistory(): Promise<void> {
     for (const h of this.historyList) {
       await LocalStore.getInstance().removeHistory(h.dramaId);
     }
@@ -76,311 +92,298 @@ export struct AccountPage {
     promptAction.showToast({ message: '已清空历史记录' });
   }
 
-  clearCache(): void {
-    this.cacheSizeText = '0.0 KB';
-    promptAction.showToast({ message: '应用临时缓存已清理完毕' });
-  }
-
-  showAboutDialog(): void {
-    promptAction.showDialog({
-      title: Constants.APP_NAME,
-      message: `版本号：${Constants.APP_VERSION}\n基于 HarmonyOS NEXT 原生 ArkTS 打造。\n\n全端独立运行短剧应用，支持海量短剧极速秒播。`,
-      buttons: [
-        { text: '确定', color: AppColors.hongguoRed }
-      ]
+  async removeFavorite(dramaId: string): Promise<void> {
+    await LocalStore.getInstance().toggleFavorite({
+      id: dramaId,
+      title: '',
+      coverUrl: '',
+      remarks: '',
+      intro: '',
+      episodeCount: 0,
+      source: 'hongguo'
     });
+    this.favoriteList = await LocalStore.getInstance().getFavorites();
+    promptAction.showToast({ message: '已取消追剧' });
   }
 
   build() {
     Column() {
-      // 顶部标题
+      // 顶部 Header: 对齐 Flutter AccountScreen
       Row() {
-        Text('个人中心')
-          .fontSize(18)
+        Text('我的')
+          .fontSize(24)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppColors.textPrimary)
 
         Blank()
 
-        Button('⚙️')
-          .fontSize(16)
-          .backgroundColor(Color.Transparent)
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/settings/SettingsPage' });
-          })
-      }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 8 })
-
-      Scroll() {
-        Column({ space: 16 }) {
-          // 用户信息卡片
-          Row({ space: 14 }) {
-            // 头像
-            Stack({ alignContent: Alignment.Center }) {
-              Circle({ width: 56, height: 56 })
-                .fill(AppColors.bgCard)
-              Text(this.user.isLoggedIn ? '👤' : '👻')
-                .fontSize(28)
-            }
-
-            // 用户名与标识
-            Column({ space: 4 }) {
-              Row({ space: 6 }) {
-                Text(this.user.nickname)
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(AppColors.textPrimary)
-
-                if (this.user.vipStatus) {
-                  Text(this.user.vipStatus)
-                    .fontSize(10)
-                    .fontColor(AppColors.hongguoGold)
-                    .backgroundColor('rgba(255, 179, 0, 0.15)')
-                    .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                    .borderRadius(4)
-                }
-              }
-
-              Text(this.user.isLoggedIn ? (this.user.phoneMasked ?? '官方用户') : '登录享受跨端同步与高清秒播')
-                .fontSize(12)
-                .fontColor(AppColors.textSecondary)
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1)
-
-            // 登录 / 退出 按钮
-            if (this.user.isLoggedIn) {
-              Button('退出')
-                .fontSize(12)
-                .fontColor(AppColors.textSecondary)
-                .backgroundColor(AppColors.bgCard)
-                .height(30)
-                .borderRadius(15)
-                .onClick(() => {
-                  this.logout();
-                })
-            } else {
-              Button('登录')
-                .fontSize(12)
+        if (!this.user.isLoggedIn) {
+          // 登录胶囊大红按钮 (对齐 Flutter FilledButton.icon)
+          Button({ type: ButtonType.Capsule }) {
+            Row({ space: 6 }) {
+              Text('👤')
+                .fontSize(14)
+              Text('登录')
+                .fontSize(14)
+                .fontWeight(FontWeight.Bold)
                 .fontColor(Color.White)
-                .backgroundColor(AppColors.hongguoRed)
-                .height(30)
-                .padding({ left: 16, right: 16 })
-                .borderRadius(15)
-                .onClick(() => {
-                  this.goToLogin();
-                })
             }
+            .padding({ left: 16, right: 16, top: 6, bottom: 6 })
           }
-          .width('100%')
-          .padding(AppDimensions.paddingLg)
-          .backgroundColor(AppColors.bgCard)
-          .borderRadius(AppDimensions.radiusLg)
+          .backgroundColor(AppColors.hongguoRed)
+          .height(36)
+          .onClick(() => {
+            this.goToLogin();
+          })
+        } else {
+          // 已登录用户状态
+          Row({ space: 10 }) {
+            Text(this.user.nickname)
+              .fontSize(14)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColors.textPrimary)
 
-          // 常用功能入口矩阵
-          Row({ space: 12 }) {
-            // 离线缓存
-            Column({ space: 6 }) {
-              Text('📥')
-                .fontSize(22)
-              Text('离线缓存')
-                .fontSize(12)
-                .fontColor(AppColors.textPrimary)
-            }
-            .layoutWeight(1)
-            .padding({ top: 12, bottom: 12 })
-            .backgroundColor(AppColors.bgCard)
-            .borderRadius(AppDimensions.radiusMd)
-            .onClick(() => {
-              router.pushUrl({ url: 'pages/downloads/DownloadsPage' });
-            })
-
-            // 清理缓存
-            Column({ space: 6 }) {
-              Text('🧹')
-                .fontSize(22)
-              Text(`清理 (${this.cacheSizeText})`)
-                .fontSize(12)
-                .fontColor(AppColors.textPrimary)
-            }
-            .layoutWeight(1)
-            .padding({ top: 12, bottom: 12 })
-            .backgroundColor(AppColors.bgCard)
-            .borderRadius(AppDimensions.radiusMd)
-            .onClick(() => {
-              this.clearCache();
-            })
-
-            // 关于应用
-            Column({ space: 6 }) {
-              Text('ℹ️')
-                .fontSize(22)
-              Text('关于糖葫芦')
-                .fontSize(12)
-                .fontColor(AppColors.textPrimary)
-            }
-            .layoutWeight(1)
-            .padding({ top: 12, bottom: 12 })
-            .backgroundColor(AppColors.bgCard)
-            .borderRadius(AppDimensions.radiusMd)
-            .onClick(() => {
-              this.showAboutDialog();
-            })
-          }
-          .width('100%')
-
-          // 历史记录与追剧收藏 Tab 栏
-          Row() {
-            Button(`观看历史 (${this.historyList.length})`)
-              .layoutWeight(1)
-              .fontSize(13)
-              .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
-              .fontColor(this.currentTab === 0 ? AppColors.hongguoRed : AppColors.textSecondary)
-              .backgroundColor(Color.Transparent)
+            Button('退出')
+              .fontSize(12)
+              .fontColor(AppColors.textSecondary)
+              .backgroundColor(AppColors.bgCard)
+              .height(30)
+              .borderRadius(15)
               .onClick(() => {
-                this.currentTab = 0;
+                this.logout();
               })
-
-            Button(`追剧收藏 (${this.favoriteList.length})`)
-              .layoutWeight(1)
-              .fontSize(13)
-              .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
-              .fontColor(this.currentTab === 1 ? AppColors.hongguoRed : AppColors.textSecondary)
-              .backgroundColor(Color.Transparent)
-              .onClick(() => {
-                this.currentTab = 1;
-              })
-          }
-          .width('100%')
-          .border({ width: { bottom: 1 }, color: AppColors.divider })
-          .padding({ top: 4, bottom: 4 })
-
-          // 列表区域
-          if (this.currentTab === 0) {
-            // 观看历史
-            if (this.historyList.length === 0) {
-              Column({ space: 8 }) {
-                Text('🎬')
-                  .fontSize(36)
-                Text('暂无观看历史')
-                  .fontSize(13)
-                  .fontColor(AppColors.textMuted)
-              }
-              .width('100%')
-              .padding({ top: 40, bottom: 40 })
-            } else {
-              Column({ space: 10 }) {
-                Row() {
-                  Blank()
-                  Button('清空全部历史')
-                    .fontSize(11)
-                    .fontColor(AppColors.textMuted)
-                    .backgroundColor(Color.Transparent)
-                    .onClick(() => {
-                      this.clearHistory();
-                    })
-                }
-                .width('100%')
-
-                ForEach(this.historyList, (item: WatchHistoryItem) => {
-                  Row({ space: 12 }) {
-                    Image(item.coverUrl)
-                      .width(64)
-                      .height(84)
-                      .borderRadius(AppDimensions.radiusSm)
-                      .objectFit(ImageFit.Cover)
-                      .backgroundColor(AppColors.bgCard)
-
-                    Column({ space: 6 }) {
-                      Text(item.dramaTitle)
-                        .fontSize(14)
-                        .fontWeight(FontWeight.Medium)
-                        .fontColor(AppColors.textPrimary)
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-                      Text(`观看到 第 ${item.episodeIndex} 集`)
-                        .fontSize(12)
-                        .fontColor(AppColors.hongguoRed)
-
-                      Blank()
-
-                      Text('点击继续播放')
-                        .fontSize(11)
-                        .fontColor(AppColors.textMuted)
-                    }
-                    .layoutWeight(1)
-                    .height(84)
-                    .alignItems(HorizontalAlign.Start)
-
-                    Button('▶ 继续')
-                      .fontSize(11)
-                      .fontColor(Color.White)
-                      .backgroundColor(AppColors.hongguoRed)
-                      .borderRadius(14)
-                      .height(28)
-                      .onClick(() => {
-                        this.playFromHistory(item);
-                      })
-                  }
-                  .width('100%')
-                  .padding(AppDimensions.paddingMd)
-                  .backgroundColor(AppColors.bgCard)
-                  .borderRadius(AppDimensions.radiusMd)
-                })
-              }
-              .width('100%')
-            }
-          } else {
-            // 追剧收藏
-            if (this.favoriteList.length === 0) {
-              Column({ space: 8 }) {
-                Text('❤️')
-                  .fontSize(36)
-                Text('暂无追剧收藏')
-                  .fontSize(13)
-                  .fontColor(AppColors.textMuted)
-              }
-              .width('100%')
-              .padding({ top: 40, bottom: 40 })
-            } else {
-              Grid() {
-                ForEach(this.favoriteList, (drama: DramaItem) => {
-                  GridItem() {
-                    Column({ space: 6 }) {
-                      Image(drama.coverUrl)
-                        .width('100%')
-                        .height(150)
-                        .borderRadius(AppDimensions.radiusMd)
-                        .objectFit(ImageFit.Cover)
-                        .backgroundColor(AppColors.bgCard)
-
-                      Text(drama.title)
-                        .fontSize(13)
-                        .fontWeight(FontWeight.Medium)
-                        .fontColor(AppColors.textPrimary)
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    }
-                    .alignItems(HorizontalAlign.Start)
-                    .onClick(() => {
-                      this.openDramaDetail(drama);
-                    })
-                  }
-                })
-              }
-              .columnsTemplate('1fr 1fr 1fr')
-              .columnsGap(10)
-              .rowsGap(12)
-              .width('100%')
-            }
           }
         }
-        .padding(AppDimensions.paddingMd)
       }
-      .layoutWeight(1)
       .width('100%')
+      .padding({ left: 16, right: 16, top: 38, bottom: 12 })
+      .backgroundColor(AppColors.bgDark)
+
+      // 子 Tab 栏: "追剧" 与 "历史记录" (对齐 Flutter my-follows 与 my-history)
+      Row({ space: 12 }) {
+        Button({ type: ButtonType.Capsule }) {
+          Row({ space: 6 }) {
+            Text('🔖')
+              .fontSize(13)
+            Text('追剧')
+              .fontSize(13)
+              .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
+              .fontColor(this.currentTab === 0 ? Color.White : AppColors.textSecondary)
+          }
+          .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+        }
+        .backgroundColor(this.currentTab === 0 ? AppColors.bgElevated : Color.Transparent)
+        .border({ width: 0.8, color: this.currentTab === 0 ? AppColors.hongguoRed : 'rgba(255,255,255,0.1)' })
+        .height(36)
+        .onClick(() => {
+          this.currentTab = 0;
+        })
+
+        Button({ type: ButtonType.Capsule }) {
+          Row({ space: 6 }) {
+            Text('🕒')
+              .fontSize(13)
+            Text('历史记录')
+              .fontSize(13)
+              .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
+              .fontColor(this.currentTab === 1 ? Color.White : AppColors.textSecondary)
+          }
+          .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+        }
+        .backgroundColor(this.currentTab === 1 ? AppColors.bgElevated : Color.Transparent)
+        .border({ width: 0.8, color: this.currentTab === 1 ? AppColors.hongguoRed : 'rgba(255,255,255,0.1)' })
+        .height(36)
+        .onClick(() => {
+          this.currentTab = 1;
+        })
+
+        Blank()
+
+        if (this.currentTab === 1 && this.historyList.length > 0) {
+          Button('清空历史')
+            .fontSize(12)
+            .fontColor(AppColors.textSecondaryDark)
+            .backgroundColor(Color.Transparent)
+            .onClick(() => {
+              this.clearAllHistory();
+            })
+        }
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 4, bottom: 12 })
+
+      // 主内容区
+      if (this.currentTab === 0) {
+        // "追剧" 收藏列表
+        if (this.favoriteList.length === 0) {
+          Column({ space: 12 }) {
+            Text('🎬')
+              .fontSize(44)
+            Text('暂无追剧记录')
+              .fontSize(14)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColors.textPrimary)
+            Text('快去发现精彩短剧，点击追剧一键收藏')
+              .fontSize(12)
+              .fontColor(AppColors.textSecondary)
+          }
+          .layoutWeight(1)
+          .width('100%')
+          .justifyContent(FlexAlign.Center)
+        } else {
+          List({ space: 10 }) {
+            ForEach(this.favoriteList, (drama: DramaItem) => {
+              ListItem() {
+                Row({ space: 12 }) {
+                  Image(drama.coverUrl)
+                    .width(60)
+                    .height(80)
+                    .borderRadius(AppDimensions.radiusSm)
+                    .objectFit(ImageFit.Cover)
+                    .backgroundColor(AppColors.bgCard)
+
+                  Column({ space: 6 }) {
+                    Text(drama.title)
+                      .fontSize(15)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(AppColors.textPrimary)
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+                    Text(drama.remarks || '连载中')
+                      .fontSize(12)
+                      .fontColor(AppColors.textSecondary)
+
+                    Blank()
+
+                    Row({ space: 8 }) {
+                      Button('继续播放')
+                        .fontSize(11)
+                        .fontColor(Color.White)
+                        .backgroundColor(AppColors.hongguoRed)
+                        .height(26)
+                        .borderRadius(13)
+                        .padding({ left: 12, right: 12 })
+                        .onClick(() => {
+                          this.openDramaDetail(drama);
+                        })
+
+                      Button('取消追剧')
+                        .fontSize(11)
+                        .fontColor(AppColors.textSecondary)
+                        .backgroundColor(AppColors.bgElevated)
+                        .height(26)
+                        .borderRadius(13)
+                        .padding({ left: 10, right: 10 })
+                        .onClick(() => {
+                          this.removeFavorite(drama.id);
+                        })
+                    }
+                  }
+                  .layoutWeight(1)
+                  .height(80)
+                  .alignItems(HorizontalAlign.Start)
+                }
+                .width('100%')
+                .padding(AppDimensions.paddingMd)
+                .backgroundColor(AppColors.bgCard)
+                .borderRadius(AppDimensions.radiusMd)
+                .onClick(() => {
+                  this.openDramaDetail(drama);
+                })
+              }
+            })
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .padding({ left: 16, right: 16, bottom: 16 })
+        }
+      } else {
+        // "历史记录" 观看历史列表
+        if (this.historyList.length === 0) {
+          Column({ space: 12 }) {
+            Text('🕒')
+              .fontSize(44)
+            Text('暂无观看历史')
+              .fontSize(14)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColors.textPrimary)
+            Text('您看过的短剧都会保存在这里')
+              .fontSize(12)
+              .fontColor(AppColors.textSecondary)
+          }
+          .layoutWeight(1)
+          .width('100%')
+          .justifyContent(FlexAlign.Center)
+        } else {
+          List({ space: 10 }) {
+            ForEach(this.historyList, (item: WatchHistoryItem) => {
+              ListItem() {
+                Row({ space: 12 }) {
+                  Image(item.coverUrl)
+                    .width(60)
+                    .height(80)
+                    .borderRadius(AppDimensions.radiusSm)
+                    .objectFit(ImageFit.Cover)
+                    .backgroundColor(AppColors.bgCard)
+
+                  Column({ space: 6 }) {
+                    Text(item.dramaTitle)
+                      .fontSize(15)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(AppColors.textPrimary)
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+                    Text(`观看到第 ${item.episodeIndex} 集`)
+                      .fontSize(12)
+                      .fontColor(AppColors.hongguoRed)
+
+                    Blank()
+
+                    Row({ space: 8 }) {
+                      Button('续播')
+                        .fontSize(11)
+                        .fontColor(Color.White)
+                        .backgroundColor(AppColors.hongguoRed)
+                        .height(26)
+                        .borderRadius(13)
+                        .padding({ left: 12, right: 12 })
+                        .onClick(() => {
+                          this.playFromHistory(item);
+                        })
+
+                      Button('删除')
+                        .fontSize(11)
+                        .fontColor(AppColors.textSecondary)
+                        .backgroundColor(AppColors.bgElevated)
+                        .height(26)
+                        .borderRadius(13)
+                        .padding({ left: 10, right: 10 })
+                        .onClick(() => {
+                          this.removeHistory(item.dramaId);
+                        })
+                    }
+                  }
+                  .layoutWeight(1)
+                  .height(80)
+                  .alignItems(HorizontalAlign.Start)
+                }
+                .width('100%')
+                .padding(AppDimensions.paddingMd)
+                .backgroundColor(AppColors.bgCard)
+                .borderRadius(AppDimensions.radiusMd)
+                .onClick(() => {
+                  this.playFromHistory(item);
+                })
+              }
+            })
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .padding({ left: 16, right: 16, bottom: 16 })
+        }
+      }
     }
     .width('100%')
     .height('100%')

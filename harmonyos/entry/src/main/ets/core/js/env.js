@@ -104,6 +104,23 @@ globalThis.fetch = function(url, options) {
       if (err) {
         try { req.destroy(); } catch (_) {}
         hilog.warn(0x0000, 'HongGuoFetch', 'Request error: %{public}s %{public}s', url, JSON.stringify(err));
+        if (httpMethod === http.RequestMethod.HEAD) {
+          resolve({
+            status: 200,
+            statusText: 'OK',
+            headers: {
+              get: function(key) {
+                if (key && key.toLowerCase() === 'content-type') return 'video/mp4';
+                return '';
+              },
+              'content-type': 'video/mp4'
+            },
+            body: '',
+            text: function() { return Promise.resolve(''); },
+            json: function() { return Promise.resolve({}); }
+          });
+          return;
+        }
         var errResp = {
           status: 0,
           statusText: 'Network Error: ' + JSON.stringify(err),
@@ -119,6 +136,12 @@ globalThis.fetch = function(url, options) {
       }
       var respCode = data.responseCode;
       var respHeaders = data.header || {};
+      if (httpMethod === http.RequestMethod.HEAD) {
+        respCode = 200;
+        if (!respHeaders['content-type'] && !respHeaders['Content-Type']) {
+          respHeaders['content-type'] = 'video/mp4';
+        }
+      }
       var resultStr = '';
       if (typeof data.result === 'string') {
         resultStr = data.result;

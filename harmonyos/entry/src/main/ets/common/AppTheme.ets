@@ -13,15 +13,19 @@ export class AppColors {
   static readonly hongguoCyan: string = '#00E5FF';
 
   // 基础背景色彩
-  static readonly bgDark: string = '#101114';
-  static readonly bgCard: string = '#18191E';
-  static readonly bgCardHover: string = '#22242B';
-  static readonly bgElevated: string = '#2A2C34';
+  static readonly bgDark: string = '#0D0E13';
+  static readonly bgCard: string = '#15171F';
+  static readonly bgCardHover: string = '#1C1F2A';
+  static readonly bgElevated: string = '#242836';
   static readonly bgDialog: string = '#1F2026';
+  static readonly darkSurfaceHighest70: string = 'rgba(45, 50, 68, 0.7)';
+  static readonly bottomNavBg: string = '#E612141C';
+  static readonly bottomNavBorder: string = 'rgba(255, 255, 255, 0.18)';
 
   // 基础文字色彩
   static readonly textPrimary: string = '#FFFFFF';
-  static readonly textSecondary: string = '#B3FFFFFF';
+  static readonly textSecondary: string = '#9EA3B2';
+  static readonly textSecondaryDark: string = '#9EA3B2';
   static readonly textMuted: string = '#66FFFFFF';
   static readonly textDisabled: string = '#33FFFFFF';
 

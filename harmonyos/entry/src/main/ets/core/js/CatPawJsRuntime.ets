@@ -59,6 +59,18 @@ interface RawPlayResponse {
   mediaBytes?: number;
 }
 
+export interface RawRankingBoard {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface RawRankingResult {
+  list: DramaItem[];
+  page: number;
+  hasMore: boolean;
+}
+
 /**
  * 鸿蒙端 CatPawOpen JS 运行时沙箱桥接器
  * 负责从 rawfile 中加载官方 hongguo.js 并执行站源函数调度
@@ -295,6 +307,51 @@ export class CatPawJsRuntime {
       hilog.error(DOMAIN, TAG, 'resolvePlay error: %{public}s', JSON.stringify(e));
     }
     return null;
+  }
+
+  /**
+   * 获取排行榜列表 (调用 spider.rankingBoards)
+   */
+  public async getRankingBoards(): Promise<RawRankingBoard[]> {
+    await this.ensureReady();
+    try {
+      const res = (await bridgeRankingBoards()) as RawRankingBoard[];
+      if (Array.isArray(res) && res.length > 0) {
+        return res;
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'getRankingBoards error: %{public}s', JSON.stringify(e));
+    }
+    const fallback: RawRankingBoard[] = [
+      { id: 'hongguo-app:all:ranklist_hot_sc', name: '热播榜', description: '全网观众都在看的火爆短剧' },
+      { id: 'hongguo-app:all:ranklist_soar_sc', name: '飙升榜', description: '人气极速上涨好剧' },
+      { id: 'hongguo-app:all:ranklist_new_sc', name: '新剧榜', description: '本周新鲜出炉短剧首发' }
+    ];
+    return fallback;
+  }
+
+  /**
+   * 分页获取榜单剧集 (调用 spider.rankings)
+   */
+  public async getRankings(boardId: string, page: number = 1): Promise<RawRankingResult> {
+    await this.ensureReady();
+    try {
+      const res = (await bridgeRankings(boardId, page)) as RawCategoryResponse;
+      const rawList = res && res.list ? res.list : [];
+      const dramaList = this.mapRawList(rawList);
+      const curPage = typeof res.page === 'number' ? res.page : page;
+      const pagecount = typeof res.pagecount === 'number' ? res.pagecount : 1;
+      const result: RawRankingResult = {
+        list: dramaList,
+        page: curPage,
+        hasMore: curPage < pagecount && dramaList.length > 0
+      };
+      return result;
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'getRankings error: %{public}s', JSON.stringify(e));
+      const fallback: RawRankingResult = { list: [], page: page, hasMore: false };
+      return fallback;
+    }
   }
 
   private mapRawList(rawList: RawVodItem[]): DramaItem[] {

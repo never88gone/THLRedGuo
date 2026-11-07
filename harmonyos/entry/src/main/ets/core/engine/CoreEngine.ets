@@ -1,6 +1,6 @@
 import { DramaItem, DramaDetail } from '../../models/Drama';
 import { CategoryItem } from '../../models/Category';
-import { RankingBoard, RankingItem } from '../../models/Ranking';
+import { RankingBoard, RankingItem, RankingPageResult } from '../../models/Ranking';
 import { PlayResult } from '../../models/Episode';
 import { CatPawJsRuntime } from '../js/CatPawJsRuntime';
 
@@ -63,77 +63,60 @@ export class CoreEngine {
   }
 
   /**
-   * 获取排行榜数据
+   * 获取排行榜分类列表
    */
   public async getRankingBoards(): Promise<RankingBoard[]> {
-    const cats = await this.getCategories();
-    const typeId = cats.length > 0 ? cats[0].typeId : 'hot';
-    const dramas = await this.loadCategoryDramas(typeId, 1);
-
-    const hotItems: RankingItem[] = [];
-    const hotList = dramas.slice(0, 15);
-    for (let i = 0; i < hotList.length; i++) {
-      const d = hotList[i];
-      hotItems.push(new RankingItem(
-        d.id,
-        i + 1,
-        d.title,
-        d.coverUrl,
-        `${(99.8 - i * 2.1).toFixed(1)}万`,
-        i === 0 ? 'top' : (i % 2 === 0 ? 'up' : 'same'),
-        d.remarks
-      ));
-    }
-
-    const soarItems: RankingItem[] = [];
-    const soarList = dramas.slice(2, 16);
-    for (let i = 0; i < soarList.length; i++) {
-      const d = soarList[i];
-      soarItems.push(new RankingItem(
-        d.id,
-        i + 1,
-        d.title,
-        d.coverUrl,
-        `${(89.5 - i * 1.8).toFixed(1)}万`,
-        'up',
-        d.remarks
-      ));
-    }
-
-    const newItems: RankingItem[] = [];
-    const newList = dramas.slice(4, 18);
-    for (let i = 0; i < newList.length; i++) {
-      const d = newList[i];
-      newItems.push(new RankingItem(
-        d.id,
-        i + 1,
-        d.title,
-        d.coverUrl,
-        `${(78.2 - i * 1.5).toFixed(1)}万`,
-        'new',
-        d.remarks
-      ));
-    }
-
-    return [
-      {
-        boardId: 'hot',
-        title: '热播榜',
-        subTitle: '全网观众都在看的火爆短剧',
-        items: hotItems
-      },
-      {
-        boardId: 'soar',
-        title: '飙升榜',
-        subTitle: '人气极速上涨好剧',
-        items: soarItems
-      },
-      {
-        boardId: 'new',
-        title: '新剧榜',
-        subTitle: '本周新鲜出炉短剧首发',
-        items: newItems
+    try {
+      const rawBoards = await this.runtime.getRankingBoards();
+      const boards: RankingBoard[] = [];
+      for (const b of rawBoards) {
+        boards.push({
+          boardId: b.id,
+          title: b.name,
+          subTitle: b.description || '每日实时更新',
+          items: []
+        });
       }
-    ];
+      return boards;
+    } catch (e) {
+      return [
+        { boardId: 'hongguo-app:all:ranklist_hot_sc', title: '热播榜', subTitle: '全网观众都在看的火爆短剧', items: [] },
+        { boardId: 'hongguo-app:all:ranklist_soar_sc', title: '飙升榜', subTitle: '人气极速上涨好剧', items: [] },
+        { boardId: 'hongguo-app:all:ranklist_new_sc', title: '新剧榜', subTitle: '本周新鲜出炉短剧首发', items: [] }
+      ];
+    }
+  }
+
+  /**
+   * 分页获取指定榜单剧集列表
+   */
+  public async getRankings(boardId: string, page: number = 1): Promise<RankingPageResult> {
+    try {
+      const res = await this.runtime.getRankings(boardId, page);
+      const items: RankingItem[] = [];
+      const startIndex = (page - 1) * 20;
+      for (let i = 0; i < res.list.length; i++) {
+        const d = res.list[i];
+        const rank = startIndex + i + 1;
+        const heat = `${(Math.max(10, 99.8 - rank * 0.8)).toFixed(1)}万`;
+        const trend = rank === 1 ? 'top' : (rank % 2 === 0 ? 'up' : 'same');
+        items.push(new RankingItem(
+          d.id,
+          rank,
+          d.title,
+          d.coverUrl,
+          heat,
+          trend,
+          d.remarks
+        ));
+      }
+      return {
+        items: items,
+        page: res.page,
+        hasMore: res.hasMore
+      };
+    } catch (e) {
+      return { items: [], page: page, hasMore: false };
+    }
   }
 }
