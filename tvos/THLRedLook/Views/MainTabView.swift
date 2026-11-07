@@ -69,6 +69,10 @@ public struct MainTabView: View {
     @State private var handoffEpIndex: Int = 1
     @State private var handoffPosition: Double = 0
 
+    @ObservedObject private var pipCoordinator = TVPictureInPictureCoordinator.shared
+    @State private var pipRestoreDrama: Drama?
+    @State private var pipRestoreSession: TVPictureInPictureSession?
+
     @State private var directDetailDrama: Drama?
     @State private var directPlayerDrama: Drama?
     @State private var directPlayerEpisodes: [Episode] = []
@@ -381,6 +385,27 @@ public struct MainTabView: View {
                 initialEpisodeIndex: handoffEpIndex,
                 initialPosition: handoffPosition
             )
+        }
+        .onReceive(pipCoordinator.$shouldRestoreFullScreen) { shouldRestore in
+            if shouldRestore, let session = pipCoordinator.currentSession {
+                NSLog("🎯 [MainTabView] 收到画中画全屏恢复请求: drama='%@', episode=%d", session.drama.title, session.episodeIndex)
+                self.pipRestoreSession = session
+                self.pipRestoreDrama = session.drama
+            }
+        }
+        .fullScreenCover(item: $pipRestoreDrama) { drama in
+            if let session = pipRestoreSession {
+                TVPlayerView(
+                    drama: drama,
+                    episodes: session.allEpisodes,
+                    initialEpisodeIndex: session.episodeIndex,
+                    initialPosition: session.currentPosition,
+                    onDismiss: {
+                        pipRestoreDrama = nil
+                        pipRestoreSession = nil
+                    }
+                )
+            }
         }
         .onReceive(DeepLinkSearchCoordinator.shared.$latestRequest) { request in
             guard let req = request else { return }

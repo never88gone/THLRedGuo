@@ -19,6 +19,7 @@ public enum PlayerOverlayFocusTarget: Hashable {
     case detail
     case refreshFeed
     case social
+    case pip
 }
 
 public struct TVPlayerControlsOverlay: View {
@@ -412,7 +413,36 @@ public struct TVPlayerControlsOverlay: View {
                                     focusedControl = .episodeDrawer
                                 }
                             case .left: focusedControl = .danmaku
+                            case .right:
+                                if viewModel.isPictureInPictureSupported {
+                                    focusedControl = .pip
+                                }
                             default: break
+                            }
+                        }
+
+                        // 11. 画中画
+                        if viewModel.isPictureInPictureSupported {
+                            overlayBarButton(
+                                title: "画中画",
+                                icon: "pip.enter",
+                                target: .pip,
+                                isProminent: false
+                            ) {
+                                viewModel.startPictureInPicture()
+                            }
+                            .onMoveCommand { dir in
+                                switch dir {
+                                case .up:
+                                    if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
+                                        focusedControl = .nextEpisode
+                                    } else {
+                                        focusedControl = .episodeDrawer
+                                    }
+                                case .left: focusedControl = .danmakuSettings
+                                case .right: focusedControl = .speed
+                                default: break
+                                }
                             }
                         }
 

@@ -26,6 +26,7 @@ public class AVPlayerContainerView: UIView {
     public var playerLayer: AVPlayerLayer?
     public var bgPlayerLayer: AVPlayerLayer?
     public var blurView: UIVisualEffectView?
+    public var pipController: AVPictureInPictureController?
 
     public var videoBackgroundStyle: Int = 0 // 0: 毛玻璃视频背景, 1: 视频铺满背景, 2: 纯黑/透明
     public var onVideoEnded: (() -> Void)?
@@ -123,6 +124,15 @@ public class AVPlayerContainerView: UIView {
         self.playerLayer = mainLayer
 
         updateBackgroundStyle()
+        setupPictureInPicture()
+    }
+
+    private func setupPictureInPicture() {
+        guard pipController == nil,
+              AVPictureInPictureController.isPictureInPictureSupported(),
+              let mainLayer = self.playerLayer else { return }
+        let pip = AVPictureInPictureController(playerLayer: mainLayer)
+        self.pipController = pip
     }
 
     public func updateBackgroundStyle() {
@@ -320,7 +330,9 @@ public class AVPlayerContainerView: UIView {
         itemStatusObserver = nil
         statusObserver?.invalidate()
         statusObserver = nil
-        player?.pause()
+        if !TVPictureInPictureCoordinator.shared.isPictureInPictureActive && !TVPictureInPictureCoordinator.shared.isStartingPiP {
+            player?.pause()
+        }
     }
 
     // MARK: - 6秒缓冲卡死超时检测
@@ -367,6 +379,7 @@ public struct AVPlayerView: UIViewRepresentable {
     public var onVideoPlaying: (() -> Void)? = nil
     public var onBufferStuck: (() -> Void)? = nil
     public var onTimeUpdate: ((Double, Double) -> Void)? = nil
+    public var onPipControllerReady: ((AVPictureInPictureController) -> Void)? = nil
 
     public init(
         player: AVPlayer? = nil,
@@ -380,7 +393,8 @@ public struct AVPlayerView: UIViewRepresentable {
         onVideoEnded: (() -> Void)? = nil,
         onVideoPlaying: (() -> Void)? = nil,
         onBufferStuck: (() -> Void)? = nil,
-        onTimeUpdate: ((Double, Double) -> Void)? = nil
+        onTimeUpdate: ((Double, Double) -> Void)? = nil,
+        onPipControllerReady: ((AVPictureInPictureController) -> Void)? = nil
     ) {
         self.player = player
         self.urlString = urlString
@@ -394,6 +408,7 @@ public struct AVPlayerView: UIViewRepresentable {
         self.onVideoPlaying = onVideoPlaying
         self.onBufferStuck = onBufferStuck
         self.onTimeUpdate = onTimeUpdate
+        self.onPipControllerReady = onPipControllerReady
     }
 
     public func makeUIView(context: Context) -> AVPlayerContainerView {
@@ -418,6 +433,10 @@ public struct AVPlayerView: UIViewRepresentable {
 
         if container.player !== targetPlayer {
             container.player = targetPlayer
+        }
+
+        if let pip = container.pipController {
+            onPipControllerReady?(pip)
         }
 
         container.videoBackgroundStyle = videoBackgroundStyle

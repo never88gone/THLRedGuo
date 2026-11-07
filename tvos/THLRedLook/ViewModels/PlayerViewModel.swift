@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import AVKit
 import Combine
 import SwiftUI
 
@@ -51,6 +52,10 @@ public final class PlayerViewModel: ObservableObject {
     @Published public private(set) var drama: Drama
     @Published public var allEpisodes: [Episode]
     public var keepControlsVisible: Bool = false
+
+    @Published public var isPictureInPictureSupported: Bool = AVPictureInPictureController.isPictureInPictureSupported()
+    @Published public var isPictureInPictureActive: Bool = false
+    public weak var pipController: AVPictureInPictureController?
 
     private let repository: NativeRepository
     private let preloadingRepository: NativeRepository
@@ -152,11 +157,55 @@ public final class PlayerViewModel: ObservableObject {
         duration = entry.duration
     }
 
+    public func bindPictureInPictureController(_ controller: AVPictureInPictureController) {
+        self.pipController = controller
+        registerPiPContextIfPossible()
+    }
+
+    public func registerPiPContextIfPossible() {
+        if let controller = pipController, let p = self.player {
+            TVPictureInPictureCoordinator.shared.register(
+                controller: controller,
+                player: p,
+                drama: self.drama,
+                currentEpisodeIndex: self.currentEpisodeIndex,
+                allEpisodes: self.allEpisodes,
+                initialPosition: self.currentTime
+            )
+        }
+    }
+
+    public func startPictureInPicture() {
+        guard isPictureInPictureSupported else {
+            showToast("当前设备不支持画中画")
+            return
+        }
+        guard let controller = pipController else {
+            showToast("画中画初始化中，请稍候...")
+            return
+        }
+        guard controller.isPictureInPicturePossible else {
+            showToast("视频画面缓冲中，请稍候...")
+            return
+        }
+        TVPictureInPictureCoordinator.shared.startPictureInPicture()
+    }
+
     public func onAppear() {
         guard !isVisible else { return }
         isVisible = true
         closed = false
         if progressSaveTimer == nil { startProgressSaveTimer() }
+
+        // 若当前画中画活跃，且与正在播放的剧集一致，无缝复用现有播放器并完成全屏恢复
+        if let activePipPlayer = TVPictureInPictureCoordinator.shared.activePlayer,
+           TVPictureInPictureCoordinator.shared.currentSession?.drama.id == self.drama.id {
+            self.startPlaybackWithPlayer(activePipPlayer, seekTo: self.currentTime)
+            self.isLoading = false
+            self.isPlaying = (activePipPlayer.timeControlStatus == .playing)
+            TVPictureInPictureCoordinator.shared.completeRestore(success: true)
+            return
+        }
 
         // 若外部已提前预加载就绪，0ms 瞬间挂载起播，彻底杜绝转圈等待
         if let preloaded = self.initialPreloadedPlan, preloaded.isReusable(),
@@ -224,6 +273,19 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     public func onDisappear() {
+        if TVPictureInPictureCoordinator.shared.isPictureInPictureActive || TVPictureInPictureCoordinator.shared.isStartingPiP {
+            NSLog("🎬 [PlayerVM] 检测到画中画活跃/过渡中，保留播放实例")
+            isVisible = false
+            saveCurrentProgress(force: true)
+            progressSaveTimer?.invalidate()
+            progressSaveTimer = nil
+            controlsHideTimer?.invalidate()
+            controlsHideTimer = nil
+            toastHideTimer?.invalidate()
+            toastHideTimer = nil
+            return
+        }
+
         closed = true
         playbackRequestSequence += 1
         resumeAfterInterruption = false
@@ -580,6 +642,7 @@ public final class PlayerViewModel: ObservableObject {
         if let item = cachedPlayer.currentItem {
             attachObservers(to: cachedPlayer, item: item, seekTo: seekTo)
         }
+        registerPiPContextIfPossible()
     }
 
     private func attachObservers(to av: AVPlayer, item: AVPlayerItem, seekTo: Double) {
