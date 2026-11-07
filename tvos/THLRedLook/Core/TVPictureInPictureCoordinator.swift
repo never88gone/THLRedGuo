@@ -6,15 +6,23 @@ import SwiftUI
 /// 画中画活跃会话数据结构
 public struct TVPictureInPictureSession: Equatable {
     public let drama: Drama
-    public let episodeIndex: Int
+    public var episodeIndex: Int
     public let allEpisodes: [Episode]
     public var currentPosition: Double
+    public var playbackPlan: PlaybackPlan?
 
-    public init(drama: Drama, episodeIndex: Int, allEpisodes: [Episode], currentPosition: Double) {
+    public init(
+        drama: Drama,
+        episodeIndex: Int,
+        allEpisodes: [Episode],
+        currentPosition: Double,
+        playbackPlan: PlaybackPlan? = nil
+    ) {
         self.drama = drama
         self.episodeIndex = episodeIndex
         self.allEpisodes = allEpisodes
         self.currentPosition = currentPosition
+        self.playbackPlan = playbackPlan
     }
 }
 
@@ -47,9 +55,20 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
     private var restoreCompletionHandler: ((Bool) -> Void)?
     private var progressSaveTimer: Timer?
     private var isRestoring: Bool = false
+    private var isSwitchingNextEpisodeInPiP: Bool = false
 
     public override init() {
         super.init()
+        setupItemEndNotification()
+    }
+
+    private func setupItemEndNotification() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handlePlayerItemDidPlayToEndTime(_:)),
+            name: .AVPlayerItemDidPlayToEndTime,
+            object: nil
+        )
     }
 
     // MARK: - 控制器与播放上下文注册
@@ -60,7 +79,8 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         drama: Drama,
         currentEpisodeIndex: Int,
         allEpisodes: [Episode],
-        initialPosition: Double = 0
+        initialPosition: Double = 0,
+        playbackPlan: PlaybackPlan? = nil
     ) {
         self.activeController = controller
         self.activePlayer = player
@@ -69,7 +89,8 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
             drama: drama,
             episodeIndex: currentEpisodeIndex,
             allEpisodes: allEpisodes,
-            currentPosition: initialPosition
+            currentPosition: initialPosition,
+            playbackPlan: playbackPlan
         )
     }
 
@@ -108,6 +129,10 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         }
     }
 
+    public func markRestoreHandled() {
+        shouldRestoreFullScreen = false
+    }
+
     public func completeRestore(success: Bool) {
         shouldRestoreFullScreen = false
         if let completion = restoreCompletionHandler {
@@ -115,6 +140,58 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
             restoreCompletionHandler = nil
         }
         isRestoring = false
+    }
+
+    // MARK: - 画中画模式下的自动连续播放功能
+
+    @objc private func handlePlayerItemDidPlayToEndTime(_ notification: Notification) {
+        Task { @MainActor in
+            guard self.isPictureInPictureActive, !self.isStartingPiP else { return }
+            guard let endedItem = notification.object as? AVPlayerItem,
+                  let currentItem = self.activePlayer?.currentItem,
+                  endedItem === currentItem else { return }
+            await self.playNextEpisodeInPiP()
+        }
+    }
+
+    public func playNextEpisodeInPiP() async {
+        guard !isSwitchingNextEpisodeInPiP else { return }
+        guard let session = currentSession else { return }
+        guard session.episodeIndex < session.allEpisodes.count else {
+            NSLog("🎬 [TVPiPCoordinator] 画中画已连播至全剧最后一集 (%d 集)", session.allEpisodes.count)
+            saveCurrentProgressToStore()
+            return
+        }
+
+        isSwitchingNextEpisodeInPiP = true
+        defer { isSwitchingNextEpisodeInPiP = false }
+
+        let nextIndex = session.episodeIndex + 1
+        let nextEp = session.allEpisodes.first { $0.number == nextIndex }
+        NSLog("🎬 [TVPiPCoordinator] 画中画自动切集: 即将播放第 %d 集 · %@", nextIndex, session.drama.title)
+
+        do {
+            let plan = try await NativeRepository.shared.resolvePlayback(
+                drama: session.drama,
+                episode: nextEp,
+                episodeIndex: nextIndex,
+                quality: 0
+            )
+            let prepared = try await PlaybackAssetFactory.prepare(plan)
+            let newItem = AVPlayerItem(asset: prepared.asset)
+
+            self.activePlayer?.replaceCurrentItem(with: newItem)
+            self.activePlayer?.play()
+
+            self.currentSession?.episodeIndex = nextIndex
+            self.currentSession?.currentPosition = 0
+            self.currentSession?.playbackPlan = plan
+
+            saveCurrentProgressToStore()
+            NSLog("🎬 [TVPiPCoordinator] 画中画已起播第 %d 集", nextIndex)
+        } catch {
+            NSLog("❌ [TVPiPCoordinator] 画中画切下一集失败: %@", error.localizedDescription)
+        }
     }
 
     // MARK: - AVPictureInPictureControllerDelegate 回调

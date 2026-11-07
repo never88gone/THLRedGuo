@@ -387,8 +387,11 @@ public struct MainTabView: View {
             )
         }
         .onReceive(pipCoordinator.$shouldRestoreFullScreen) { shouldRestore in
-            if shouldRestore, let session = pipCoordinator.currentSession {
-                NSLog("🎯 [MainTabView] 收到画中画全屏恢复请求: drama='%@', episode=%d", session.drama.title, session.episodeIndex)
+            guard shouldRestore, let session = pipCoordinator.currentSession else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                guard pipCoordinator.shouldRestoreFullScreen else { return }
+                NSLog("🎯 [MainTabView] 兜底处理画中画全屏恢复: drama='%@', episode=%d", session.drama.title, session.episodeIndex)
+                pipCoordinator.markRestoreHandled()
                 self.pipRestoreSession = session
                 self.pipRestoreDrama = session.drama
             }

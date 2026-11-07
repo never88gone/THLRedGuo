@@ -532,6 +532,16 @@ public struct DramaDetailView: View {
                 )
             }
         }
+        .onReceive(TVPictureInPictureCoordinator.shared.$shouldRestoreFullScreen) { shouldRestore in
+            guard shouldRestore, let session = TVPictureInPictureCoordinator.shared.currentSession else { return }
+            if session.drama.id == viewModel.drama.id {
+                NSLog("🎯 [DramaDetailView] 接管画中画恢复全屏: drama='%@', episode=%d", session.drama.title, session.episodeIndex)
+                TVPictureInPictureCoordinator.shared.markRestoreHandled()
+                self.selectedEpisodeNumber = session.episodeIndex
+                self.resumePosition = session.currentPosition
+                self.playingEpisodeIndex = session.episodeIndex
+            }
+        }
         .overlay(alignment: .bottom) {
             if showingDownloadSuccess {
                 HStack(spacing: 12) {

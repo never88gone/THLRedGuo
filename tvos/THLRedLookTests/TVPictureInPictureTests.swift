@@ -31,10 +31,8 @@ final class TVPictureInPictureTests: XCTestCase {
         let episodes = (1...20).map { Episode(id: "ep_\($0)", title: "第 \($0) 集", number: $0) }
         let player = AVPlayer()
 
-        // 构造一个模拟容器与图层用于控制器测试
         let playerLayer = AVPlayerLayer(player: player)
         guard AVPictureInPictureController.isPictureInPictureSupported() else {
-            // 在不支持的环境下安全跳过底层控制器测试
             return
         }
         let controller = AVPictureInPictureController(playerLayer: playerLayer)!
@@ -112,5 +110,58 @@ final class TVPictureInPictureTests: XCTestCase {
         // 模拟画中画停止
         coordinator.pictureInPictureControllerDidStopPictureInPicture(controller)
         XCTAssertFalse(coordinator.isPictureInPictureActive)
+    }
+
+    func testRestoreHandledMechanism() {
+        let player = AVPlayer()
+        let playerLayer = AVPlayerLayer(player: player)
+        guard AVPictureInPictureController.isPictureInPictureSupported(),
+              let controller = AVPictureInPictureController(playerLayer: playerLayer) else {
+            coordinator.shouldRestoreFullScreen = true
+            coordinator.markRestoreHandled()
+            XCTAssertFalse(coordinator.shouldRestoreFullScreen)
+            return
+        }
+
+        coordinator.pictureInPictureController(controller) { _ in }
+        XCTAssertTrue(coordinator.shouldRestoreFullScreen)
+
+        coordinator.markRestoreHandled()
+        XCTAssertFalse(coordinator.shouldRestoreFullScreen)
+    }
+
+    func testPiPContinuousPlaybackNextEpisode() async {
+        let drama = Drama(
+            id: "pip_test_drama_03",
+            source: "hongguo",
+            title: "画中画连播测试",
+            description: "连续播放验证",
+            cover: "https://example.com/cover.jpg",
+            episodes: 5
+        )
+        let episodes = (1...5).map { Episode(id: "ep_\($0)", title: "第 \($0) 集", number: $0) }
+        let player = AVPlayer()
+        let playerLayer = AVPlayerLayer(player: player)
+        guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
+        let controller = AVPictureInPictureController(playerLayer: playerLayer)!
+
+        coordinator.register(
+            controller: controller,
+            player: player,
+            drama: drama,
+            currentEpisodeIndex: 2,
+            allEpisodes: episodes,
+            initialPosition: 100.0
+        )
+
+        // 验证切集前
+        XCTAssertEqual(coordinator.currentSession?.episodeIndex, 2)
+
+        // 触发画中画连续切集
+        await coordinator.playNextEpisodeInPiP()
+
+        // 验证当前集数已切到第 3 集，播放进度复位为 0
+        XCTAssertEqual(coordinator.currentSession?.episodeIndex, 3)
+        XCTAssertEqual(coordinator.currentSession?.currentPosition, 0)
     }
 }

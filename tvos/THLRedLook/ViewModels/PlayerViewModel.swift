@@ -170,7 +170,8 @@ public final class PlayerViewModel: ObservableObject {
                 drama: self.drama,
                 currentEpisodeIndex: self.currentEpisodeIndex,
                 allEpisodes: self.allEpisodes,
-                initialPosition: self.currentTime
+                initialPosition: self.currentTime,
+                playbackPlan: self.plan
             )
         }
     }
@@ -199,8 +200,16 @@ public final class PlayerViewModel: ObservableObject {
 
         // 若当前画中画活跃，且与正在播放的剧集一致，无缝复用现有播放器并完成全屏恢复
         if let activePipPlayer = TVPictureInPictureCoordinator.shared.activePlayer,
-           TVPictureInPictureCoordinator.shared.currentSession?.drama.id == self.drama.id {
-            self.startPlaybackWithPlayer(activePipPlayer, seekTo: self.currentTime)
+           let session = TVPictureInPictureCoordinator.shared.currentSession,
+           session.drama.id == self.drama.id {
+            let currentSeconds = CMTimeGetSeconds(activePipPlayer.currentTime())
+            self.currentTime = (currentSeconds.isFinite && currentSeconds >= 0) ? currentSeconds : session.currentPosition
+            self.currentEpisodeIndex = session.episodeIndex
+            if let p = session.playbackPlan {
+                self.plan = p
+                self.selectedQuality = p.quality
+            }
+            self.startPlaybackWithPlayer(activePipPlayer, seekTo: 0)
             self.isLoading = false
             self.isPlaying = (activePipPlayer.timeControlStatus == .playing)
             TVPictureInPictureCoordinator.shared.completeRestore(success: true)
