@@ -95,10 +95,54 @@ platform :tvos do
     UI.success("Apple TV (tvOS) IPA 打包完成: #{output_dir}/THLRedLook.ipa")
   end
 
+  desc "从 release.md 中提取最近一次更新内容"
+  private_lane :extract_release_notes do |options|
+    file_path = options[:path] || File.expand_path("../release.md", __dir__)
+    unless File.exist?(file_path)
+      file_path = File.expand_path("../../tvos/release.md", __dir__)
+    end
+    if File.exist?(file_path)
+      content = File.read(file_path, encoding: "utf-8")
+      lines = content.split("\n")
+      in_section = false
+      section_lines = []
+      header = ""
+      lines.each do |line|
+        stripped = line.strip
+        if stripped.start_with?("## ")
+          if !in_section
+            in_section = true
+            header = stripped[3..-1].strip
+          else
+            break
+          end
+        elsif in_section
+          break if stripped.start_with?("# ")
+          section_lines << stripped unless stripped.empty?
+        end
+      end
+      if in_section && !section_lines.empty?
+        items = section_lines.map { |l| l.sub(/^[-*•]\s*/, "• ") }
+        "【#{header} 更新内容】\n" + items.join("\n")
+      else
+        nil
+      end
+    else
+      nil
+    end
+  end
+
   desc "发布 tvOS Beta 版本到 TestFlight (对齐 thldytv)"
   lane :beta do |options|
     api_key = setup_api_key
     build_ipa(options)
+
+    changelog = options[:changelog]
+    if changelog.nil? || changelog.empty?
+      changelog = extract_release_notes
+    end
+    changelog ||= "Apple TV 版本更新测试"
+    UI.message("📝 TestFlight 更新说明: \n#{changelog}")
 
     if api_key
       upload_to_testflight(
@@ -109,7 +153,7 @@ platform :tvos do
         skip_submission: true,
         distribute_external: false,
         notify_external_testers: false,
-        changelog: options[:changelog] || "Apple TV 版本更新测试",
+        changelog: changelog,
         uses_non_exempt_encryption: false,
         ipa: File.expand_path("../../build/tvos/ipa/THLRedLook.ipa")
       )

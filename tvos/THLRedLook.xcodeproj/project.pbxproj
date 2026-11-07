@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		REL000022C00000100000001 /* ReleaseNoteItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = REL000012C00000100000001 /* ReleaseNoteItem.swift */; };
+		REL000042C00000100000001 /* ReleaseNotesLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = REL000032C00000100000001 /* ReleaseNotesLoader.swift */; };
+		REL000062C00000100000001 /* SettingsReleaseNotesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = REL000052C00000100000001 /* SettingsReleaseNotesPanel.swift */; };
+		REL000082C00000100000001 /* TVGlobalPiPHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = REL000072C00000100000001 /* TVGlobalPiPHostView.swift */; };
+		REL000102C00000100000001 /* ReleaseNotesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = REL000092C00000100000001 /* ReleaseNotesTests.swift */; };
+		REL000122C00000100000001 /* release.md in Resources */ = {isa = PBXBuildFile; fileRef = REL000112C00000100000001 /* release.md */; };
 		15E1590AD319F20DCB1BDF37 /* TVColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 874AE06158F32CB25E160D95 /* TVColors.swift */; };
 		9399E26E09919ADFEA5D0C7E /* TVZeroHighlightButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA44D7567E364464CF47FE29 /* TVZeroHighlightButtonStyle.swift */; };
 		847DAAB634475D8A4EA728A9 /* TvButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E092BC4CA7A31AA0D0C43FD /* TvButtonStyle.swift */; };
@@ -133,6 +139,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		REL000012C00000100000001 /* ReleaseNoteItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNoteItem.swift; sourceTree = "<group>"; };
+		REL000032C00000100000001 /* ReleaseNotesLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotesLoader.swift; sourceTree = "<group>"; };
+		REL000052C00000100000001 /* SettingsReleaseNotesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsReleaseNotesPanel.swift; sourceTree = "<group>"; };
+		REL000072C00000100000001 /* TVGlobalPiPHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVGlobalPiPHostView.swift; sourceTree = "<group>"; };
+		REL000092C00000100000001 /* ReleaseNotesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotesTests.swift; sourceTree = "<group>"; };
+		REL000112C00000100000001 /* release.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = release.md; sourceTree = "<group>"; };
 		874AE06158F32CB25E160D95 /* TVColors.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVColors.swift; path = THLRedLook/Views/TVColors.swift; sourceTree = SOURCE_ROOT; };
 		DA44D7567E364464CF47FE29 /* TVZeroHighlightButtonStyle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVZeroHighlightButtonStyle.swift; path = THLRedLook/Views/Components/TVZeroHighlightButtonStyle.swift; sourceTree = SOURCE_ROOT; };
 		3E092BC4CA7A31AA0D0C43FD /* TvButtonStyle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TvButtonStyle.swift; path = THLRedLook/Views/Components/TvButtonStyle.swift; sourceTree = SOURCE_ROOT; };
@@ -331,6 +343,7 @@
 				DDF46F916F921E87B28F33AB /* PlaybackTests.swift */,
 				C1A3B602F4D3468399B31103 /* AccountPairingTests.swift */,
 				PIP000032C00000100000001 /* TVPictureInPictureTests.swift */,
+				REL000092C00000100000001 /* ReleaseNotesTests.swift */,
 				83ED37DCE4952B3E82C4DBD3 /* CENCDecoderTests.swift */,
 				9E1EEFA726D64CAC46CB01B5 /* LocalLibraryTests.swift */,
 				ADCC53A4B80992B7FB26447F /* ListLoadingTests.swift */,
@@ -367,6 +380,7 @@
 				G10000042C00000100000001 /* ViewModels */,
 				G10000052C00000100000001 /* Views */,
 				B10000382C00000100000001 /* Assets.xcassets */,
+				REL000112C00000100000001 /* release.md */,
 			);
 			path = THLRedLook;
 			sourceTree = "<group>";
@@ -403,6 +417,7 @@
 				B10000072C00000100000001 /* DownloadJob.swift */,
 				B10000082C00000100000001 /* RankingBoard.swift */,
 				B10000092C00000100000001 /* LanModels.swift */,
+				REL000012C00000100000001 /* ReleaseNoteItem.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -417,6 +432,7 @@
 				E34571822EE6222200000022 /* VideoCacheManager.swift */,
 				B10000102C00000100000001 /* LocalStore.swift */,
 				PIP000012C00000100000001 /* TVPictureInPictureCoordinator.swift */,
+				REL000032C00000100000001 /* ReleaseNotesLoader.swift */,
 				ICLOUD001C00000100000001 /* ICloudSyncService.swift */,
 				B10000112C00000100000001 /* NativeBridge.swift */,
 				B10000122C00000100000001 /* NativeRepository.swift */,
@@ -519,6 +535,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000262C00000100000001 /* TVPlayerView.swift */,
+				REL000072C00000100000001 /* TVGlobalPiPHostView.swift */,
 				B10000252C00000100000001 /* TVPlayerControlsOverlay.swift */,
 				A41C80E59CBF4F2096A85A02 /* TVQualitySelectionDrawer.swift */,
 				B10000242C00000100000001 /* TVDanmakuView.swift */,
@@ -570,6 +587,7 @@
 				BF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift */,
 				B75AFF05E2765687A3A41090 /* SettingsContactPanel.swift */,
 				BC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift */,
+				REL000052C00000100000001 /* SettingsReleaseNotesPanel.swift */,
 				B4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift */,
 				D255715E326D23643B59BC9D /* ApkProfileImportSheet.swift */,
 			);
@@ -683,6 +701,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000382C00000100000001 /* Assets.xcassets in Resources */,
+				REL000122C00000100000001 /* release.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -790,6 +809,7 @@
 				BC5B31CB27136862380FB32F /* PlaybackTests.swift in Sources */,
 				C1A3B602F4D3468399B31104 /* AccountPairingTests.swift in Sources */,
 				PIP000042C00000100000001 /* TVPictureInPictureTests.swift in Sources */,
+				REL000102C00000100000001 /* ReleaseNotesTests.swift in Sources */,
 				3F654B7E4306B53376917E16 /* CENCDecoderTests.swift in Sources */,
 				CABD071B5C68D672495450B9 /* LocalLibraryTests.swift in Sources */,
 				90DA19CCFD6C5C493E36FED0 /* ListLoadingTests.swift in Sources */,
@@ -890,6 +910,10 @@
 				AF60C48E1E8F5294AB856095 /* SettingsHelpPanel.swift in Sources */,
 				A75AFF05E2765687A3A41090 /* SettingsContactPanel.swift in Sources */,
 				AC669CCF24D352C1BA730802 /* SettingsAboutPanel.swift in Sources */,
+				REL000022C00000100000001 /* ReleaseNoteItem.swift in Sources */,
+				REL000042C00000100000001 /* ReleaseNotesLoader.swift in Sources */,
+				REL000062C00000100000001 /* SettingsReleaseNotesPanel.swift in Sources */,
+				REL000082C00000100000001 /* TVGlobalPiPHostView.swift in Sources */,
 				A4D335DF9E155C7BB6673B6B /* SourceDiagnosticsSheetView.swift in Sources */,
 				A10000332C00000100000001 /* MainTabView.swift in Sources */,
 				E34571822EE6222200000031 /* TVCustomSplitView.swift in Sources */,

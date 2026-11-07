@@ -190,6 +190,9 @@ public struct MainTabView: View {
             case "settings_cache":
                 initTab = .settings
                 initSettingsCategory = .cache
+            case "settings_release_notes":
+                initTab = .settings
+                initSettingsCategory = .releaseNotes
             case "settings", "importFlow", "settings_sources":
                 initTab = .settings
                 initSettingsCategory = .sources
@@ -427,6 +430,11 @@ public struct MainTabView: View {
             self.deepLinkEpisode = req.episode
             self.enterContentArea(for: .search)
         }
+        .background {
+            TVGlobalPiPHostView()
+                .frame(width: 1, height: 1)
+                .allowsHitTesting(false)
+        }
     }
 
     private func requestFocusSidebar() {
@@ -514,7 +522,7 @@ public struct MainTabView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 focusedNavTab = .settings
             }
-        case "settings_cache", "settings_about", "settings_help", "settings_contact", "settings_sync":
+        case "settings_cache", "settings_about", "settings_help", "settings_contact", "settings_sync", "settings_release_notes":
             selectedTab = .settings
             if page == "settings_help" {
                 settingsInitialCategory = .help
@@ -526,6 +534,8 @@ public struct MainTabView: View {
                 settingsInitialCategory = .cache
             } else if page == "settings_sync" {
                 settingsInitialCategory = .sync
+            } else if page == "settings_release_notes" {
+                settingsInitialCategory = .releaseNotes
             }
             columnVisibility = .detailOnly
             focusedNavTab = nil

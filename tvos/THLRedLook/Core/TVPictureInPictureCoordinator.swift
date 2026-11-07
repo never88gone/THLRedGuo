@@ -48,6 +48,9 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
     /// 请求恢复全屏播放界面的信号
     @Published public var shouldRestoreFullScreen: Bool = false
 
+    /// 全局常驻宿主视图 (挂载在 MainTabView，永不被销毁)
+    public private(set) weak var globalHostView: TVGlobalPiPHostUIView?
+
     /// 当前绑定的控制器与播放器
     public private(set) weak var activeController: AVPictureInPictureController?
     public private(set) var activePlayer: AVPlayer?
@@ -71,10 +74,21 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         )
     }
 
+    // MARK: - 全局常驻宿主绑定
+
+    public func bindGlobalHost(view: TVGlobalPiPHostUIView) {
+        self.globalHostView = view
+        if let controller = view.pipController {
+            controller.delegate = self
+            self.activeController = controller
+        }
+        NSLog("🎬 [TVPiPCoordinator] 成功绑定常驻全局画中画宿主容器")
+    }
+
     // MARK: - 控制器与播放上下文注册
 
     public func register(
-        controller: AVPictureInPictureController,
+        controller: AVPictureInPictureController? = nil,
         player: AVPlayer,
         drama: Drama,
         currentEpisodeIndex: Int,
@@ -82,9 +96,14 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         initialPosition: Double = 0,
         playbackPlan: PlaybackPlan? = nil
     ) {
-        self.activeController = controller
+        if let ctrl = controller {
+            self.activeController = ctrl
+            ctrl.delegate = self
+        } else if let globalCtrl = globalHostView?.pipController {
+            self.activeController = globalCtrl
+            globalCtrl.delegate = self
+        }
         self.activePlayer = player
-        controller.delegate = self
         self.currentSession = TVPictureInPictureSession(
             drama: drama,
             episodeIndex: currentEpisodeIndex,
@@ -96,7 +115,7 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
 
     public func unregister(controller: AVPictureInPictureController) {
         guard activeController === controller else { return }
-        if !isPictureInPictureActive {
+        if !isPictureInPictureActive && !isStartingPiP {
             self.activeController = nil
             self.activePlayer = nil
             self.currentSession = nil
@@ -105,21 +124,68 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
 
     // MARK: - 触发操作
 
-    public func startPictureInPicture() {
+    public func startPictureInPicture(
+        player: AVPlayer? = nil,
+        drama: Drama? = nil,
+        currentEpisodeIndex: Int? = nil,
+        allEpisodes: [Episode]? = nil,
+        initialPosition: Double? = nil,
+        playbackPlan: PlaybackPlan? = nil
+    ) {
         guard isPictureInPictureSupported else {
             NSLog("⚠️ [TVPiPCoordinator] 当前环境不支持画中画")
             return
         }
+
+        if let p = player, let d = drama, let ep = currentEpisodeIndex, let eps = allEpisodes {
+            register(
+                player: p,
+                drama: d,
+                currentEpisodeIndex: ep,
+                allEpisodes: eps,
+                initialPosition: initialPosition ?? 0,
+                playbackPlan: playbackPlan
+            )
+        }
+
+        // 优先使用全局常驻宿主挂接播放器启动画中画（保障退出全屏后图层依然存活）
+        if let host = globalHostView, let globalPip = host.pipController {
+            host.attachPlayer(self.activePlayer)
+            self.activeController = globalPip
+            globalPip.delegate = self
+
+            if globalPip.isPictureInPicturePossible {
+                isStartingPiP = true
+                globalPip.startPictureInPicture()
+                NSLog("🎬 [TVPiPCoordinator] 通过全局宿主启动系统画中画")
+                return
+            }
+        }
+
+        // 回退机制：使用局部注册的控制器启动
         guard let controller = activeController, controller.isPictureInPicturePossible else {
             NSLog("⚠️ [TVPiPCoordinator] 画中画暂不可用 (尚未就绪)")
             return
         }
         isStartingPiP = true
         controller.startPictureInPicture()
+        NSLog("🎬 [TVPiPCoordinator] 通过局部控制器启动系统画中画")
     }
 
     public func stopPictureInPicture() {
+        globalHostView?.pipController?.stopPictureInPicture()
         activeController?.stopPictureInPicture()
+        isPictureInPictureActive = false
+        isStartingPiP = false
+
+        if !isRestoring {
+            // 主动停止且非全屏恢复时，立即停止音频与播放器，消除残留声音
+            activePlayer?.pause()
+            activePlayer?.replaceCurrentItem(with: nil)
+            globalHostView?.detachPlayer()
+            activePlayer = nil
+            currentSession = nil
+        }
     }
 
     public func updatePlaybackProgress(position: Double) {
@@ -215,6 +281,7 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         NSLog("❌ [TVPiPCoordinator] 画中画启动失败: %@", error.localizedDescription)
         isStartingPiP = false
         isPictureInPictureActive = false
+        globalHostView?.detachPlayer()
     }
 
     public func pictureInPictureControllerWillStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
@@ -228,9 +295,11 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         isStartingPiP = false
 
         if !isRestoring {
-            // 用户从小窗直接点击了关闭按钮，保存历史记录并释放播放器
+            // 用户从小窗直接点击关闭或者系统停止小窗，保存历史记录并彻底暂停清理播放器，杜绝声音残留
             saveCurrentProgressToStore()
             activePlayer?.pause()
+            activePlayer?.replaceCurrentItem(with: nil)
+            globalHostView?.detachPlayer()
             activePlayer = nil
             activeController = nil
             currentSession = nil

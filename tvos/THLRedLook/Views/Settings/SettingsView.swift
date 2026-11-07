@@ -84,6 +84,8 @@ public struct SettingsView: View {
                         )
                     case .cache:
                         SettingsStoragePanel()
+                    case .releaseNotes:
+                        SettingsReleaseNotesPanel()
                     case .help:
                         SettingsHelpPanel()
                     case .contact:
@@ -143,6 +145,8 @@ public struct SettingsView: View {
             if let testPage = testPage {
                 if testPage == "settings_cache" {
                     targetCat = .cache
+                } else if testPage == "settings_release_notes" {
+                    targetCat = .releaseNotes
                 } else if testPage == "settings_about" {
                     targetCat = .about
                 } else if testPage == "settings_help" {

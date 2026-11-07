@@ -83,6 +83,13 @@ public enum TVColors {
     public static let successGreen = Color.green
     public static let tagBackground = Color.black.opacity(0.4)
     public static let focusedTagBackground = Color.black.opacity(0.12)
+
+    // MARK: - 更新内容与版本面板指示色
+    public static let releaseLatestBadge = Color(red: 0.95, green: 0.22, blue: 0.28)
+    public static let releaseDateText = Color.white.opacity(0.65)
+    public static let releaseTimelineDot = Color.red.opacity(0.85)
+    public static let releaseTimelineLine = Color.white.opacity(0.12)
+    public static let releaseBulletPoint = Color.white.opacity(0.9)
 }
 
 // MARK: - SwiftUI Color 语义化拓展
@@ -98,6 +105,8 @@ public extension Color {
         public static var textSecondary: Color { TVColors.textSecondary }
         public static var textMuted: Color { TVColors.textMuted }
         public static var vipAccent: Color { TVColors.vipAccent }
+        public static var releaseLatestBadge: Color { TVColors.releaseLatestBadge }
+        public static var releaseDateText: Color { TVColors.releaseDateText }
     }
 }
 
