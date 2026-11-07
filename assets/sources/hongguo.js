@@ -1078,7 +1078,32 @@ async function oo(r, e = {}) {
       }
     }
   } catch (error) { h = error; }
-if(f.length&&!e.includeFallback)return{...f[0],variants:f};let d=ro(u.fallback_api);if(d&&u.dynamic_video&&!Object.keys(u.video_list||{}).length&&(d=lt(d,["fqnovel.com","snssdk.com"]),d=d.replace(/([?&])force_fids=[^&]*(&?)/,(y,I,F)=>F?I:""),d=/[?&]format_type=/.test(d)?d.replace(/([?&]format_type=)[^&]*/,"$1mp4"):d+(d.includes("?")?"&":"?")+"format_type=mp4"),d)try{let y=await Pe(d,{headers:{"User-Agent":dt}},n);if([y,y.video_info].some(F=>Number(F?.Code||F?.code||0)!==0))throw Object.assign(new Error("App \u63A5\u53E3\u6682\u672A\u63D0\u4F9B\u672C\u96C6\u64AD\u653E\u4FE1\u606F"),{code:"BUSINESS_REJECTED"});let I=y?.video_info?.data;if(!I)throw Object.assign(new Error("App \u63A5\u53E3\u672A\u8FD4\u56DE\u672C\u96C6\u7247\u6E90\u6A21\u578B"),{code:"MISSING_MODEL"});f.push(...ln(I,r,t))}catch(y){h=y}let x=new Set;if(f=f.filter(y=>{let I=y.url+":"+(y.contentKey||"");return x.has(I)?!1:(x.add(I),!0)}),f.length)return{...f[0],variants:f};throw h||Object.assign(new Error("App \u63A5\u53E3\u672A\u8FD4\u56DE\u672C\u96C6\u7247\u6E90\u5730\u5740"),{code:"MISSING_MODEL"})}
+  if (f.length && !e.includeFallback) return { ...f[0], variants: f };
+  let d = ro(u.fallback_api);
+  if (d && (!f.length || e.includeFallback || !Object.keys(u.video_list || {}).length || u.dynamic_video)) {
+    d = lt(d, ["fqnovel.com", "snssdk.com"]);
+    d = d.replace(/([?&])force_fids=[^&]*(&?)/, (y, I, F) => F ? I : "");
+    d = /[?&]format_type=/.test(d) ? d.replace(/([?&]format_type=)[^&]*/, "$1mp4") : d + (d.includes("?") ? "&" : "?") + "format_type=mp4";
+    d = /[?&]codec_type=/.test(d) ? d.replace(/([?&]codec_type=)[^&]*/, "$11") : d + (d.includes("?") ? "&" : "?") + "codec_type=1";
+    try {
+      let y = await Pe(d, { headers: { "User-Agent": dt } }, n);
+      if ([y, y.video_info].some(F => Number(F?.Code || F?.code || 0) !== 0)) {
+        throw Object.assign(new Error("App \u63A5\u53E3\u6682\u672A\u63D0\u4F9B\u672C\u96C6\u64AD\u653E\u4FE1\u606F"), { code: "BUSINESS_REJECTED" });
+      }
+      let I = y?.video_info?.data;
+      if (!I) throw Object.assign(new Error("App \u63A5\u53E3\u672A\u8FD4\u56DE\u672C\u96C6\u7247\u6E90\u6A21\u578B"), { code: "MISSING_MODEL" });
+      f.push(...ln(I, r, t));
+    } catch (y) {
+      h = y;
+    }
+  }
+  let x = new Set;
+  if (f = f.filter(y => {
+    let I = y.url + ":" + (y.contentKey || "");
+    return x.has(I) ? false : (x.add(I), true);
+  }), f.length) return { ...f[0], variants: f };
+  throw h || Object.assign(new Error("App \u63A5\u53E3\u672A\u8FD4\u56DE\u672C\u96C6\u7247\u6E90\u5730\u5740"), { code: "MISSING_MODEL" });
+}
 function ln(model, videoId, downloadQuality) {
   const entries = Object.values(model?.video_list || {}).filter(item => item && (item.main_url || item.backup_url || Array.isArray(item.backup_url_list))).map(item => {
     const meta = item.video_meta || {};

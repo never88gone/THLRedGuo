@@ -73,49 +73,6 @@ class _Repo extends AppRepository {
 //   修复后 _back() 在 TV 模式下直接调用 Navigator.pop()（强制），
 //   PopScope.canPop = false，系统通道不会再自动 pop 一次，确保只退一层。
 
-Widget _buildTvPlayerScope({
-  required bool televisionMode,
-  required int Function() popCount,
-  required void Function() onPop,
-}) {
-  return MaterialApp(
-    home: Navigator(
-      pages: [
-        MaterialPage(
-          child: Scaffold(body: const Text('首页')),
-        ),
-        MaterialPage(
-          child: Scaffold(body: const Text('详情页')),
-        ),
-        MaterialPage(
-          child: Builder(
-            builder: (context) => PopScope(
-              // 修复后 TV 模式下 canPop 为 false
-              canPop: !televisionMode,
-              onPopInvokedWithResult: (didPop, _) {
-                if (!didPop) onPop();
-              },
-              child: Scaffold(
-                body: ElevatedButton(
-                  key: const ValueKey('back-btn'),
-                  onPressed: () {
-                    onPop();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('返回'),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-      onPopPage: (route, result) {
-        onPop();
-        return route.didPop(result);
-      },
-    ),
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Issue #6 — 画中画状态栏遮挡

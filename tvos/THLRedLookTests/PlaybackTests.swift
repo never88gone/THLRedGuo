@@ -10,6 +10,43 @@ final class PlaybackTests: XCTestCase {
     private var videoLayer: AVPlayerLayer?
     private var testStarted = Date()
 
+    func testReTaGanMaDynamicVideoPlayback() async throws {
+        await JSSourceService.shared.initialize()
+        let query = "惹他干嘛，她家夫君妖力无边！第八季"
+        let catalog = try await repository.loadCatalog(source: "hongguo", query: query, force: true)
+        let drama = try XCTUnwrap(catalog.items.first { $0.title.contains("惹") && $0.title.contains("第八季") } ?? catalog.items.first)
+        let detail = try await repository.loadDetail(drama: drama)
+        XCTAssertGreaterThanOrEqual(detail.episodes.count, 1)
+
+        let firstEpisode = try XCTUnwrap(detail.episodes.first)
+        let plan1 = try await repository.resolvePlayback(drama: detail.drama, episode: firstEpisode, episodeIndex: 1)
+        XCTAssertFalse(plan1.url.isEmpty)
+        XCTAssertTrue(plan1.url.hasPrefix("https://"))
+
+        if detail.episodes.count >= 2 {
+            let ep2 = detail.episodes[1]
+            let plan2 = try await repository.resolvePlayback(drama: detail.drama, episode: ep2, episodeIndex: 2)
+            XCTAssertFalse(plan2.url.isEmpty)
+            XCTAssertTrue(plan2.url.hasPrefix("https://"))
+        }
+
+        if detail.episodes.count >= 10 {
+            let ep10 = detail.episodes[9]
+            let plan10 = try await repository.resolvePlayback(drama: detail.drama, episode: ep10, episodeIndex: 10)
+            XCTAssertFalse(plan10.url.isEmpty)
+            XCTAssertTrue(plan10.url.hasPrefix("https://"))
+        }
+
+        if ProcessInfo.processInfo.environment["HONGGUO_LIVE"] == "1" {
+            let playerModel = try model(detail)
+            defer { playerModel.onDisappear() }
+            await playerModel.preparePlayback(episodeIndex: 1)
+            try await ready(playerModel)
+            XCTAssertGreaterThan(playerModel.currentTime, 0.5)
+            XCTAssertNil(playerModel.errorMessage)
+        }
+    }
+
     func testOfficialAccountCookieScope() throws {
         let now = Date()
         let record = HongguoAccountRecord(id: "123", nickname: "synthetic", cookies: [
