@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/core/player/playback_preferences.dart';
+import 'package:THLRedLook/core/player/playback_diagnostics.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_preferences.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_settings.dart';
@@ -29,6 +30,7 @@ class TelevisionControls extends StatefulWidget {
     required this.onSettings,
     required this.onBack,
     this.enhancement,
+    this.onFetchDiagnostics,
   });
   final Player player;
   final String title;
@@ -42,6 +44,7 @@ class TelevisionControls extends StatefulWidget {
   final Future<void> Function() onSettings;
   final VoidCallback onBack;
   final VideoEnhancementController? enhancement;
+  final Future<PlaybackTechnicalDiagnostics?> Function()? onFetchDiagnostics;
 
   @override
   State<TelevisionControls> createState() => _TelevisionControlsState();
@@ -419,7 +422,10 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                               onPressed: () async {
                                 _hideTimer?.cancel();
                                 setState(() => _panelOpen = true);
-                                await DiaryService.showDiaryDialog(context);
+                                await DiaryService.showDiaryDialog(
+                                  context,
+                                  fetchDiagnostics: widget.onFetchDiagnostics,
+                                );
                                 if (mounted) {
                                   setState(() => _panelOpen = false);
                                   _focus(_diary);
@@ -550,6 +556,7 @@ class TelevisionSettingsDialog extends StatelessWidget {
     required this.qualities,
     required this.favorite,
     required this.onFavorite,
+    this.actualQuality = 0,
     this.autoAdvance = true,
     this.danmaku = true,
     this.showDanmaku = false,
@@ -564,6 +571,7 @@ class TelevisionSettingsDialog extends StatelessWidget {
   final double speed;
   final int quality;
   final List<int> qualities;
+  final int actualQuality;
   final bool favorite;
   final VoidCallback onFavorite;
   final bool autoAdvance;
@@ -607,23 +615,69 @@ class TelevisionSettingsDialog extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            const Text('清晰度', style: TextStyle(fontSize: 18)),
+            Row(
+              children: [
+                const Text('清晰度', style: TextStyle(fontSize: 18)),
+                const SizedBox(width: 12),
+                if (quality > 0 && !qualities.contains(quality) && actualQuality > 0)
+                  Text(
+                    '当前集未提供 ${quality}P，已自动匹配 ${actualQuality}P',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.whiteWithAlpha(0.6),
+                    ),
+                  )
+                else if (actualQuality > 0 && actualQuality != quality)
+                  Text(
+                    '当前播放：${actualQuality}P',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.whiteWithAlpha(0.6),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final value in [
-                  0,
-                  ...qualities.where((value) => value > 0).toSet(),
-                ])
+                RemoteButton(
+                  key: const ValueKey('tv-quality-0'),
+                  label: '自动（优先高清）',
+                  selected: quality == 0,
+                  onPressed: () => Navigator.pop(
+                    context,
+                    const TelevisionPlaybackSetting(quality: 0),
+                  ),
+                ),
+                for (final value in qualities.where((value) => value > 0).toSet())
                   RemoteButton(
                     key: ValueKey('tv-quality-$value'),
-                    label: value == 0 ? '自动（优先高清）' : '${value}P',
-                    selected: value == quality,
+                    label: value == quality
+                        ? '${value}P'
+                        : (value == actualQuality &&
+                                quality > 0 &&
+                                !qualities.contains(quality)
+                            ? '${value}P (当前匹配)'
+                            : '${value}P'),
+                    selected: value == quality ||
+                        (quality > 0 &&
+                            !qualities.contains(quality) &&
+                            value == actualQuality),
                     onPressed: () => Navigator.pop(
                       context,
                       TelevisionPlaybackSetting(quality: value),
+                    ),
+                  ),
+                if (quality > 0 && !qualities.contains(quality))
+                  RemoteButton(
+                    key: ValueKey('tv-quality-$quality'),
+                    label: '${quality}P (偏好锁定)',
+                    selected: true,
+                    onPressed: () => Navigator.pop(
+                      context,
+                      TelevisionPlaybackSetting(quality: quality),
                     ),
                   ),
               ],

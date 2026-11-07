@@ -41,6 +41,7 @@ List<DanmakuFlight> planDanmaku(
   final seen = <String>{};
   final flights = <DanmakuFlight>[];
 
+  final maxConcurrent = width > 800 ? 18 : 30;
   for (final item in sorted) {
     if (item.id.isEmpty ||
         item.text.trim().isEmpty ||
@@ -53,7 +54,7 @@ List<DanmakuFlight> planDanmaku(
               (flight) => item.timeMs - flight.item.timeMs < flight.durationMs,
             )
             .length >=
-        40) {
+        maxConcurrent) {
       continue;
     }
     final runes = item.text.runes;
@@ -155,7 +156,8 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
           final fontSize = baseFontSize * widget.style.fontSizeScale;
           final scaler = MediaQuery.textScalerOf(context);
           final rowHeight = scaler.scale(fontSize) * 1.5;
-          final rows = ((height * widget.style.displayArea - 8) / rowHeight).floor().clamp(0, 10);
+          final maxRows = width > 800 ? 5 : 8;
+          final rows = ((height * widget.style.displayArea - 8) / rowHeight).floor().clamp(0, maxRows);
           final opacity = widget.style.opacity.clamp(0.1, 1.0);
           final style = TextStyle(
             fontSize: fontSize,
@@ -165,7 +167,7 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
             shadows: [
               Shadow(
                 color: AppColors.black.withValues(alpha: opacity * 0.85),
-                blurRadius: 3,
+                blurRadius: width > 800 ? 0 : 2,
                 offset: const Offset(1, 1),
               ),
             ],
