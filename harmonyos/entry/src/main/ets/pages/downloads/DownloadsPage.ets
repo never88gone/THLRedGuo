@@ -62,13 +62,18 @@ export struct DownloadsPage {
     Column() {
       // 顶部导航栏
       Row() {
-        Button('< 返回')
-          .fontSize(14)
-          .fontColor(AppColors.textPrimary)
-          .backgroundColor(Color.Transparent)
-          .onClick(() => {
-            router.back();
-          })
+        Button({ type: ButtonType.Circle }) {
+          Image($r('app.media.ic_arrow_back'))
+            .width(22)
+            .height(22)
+            .fillColor(AppColors.textPrimary)
+        }
+        .backgroundColor(Color.Transparent)
+        .width(40)
+        .height(40)
+        .onClick(() => {
+          router.back();
+        })
 
         Blank()
 

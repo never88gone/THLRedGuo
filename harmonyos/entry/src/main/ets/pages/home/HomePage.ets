@@ -295,7 +295,7 @@ export struct HomePage {
         .padding({ left: 16, right: 16, top: 4, bottom: 6 })
       } else {
         Scroll() {
-          Row({ space: 8 }) {
+          Row({ space: 10 }) {
             ForEach(this.categories, (item: CategoryItem, index: number) => {
               Button(item.typeName)
                 .fontSize(13)
@@ -311,8 +311,10 @@ export struct HomePage {
                 })
             })
           }
+          .justifyContent(FlexAlign.Start)
           .padding({ left: 16, right: 16, top: 4, bottom: 8 })
         }
+        .align(Alignment.Start)
         .scrollable(ScrollDirection.Horizontal)
         .scrollBar(BarState.Off)
         .width('100%')

@@ -249,17 +249,23 @@ struct PlayerPage {
           Column() {
             // 顶部导航栏
             Row({ space: 10 }) {
-              Button('< 返回')
-                .fontSize(14)
-                .fontColor(AppColors.textPrimary)
-                .backgroundColor(Color.Transparent)
-                .onClick(() => {
-                  if (this.isFullscreen) {
-                    this.isFullscreen = false;
-                  } else {
-                    router.back();
-                  }
-                })
+              Button({ type: ButtonType.Circle }) {
+                Image($r('app.media.ic_arrow_back'))
+                  .width(20)
+                  .height(20)
+                  .fillColor(Color.White)
+              }
+              .backgroundColor('rgba(0, 0, 0, 0.45)')
+              .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.2)' })
+              .width(36)
+              .height(36)
+              .onClick(() => {
+                if (this.isFullscreen) {
+                  this.isFullscreen = false;
+                } else {
+                  router.back();
+                }
+              })
 
               Column({ space: 2 }) {
                 Text(this.dramaTitle || '正在播放')

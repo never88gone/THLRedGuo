@@ -104,18 +104,20 @@ export struct RankingsPage {
 
   build() {
     Column() {
-      // 顶部导航栏 (带返回按钮与标题)
+      // 顶部导航栏 (对齐 Flutter 风格返回按钮与标题)
       Row({ space: 8 }) {
-        Button('<')
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.textPrimary)
-          .backgroundColor(Color.Transparent)
-          .width(40)
-          .height(40)
-          .onClick(() => {
-            router.back();
-          })
+        Button({ type: ButtonType.Circle }) {
+          Image($r('app.media.ic_arrow_back'))
+            .width(22)
+            .height(22)
+            .fillColor(AppColors.textPrimary)
+        }
+        .backgroundColor(Color.Transparent)
+        .width(40)
+        .height(40)
+        .onClick(() => {
+          router.back();
+        })
 
         Text('短剧排行榜')
           .fontSize(18)
@@ -124,14 +126,18 @@ export struct RankingsPage {
 
         Blank()
 
-        Button('🔍')
-          .fontSize(16)
-          .backgroundColor(Color.Transparent)
-          .width(40)
-          .height(40)
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/search/SearchPage' });
-          })
+        Button({ type: ButtonType.Circle }) {
+          Image($r('app.media.ic_search'))
+            .width(20)
+            .height(20)
+            .fillColor(AppColors.textPrimary)
+        }
+        .backgroundColor(Color.Transparent)
+        .width(40)
+        .height(40)
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/search/SearchPage' });
+        })
       }
       .width('100%')
       .padding({ left: 8, right: 16, top: 38, bottom: 8 })

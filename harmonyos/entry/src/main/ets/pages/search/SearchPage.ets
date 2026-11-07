@@ -65,13 +65,18 @@ export struct SearchPage {
     Column() {
       // 顶部搜索输入栏
       Row({ space: 10 }) {
-        Button('< 返回')
-          .fontSize(14)
-          .fontColor(AppColors.textPrimary)
-          .backgroundColor(Color.Transparent)
-          .onClick(() => {
-            router.back();
-          })
+        Button({ type: ButtonType.Circle }) {
+          Image($r('app.media.ic_arrow_back'))
+            .width(22)
+            .height(22)
+            .fillColor(AppColors.textPrimary)
+        }
+        .backgroundColor(Color.Transparent)
+        .width(40)
+        .height(40)
+        .onClick(() => {
+          router.back();
+        })
 
         Row() {
           TextInput({ text: this.searchText, placeholder: '搜索短剧名称或主角...' })
