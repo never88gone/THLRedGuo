@@ -156,6 +156,7 @@ public class AVPlayerContainerView: UIView {
             self.player?.removeTimeObserver(token)
             timeObserver = nil
         }
+        guard onTimeUpdate != nil else { return }
 
         let interval = CMTime(seconds: 0.1, preferredTimescale: 1000)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
@@ -330,8 +331,14 @@ public class AVPlayerContainerView: UIView {
         itemStatusObserver = nil
         statusObserver?.invalidate()
         statusObserver = nil
+        if let token = timeObserver {
+            player?.removeTimeObserver(token)
+            timeObserver = nil
+        }
         if !TVPictureInPictureCoordinator.shared.isPictureInPictureActive && !TVPictureInPictureCoordinator.shared.isStartingPiP {
             player?.pause()
+            playerLayer?.player = nil
+            bgPlayerLayer?.player = nil
         }
     }
 

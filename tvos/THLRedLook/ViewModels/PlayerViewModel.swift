@@ -256,7 +256,11 @@ public final class PlayerViewModel: ObservableObject {
                         self.allEpisodes = detail.episodes
                     }
                 }
-                await self.loadSeasons()
+                Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                    guard let self, !self.closed else { return }
+                    await self.loadSeasons()
+                }
             }
             return
         }
@@ -264,20 +268,27 @@ public final class PlayerViewModel: ObservableObject {
         lifecycleTask = Task { [weak self] in
             guard let self else { return }
             if !self.drama.id.starts(with: "test_") {
-                do {
-                    let detail = try await repository.loadDetail(drama: drama, store: store)
-                    guard !Task.isCancelled, !closed else { return }
-                    drama = detail.drama
-                    identityVerified = true
-                    if !detail.episodes.isEmpty { allEpisodes = detail.episodes }
-                } catch {
-                    guard !Task.isCancelled, !closed else { return }
+                let hasCurrentEpisode = self.allEpisodes.contains { $0.number == self.currentEpisodeIndex && $0.raw != nil }
+                if !hasCurrentEpisode {
+                    do {
+                        let detail = try await repository.loadDetail(drama: drama, store: store)
+                        guard !Task.isCancelled, !closed else { return }
+                        drama = detail.drama
+                        identityVerified = true
+                        if !detail.episodes.isEmpty { allEpisodes = detail.episodes }
+                    } catch {
+                        guard !Task.isCancelled, !closed else { return }
+                    }
                 }
             }
             await preparePlayback(episodeIndex: currentEpisodeIndex, seekTo: currentTime)
             guard !Task.isCancelled, !closed else { return }
             if !self.drama.id.starts(with: "test_") {
-                await loadSeasons()
+                Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                    guard let self, !self.closed else { return }
+                    await self.loadSeasons()
+                }
             }
         }
     }

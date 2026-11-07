@@ -68,6 +68,7 @@ public struct MainTabView: View {
     @State private var handoffDrama: Drama?
     @State private var handoffEpIndex: Int = 1
     @State private var handoffPosition: Double = 0
+    @State private var tabDebounceTask: Task<Void, Never>? = nil
 
     @ObservedObject private var pipCoordinator = TVPictureInPictureCoordinator.shared
     @State private var pipRestoreDrama: Drama?
@@ -349,8 +350,17 @@ public struct MainTabView: View {
                 }
                 .onChange(of: focusedNavTab) { _, newTab in
                     NSLog("🎯 [FOCUS_TRACE] Sidebar focusedNavTab = %@", newTab?.rawValue ?? "nil")
+                    tabDebounceTask?.cancel()
                     if let tab = newTab {
-                        selectedTab = tab
+                        if tab == .feed {
+                            tabDebounceTask = Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 120_000_000)
+                                guard !Task.isCancelled, focusedNavTab == tab else { return }
+                                selectedTab = tab
+                            }
+                        } else {
+                            selectedTab = tab
+                        }
                         if columnVisibility != .all {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                                 columnVisibility = .all

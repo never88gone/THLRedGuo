@@ -289,11 +289,11 @@ public actor NativeBridge {
     }
 
     /// 获取或构建指定数据源的 CatPawOpen JS 运行时上下文
-    public func accountRequest(_ action: String, payload: [String: String] = [:]) throws -> [String: Any] {
+    public func accountRequest(_ action: String, payload: [String: String] = [:]) async throws -> [String: Any] {
         sourceScripts["__official_account"] = BuiltInHongguoJSContent
         guard let context = getOrCreateContext(sourceId: "__official_account") else { throw HongguoAccountError.invalid }
         let expression = try spiderExpression("accountRequest", [action, payload])
-        guard let response = evalAsync(context: context, scriptExpr: expression) else { throw HongguoAccountError.invalid }
+        guard let response = await evalAsync(context: context, scriptExpr: expression) else { throw HongguoAccountError.invalid }
         guard response["ok"] as? Bool == true, let result = response["data"] as? [String: Any] else {
             let detail = response["error"] as? String ?? ""
             let code = detail.contains("buildAccountRequest") ? "ACCOUNT_BUILDER_UNAVAILABLE" :
@@ -715,50 +715,65 @@ public actor NativeBridge {
         return "spider.\(method).apply(spider, \(String(decoding: data, as: UTF8.self)))"
     }
 
-    /// 在 JS 运行时中异步评估 Promise 并等待结果
-    private func evalAsync(context: JSContext, scriptExpr: String) -> [String: Any]? {
+    /// 在 JS 运行时中异步评估 Promise 并等待结果（使用协同 continuation，避免底层线程饥饿与死锁）
+    private func evalAsync(context: JSContext, scriptExpr: String) async -> [String: Any]? {
         let expectedAccountRevision = accountSnapshot().revision
-        let sem = DispatchSemaphore(value: 0)
-        var resultData: [String: Any]? = nil
-
         let doneKey = "__done_\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
-        let onDone: @convention(block) (String) -> Void = { jsonStr in
-            if let data = jsonStr.data(using: .utf8),
-               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                resultData = obj
+
+        return await withCheckedContinuation { continuation in
+            let isResumed = NSLock()
+            var resumed = false
+            func safeResume(_ value: [String: Any]?) {
+                isResumed.lock()
+                defer { isResumed.unlock() }
+                guard !resumed else { return }
+                resumed = true
+                context.setObject(nil, forKeyedSubscript: doneKey as NSString)
+                if expectedAccountRevision != accountSnapshot().revision {
+                    continuation.resume(returning: nil)
+                } else {
+                    continuation.resume(returning: value)
+                }
             }
-            sem.signal()
+
+            let onDone: @convention(block) (String) -> Void = { jsonStr in
+                var resultData: [String: Any]? = nil
+                if let data = jsonStr.data(using: .utf8),
+                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    resultData = obj
+                }
+                safeResume(resultData)
+            }
+            context.setObject(onDone, forKeyedSubscript: doneKey as NSString)
+
+            let wrapper = """
+            globalThis.__hongguoCancelled = false;
+            (async function() {
+                try {
+                    var res = await (\(scriptExpr));
+                    \(doneKey)(JSON.stringify({ ok: true, data: res }));
+                } catch (err) {
+                    var errMsg = err ? (err.message || String(err)) : "未知错误";
+                    var errStack = err && err.stack ? String(err.stack) : "";
+                    var errCat = err && err.category ? String(err.category) : "js_error";
+                    var errCode = err && err.code ? String(err.code) : "JS_EXECUTION";
+                    \(doneKey)(JSON.stringify({
+                        ok: false,
+                        error: errMsg,
+                        stack: errStack,
+                        category: errCat,
+                        code: errCode
+                    }));
+                }
+            })();
+            """
+            context.evaluateScript(wrapper)
+
+            // 15 秒超时保护，彻底消除 JS 挂死导致的协同等待
+            DispatchQueue.global().asyncAfter(deadline: .now() + 15.0) {
+                safeResume(["ok": false, "error": "JS 执行无响应或超时", "code": "TIMEOUT"])
+            }
         }
-        context.setObject(onDone, forKeyedSubscript: doneKey as NSString)
-
-        let wrapper = """
-        globalThis.__hongguoCancelled = false;
-        (async function() {
-            try {
-                var res = await (\(scriptExpr));
-                \(doneKey)(JSON.stringify({ ok: true, data: res }));
-            } catch (err) {
-                var errMsg = err ? (err.message || String(err)) : "未知错误";
-                var errStack = err && err.stack ? String(err.stack) : "";
-                var errCat = err && err.category ? String(err.category) : "js_error";
-                var errCode = err && err.code ? String(err.code) : "JS_EXECUTION";
-                \(doneKey)(JSON.stringify({
-                    ok: false,
-                    error: errMsg,
-                    stack: errStack,
-                    category: errCat,
-                    code: errCode
-                }));
-            }
-        })();
-        """
-        context.evaluateScript(wrapper)
-
-        _ = sem.wait(timeout: .now() + 60.0)
-        context.setObject(nil, forKeyedSubscript: doneKey as NSString)
-
-        guard expectedAccountRevision == accountSnapshot().revision else { return nil }
-        return resultData
     }
 
     private func playbackFailure(code: String, message: String, episode: Int) -> NSError {
@@ -1012,7 +1027,7 @@ public actor NativeBridge {
                 return ["items": [["id": "", "name": "全部"]]]
             }
 
-            let res = evalAsync(context: ctx, scriptExpr: targetSrc == "hongguo" ? "spider.home(true)" : "spider.home()")
+            let res = await evalAsync(context: ctx, scriptExpr: targetSrc == "hongguo" ? "spider.home(true)" : "spider.home()")
             guard res?["ok"] as? Bool == true else {
                 throw SourceAPIError.sourceUnavailable(res?["error"] as? String ?? "分类请求失败，请重试")
             }
@@ -1042,7 +1057,7 @@ public actor NativeBridge {
 
             if !query.isEmpty {
                 let scriptExpr = try spiderExpression("search", [query, false, pg])
-                let evaluated = evalAsync(context: ctx, scriptExpr: scriptExpr)
+                let evaluated = await evalAsync(context: ctx, scriptExpr: scriptExpr)
                 guard let res = evaluated, res["ok"] as? Bool == true else {
                     let errMsg = evaluated?["error"] as? String ?? "JS 执行无响应或超时"
                     let rawCat = evaluated?["category"] as? String ?? ""
@@ -1118,7 +1133,7 @@ public actor NativeBridge {
             }
 
             let scriptExpr = try spiderExpression("category", [cat, pg, false, ["initialBatch": 12]])
-            let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
+            let res = await evalAsync(context: ctx, scriptExpr: scriptExpr)
             guard res?["ok"] as? Bool == true else {
                 throw SourceAPIError.sourceUnavailable(res?["error"] as? String ?? "发现数据请求失败，请重试")
             }
@@ -1148,7 +1163,7 @@ public actor NativeBridge {
             }
 
             let scriptExpr = try spiderExpression("search", [query, false, 1])
-            let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
+            let res = await evalAsync(context: ctx, scriptExpr: scriptExpr)
 
             var dramas: [[String: Any]] = []
             if let data = res?["data"] as? [String: Any] {
@@ -1176,7 +1191,7 @@ public actor NativeBridge {
             }
 
             let scriptExpr = try spiderExpression("detail", [dramaId])
-            let evaluated = evalAsync(context: ctx, scriptExpr: scriptExpr)
+            let evaluated = await evalAsync(context: ctx, scriptExpr: scriptExpr)
             guard let res = evaluated, res["ok"] as? Bool == true else {
                 let errMsg = evaluated?["error"] as? String ?? "详情解析无响应或异常"
                 let errCat = DiagnosticCategory(rawValue: evaluated?["category"] as? String ?? "") ?? (errMsg.contains("网络") ? .dnsError : .jsError)
@@ -1289,7 +1304,7 @@ public actor NativeBridge {
                 ]]
                 let scriptExpr = try spiderExpression("play", ["", rawUrl, flags])
                 let started = Date()
-                let res = evalAsync(context: ctx, scriptExpr: scriptExpr)
+                let res = await evalAsync(context: ctx, scriptExpr: scriptExpr)
                 try Task.checkCancellation()
                 let data = res?["data"] as? [String: Any]
                 guard res?["ok"] as? Bool == true,
@@ -1370,7 +1385,7 @@ public actor NativeBridge {
                 throw NSError(domain: "THLRedLook.Danmaku", code: -1, userInfo: [NSLocalizedDescriptionKey: "本集暂不支持弹幕"])
             }
             let expression = try spiderExpression("danmaku", [id, payload["startMs"] as? Int64 ?? 0, payload["durationMs"] as? Int64 ?? 0])
-            guard let response = evalAsync(context: context, scriptExpr: expression), response["ok"] as? Bool == true,
+            guard let response = await evalAsync(context: context, scriptExpr: expression), response["ok"] as? Bool == true,
                   let result = response["data"] as? [String: Any], result["items"] is [[String: Any]] else {
                 throw NSError(domain: "THLRedLook.Danmaku", code: -2, userInfo: [NSLocalizedDescriptionKey: "官方弹幕暂不可用"])
             }
@@ -1393,7 +1408,7 @@ public actor NativeBridge {
             default: arguments = []
             }
             let expression = try spiderExpression(action, arguments)
-            let evaluated = evalAsync(context: context, scriptExpr: expression)
+            let evaluated = await evalAsync(context: context, scriptExpr: expression)
             guard evaluated?["ok"] as? Bool == true, let result = evaluated?["data"] as? [String: Any] else {
                 let message = evaluated?["error"] as? String ?? "官方列表响应超时，请重试"
                 let code = SourceDiagnostics.safeCode(evaluated?["code"])
