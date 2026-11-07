@@ -1619,6 +1619,19 @@ class _PlayerScreenState extends State<PlayerScreen>
           return;
         }
         _openedIndex = index;
+        DiaryService.add(
+          '[Play] 清晰度判定: 请求=${_requestedQuality > 0 ? "${_requestedQuality}P" : "自动(优先高清)"}, '
+          '源下发=${plan.quality > 0 ? "${plan.quality}P" : "未知"}, '
+          '当前集可选=[${plan.qualities.map((q) => "${q}P").join('/')}], '
+          '状态=${_requestedQuality > 0 && plan.quality > 0 && _requestedQuality != plan.quality ? "当前集无请求档位，自动回退/匹配" : "完全匹配"}',
+        );
+        Future.delayed(const Duration(seconds: 2), () async {
+          if (_closed || ticket != _generation) return;
+          final diag = await _getDiagnostics();
+          if (diag != null) {
+            DiaryService.add(diag.toDiaryLog());
+          }
+        });
         _enhancement.mediaReady();
         _attachLanPlayback();
         _health.reset();
@@ -2051,6 +2064,37 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
   }
 
+  Future<PlaybackTechnicalDiagnostics?> _getDiagnostics() async {
+    final player = _player;
+    if (player is LunaExoPlayer) {
+      return player.getDiagnostics(
+        requestedQuality: _requestedQuality,
+        actualQuality: _plan?.quality ?? 0,
+        availableQualities: _plan?.qualities ?? const [],
+        mediaHost: Uri.tryParse(_plan?.url ?? '')?.host,
+      );
+    }
+    final state = _player.state;
+    final w = state.videoParams.w;
+    final h = state.videoParams.h;
+    const codec = 'hevc';
+    return PlaybackTechnicalDiagnostics(
+      playerEngine: 'MediaKit (NativePlayer)',
+      decoderName: codec,
+      isHardwareAccelerated: _decoderMode == PlaybackDecoderMode.hardware,
+      videoWidth: w,
+      videoHeight: h,
+      bufferDuration: state.buffer,
+      bufferingEventsCount: 0,
+      requestedQuality: _requestedQuality,
+      actualQuality: _plan?.quality ?? 0,
+      availableQualities: _plan?.qualities ?? const [],
+      isEncrypted: _plan?.decryptionKey.isNotEmpty == true,
+      mediaHost: Uri.tryParse(_plan?.url ?? '')?.host,
+      timestamp: DateTime.now(),
+    );
+  }
+
   Future<void> _televisionSettings(BuildContext context) async {
     if (_panelOpen || _closed) return;
     setState(() => _panelOpen = true);
@@ -2061,6 +2105,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         speed: _speed,
         quality: _requestedQuality,
         qualities: _plan?.qualities ?? [],
+        actualQuality: _plan?.quality ?? 0,
         favorite: widget.store.isFavorite(widget.detail.drama.id),
         onFavorite: _toggleFavorite,
         autoAdvance: _autoAdvance,
@@ -2460,6 +2505,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       onRestorePictureInPicture: _restoreFromPictureInPicture,
       onTelevisionEpisodes: _televisionEpisodes,
       onTelevisionSettings: _televisionSettings,
+      onFetchDiagnostics: _getDiagnostics,
     );
   }
 }

@@ -11,6 +11,7 @@ import 'package:THLRedLook/views/danmaku/danmaku_overlay.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/core/player/luna_exo_player.dart';
+import 'package:THLRedLook/core/player/playback_diagnostics.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/core/player/player_interactions.dart';
 import 'package:THLRedLook/views/player/player_menu.dart';
@@ -80,10 +81,12 @@ class PlayerViewportView extends StatelessWidget {
     this.onRestorePictureInPicture,
     required this.onTelevisionEpisodes,
     required this.onTelevisionSettings,
+    this.onFetchDiagnostics,
     this.topPadding = 0.0,
   });
 
   final double topPadding;
+  final Future<PlaybackTechnicalDiagnostics?> Function()? onFetchDiagnostics;
   final bool television;
   final bool fullscreen;
   final bool pictureInPictureVisible;
@@ -288,6 +291,7 @@ class PlayerViewportView extends StatelessWidget {
             onEpisodes: () => onTelevisionEpisodes(context),
             onSettings: () => onTelevisionSettings(context),
             onBack: onBack,
+            onFetchDiagnostics: onFetchDiagnostics,
           )
         : PlayerControls(
             player: player,
@@ -466,8 +470,10 @@ class PlayerViewportView extends StatelessWidget {
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               FilledButton.tonalIcon(
-                                onPressed: () =>
-                                    DiaryService.showDiaryDialog(context),
+                                onPressed: () => DiaryService.showDiaryDialog(
+                                  context,
+                                  fetchDiagnostics: onFetchDiagnostics,
+                                ),
                                 icon: const Icon(Icons.receipt_long_rounded),
                                 label: const Text('查看播放日记'),
                               ),

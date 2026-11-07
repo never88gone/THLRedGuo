@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/core/player/playback_diagnostics.dart';
 
 /// 应用内「日记」日志服务 — 实时记录播放与系统事件，方便在电视与手机端快速排查问题。
 class DiaryService {
@@ -49,8 +50,11 @@ class DiaryService {
     }
   }
 
-  /// 在界面上弹出交互式日记弹窗（兼容 TV 遥控器与手机触屏）
-  static Future<void> showDiaryDialog(BuildContext context) {
+  /// 在界面上弹出交互式日记弹窗（兼容 TV 遥控器与手机触屏，支持实时诊断数据面板）
+  static Future<void> showDiaryDialog(
+    BuildContext context, {
+    Future<PlaybackTechnicalDiagnostics?> Function()? fetchDiagnostics,
+  }) {
     return showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -89,44 +93,160 @@ class DiaryService {
           ),
           content: SizedBox(
             width: double.maxFinite,
-            height: MediaQuery.of(dialogContext).size.height * 0.65,
-            child: AnimatedBuilder(
-              animation: revision,
-              builder: (context, _) {
-                final list = entries;
-                if (list.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      '暂无日记记录',
-                      style: TextStyle(color: AppColors.textTertiaryDark),
-                    ),
-                  );
-                }
-                return Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.blackWithAlpha(0.4),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.whiteWithAlpha(0.08),
-                    ),
+            height: MediaQuery.of(dialogContext).size.height * 0.72,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (fetchDiagnostics != null)
+                  FutureBuilder<PlaybackTechnicalDiagnostics?>(
+                    future: fetchDiagnostics(),
+                    builder: (context, snapshot) {
+                      final diag = snapshot.data;
+                      if (diag == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.darkCard,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.hongguoRed.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.speed_rounded,
+                                  size: 16,
+                                  color: AppColors.hongguoGold,
+                                ),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  '实时核心技术指标',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.white,
+                                  ),
+                                ),
+                                const Spacer(),
+                                GestureDetector(
+                                  onTap: () {
+                                    DiaryService.add(diag.toDiaryLog());
+                                    ScaffoldMessenger.maybeOf(dialogContext)?.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('已将诊断快照写入日记'),
+                                        duration: Duration(seconds: 1),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.whiteWithAlpha(0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      '记录快照',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 6,
+                              children: [
+                                _DiagBadge(label: '引擎', value: diag.playerEngine),
+                                _DiagBadge(
+                                  label: '解码',
+                                  value:
+                                      '${diag.decoderName} (${diag.isHardwareAccelerated ? "硬解生效" : "软解"})',
+                                  highlight: diag.isHardwareAccelerated,
+                                ),
+                                _DiagBadge(
+                                  label: '画面',
+                                  value:
+                                      '${diag.videoSizeText} @ ${diag.fps != null && diag.fps! > 0 ? "${diag.fps!.toStringAsFixed(1)}fps" : "未知"}',
+                                ),
+                                _DiagBadge(
+                                  label: '呈现掉帧',
+                                  value: '${diag.droppedFrames} 帧',
+                                  isWarn: diag.droppedFrames > 20,
+                                ),
+                                _DiagBadge(
+                                  label: '缓冲健康',
+                                  value:
+                                      '${(diag.bufferDuration.inMilliseconds / 1000).toStringAsFixed(1)}s (卡顿: ${diag.bufferingEventsCount}次)',
+                                  isWarn: diag.bufferingEventsCount > 0,
+                                ),
+                                _DiagBadge(
+                                  label: '清晰度对应',
+                                  value: diag.qualityMatchSummary,
+                                ),
+                                _DiagBadge(
+                                  label: '流媒体',
+                                  value:
+                                      '${diag.isEncrypted ? "AES-128加密" : "明文"} (host: ${diag.mediaHost ?? "未知"})',
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                  child: Scrollbar(
-                    controller: scrollController,
-                    thumbVisibility: true,
-                    child: ListView.builder(
-                      controller: scrollController,
-                      itemCount: list.length,
-                      itemBuilder: (context, index) {
-                        final item = list[list.length - 1 - index]; // 倒序显示最新
-                        Color textColor = AppColors.textSecondaryDark;
-                        final lower = item.toLowerCase();
-                        if (lower.contains('err') ||
-                            lower.contains('fail') ||
-                            lower.contains('异常') ||
-                            lower.contains('失败') ||
-                            lower.contains('exception')) {
-                          textColor = AppColors.error;
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: revision,
+                    builder: (context, _) {
+                      final list = entries;
+                      if (list.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            '暂无日记记录',
+                            style: TextStyle(color: AppColors.textTertiaryDark),
+                          ),
+                        );
+                      }
+                      return Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.blackWithAlpha(0.4),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.whiteWithAlpha(0.08),
+                          ),
+                        ),
+                        child: Scrollbar(
+                          controller: scrollController,
+                          thumbVisibility: true,
+                          child: ListView.builder(
+                            controller: scrollController,
+                            itemCount: list.length,
+                            itemBuilder: (context, index) {
+                              final item = list[list.length - 1 - index]; // 倒序显示最新
+                              Color textColor = AppColors.textSecondaryDark;
+                              final lower = item.toLowerCase();
+                              if (lower.contains('err') ||
+                                  lower.contains('fail') ||
+                                  lower.contains('异常') ||
+                                  lower.contains('失败') ||
+                                  lower.contains('exception')) {
+                                textColor = AppColors.error;
                         } else if (lower.contains('成功') ||
                             lower.contains('ok') ||
                             lower.contains('success')) {
@@ -159,7 +279,10 @@ class DiaryService {
               },
             ),
           ),
-          actions: [
+        ],
+      ),
+    ),
+    actions: [
             TextButton.icon(
               icon: const Icon(Icons.copy_rounded, size: 16),
               label: const Text('一键复制'),
@@ -173,6 +296,71 @@ class DiaryService {
           ],
         );
       },
+    );
+  }
+}
+
+class _DiagBadge extends StatelessWidget {
+  const _DiagBadge({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+    this.isWarn = false,
+  });
+
+  final String label;
+  final String value;
+  final bool highlight;
+  final bool isWarn;
+
+  @override
+  Widget build(BuildContext context) {
+    Color bg = AppColors.white.withValues(alpha: 0.06);
+    Color fg = AppColors.white.withValues(alpha: 0.85);
+    Color labelColor = AppColors.white.withValues(alpha: 0.5);
+
+    if (highlight) {
+      bg = AppColors.hongguoGold.withValues(alpha: 0.15);
+      fg = AppColors.hongguoGold;
+      labelColor = AppColors.hongguoGold.withValues(alpha: 0.7);
+    } else if (isWarn) {
+      bg = AppColors.warning.withValues(alpha: 0.15);
+      fg = AppColors.warning;
+      labelColor = AppColors.warning.withValues(alpha: 0.7);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: highlight || isWarn
+              ? fg.withValues(alpha: 0.3)
+              : AppColors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 12,
+              color: labelColor,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

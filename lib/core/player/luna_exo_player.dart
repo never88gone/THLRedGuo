@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
+import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart' as kit;
 import 'package:video_player/video_player.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
+import 'package:THLRedLook/core/player/playback_diagnostics.dart';
 import 'package:THLRedLook/core/player/playback_preferences.dart';
 import 'package:THLRedLook/core/player/playback_recovery.dart';
 
@@ -147,13 +150,14 @@ class LunaExoPlayer implements Player {
   Timer? _positionPollTimer;
   Timer? _watchdogTimer;
   int _consecutiveZeroSizeTicks = 0;
+  int _bufferingEventsCount = 0;
   PlaybackDecoderMode _decoderMode = PlaybackDecoderMode.hardware;
   Media? _currentMedia;
   bool _currentPlay = true;
 
   PlaybackDecoderMode get decoderMode => _decoderMode;
-  bool get isHardwareDecoding =>
-      _decoderMode == PlaybackDecoderMode.hardware && _streamPlayer == null;
+  bool get isHardwareDecoding => _decoderMode == PlaybackDecoderMode.hardware;
+  int get bufferingEventsCount => _bufferingEventsCount;
 
   void setDecoderMode(PlaybackDecoderMode mode) {
     if (_decoderMode == mode) return;
@@ -263,7 +267,22 @@ class LunaExoPlayer implements Player {
     mirror(native.stream.duration, stream.durationController);
     mirror(native.stream.buffer, stream.bufferController);
     mirror(native.stream.playing, stream.playingController, repaint: true);
-    mirror(native.stream.buffering, stream.bufferingController, repaint: true);
+    _streamSubscriptions.add(
+      native.stream.buffering.listen((buffering) {
+        if (_disposed ||
+            generation != _openGeneration ||
+            !identical(native, _streamPlayer)) {
+          return;
+        }
+        if (buffering) {
+          _bufferingEventsCount++;
+          DiaryService.add('[MediaKit] 发生缓冲卡顿等待 (累计卡顿: $_bufferingEventsCount 次)');
+        }
+        state = native.state;
+        _safeAdd(stream.bufferingController, buffering);
+        revision.value++;
+      }),
+    );
     mirror(native.stream.completed, stream.completedController, repaint: true);
     mirror(
       native.stream.videoParams,
@@ -279,6 +298,39 @@ class LunaExoPlayer implements Player {
           return;
         }
         _safeAdd(stream.logController, log);
+        final logText = log.text.toLowerCase();
+        if (hwdec &&
+            (logText.contains('hardware decoding failed') ||
+                logText.contains('mediacodec error') ||
+                logText.contains('mediacodec failed'))) {
+          DiaryService.add(
+            '[MediaKit] 捕获硬件解码异常: ${log.text}，自动回退到兼容软解引擎...',
+          );
+          unawaited(() async {
+            if (_disposed ||
+                generation != _openGeneration ||
+                !identical(native, _streamPlayer)) {
+              return;
+            }
+            final startPos = native.state.position;
+            final recoveryMedia = Media(
+              media.uri,
+              httpHeaders: media.httpHeaders,
+              start: startPos > Duration.zero ? startPos : null,
+              extras: media.extras,
+            );
+            try {
+              await _openWithMediaKit(
+                recoveryMedia,
+                key: key,
+                play: play,
+                hwdec: false,
+              );
+            } catch (e) {
+              DiaryService.add('[MediaKit] 软解回退自愈失败: $e');
+            }
+          }());
+        }
         if (PlaybackRecovery.videoOutputFailed(log.text)) {
           _safeAdd(stream.errorController, log.text);
         }
@@ -292,11 +344,37 @@ class LunaExoPlayer implements Player {
         await backend.setProperty('demuxer-lavf-o', 'decryption_key=$key');
       }
       await backend.setProperty('network-timeout', '20');
+      if (Platform.isAndroid) {
+        if (hwdec) {
+          await backend.setProperty('hwdec', 'mediacodec');
+          await backend.setProperty('hwdec-codecs', 'all');
+        } else {
+          await backend.setProperty('hwdec', 'no');
+        }
+        await backend.setProperty('framedrop', 'vo');
+        await backend.setProperty('video-sync', 'audio');
+        await backend.setProperty('vd-lavc-fast', 'yes');
+        await backend.setProperty('vd-lavc-threads', '4');
+        await backend.setProperty('demuxer-readahead-secs', '20');
+        await backend.setProperty('demuxer-max-bytes', '${32 * 1024 * 1024}');
+        await backend.setProperty('demuxer-max-back-bytes', '${8 * 1024 * 1024}');
+        await backend.setProperty('scale', 'bilinear');
+        await backend.setProperty('cscale', 'bilinear');
+        await backend.setProperty('dscale', 'bilinear');
+      }
       await native.setVolume(volume);
       await native.setRate(rate);
       if (_disposed || generation != _openGeneration) return;
       await native.open(media, play: play);
       if (!_disposed && generation == _openGeneration) revision.value++;
+      _startMediaKitWatchdog(
+        native,
+        media,
+        key: key,
+        play: play,
+        hwdec: hwdec,
+        generation: generation,
+      );
     } catch (_) {
       if (identical(native, _streamPlayer)) await stop();
       rethrow;
@@ -311,6 +389,7 @@ class LunaExoPlayer implements Player {
     final media = playable;
     final url = media.uri;
     if (url.isEmpty) return;
+    _bufferingEventsCount = 0;
     _currentMedia = media;
     _currentPlay = play;
     final key = media.extras?['decryptionKey']?.toString() ?? '';
@@ -655,6 +734,168 @@ class LunaExoPlayer implements Player {
     });
   }
 
+  void _startMediaKitWatchdog(
+    Player native,
+    Media media, {
+    String? key,
+    bool play = true,
+    bool hwdec = false,
+    required int generation,
+  }) {
+    _watchdogTimer?.cancel();
+    _consecutiveZeroSizeTicks = 0;
+    if (!hwdec) return;
+
+    _watchdogTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) async {
+      if (_disposed || generation != _openGeneration || !identical(native, _streamPlayer)) {
+        timer.cancel();
+        return;
+      }
+      if (native.state.playing && native.state.position > const Duration(seconds: 1)) {
+        final w = native.state.videoParams.w ?? 0;
+        final h = native.state.videoParams.h ?? 0;
+        if (w == 0 || h == 0) {
+          _consecutiveZeroSizeTicks++;
+          DiaryService.add(
+            '[MediaKit Watchdog] 警告: 播放中画面尺寸为 0x0 (tick=$_consecutiveZeroSizeTicks)',
+          );
+          if (_consecutiveZeroSizeTicks >= 3) {
+            timer.cancel();
+            DiaryService.add(
+              '[MediaKit Watchdog] 判定电视硬解黑屏/无画面：立即激活 MediaKit 软解兼容模式自愈恢复画面！',
+            );
+            if (!_disposed && generation == _openGeneration) {
+              final startPos = native.state.position;
+              final recoveryMedia = Media(
+                media.uri,
+                httpHeaders: media.httpHeaders,
+                start: startPos > Duration.zero ? startPos : null,
+                extras: media.extras,
+              );
+              try {
+                await _openWithMediaKit(
+                  recoveryMedia,
+                  key: key,
+                  play: play,
+                  hwdec: false,
+                );
+              } catch (e) {
+                DiaryService.add('[MediaKit Watchdog] 软解自愈失败: $e');
+              }
+            }
+          }
+        } else {
+          _consecutiveZeroSizeTicks = 0;
+          timer.cancel();
+        }
+      }
+    });
+  }
+
+  String? _readMpvString(NativePlayer player, String property) {
+    if (player.disposed || player.ctx == nullptr) return null;
+    final name = property.toNativeUtf8();
+    try {
+      final value = player.mpv.mpv_get_property_string(player.ctx, name.cast());
+      if (value == nullptr) return null;
+      try {
+        return value.cast<Utf8>().toDartString();
+      } finally {
+        player.mpv.mpv_free(value.cast());
+      }
+    } catch (_) {
+      return null;
+    } finally {
+      calloc.free(name);
+    }
+  }
+
+  Future<PlaybackTechnicalDiagnostics> getDiagnostics({
+    int requestedQuality = 0,
+    int actualQuality = 0,
+    List<int> availableQualities = const [],
+    String? mediaHost,
+  }) async {
+    final native = _streamPlayer;
+    final c = _controller;
+    final isStream = native != null;
+    final engine = isStream ? 'MediaKit (libmpv)' : 'ExoPlayer (AndroidX Media3)';
+
+    String decoder = '未知';
+    bool hwActive = false;
+    int? w;
+    int? h;
+    double? fps;
+    int dropped = 0;
+    Duration buf = Duration.zero;
+
+    if (isStream) {
+      final params = native.state.videoParams;
+      w = params.w;
+      h = params.h;
+      decoder = 'hevc';
+      buf = native.state.buffer;
+
+      if (native.platform is NativePlayer) {
+        final backend = native.platform as NativePlayer;
+        final mpvCodec = _readMpvString(backend, 'video-codec') ??
+            _readMpvString(backend, 'video-format');
+        if (mpvCodec != null && mpvCodec.isNotEmpty) {
+          decoder = mpvCodec;
+        }
+        final hwdecCurrent = _readMpvString(backend, 'hwdec-current');
+        if (hwdecCurrent != null && hwdecCurrent != 'no' && hwdecCurrent.isNotEmpty) {
+          hwActive = true;
+          decoder = '$decoder ($hwdecCurrent)';
+        } else {
+          hwActive = false;
+          decoder = '$decoder (software)';
+        }
+        final dropStr = _readMpvString(backend, 'decoder-frame-drop-count') ??
+            _readMpvString(backend, 'frame-drop-count');
+        if (dropStr != null) {
+          dropped = int.tryParse(dropStr) ?? 0;
+        }
+        final fpsStr = _readMpvString(backend, 'container-fps') ??
+            _readMpvString(backend, 'estimated-vf-fps');
+        if (fpsStr != null) {
+          fps = double.tryParse(fpsStr);
+        }
+      }
+    } else if (c != null && c.value.isInitialized) {
+      w = c.value.size.width.toInt();
+      h = c.value.size.height.toInt();
+      decoder = 'MediaCodec';
+      hwActive = _decoderMode == PlaybackDecoderMode.hardware;
+      if (c.value.buffered.isNotEmpty) {
+        final last = c.value.buffered.last.end;
+        final pos = c.value.position;
+        if (last > pos) buf = last - pos;
+      }
+    }
+
+    return PlaybackTechnicalDiagnostics(
+      playerEngine: engine,
+      decoderName: decoder,
+      isHardwareAccelerated: hwActive,
+      videoWidth: w,
+      videoHeight: h,
+      fps: fps,
+      droppedFrames: dropped,
+      bufferDuration: buf,
+      bufferingEventsCount: _bufferingEventsCount,
+      requestedQuality: requestedQuality,
+      actualQuality: actualQuality,
+      availableQualities: availableQualities,
+      isEncrypted: streamingDecryption ||
+          (mediaUri.contains('crypto') ||
+              (c == null &&
+                  _currentMedia?.extras?['decryptionKey']?.toString().isNotEmpty == true)),
+      mediaHost: mediaHost ?? (Uri.tryParse(mediaUri)?.host),
+      timestamp: DateTime.now(),
+    );
+  }
+
   void _onControllerValue(VideoPlayerController c) {
     if (_disposed || _controller != c) return;
     final v = c.value;
@@ -677,6 +918,10 @@ class LunaExoPlayer implements Player {
       stateChanged = true;
     }
     if (v.isBuffering != state.buffering) {
+      if (v.isBuffering) {
+        _bufferingEventsCount++;
+        DiaryService.add('[ExoPlayer] 发生缓冲卡顿等待 (累计卡顿: $_bufferingEventsCount 次)');
+      }
       DiaryService.add('[ExoPlayer] isBuffering 变为: ${v.isBuffering}');
       state = state.copyWith(buffering: v.isBuffering);
       _safeAdd(stream.bufferingController, v.isBuffering);
