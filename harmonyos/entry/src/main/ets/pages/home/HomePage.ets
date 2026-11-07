@@ -1,10 +1,14 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
+import hilog from '@ohos.hilog';
 import { AppColors, AppDimensions } from '../../common/AppTheme';
 import { DramaItem } from '../../models/Drama';
 import { CategoryItem } from '../../models/Category';
 import { CoreEngine } from '../../core/engine/CoreEngine';
 import { LocalStore } from '../../core/store/LocalStore';
+
+const TAG = 'HomePage';
+const DOMAIN = 0x0000;
 
 @Entry
 @Component
@@ -13,6 +17,11 @@ export struct HomePage {
   @State selectedCategoryIndex: number = 0;
   @State dramas: DramaItem[] = [];
   @State isLoading: boolean = false;
+
+  // 分页相关状态
+  @State page: number = 1;
+  @State isLoadingMore: boolean = false;
+  @State hasMore: boolean = true;
 
   // 搜索相关状态
   @State isSearchVisible: boolean = false;
@@ -39,40 +48,123 @@ export struct HomePage {
         { typeId: 'ai-drama', typeName: 'AI短剧', isSelected: false }
       ];
     }
-    this.loadDramas();
+    this.loadDramas(1, false);
   }
 
-  async loadDramas(): Promise<void> {
-    this.isLoading = true;
-    this.searchActiveKeyword = '';
+  async loadDramas(page: number = 1, isMore: boolean = false): Promise<void> {
+    if (isMore) {
+      if (this.isLoadingMore || !this.hasMore || this.isLoading) return;
+      this.isLoadingMore = true;
+    } else {
+      this.isLoading = true;
+      this.page = 1;
+      this.hasMore = true;
+      this.searchActiveKeyword = '';
+    }
+
     try {
       const cat = this.categories[this.selectedCategoryIndex];
       const tid = cat ? cat.typeId : 'hot';
-      this.dramas = await CoreEngine.getInstance().loadCategoryDramas(tid, 1);
+      hilog.info(DOMAIN, TAG, 'loadDramas: tid=%{public}s, page=%{public}d, isMore=%{public}s', tid, page, String(isMore));
+      const results = await CoreEngine.getInstance().loadCategoryDramas(tid, page);
+
+      if (isMore) {
+        if (results && results.length > 0) {
+          const existingIds = new Set(this.dramas.map(d => d.id));
+          const newItems = results.filter(d => !existingIds.has(d.id));
+          if (newItems.length > 0) {
+            this.dramas.push(...newItems);
+            this.page = page;
+            this.hasMore = true;
+          } else {
+            this.hasMore = false;
+          }
+          hilog.info(DOMAIN, TAG, 'loadDramas more: added %{public}d items, total: %{public}d, hasMore: %{public}s', newItems.length, this.dramas.length, String(this.hasMore));
+        } else {
+          this.hasMore = false;
+        }
+      } else {
+        this.dramas = results || [];
+        this.page = 1;
+        this.hasMore = (results && results.length > 0);
+        hilog.info(DOMAIN, TAG, 'loadDramas first: %{public}d items, hasMore: %{public}s', this.dramas.length, String(this.hasMore));
+      }
     } catch (e) {
-      console.error('loadDramas error: ' + JSON.stringify(e));
+      hilog.error(DOMAIN, TAG, 'loadDramas error: %{public}s', JSON.stringify(e));
+      if (!isMore) {
+        this.dramas = [];
+      }
+      this.hasMore = false;
+    } finally {
+      this.isLoading = false;
+      this.isLoadingMore = false;
     }
-    this.isLoading = false;
   }
 
-  async performSearch(query: string): Promise<void> {
+  async loadMore(): Promise<void> {
+    if (this.isLoading || this.isLoadingMore || !this.hasMore) return;
+    hilog.info(DOMAIN, TAG, 'loadMore requested: current page=%{public}d, search=%{public}s', this.page, this.searchActiveKeyword);
+    if (this.searchActiveKeyword) {
+      await this.performSearch(this.searchActiveKeyword, this.page + 1, true);
+    } else {
+      await this.loadDramas(this.page + 1, true);
+    }
+  }
+
+  async performSearch(query: string, page: number = 1, isMore: boolean = false): Promise<void> {
     const trimmed = query.trim();
     if (!trimmed) {
       this.searchActiveKeyword = '';
-      this.loadDramas();
+      this.loadDramas(1, false);
       return;
     }
-    this.isLoading = true;
-    this.searchActiveKeyword = trimmed;
-    await LocalStore.getInstance().saveRecentSearch(trimmed);
-    this.recentSearches = await LocalStore.getInstance().getRecentSearches();
+
+    if (isMore) {
+      if (this.isLoadingMore || !this.hasMore || this.isLoading) return;
+      this.isLoadingMore = true;
+    } else {
+      this.isLoading = true;
+      this.page = 1;
+      this.hasMore = true;
+      this.searchActiveKeyword = trimmed;
+      await LocalStore.getInstance().saveRecentSearch(trimmed);
+      this.recentSearches = await LocalStore.getInstance().getRecentSearches();
+    }
 
     try {
-      this.dramas = await CoreEngine.getInstance().searchDramas(trimmed, 1);
+      hilog.info(DOMAIN, TAG, 'performSearch: query=%{public}s, page=%{public}d, isMore=%{public}s', trimmed, page, String(isMore));
+      const results = await CoreEngine.getInstance().searchDramas(trimmed, page);
+      if (isMore) {
+        if (results && results.length > 0) {
+          const existingIds = new Set(this.dramas.map(d => d.id));
+          const newItems = results.filter(d => !existingIds.has(d.id));
+          if (newItems.length > 0) {
+            this.dramas.push(...newItems);
+            this.page = page;
+            this.hasMore = true;
+          } else {
+            this.hasMore = false;
+          }
+          hilog.info(DOMAIN, TAG, 'performSearch more: added %{public}d items, total: %{public}d, hasMore: %{public}s', newItems.length, this.dramas.length, String(this.hasMore));
+        } else {
+          this.hasMore = false;
+        }
+      } else {
+        this.dramas = results || [];
+        this.page = 1;
+        this.hasMore = (results && results.length > 0);
+        hilog.info(DOMAIN, TAG, 'performSearch first: %{public}d items, hasMore: %{public}s', this.dramas.length, String(this.hasMore));
+      }
     } catch (e) {
-      console.error('search error: ' + JSON.stringify(e));
+      hilog.error(DOMAIN, TAG, 'search error: %{public}s', JSON.stringify(e));
+      if (!isMore) {
+        this.dramas = [];
+      }
+      this.hasMore = false;
+    } finally {
+      this.isLoading = false;
+      this.isLoadingMore = false;
     }
-    this.isLoading = false;
   }
 
   async clearRecentSearches(): Promise<void> {
@@ -151,7 +243,10 @@ export struct HomePage {
             this.isSearchVisible = !this.isSearchVisible;
             if (!this.isSearchVisible && this.searchActiveKeyword) {
               this.searchQuery = '';
-              this.loadDramas();
+              this.searchActiveKeyword = '';
+              this.page = 1;
+              this.hasMore = true;
+              this.loadDramas(1, false);
             }
           })
         }
@@ -288,7 +383,11 @@ export struct HomePage {
             .backgroundColor(Color.Transparent)
             .onClick(() => {
               this.searchQuery = '';
-              this.loadDramas();
+              this.searchActiveKeyword = '';
+              this.dramas = [];
+              this.page = 1;
+              this.hasMore = true;
+              this.loadDramas(1, false);
             })
         }
         .width('100%')
@@ -307,7 +406,10 @@ export struct HomePage {
                 .borderRadius(16)
                 .onClick(() => {
                   this.selectedCategoryIndex = index;
-                  this.loadDramas();
+                  this.dramas = [];
+                  this.page = 1;
+                  this.hasMore = true;
+                  this.loadDramas(1, false);
                 })
             })
           }
@@ -352,6 +454,39 @@ export struct HomePage {
               this.DramaCard(item)
             }
           })
+
+          // 底部分页加载状态指示器 (跨双列展示)
+          if (this.isLoadingMore) {
+            GridItem() {
+              Row({ space: 8 }) {
+                LoadingProgress()
+                  .width(22)
+                  .height(22)
+                  .color(AppColors.hongguoRed)
+                Text('正在加载更多短剧...')
+                  .fontSize(12)
+                  .fontColor(AppColors.textSecondary)
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+              .padding({ top: 14, bottom: 20 })
+            }
+            .columnStart(0)
+            .columnEnd(1)
+          } else if (!this.hasMore && this.dramas.length > 0) {
+            GridItem() {
+              Row() {
+                Text('已经到底啦')
+                  .fontSize(12)
+                  .fontColor(AppColors.textSecondary)
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+              .padding({ top: 14, bottom: 20 })
+            }
+            .columnStart(0)
+            .columnEnd(1)
+          }
         }
         .columnsTemplate('1fr 1fr')
         .columnsGap(10)
@@ -359,6 +494,10 @@ export struct HomePage {
         .padding({ left: 16, right: 16, top: 6, bottom: 16 })
         .layoutWeight(1)
         .width('100%')
+        .onReachEnd(() => {
+          hilog.info(DOMAIN, TAG, 'Grid onReachEnd triggered! hasMore=%{public}s, isLoadingMore=%{public}s', String(this.hasMore), String(this.isLoadingMore));
+          this.loadMore();
+        })
       }
     }
     .width('100%')
