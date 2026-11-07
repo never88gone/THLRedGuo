@@ -90,6 +90,45 @@ def api_request(url: str, token: str, method: str = "GET", data: dict = None) ->
         return json.loads(body) if body else {}
 
 
+def extract_latest_release_notes(md_text: str) -> str:
+    """
+    从 Markdown 文本中提取最近一次更新（即第一个 ## 标题及其子条目）。
+    """
+    lines = md_text.strip().splitlines()
+    in_section = False
+    section_lines = []
+    header = ""
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            if not in_section:
+                in_section = True
+                header = stripped[3:].strip()
+            else:
+                break
+        elif in_section:
+            if stripped.startswith("# "):
+                break
+            if stripped:
+                section_lines.append(stripped)
+
+    if not in_section or not section_lines:
+        return ""
+
+    formatted_items = []
+    for item in section_lines:
+        if item.startswith("- ") or item.startswith("* ") or item.startswith("• "):
+            item_text = item[2:].strip()
+        else:
+            item_text = item
+        formatted_items.append(f"• {item_text}")
+
+    if header:
+        return f"【{header} 更新内容】\n" + "\n".join(formatted_items)
+    return "\n".join(formatted_items)
+
+
 def main():
     parser = argparse.ArgumentParser(description="为 TestFlight 最新构建设置更新说明")
     parser.add_argument("--notes", type=str, help="更新说明文本")
@@ -103,10 +142,25 @@ def main():
     if not key_id:
         sys.exit(0)
 
-    # 确定更新说明内容
+    # 确定更新说明内容：优先从指定文件、根目录 release.md 或 tvos/release.md 自动提取最近一次修改内容
     notes = args.notes
     if not notes and args.notes_file and args.notes_file.is_file():
-        notes = args.notes_file.read_text(encoding="utf-8").strip()
+        file_content = args.notes_file.read_text(encoding="utf-8").strip()
+        if args.notes_file.suffix.lower() == ".md":
+            notes = extract_latest_release_notes(file_content)
+        else:
+            notes = file_content
+
+    if not notes:
+        root_release = root / "release.md"
+        if root_release.is_file():
+            notes = extract_latest_release_notes(root_release.read_text(encoding="utf-8"))
+
+    if not notes:
+        tvos_release = root / "tvos" / "release.md"
+        if tvos_release.is_file():
+            notes = extract_latest_release_notes(tvos_release.read_text(encoding="utf-8"))
+
     if not notes:
         default_file = root / "testflight_whatsnew.txt"
         if not default_file.is_file():

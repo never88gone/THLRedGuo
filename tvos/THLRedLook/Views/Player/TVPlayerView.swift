@@ -511,16 +511,6 @@ public struct TVPlayerView: View {
 
     private func applyStateListeners<Content: View>(to content: Content) -> some View {
         content
-            .onReceive(TVPictureInPictureCoordinator.shared.$isPictureInPictureActive) { isActive in
-                if isActive {
-                    NSLog("🎬 [TVPlayerView] 收到画中画已激活通知，自动 dismiss 当前全屏视图")
-                    if let onDismiss = onDismiss {
-                        onDismiss()
-                    } else {
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                }
-            }
             .onChange(of: viewModel.switchSeasonDrama) { _, newDrama in
                 if let drama = newDrama {
                     viewModel.onDisappear()

@@ -166,17 +166,31 @@ platform :ios do
 
     build_app_store_ipa(options)
 
+    changelog_text = nil
+    release_md = File.join(PROJECT_ROOT, "release.md")
+    if File.exist?(release_md)
+      content = File.read(release_md)
+      match = content.match(/^##\s+(.+?)$([\s\S]*?)(?=^##\s+|\Z)/)
+      if match
+        header = match[1].strip
+        items = match[2].strip.lines.map(&:strip).reject(&:empty?).map { |l| l.sub(/^[-*•]\s*/, '• ') }
+        changelog_text = "【#{header} 更新内容】\n" + items.join("\n")
+      end
+    end
+
     ipa_path = Actions.lane_context[SharedValues::IPA_OUTPUT_PATH] || File.join(PROJECT_ROOT, "build/ios/ipa/redlook-release.ipa")
     if File.exist?(ipa_path.to_s)
       upload_to_testflight(
         skip_waiting_for_build_processing: true,
         uses_non_exempt_encryption: false,
+        changelog: changelog_text,
         ipa: ipa_path
       )
     else
       upload_to_testflight(
         skip_waiting_for_build_processing: true,
-        uses_non_exempt_encryption: false
+        uses_non_exempt_encryption: false,
+        changelog: changelog_text
       )
     end
   end

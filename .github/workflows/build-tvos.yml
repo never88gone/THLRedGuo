@@ -133,6 +133,8 @@ jobs:
             python .github/ci/source_manifest.py verify --ipa "$signed_ipa"
             xcrun altool --upload-app -f "$signed_ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
             echo "✅ tvOS 版本成功上传到 App Store Connect！"
+            echo "正在自动从 tvos/release.md 提取最新修改内容并同步至 TestFlight 更新说明..."
+            python .github/ci/set_testflight_notes.py --notes-file tvos/release.md || echo "::warning::同步 TestFlight 更新说明提示非阻断异常"
           else
             echo "::error::未发现签名的 tvOS IPA 产物，无法上传。"
             exit 1

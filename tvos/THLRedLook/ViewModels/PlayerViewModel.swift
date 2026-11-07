@@ -193,15 +193,19 @@ public final class PlayerViewModel: ObservableObject {
             showToast("当前设备不支持系统画中画")
             return
         }
-        guard let controller = pipController else {
-            showToast("画中画正在准备，请稍候...")
+        guard let p = self.player else {
+            showToast("播放器准备中，请稍候...")
             return
         }
-        guard controller.isPictureInPicturePossible else {
-            showToast("视频画面缓冲中，请稍候...")
-            return
-        }
-        TVPictureInPictureCoordinator.shared.startPictureInPicture()
+        showToast("已开启画中画，返回主界面可持续悬浮播放")
+        TVPictureInPictureCoordinator.shared.startPictureInPicture(
+            player: p,
+            drama: self.drama,
+            currentEpisodeIndex: self.currentEpisodeIndex,
+            allEpisodes: self.allEpisodes,
+            initialPosition: self.currentTime,
+            playbackPlan: self.plan
+        )
     }
 
     public func onAppear() {
@@ -210,22 +214,28 @@ public final class PlayerViewModel: ObservableObject {
         closed = false
         if progressSaveTimer == nil { startProgressSaveTimer() }
 
-        // 若当前画中画活跃，且与正在播放的剧集一致，无缝复用现有播放器并完成全屏恢复
+        // 若当前画中画活跃，且与正在播放的剧集一致，无缝复用现有播放器收归全屏
         if let activePipPlayer = TVPictureInPictureCoordinator.shared.activePlayer,
-           let session = TVPictureInPictureCoordinator.shared.currentSession,
-           session.drama.id == self.drama.id {
-            let currentSeconds = CMTimeGetSeconds(activePipPlayer.currentTime())
-            self.currentTime = (currentSeconds.isFinite && currentSeconds >= 0) ? currentSeconds : session.currentPosition
-            self.currentEpisodeIndex = session.episodeIndex
-            if let p = session.playbackPlan {
-                self.plan = p
-                self.selectedQuality = p.quality
+           let session = TVPictureInPictureCoordinator.shared.currentSession {
+            if session.drama.id == self.drama.id {
+                let currentSeconds = CMTimeGetSeconds(activePipPlayer.currentTime())
+                self.currentTime = (currentSeconds.isFinite && currentSeconds >= 0) ? currentSeconds : session.currentPosition
+                self.currentEpisodeIndex = session.episodeIndex
+                if let p = session.playbackPlan {
+                    self.plan = p
+                    self.selectedQuality = p.quality
+                }
+                // 收起画中画小窗并由全屏接管播放
+                TVPictureInPictureCoordinator.shared.stopPictureInPicture()
+                self.startPlaybackWithPlayer(activePipPlayer, seekTo: 0)
+                self.isLoading = false
+                self.isPlaying = (activePipPlayer.timeControlStatus == .playing)
+                TVPictureInPictureCoordinator.shared.completeRestore(success: true)
+                return
+            } else {
+                // 打开新剧，先停止旧画中画浮窗
+                TVPictureInPictureCoordinator.shared.stopPictureInPicture()
             }
-            self.startPlaybackWithPlayer(activePipPlayer, seekTo: 0)
-            self.isLoading = false
-            self.isPlaying = (activePipPlayer.timeControlStatus == .playing)
-            TVPictureInPictureCoordinator.shared.completeRestore(success: true)
-            return
         }
 
         // 若外部已提前预加载就绪，0ms 瞬间挂载起播，彻底杜绝转圈等待
