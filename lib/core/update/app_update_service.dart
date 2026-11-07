@@ -311,6 +311,13 @@ class AppUpdateService {
       return matchInTag.group(1) ?? '';
     }
 
+    // 匹配如: -263051654
+    final dashRegex = RegExp(r'-(\d{6,})');
+    final matchDash = dashRegex.firstMatch(tag);
+    if (matchDash != null) {
+      return matchDash.group(1) ?? '';
+    }
+
     final matchInBody = buildRegex.firstMatch(body);
     if (matchInBody != null) {
       return matchInBody.group(1) ?? '';

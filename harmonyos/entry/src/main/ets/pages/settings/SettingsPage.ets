@@ -2,7 +2,9 @@ import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 import { AppColors, AppDimensions } from '../../common/AppTheme';
 import { Constants } from '../../common/Constants';
+import common from '@ohos.app.ability.common';
 import { LocalStore } from '../../core/store/LocalStore';
+import { AppUpdateService } from '../../core/update/AppUpdateService';
 
 @Entry
 @Component
@@ -122,7 +124,7 @@ export struct SettingsPage {
   showAboutDialog(): void {
     promptAction.showDialog({
       title: Constants.APP_NAME,
-      message: `版本号：${Constants.APP_VERSION}\n\n基于 HarmonyOS NEXT 原生 ArkTS 与 Stage 模型研发。\n\n遵守开源合规规范，纯净短剧独立设备端客户端。\n\n端侧解析，无第三方中转。`,
+      message: `版本号：v${Constants.APP_VERSION} (Build ${Constants.APP_BUILD_NUMBER})\n\n基于 HarmonyOS NEXT 原生 ArkTS 与 Stage 模型研发。\n\n遵守开源合规规范，纯净短剧独立设备端客户端。\n\n端侧解析，无第三方中转。`,
       buttons: [
         { text: '确定', color: AppColors.hongguoRed }
       ]
@@ -130,7 +132,32 @@ export struct SettingsPage {
   }
 
   checkAppUpdate(): void {
-    promptAction.showToast({ message: `当前版本 v${Constants.APP_VERSION} 已是最新稳定版` });
+    promptAction.showToast({ message: '正在检查新版本...' });
+    AppUpdateService.getInstance().checkUpdate()
+      .then((info) => {
+        if (info.hasUpdate) {
+          const targetUrl = info.primaryAsset ? info.primaryAsset.downloadUrl : info.htmlUrl;
+          const notes = info.releaseNotes ? ('\n\n更新说明:\n' + info.releaseNotes.substring(0, 300)) : '';
+          promptAction.showDialog({
+            title: `发现新版本: ${info.title}`,
+            message: `当前版本: v${info.currentVersion} (Build ${info.currentBuild})\n最新版本: v${info.remoteVersion} (Build ${info.remoteBuild})${notes}`,
+            buttons: [
+              { text: '前往下载', color: AppColors.hongguoRed },
+              { text: '稍后再说', color: AppColors.textSecondary }
+            ]
+          }, (err, data) => {
+            if (!err && data.index === 0) {
+              const ctx = getContext(this) as common.UIAbilityContext;
+              AppUpdateService.getInstance().openUpdateUrl(ctx, targetUrl);
+            }
+          });
+        } else {
+          promptAction.showToast({ message: `当前版本 v${info.currentVersion} (Build ${info.currentBuild}) 已是最新` });
+        }
+      })
+      .catch(() => {
+        promptAction.showToast({ message: '检查更新失败，请检查网络或稍后重试' });
+      });
   }
 
   build() {
@@ -470,7 +497,7 @@ export struct SettingsPage {
                 .fontSize(14)
                 .fontColor(AppColors.textPrimary)
               Blank()
-              Text(`v${Constants.APP_VERSION}`)
+              Text(`v${Constants.APP_VERSION} (${Constants.APP_BUILD_NUMBER})`)
                 .fontSize(13)
                 .fontColor(AppColors.textSecondary)
             }
@@ -485,7 +512,7 @@ export struct SettingsPage {
                 .fontSize(14)
                 .fontColor(AppColors.textPrimary)
               Blank()
-              Text('已是最新版本 >')
+              Text('检测 GitHub 最新版本 >')
                 .fontSize(13)
                 .fontColor(AppColors.textSecondary)
             }
