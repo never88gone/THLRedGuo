@@ -2558,8 +2558,8 @@ spider.danmaku = function (id, startMs, durationMs) {
         if (!/^[1-9]\d{9,29}$/.test(vid) || !season || season > 200 || !text(video.title)) continue;
         const episodes = integer(video.episode_cnt);
         const upcoming = !episodes && !!video.subscribe_item;
-        const playable = episodes > 0 && video.disable_play !== true;
-        const status = upcoming ? '待上线' : playable ? '' : '暂不可播放';
+        const playable = video.disable_play !== true && (!upcoming || episodes > 0);
+        const status = upcoming ? '待上线' : (video.disable_play === true ? '暂不可播放' : '');
         rows.set(vid, {
           vod_id: vid, vod_name: text(video.title), vod_pic: cleanCoverUrl(text(video.cover)),
           vod_content: text(video.video_desc), vod_episodes: episodes,

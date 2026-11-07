@@ -146,11 +146,17 @@ class IosEncryptedStream {
         if (bytes == null || bytes.length != count) {
           throw const FormatException('媒体分段数据不完整');
         }
-        response.add(bytes);
-        await response.flush();
+        try {
+          response.add(bytes);
+          await response.flush();
+        } catch (_) {
+          break;
+        }
         cursor += bytes.length;
       }
-      await response.close();
+      try {
+        await response.close();
+      } catch (_) {}
     } catch (_) {
       try {
         response.statusCode = HttpStatus.badGateway;

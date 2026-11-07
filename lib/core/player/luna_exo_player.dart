@@ -388,8 +388,17 @@ class LunaExoPlayer implements Player {
       throw Exception('无效的播放地址: $url');
     }
 
-    // 先导探测：如果尚未显式判定为 HLS，向网络地址快速嗅探前置响应头与内容，智能识别
-    if (!isHls &&
+    final isLoopbackStream =
+        uri != null &&
+        (uri.host == '127.0.0.1' ||
+            uri.host == 'localhost' ||
+            uri.host == '::1') &&
+        uri.path.endsWith('.mp4');
+
+    if (isLoopbackStream) {
+      confirmedMp4 = true;
+      isHls = false;
+    } else if (!isHls &&
         uri != null &&
         (uri.scheme == 'http' || uri.scheme == 'https')) {
       final client = HttpClient()
