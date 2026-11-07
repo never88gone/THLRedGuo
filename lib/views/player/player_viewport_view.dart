@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -154,7 +155,9 @@ class PlayerViewportView extends StatelessWidget {
     final title =
         '${detail.drama.title} · 第 ${detail.episodes[index].number} 集${plan?.offline == true ? ' · 本地' : ''}${isVipEp ? ' · VIP 试看' : ''}${(plan?.routeIndex ?? 0) > 0 ? ' · 线路 ${plan!.routeIndex + 1}' : ''}';
     final hideOverlayForPictureInPicture = pictureInPictureVisible;
-    final Widget controls = hideOverlayForPictureInPicture
+    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
+    final showPipPlaceholder = hideOverlayForPictureInPicture && !isAndroid;
+    final Widget controls = showPipPlaceholder
         ? Stack(
             fit: StackFit.expand,
             children: [
@@ -275,6 +278,8 @@ class PlayerViewportView extends StatelessWidget {
               ),
             ],
           )
+        : hideOverlayForPictureInPicture
+        ? const SizedBox.shrink()
         : television
         ? TelevisionControls(
             player: player,
@@ -338,13 +343,18 @@ class PlayerViewportView extends StatelessWidget {
     final layeredControls = Stack(
       fit: StackFit.expand,
       children: [
-        if (!hideOverlayForPictureInPicture)
+        if (!hideOverlayForPictureInPicture) ...[
           DanmakuOverlay(
             controller: danmaku,
             aspectRatio: aspectRatio,
             style: danmakuStyle ?? const DanmakuStyle(),
           ),
-        controlsOverlay ?? controls,
+          ?controlsOverlay,
+        ],
+        if (hideOverlayForPictureInPicture)
+          controls
+        else if (controlsOverlay == null)
+          controls,
       ],
     );
 
@@ -367,7 +377,7 @@ class PlayerViewportView extends StatelessWidget {
                 child: IgnorePointer(child: SizedBox.expand(key: videoPaneKey)),
               ),
               // 0. 最底层托底背景（电视大屏使用纯黑底衬，避免彩色漫反射破坏电视背光分区控光与黑位对比度；移动端保留适度毛玻璃）
-              if (!television)
+              if (!television && !pictureInPictureVisible)
                 DramaBackdrop(
                   drama: detail.drama,
                   repository: repository,

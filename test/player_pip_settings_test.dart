@@ -379,6 +379,86 @@ void main() {
       }
     });
 
+    testWidgets('5.1 UI 验证：Android 平台进入画中画状态时，播控与遮罩面板彻底隐藏，确保画中画浮窗纯净播放无遮挡', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final store = LocalStore(prefs);
+        await store.setPlaybackPreferences(
+          store.playbackPreferences.copyWith(pictureInPicture: true),
+        );
+
+        final mockDrama = const Drama(
+          id: 'test_pip_drama_android',
+          title: 'Android画中画纯净无遮挡测试',
+          source: 'hongguo',
+          sourceId: '7694896136963755032',
+          cover: 'https://mock.snssdk.com/cover.png',
+          episodes: 5,
+        );
+        final mockDetail = DramaDetail(mockDrama, [
+          Episode(const {
+            'url': 'https://mock.snssdk.com/video/mp4/test_pip_drama.mp4',
+            'title': '第 1 集',
+          }, 1),
+        ]);
+        final mockPlayer = _MockPlayer();
+        final mockRepo = _MockRepo();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: PlayerScreen(
+              detail: mockDetail,
+              initialIndex: 0,
+              repository: mockRepo,
+              store: store,
+              playerFactory: () => mockPlayer,
+              videoBuilder: (controls) => Stack(children: [controls]),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        final enterMessage = const StandardMethodCodec().encodeMethodCall(
+          const MethodCall('pictureInPictureChanged', {'active': true}),
+        );
+        await messenger.handlePlatformMessage(
+          'duanju/device',
+          enterMessage,
+          null,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+
+        expect(
+          find.byKey(const ValueKey('player-pip-viewport-back')),
+          findsNothing,
+        );
+        expect(
+          find.byIcon(Icons.picture_in_picture_alt_rounded),
+          findsNothing,
+        );
+        expect(find.text('正在画中画窗口中播放'), findsNothing);
+        expect(
+          find.byKey(const ValueKey('player-pip-restore-btn')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('player-pip-exit-btn')),
+          findsNothing,
+        );
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
     testWidgets('6. 交互验证：轻触「恢复应用内播放」按钮触发 stopPictureInPicture 退出画中画并恢复应用内播放', (
       tester,
     ) async {

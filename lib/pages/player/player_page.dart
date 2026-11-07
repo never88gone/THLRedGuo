@@ -121,6 +121,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   Timer? _healthTimer;
   Timer? _errorTimer;
   Timer? _pictureInPictureExitTimer;
+  Timer? _diagnosticsTimer;
   Future<void> _operations = Future<void>.value();
   late int _index;
   late final int _profileEpoch;
@@ -1636,7 +1637,8 @@ class _PlayerScreenState extends State<PlayerScreen>
           '当前集可选=[${plan.qualities.map((q) => "${q}P").join('/')}], '
           '状态=${_requestedQuality > 0 && plan.quality > 0 && _requestedQuality != plan.quality ? "当前集无请求档位，自动回退/匹配" : "完全匹配"}',
         );
-        Future.delayed(const Duration(seconds: 2), () async {
+        _diagnosticsTimer?.cancel();
+        _diagnosticsTimer = Timer(const Duration(seconds: 2), () async {
           if (_closed || ticket != _generation) return;
           final diag = await _getDiagnostics();
           if (diag != null) {
@@ -2198,6 +2200,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     _healthTimer?.cancel();
     _errorTimer?.cancel();
     _pictureInPictureExitTimer?.cancel();
+    _diagnosticsTimer?.cancel();
     if (_pictureInPictureHandlerInstalled) {
       PipManager.instance.notifyPlayerDisposed();
     }
@@ -2320,7 +2323,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                     ],
                   ),
             body: pictureInPicture
-                ? _videoPane(context, topPadding: MediaQuery.paddingOf(context).top)
+                ? _videoPane(context, topPadding: 0.0)
                 : SafeArea(
                     top: false,
                     bottom: !fullscreen,
