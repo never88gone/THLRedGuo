@@ -11,52 +11,30 @@
 
 ## 项目定位
 
-以下声明适用于本项目当前公开源码：
+> ⚠️ **免责声明**：本项目仅供编程技术交流与跨平台/原生客户端架构研究（Flutter / Apple tvOS / HarmonyOS NEXT），严禁用于商业牟利或侵权用途。本软件为纯本地端侧播放工具，不存储、不分发任何音视频资源，网络请求与数据解析均在设备端完成。
 
-> 本项目仅用于学习交流网络框架与架构设计，出于法律合规与安全考虑，已移除目标平台的核心签名参数（Secret/Salt），不提供开箱即用的破解功能。
+**糖葫芦Haw**（`THLRedLook`）是一款基于 **Flutter + Apple tvOS 原生 + HarmonyOS NEXT 原生** 打造的全平台独立短剧聚合播放器。应用无需注册或登录，网络请求与规则解析由端侧独立 JS 引擎驱动，媒体硬件解码与解密均在设备本地完成，无需中转服务器。
 
-> ⚠️ **免责声明 (Disclaimer)**：
-> 1. **仅供学习研究**：本项目仅供编程技术交流、Flutter 跨平台、Apple tvOS 原生与 HarmonyOS NEXT 原生应用架构研究使用，严禁用于任何商业牟利或侵权用途；
-> 2. **纯客户端工具，无内容存储**：本项目为纯本地端侧播放器工具，无需注册登录即可直接使用；开发者不搭建、不运营任何流媒体服务器，不提供、不存储、不分发任何音视频资源；
-> 3. **网络数据版权归属**：应用中所有可访问的数据源均来源于第三方网络公开平台，其版权与知识产权均归原版权方所有，请自觉支持正版内容；
-> 4. **责任限制**：用户使用本软件及自配数据源产生的一切法律责任及版权纠纷均由使用者自行承担，与本项目及其代码贡献者无关。
-
-**糖葫芦Haw**（工程标识：`THLRedLook`，包名 / Application ID：`com.never88gone.redlook` / `com.never88gone.airdrop`）是一款基于 **Flutter + Apple tvOS 原生 + HarmonyOS NEXT 原生** 打造的全平台独立流媒体与短剧聚合应用。
-
-应用内无需注册账号或登录。数据请求、签名和解析由设备端 JS 数据源完成，媒体解码、流式解密等底层能力由客户端提供，无需搭建远程中转或中心化代理服务。
-
-## JS 数据源
-
-应用内置官方 `assets/sources/hongguo.js`，也可在数据源管理页面导入兼容的 JS 数据源。iOS、iPadOS、tvOS 与 HarmonyOS 的浏览和在线播放均通过 JS 数据源工作，用户无需准备或导入 Android APK。
-
-独立导入请使用 [发布版 hongguo.js](https://github.com/never88gone/THLRedGuo/releases/download/official-source/hongguo.js)。
-
-- **iOS / iPadOS**：进入「设置 → JS 数据源插件管理」管理数据源。
-- **tvOS**：进入「设置 → 站源管理」查看当前 JS 版本、导入数据源网址和执行诊断。
-- **HarmonyOS**：支持在鸿蒙端原生执行 JS 数据源，由内置轻量 JS 引擎直连官方 API。
-
-收藏、历史和播放进度保存在设备端，并可通过 iCloud 在支持的平台间同步。
+内置官方标准短剧源 `assets/sources/hongguo.js`，支持在各端管理界面导入扩展脚本。独立导入可获取 [发布版 hongguo.js](https://github.com/never88gone/THLRedGuo/releases/download/official-source/hongguo.js)。
 
 ---
 
-## 📲 官方公测与交流反馈
+## 📲 公测与交流
 
-- **🍏 Apple TestFlight 官方公测**：[立即加入 TestFlight 公测 (iOS / iPadOS / tvOS)](https://testflight.apple.com/join/rkvvdp7J)
-  > 覆盖 iOS (iPhone / iPad) 与 Apple tvOS 客厅大屏版，点击链接即可通过苹果官方 TestFlight 一键安装并接收版本更新。
-- **💬 Telegram 官方交流与反馈**：[https://t.me/tanghulutvos](https://t.me/tanghulutvos) （频道 / 群组：`@tanghulutvos`）
-  > 欢迎加入 Telegram 官方交流群获取最新动态、交流反馈与建议。
+- **🍏 Apple TestFlight 公测**：[加入 TestFlight 公测 (iOS / iPadOS / tvOS)](https://testflight.apple.com/join/rkvvdp7J)
+- **💬 Telegram 官方群组**：[https://t.me/tanghulutvos](https://t.me/tanghulutvos) (`@tanghulutvos`)
 
 ---
 
 ## 界面预览
 
-### 🖥️ 桌面端宽屏与分栏视窗 (Windows / macOS)
+### 🖥️ 桌面端 (Windows / macOS)
 
 | 桌面端宽屏分栏全景 | 桌面端高清播放与选集 |
 | :---: | :---: |
 | <img src="assets/screenshots/desktop_overview.png" width="440" alt="桌面端全景" /> | <img src="assets/screenshots/desktop_player.png" width="440" alt="桌面端播放器" /> |
 
-### 📱 移动端核心观影体验 (iOS / Android)
+### 📱 移动端 (iOS / Android)
 
 | 首页发现与分类 | 搜索与关键词联想 | 热播短剧排行榜 |
 | :---: | :---: | :---: |
@@ -66,31 +44,13 @@
 | :---: | :---: | :---: |
 | <img src="assets/screenshots/mobile_detail.png" width="180" alt="剧集详情" /> | <img src="assets/screenshots/mobile_player_portrait.png" width="180" alt="竖屏播放" /> | <img src="assets/screenshots/mobile_player_fullscreen.png" width="260" alt="横屏播放" /> |
 
-### 🔴 HarmonyOS NEXT 鸿蒙原生端 (Huawei)
+### 🔴 鸿蒙原生端 (HarmonyOS NEXT)
 
-| 鸿蒙端首页与分类流式浏览 | 鸿蒙端短剧选集与沉浸播放 |
+| 鸿蒙端首页与流式分页 | 鸿蒙端短剧选集与沉浸播放 |
 | :---: | :---: |
 | <img src="assets/screenshots/harmonyos_home.png" width="220" alt="鸿蒙端首页" /> | <img src="assets/screenshots/harmonyos_player.png" width="220" alt="鸿蒙端播放器" /> |
 
-### 📱 iPhone Duo 双屏折叠设备适配 (iOS)
-
-| iPhone Duo 折叠态 (外屏 3 列自适应网格) | iPhone Duo 展开态 (折叠屏打开 4 列大画幅瀑布流) |
-| :---: | :---: |
-| <img src="assets/screenshots/iphone_duo_home.png" width="220" alt="iPhone Duo 折叠外屏" /> | <img src="assets/screenshots/iphone_duo_unfolded.png" width="310" alt="iPhone Duo 展开内屏" /> |
-
-### 🗂️ 追剧、历史、离线缓存与插件管理
-
-| 我的追剧收藏 | 最近观看 | 离线下载管理 | JS 数据源插件管理 |
-| :---: | :---: | :---: | :---: |
-| <img src="assets/screenshots/mobile_follow.png" width="150" alt="我的追剧" /> | <img src="assets/screenshots/mobile_history.png" width="150" alt="最近观看" /> | <img src="assets/screenshots/mobile_downloads.png" width="150" alt="离线下载" /> | <img src="assets/screenshots/mobile_js_sources.png" width="150" alt="JS数据源管理" /> |
-
-### 🔒 隐私安全与私密保险箱
-
-| 九宫格手势锁 | 隐私模式与私密设置 | 独立私密短剧库 |
-| :---: | :---: | :---: |
-| <img src="assets/screenshots/privacy_lock.png" width="180" alt="九宫格手势锁" /> | <img src="assets/screenshots/privacy_settings.png" width="180" alt="隐私设置" /> | <img src="assets/screenshots/privacy_vault.png" width="180" alt="私密短剧库" /> |
-
-### 📺 Apple tvOS 客厅大屏原生端
+### 📺 客厅大屏端 (Apple tvOS)
 
 | tvOS 首页瀑布流 | tvOS 剧集详情与选集 |
 | :---: | :---: |
@@ -104,124 +64,61 @@
 
 ## 平台支持矩阵
 
-应用深度适配移动端、桌面端与客厅大屏，覆盖以下操作系统与形态：
-
-| 平台 | 形态与特性 | 构建与交付产物 |
+| 平台 | 架构与特性 | 交付产物 |
 | :--- | :--- | :--- |
-| **Android** | 适配手机、折叠屏与老旧设备，兼容 Android 7.1+（API 25+），支持竖屏短剧滑动手势、画中画（PiP）浮窗、arm64-v8a / armeabi-v7a / x86_64 三架构 | 原生 Flutter + NDK 编译，输出 APK / AAB |
-| **Android TV** | 自动识别大屏电视模式，锁定横屏影院布局，完整适配遥控器方向键与焦点移动 | 共用 Flutter 源码，自适应电视 UI 布局 |
-| **iOS / iPadOS** | 适配 iPhone、iPad 与 iPhone Duo 双屏折叠设备，原生画中画（PiP）小窗播放与后台接续、深色模式自适应、原生手势返回与低功耗下载 | 支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装，或通过 Xcode 编译打包 |
-| **HarmonyOS NEXT** | 华为鸿蒙原生端，适配 HarmonyOS NEXT 手机与折叠屏。采用纯 ArkTS + ArkUI 声明式架构，集成 OpenSSL CENC 硬件级流式解密与 AVPlayer 原生硬解，具备无限滚动分页、分类检索、短剧榜单、沉浸推荐流与本地追剧历史 | 独立 HarmonyOS 原生工程（`harmonyos/`），基于 DevEco Studio + Hvigor 构建，输出已签名 HAP 安装包 |
-| **macOS** | 桌面端大屏响应式三栏/分栏布局，键盘方向键与快捷键全面支持 | macOS App / PKG 安装包 |
-| **Windows** | 基于 `media_kit` / libmpv 硬件解码，集成专属 Shader 画质增强滤镜 | 独立免安装绿色包 / 便携目录（含完整 DLL 与运行环境） |
-| **Apple tvOS** | 独立原生工程（`tvos/`），纯 SwiftUI + Siri Remote 焦点引擎 + AVKit 原生渲染打造，具备完整客厅大屏交互与原生影院体验 | 独立 Xcode 工程，输出 tvOS IPA；支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装 |
-
-Windows 当前提供浏览、搜索、详情、选集、播放、追剧历史、设置与本地备份入口，需要有效的官方数据源配置。Windows 加密视频需完成本地缓存后起播；系统画中画和 iCloud 同步不在 Windows 提供。
-
-Windows 硬件解码采用兼容拷贝路径，也可在播放设置中切换软件解码的「兼容稳定模式」。画质增强默认关闭，开启后可使用原画对比，增强强度会根据设备负载调整。
-
-当前 Flutter 客户端尚未实现下载传输、断点续传、下载目录迁移、设备互联传输、站源批量更新任务及代理和并发调度设置。下载入口会显示功能尚未提供，相关操作会明确提示未实现；现有媒体合并与导出组件不代表下载到离线播放的完整流程已经可用。手机扫码传递账号使用独立的账号配对服务。
+| **Android / Android TV** | 适配手机、折叠屏与电视大屏，支持竖屏滑动手势、画中画（PiP）浮窗与遥控器焦点导航 | 原生 Flutter + NDK，输出 APK / AAB |
+| **iOS / iPadOS** | 原生画中画（PiP）、后台续播、深色模式自适应、双屏折叠设备适配与 iCloud 进度同步 | 支持 TestFlight 一键安装 / IPA |
+| **HarmonyOS NEXT** | 华为纯血鸿蒙原生工程（`harmonyos/`），纯 ArkTS + ArkUI 架构，集成 OpenSSL CENC 硬件级流式解密与 AVPlayer 硬解 | 签名 HAP 安装包 |
+| **Apple tvOS** | 独立原生大屏工程（`tvos/`），SwiftUI + Siri Remote 焦点引擎 + AVKit 原生渲染 | 独立 Xcode 工程，输出 tvOS IPA |
+| **Windows / macOS** | 桌面端大屏自适应分栏视窗，支持 libmpv 硬件解码与键盘方向键快捷操作 | 免安装绿色便携包 / PKG |
 
 ---
 
-## 核心功能介绍
+## 核心功能
 
-### 📺 首页探索与热播排行
-- **发现页（Flutter / tvOS / HarmonyOS）**：直接读取红果手机 App「找剧」的全部、真人剧、漫剧、AI剧分类与数据；瀑布流滚动自动加载下一页，失败后可重试；
-- **手机版短剧榜单**：读取手机 App 返回的总榜与真人剧、漫剧、AI 剧分类榜，保留官方排序和指标。
-
-### 🔍 智能搜索与联想
-- **手机版搜索与联想**：使用红果手机 App 搜索接口，支持游标分页；空输入展示官方“猜你想搜”，输入关键字展示官方搜索联想；
-- **本地搜索历史**：自动记录搜索词，支持一键点击历史词快捷重新检索或清理历史。
-
-### 🎬 剧集详情与系列多季
-- **海报大图与高清全屏预览**：剧集海报呈现放大至舒适比例，支持点击海报调起全屏查看与双指缩放；
-- **紧凑布局与多状态追剧**：标签移至海报右侧紧凑对齐，支持「想看 / 在看 / 已看」多档追剧状态底部弹窗管理；
-- **防眩光沉浸对比度**：采用多重深度渐变遮罩与独立半透明底衬，彻底消除背景海报高光对剧情简介和播放量的眩光干扰；
-- **系列多季聚拢展示**：优先使用官方系列剧接口按官方季号展示与切换，未上线季智能标识，接口不可用时平滑回退搜索关联。
-
-### ⚡ 影院级视听与播放控制
-- **系统级画中画 (PiP) 浮窗观影**：支持 iOS 与 Android 系统级原生画中画小窗播放，切出应用不中断观影，点击浮窗秒级还原跳转回播放器页面；
-- **沉浸式视频流推荐与无限翻页**：满宽贴底进度条直达屏幕边缘，去除多余按钮与翻页阻断，支持上下滑动平滑无限轮转切剧；
-- **iOS / tvOS / HarmonyOS 加密短剧流式播放**：支持边加载边解密、平滑拖拽与连续切集；短暂分段请求失败自动重试，播放中断时保留进度恢复，并可导出故障诊断；
-- **完整分集取流**：通过官方 App 接口解析完整分集，不将网页公共试看视频作为在线播放兜底；未取得完整片源时保留真实错误供重试和诊断。
-- **清晰度智能与手动切换**：默认优先播放可用的 1080P，片源不可用时回退到其他实际档位；清晰度菜单显示当前分集返回的档位，手动切换保留播放进度；
-- **实时弹幕互动**：弹幕随播放时间轴滚动渲染，支持在播放菜单中随时开启或关闭弹幕；
-- **多种播放手势与偏好**：
-  - **手机竖屏**：手指上下滑动快速换集，长按屏幕任意位置触发 3 倍速快进，轻点启停；
-  - **横屏模式**：屏幕左侧上下滑动调节亮度，右侧上下滑动调节音量，左右滑动快进/后退；
-  - **连播与预热**：支持在播放菜单中自由开启或关闭“自动连播”；开启下一集预加载，片尾秒开切集；
-- **统一全景选集浮层**：弹出浮层支持多季切换、正序/倒序排列与完整平滑滚动，横屏播放下选集顺畅不遮挡。
-
-### 🗂️ 我的追剧与播放历史
-- **一键追剧收藏**：在详情页或播放器中点击“加入追剧”即可收藏，方便随时回看；
-- **精准断点续播**：自动记录每部短剧的观看集数与秒级进度，下次打开即刻无缝续播；
-- **播放历史管理**：提供独立的“最近观看”页面，支持单条滑动删除或一键清空历史记录。
-
-### 📥 离线缓存与分集下载
-- **分集多选批量下载**：在短剧详情页支持批量勾选剧集并一键加入下载队列；
-- **断点续传与离线播放**：下载过程网络波动自动恢复断点，下载完成后无需网络流量即可离线完整观看；
-- **下载常亮防息屏**：提供下载时屏幕常亮开关，防止设备息屏导致批量下载挂起。
-
-### 🔒 隐私安全与私密空间
-- **九宫格图形手势锁**：支持在设置中开启九宫格锁屏密码，应用切至后台自动加锁防窥；
-- **多任务防窥虚化**：切换应用或打开多任务栏时，画面自动触发高斯模糊遮罩；
-- **独立私密短剧空间**：提供独立加密的私密空间，私密剧集与专属记录独立存放，不进入常规播放列表。
-
-### ⚙️ 数据源管理与网络诊断
-- **数据源插件管理**：在设置页面可查看当前已启用的数据源，支持长按或点击删除自定义数据源并带有二次确认；
-- **tvOS 数据源版本核对**：设置 → 站源管理显示应用构建号、内置 JS 指纹与运行一致性；完整诊断日志包含源提交和各运行上下文指纹，便于确认安装包和实际执行的 JS。
-- **tvOS 游客会话恢复**：官方请求独立管理游客身份，不自动混用系统 Cookie；确认缓存会话异常后受限恢复，持续拒绝时保留真实错误，不影响收藏和历史。
-- **网络状态一键诊断**：设置页提供网络检测与诊断工具，可查看与当前数据源的网络连接状态并一键复制完整脱敏排查报告。
-- **出口 IP 与地区**：数据源诊断页及导出报告显示查询服务看到的出口 IP、估算归属地区、来源和检测时间。查询使用 IP.SB / IPWho.is，不读取 GPS；代理分流时可能与红果接口的出口不同，归属地区不能单独证明风控原因。
-- **诊断日志导出**：Flutter 支持导出完整脱敏文本日志，iOS 可通过系统分享面板存储到“文件”或手动反馈。tvOS 可由同一局域网内的手机扫码复制或下载日志，关闭二维码页面后链接失效，最长有效 10 分钟。日志不会自动上传。
+- 📺 **全端硬件级解码**：iOS / tvOS / HarmonyOS 原生支持加密短剧边下边解流式播放，多清晰度自适应切换、实时弹幕与连播预加载。
+- 📱 **多端手势与画中画**：手机竖屏上下滑换集、长按 3 倍速快进；横屏手势精准调节音量/亮度/进度；支持 iOS 与 Android 系统级画中画（PiP）小窗后台接续。
+- 🔍 **分类检索与无限分页**：真人剧、漫剧、AI短剧多分类无缝切换；触底流式无限分页；支持实时联想搜索与本地历史管理。
+- 🎬 **剧集详情与多季聚合**：官方系列多季短剧智能聚合展示与快速选集，正序/倒序轻松切换。
+- 🗂️ **本地追剧与断点续播**：纯端侧保存追剧收藏，秒级断点续播，支持最近观看记录管理。
+- 🔒 **隐私保护与专属空间**：内置九宫格图形手势锁屏、后台多任务防窥虚化及独立私密短剧库。
 
 ---
 
 ## 构建说明
 
-### Flutter 跨平台客户端 (Android / iOS / Windows / macOS)
+### Flutter 客户端 (Android / iOS / Windows / macOS)
 
 ```bash
-# 获取依赖
+# 获取依赖与启动运行
 fvm flutter pub get
-
-# 启动运行
 fvm flutter run
-```
 
-项目通过 `.fvmrc` 固定 Flutter 版本。首次使用时执行 `fvm install`，Windows 开发环境需安装 Visual Studio 的“使用 C++ 的桌面开发”工作负载和 Windows SDK。
-
-```bash
-# 检查环境与源码
-fvm flutter doctor -v
-fvm flutter analyze
-
-# 启动 Windows 桌面版
-fvm flutter run -d windows
-
-# 构建 Windows x64 发布目录
+# 构建 Windows x64 发布包 (产物位于 build/windows/x64/runner/Release/)
 fvm flutter build windows --release
 ```
-
-Windows 产物位于 `build/windows/x64/runner/Release/`，分发时需保留整个目录中的 DLL、`data` 和其他运行依赖。首次构建会下载并校验固定版本的 libmpv 和 ANGLE，需要能够访问 GitHub Releases。
 
 ### 鸿蒙原生端 (HarmonyOS NEXT)
 
 ```bash
-# 进入鸿蒙工程目录
 cd harmonyos
 
-# 执行模块编译打包已签名 HAP
+# 执行构建并输出签名 HAP (产物位于 entry/build/default/outputs/default/entry-default-signed.hap)
 hvigorw --mode module -p module=entry@default -p product=default assembleHap
+```
 
-# 编译生成的签名 HAP 产物位于：
-# harmonyos/entry/build/default/outputs/default/entry-default-signed.hap
+### Apple tvOS 原生端
+
+```bash
+cd tvos
+
+# 打开 Xcode 编译或使用 fastlane 打包
+open THLRedLook.xcodeproj
 ```
 
 ---
 
-## 📈 Star 历史趋势 (Star History)
+## 📈 Star 历史趋势
 
 <a href="https://star-history.com/#never88gone/THLRedGuo&Date">
  <picture>
