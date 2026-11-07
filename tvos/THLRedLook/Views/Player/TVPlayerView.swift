@@ -443,9 +443,7 @@ public struct TVPlayerView: View {
                 viewModel.onAppear()
                 viewModel.setSceneActive(scenePhase == .active)
                 if isInteractive && !viewModel.isControlsVisible {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        activeWakeFocus = .centerWake
-                    }
+                    activeWakeFocus = .centerWake
                 }
             }
             .onDisappear {
@@ -539,22 +537,20 @@ public struct TVPlayerView: View {
             .onChange(of: viewModel.isControlsVisible) { _, isVisible in
                 guard isInteractive else { return }
                 if !isVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible && !viewModel.isQualitySheetVisible {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { activeWakeFocus = .centerWake }
+                    activeWakeFocus = .centerWake
                 }
             }
             .onChange(of: isInteractive) { _, interactive in
                 if !interactive {
                     activeWakeFocus = nil
                 } else if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible && !viewModel.isQualitySheetVisible {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { activeWakeFocus = .centerWake }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { activeWakeFocus = .centerWake }
+                    activeWakeFocus = .centerWake
                 }
             }
             .onChange(of: focusWakeTrigger) { _, _ in
                 guard isInteractive else { return }
                 if !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible && !viewModel.isQualitySheetVisible {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { activeWakeFocus = .centerWake }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { activeWakeFocus = .centerWake }
+                    activeWakeFocus = .centerWake
                 }
             }
             .onChange(of: viewModel.errorMessage) { _, newErr in
@@ -621,9 +617,7 @@ public struct TVPlayerView: View {
         } else {
             state = "已暂停"
         }
-        let val = "\(viewModel.drama.title) · 第 \(viewModel.currentEpisodeIndex) 集 · 已播放 \(position) 秒 · \(state)"
-        NSLog("📺 [WAKE_VALUE] %@", val)
-        return val
+        return "\(viewModel.drama.title) · 第 \(viewModel.currentEpisodeIndex) 集 · 已播放 \(position) 秒 · \(state)"
     }
 
     private var playerFeedActions: TVVideoFeedActions? {

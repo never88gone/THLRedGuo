@@ -70,7 +70,7 @@ public struct MainTabView: View {
     @State private var handoffPosition: Double = 0
     @State private var tabDebounceTask: Task<Void, Never>? = nil
 
-    @ObservedObject private var pipCoordinator = TVPictureInPictureCoordinator.shared
+    private let pipCoordinator = TVPictureInPictureCoordinator.shared
     @State private var pipRestoreDrama: Drama?
     @State private var pipRestoreSession: TVPictureInPictureSession?
 

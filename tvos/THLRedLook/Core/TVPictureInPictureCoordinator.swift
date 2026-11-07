@@ -96,21 +96,38 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         initialPosition: Double = 0,
         playbackPlan: PlaybackPlan? = nil
     ) {
-        if let ctrl = controller {
+        let targetController = controller ?? globalHostView?.pipController
+
+        // 关键防抖：如果画中画未处于激活状态，且播放的剧集、集数、播放源与控制器均未改变，直接复用既有会话，
+        // 严禁在此高频重复给 @Published currentSession 赋值，彻底杜绝引发 SwiftUI 根视图 AttributeGraph 无限重绘死循环
+        if let current = self.currentSession,
+           current.drama.id == drama.id,
+           current.episodeIndex == currentEpisodeIndex,
+           current.playbackPlan?.url == playbackPlan?.url,
+           self.activeController === targetController,
+           self.activePlayer === player,
+           !isPictureInPictureActive {
+            return
+        }
+
+        if let ctrl = targetController, self.activeController !== ctrl {
             self.activeController = ctrl
             ctrl.delegate = self
-        } else if let globalCtrl = globalHostView?.pipController {
-            self.activeController = globalCtrl
-            globalCtrl.delegate = self
         }
-        self.activePlayer = player
-        self.currentSession = TVPictureInPictureSession(
+        if self.activePlayer !== player {
+            self.activePlayer = player
+        }
+
+        let newSession = TVPictureInPictureSession(
             drama: drama,
             episodeIndex: currentEpisodeIndex,
             allEpisodes: allEpisodes,
             currentPosition: initialPosition,
             playbackPlan: playbackPlan
         )
+        if self.currentSession != newSession {
+            self.currentSession = newSession
+        }
     }
 
     public func unregister(controller: AVPictureInPictureController) {

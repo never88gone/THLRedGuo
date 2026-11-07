@@ -27,6 +27,7 @@ public class AVPlayerContainerView: UIView {
     public var bgPlayerLayer: AVPlayerLayer?
     public var blurView: UIVisualEffectView?
     public var pipController: AVPictureInPictureController?
+    public weak var lastReportedPipController: AVPictureInPictureController?
 
     public var videoBackgroundStyle: Int = 0 // 0: 毛玻璃视频背景, 1: 视频铺满背景, 2: 纯黑/透明
     public var onVideoEnded: (() -> Void)?
@@ -36,6 +37,7 @@ public class AVPlayerContainerView: UIView {
 
     public var shouldPlay: Bool = false {
         didSet {
+            guard oldValue != shouldPlay else { return }
             if shouldPlay {
                 play()
             } else {
@@ -442,7 +444,8 @@ public struct AVPlayerView: UIViewRepresentable {
             container.player = targetPlayer
         }
 
-        if let pip = container.pipController {
+        if let pip = container.pipController, pip !== container.lastReportedPipController {
+            container.lastReportedPipController = pip
             onPipControllerReady?(pip)
         }
 
@@ -462,9 +465,13 @@ public struct AVPlayerView: UIViewRepresentable {
             if let url = urlString, !url.isEmpty {
                 VideoCacheManager.shared.focusOnVideo(urlString: url, namespace: namespace)
             }
-            container.shouldPlay = true
+            if !container.shouldPlay {
+                container.shouldPlay = true
+            }
         } else {
-            container.shouldPlay = false
+            if container.shouldPlay {
+                container.shouldPlay = false
+            }
         }
     }
 
