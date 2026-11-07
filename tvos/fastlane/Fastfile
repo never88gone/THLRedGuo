@@ -57,7 +57,7 @@ platform :tvos do
     profile_name = export_method == "development" ? "thlredlook_tvOS_dev" : "thlredlook_tvOS_dis"
 
     # 动态生成北京时间年月日时分秒编译号 (YYYYMMDDHHMMSS) 并通过 agvtool 注入
-    beijing_build = options[:build_number] || Time.now.getlocal("+08:00").strftime("%Y%m%d%H%M%S")
+    beijing_build = options[:build_number] || Time.now.getlocal("+08:00").strftime("%Y%m%d%H%M")
     UI.message("🚀 动态注入北京时间编译号 (Build Number): #{beijing_build}")
     increment_build_number(
       build_number: beijing_build,
