@@ -15,7 +15,7 @@
 
 **糖葫芦Haw**（`THLRedLook`）是一款基于 **Flutter + Apple tvOS 原生 + HarmonyOS NEXT 原生** 打造的全平台独立短剧聚合播放器。应用无需注册或登录，网络请求与规则解析由端侧独立 JS 引擎驱动，媒体硬件解码与解密均在设备本地完成，无需中转服务器。
 
-内置官方标准短剧源 `assets/sources/hongguo.js`，支持在各端管理界面导入扩展脚本。独立导入可获取 [发布版 hongguo.js](https://github.com/never88gone/THLRedGuo/releases/download/official-source/hongguo.js)。
+内置官方标准短剧源 `assets/sources/hongguo.js`。数据源脚本与应用源码持续同步维护更新，所有网络请求与解析在端侧直接驱动。
 
 ---
 
