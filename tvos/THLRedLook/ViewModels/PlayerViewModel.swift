@@ -53,7 +53,13 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var allEpisodes: [Episode]
     public var keepControlsVisible: Bool = false
 
-    @Published public var isPictureInPictureSupported: Bool = AVPictureInPictureController.isPictureInPictureSupported()
+    @Published public var isPictureInPictureSupported: Bool = {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return AVPictureInPictureController.isPictureInPictureSupported()
+        #endif
+    }()
     @Published public var isPictureInPictureActive: Bool = false
     public weak var pipController: AVPictureInPictureController?
 
@@ -177,12 +183,18 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     public func startPictureInPicture() {
+        #if targetEnvironment(simulator)
+        if !AVPictureInPictureController.isPictureInPictureSupported() {
+            showToast("tvOS 模拟器不支持系统画中画浮窗，请在 Apple TV 真机上体验")
+            return
+        }
+        #endif
         guard isPictureInPictureSupported else {
-            showToast("当前设备不支持画中画")
+            showToast("当前设备不支持系统画中画")
             return
         }
         guard let controller = pipController else {
-            showToast("画中画初始化中，请稍候...")
+            showToast("画中画正在准备，请稍候...")
             return
         }
         guard controller.isPictureInPicturePossible else {

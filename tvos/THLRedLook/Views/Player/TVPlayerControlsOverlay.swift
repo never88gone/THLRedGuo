@@ -186,6 +186,7 @@ public struct TVPlayerControlsOverlay: View {
                             switch dir {
                             case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
                             case .down: focusedControl = .speed
+                            case .left: focusedControl = .pip
                             case .right: focusedControl = .playPause
                             default: break
                             }
@@ -310,7 +311,30 @@ public struct TVPlayerControlsOverlay: View {
                             case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
                             case .down: focusedControl = .danmakuSettings
                             case .left: focusedControl = .episodeDrawer
-                            case .right: focusedControl = .speed
+                            case .right: focusedControl = .pip
+                            default: break
+                            }
+                        }
+
+                        // 7. 画中画 (核心控制栏显眼入口)
+                        overlayBarButton(
+                            title: "画中画",
+                            icon: "pip.enter",
+                            target: .pip
+                        ) {
+                            viewModel.startPictureInPicture()
+                        }
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
+                            case .down: focusedControl = .danmakuSettings
+                            case .left:
+                                if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
+                                    focusedControl = .nextEpisode
+                                } else {
+                                    focusedControl = .episodeDrawer
+                                }
+                            case .right: focusedControl = .seekBackward
                             default: break
                             }
                         }
@@ -406,43 +430,10 @@ public struct TVPlayerControlsOverlay: View {
                         }
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up:
-                                if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
-                                    focusedControl = .nextEpisode
-                                } else {
-                                    focusedControl = .episodeDrawer
-                                }
+                            case .up: focusedControl = .pip
                             case .left: focusedControl = .danmaku
-                            case .right:
-                                if viewModel.isPictureInPictureSupported {
-                                    focusedControl = .pip
-                                }
+                            case .right: focusedControl = .speed
                             default: break
-                            }
-                        }
-
-                        // 11. 画中画
-                        if viewModel.isPictureInPictureSupported {
-                            overlayBarButton(
-                                title: "画中画",
-                                icon: "pip.enter",
-                                target: .pip,
-                                isProminent: false
-                            ) {
-                                viewModel.startPictureInPicture()
-                            }
-                            .onMoveCommand { dir in
-                                switch dir {
-                                case .up:
-                                    if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
-                                        focusedControl = .nextEpisode
-                                    } else {
-                                        focusedControl = .episodeDrawer
-                                    }
-                                case .left: focusedControl = .danmakuSettings
-                                case .right: focusedControl = .speed
-                                default: break
-                                }
                             }
                         }
 

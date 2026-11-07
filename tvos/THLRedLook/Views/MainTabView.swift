@@ -78,6 +78,7 @@ public struct MainTabView: View {
     @State private var directPlayerEpisodes: [Episode] = []
     @State private var directPlayerControls: Bool = false
     @State private var directPlayerDrawer: Bool = false
+    @State private var directPlayerFocusPiP: Bool = false
     @State private var isCardFocusedDemo: Bool = false
     @State private var isSettingsActiveDemo: Bool = false
     @State private var settingsInitialCategory: SettingsCategory = .sources
@@ -103,6 +104,7 @@ public struct MainTabView: View {
         var initPlayerEpisodes: [Episode] = []
         var initPlayerControls: Bool = false
         var initPlayerDrawer: Bool = false
+        var initPlayerFocusPiP: Bool = false
         var initCardFocused: Bool = false
         var initSettingsActive: Bool = false
         var initSettingsCategory: SettingsCategory = .sources
@@ -196,11 +198,12 @@ public struct MainTabView: View {
                 initSettingsActive = true
             case "detail":
                 initDetailDrama = representativeDrama
-            case "player", "controls", "drawer":
+            case "player", "controls", "drawer", "pipFocused":
                 initPlayerDrama = representativeDrama
                 initPlayerEpisodes = representativeEpisodes
-                initPlayerControls = (p == "controls")
+                initPlayerControls = (p == "controls" || p == "pipFocused")
                 initPlayerDrawer = (p == "drawer")
+                initPlayerFocusPiP = (p == "pipFocused")
             default:
                 break
             }
@@ -212,6 +215,7 @@ public struct MainTabView: View {
         _directPlayerEpisodes = State(initialValue: initPlayerEpisodes)
         _directPlayerControls = State(initialValue: initPlayerControls)
         _directPlayerDrawer = State(initialValue: initPlayerDrawer)
+        _directPlayerFocusPiP = State(initialValue: initPlayerFocusPiP)
         _isCardFocusedDemo = State(initialValue: initCardFocused)
         _isSettingsActiveDemo = State(initialValue: initSettingsActive)
         _settingsInitialCategory = State(initialValue: initSettingsCategory)
@@ -231,10 +235,12 @@ public struct MainTabView: View {
                     initialShowControls: directPlayerControls,
                     keepControlsVisible: directPlayerControls,
                     initialShowDrawer: directPlayerDrawer,
+                    initialRestoreFocusTarget: directPlayerFocusPiP ? .pip : nil,
                     onDismiss: {
                         directPlayerDrama = nil
                         directPlayerEpisodes = []
                         directPlayerDrawer = false
+                        directPlayerFocusPiP = false
                     }
                 )
                 .id("player_\(directPlayerControls)_\(directPlayerDrawer)_\(drama.id)")
