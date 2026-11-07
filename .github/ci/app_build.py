@@ -54,15 +54,17 @@ import re
 def get_beijing_build_number() -> str:
     tz_bj = timezone(timedelta(hours=8))
     now = datetime.now(tz_bj)
-    # 格式：年月日时分 (YYYYMMDDHHmm)
-    return now.strftime('%Y%m%d%H%M')
+    # 格式：年取后两位(2位) + 月日取今年第几天(3位补零) + 时分(4位补零)
+    # 例如：2026年第311天13:41 -> 263111341 (9位纯数字整数，最大值 263662359，远低于 Android/HarmonyOS 21.47 亿上限且单调递增)
+    year_part = now.strftime('%y')
+    day_of_year = now.strftime('%j')
+    time_part = now.strftime('%H%M')
+    return f"{year_part}{day_of_year}{time_part}"
 
 
 def get_beijing_timestamp_build_number() -> str:
-    """生成北京时间年月日时分构建号 (YYYYMMDDHHmm)"""
-    tz_bj = timezone(timedelta(hours=8))
-    now = datetime.now(tz_bj)
-    return now.strftime('%Y%m%d%H%M')
+    """生成北京时间构建号 (年2位 + 第几天3位 + 时分4位)"""
+    return get_beijing_build_number()
 
 
 def sync_project_version(root: Path, base_version: str = "1.0.0") -> str:
