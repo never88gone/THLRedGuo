@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from app_build import sync_project_version, get_beijing_timestamp_build_number
+from app_build import sync_project_version, get_beijing_tvos_build_number
 
 from prepare_official_source import prepared_official_source
 
@@ -51,7 +51,7 @@ def build(args, xcodebuild, workspace_path, project_path):
     configuration = "Release" if (args.release or args.package) else "Debug"
     destination = "generic/platform=tvOS"
 
-    beijing_build = get_beijing_timestamp_build_number()
+    beijing_build = get_beijing_tvos_build_number()
     print(f"[INFO] 动态注入北京时间编译号 (Build Number): {beijing_build}")
     os.environ["TZ"] = "Asia/Shanghai"
     os.environ["BUILD_NUMBER"] = beijing_build

@@ -13,6 +13,8 @@ android/app/src/main/jniLibs/
 __pycache__/
 *.pyc
 key.properties
+key_debug.properties
+key*.properties
 .DS_Store
 .idea/
 *.iml
@@ -45,7 +47,7 @@ agents/
 *.cer
 *.p8
 .claude/
-fastlane/
+/fastlane/
 
 tvos/THLRedLookTests
 tvos/THLRedLookUITests
