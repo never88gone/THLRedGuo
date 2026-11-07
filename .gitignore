@@ -48,6 +48,7 @@ agents/
 *.p8
 .claude/
 /fastlane/
+**/fastlane/
 
 tvos/THLRedLookTests
 tvos/THLRedLookUITests
