@@ -86,6 +86,7 @@ public actor NativeBridge {
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
     private var accountRevision: UInt64 = 0
+    private let executionQueue = DispatchQueue(label: "com.never88gone.redlook.bridge.worker", qos: .userInitiated)
 
     public func applyLocalPlaybackProfileChange() {
         jsContexts.removeValue(forKey: "hongguo")
@@ -715,63 +716,66 @@ public actor NativeBridge {
         return "spider.\(method).apply(spider, \(String(decoding: data, as: UTF8.self)))"
     }
 
-    /// 在 JS 运行时中异步评估 Promise 并等待结果（使用协同 continuation，避免底层线程饥饿与死锁）
+    /// 在 JS 运行时中异步评估 Promise 并等待结果（使用专用后台队列，避免阻塞主线程及协同线程池）
     private func evalAsync(context: JSContext, scriptExpr: String) async -> [String: Any]? {
         let expectedAccountRevision = accountSnapshot().revision
         let doneKey = "__done_\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        let snapshotGetter = self.accountSnapshot
 
         return await withCheckedContinuation { continuation in
-            let isResumed = NSLock()
-            var resumed = false
-            func safeResume(_ value: [String: Any]?) {
-                isResumed.lock()
-                defer { isResumed.unlock() }
-                guard !resumed else { return }
-                resumed = true
-                context.setObject(nil, forKeyedSubscript: doneKey as NSString)
-                if expectedAccountRevision != accountSnapshot().revision {
-                    continuation.resume(returning: nil)
-                } else {
-                    continuation.resume(returning: value)
+            executionQueue.async {
+                let isResumed = NSLock()
+                var resumed = false
+                func safeResume(_ value: [String: Any]?) {
+                    isResumed.lock()
+                    defer { isResumed.unlock() }
+                    guard !resumed else { return }
+                    resumed = true
+                    context.setObject(nil, forKeyedSubscript: doneKey as NSString)
+                    if expectedAccountRevision != snapshotGetter().revision {
+                        continuation.resume(returning: nil)
+                    } else {
+                        continuation.resume(returning: value)
+                    }
                 }
-            }
 
-            let onDone: @convention(block) (String) -> Void = { jsonStr in
-                var resultData: [String: Any]? = nil
-                if let data = jsonStr.data(using: .utf8),
-                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    resultData = obj
+                let onDone: @convention(block) (String) -> Void = { jsonStr in
+                    var resultData: [String: Any]? = nil
+                    if let data = jsonStr.data(using: .utf8),
+                       let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        resultData = obj
+                    }
+                    safeResume(resultData)
                 }
-                safeResume(resultData)
-            }
-            context.setObject(onDone, forKeyedSubscript: doneKey as NSString)
+                context.setObject(onDone, forKeyedSubscript: doneKey as NSString)
 
-            let wrapper = """
-            globalThis.__hongguoCancelled = false;
-            (async function() {
-                try {
-                    var res = await (\(scriptExpr));
-                    \(doneKey)(JSON.stringify({ ok: true, data: res }));
-                } catch (err) {
-                    var errMsg = err ? (err.message || String(err)) : "未知错误";
-                    var errStack = err && err.stack ? String(err.stack) : "";
-                    var errCat = err && err.category ? String(err.category) : "js_error";
-                    var errCode = err && err.code ? String(err.code) : "JS_EXECUTION";
-                    \(doneKey)(JSON.stringify({
-                        ok: false,
-                        error: errMsg,
-                        stack: errStack,
-                        category: errCat,
-                        code: errCode
-                    }));
+                let wrapper = """
+                globalThis.__hongguoCancelled = false;
+                (async function() {
+                    try {
+                        var res = await (\(scriptExpr));
+                        \(doneKey)(JSON.stringify({ ok: true, data: res }));
+                    } catch (err) {
+                        var errMsg = err ? (err.message || String(err)) : "未知错误";
+                        var errStack = err && err.stack ? String(err.stack) : "";
+                        var errCat = err && err.category ? String(err.category) : "js_error";
+                        var errCode = err && err.code ? String(err.code) : "JS_EXECUTION";
+                        \(doneKey)(JSON.stringify({
+                            ok: false,
+                            error: errMsg,
+                            stack: errStack,
+                            category: errCat,
+                            code: errCode
+                        }));
+                    }
+                })();
+                """
+                context.evaluateScript(wrapper)
+
+                // 15 秒超时保护，彻底消除 JS 挂死导致的协同等待
+                DispatchQueue.global().asyncAfter(deadline: .now() + 15.0) {
+                    safeResume(["ok": false, "error": "JS 执行无响应或超时", "code": "TIMEOUT"])
                 }
-            })();
-            """
-            context.evaluateScript(wrapper)
-
-            // 15 秒超时保护，彻底消除 JS 挂死导致的协同等待
-            DispatchQueue.global().asyncAfter(deadline: .now() + 15.0) {
-                safeResume(["ok": false, "error": "JS 执行无响应或超时", "code": "TIMEOUT"])
             }
         }
     }

@@ -72,7 +72,8 @@ public struct TVPlayerView: View {
             keepControlsVisible: keepControlsVisible,
             initialShowDrawer: initialShowDrawer,
             initialRestoreFocusTarget: initialRestoreFocusTarget,
-            preloadedPlan: preloadedPlan
+            preloadedPlan: preloadedPlan,
+            isFeedMode: feedActions != nil
         ))
         self.onDismiss = onDismiss
         self.onSwitchSeason = onSwitchSeason
@@ -1011,45 +1012,6 @@ public class TVTouchCapturingView: UIView, UIGestureRecognizerDelegate {
     }
 
     public override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        var handled = false
-        for press in presses {
-            switch press.type {
-            case .leftArrow:
-                print("THL_PRESSES_BEGAN_LEFT_ARROW")
-                onLeftArrow?()
-                handled = true
-            case .rightArrow:
-                print("THL_PRESSES_BEGAN_RIGHT_ARROW")
-                onRightArrow?()
-                handled = true
-            case .upArrow:
-                print("THL_PRESSES_BEGAN_UP_ARROW")
-                onUpArrow?()
-                handled = true
-            case .downArrow:
-                print("THL_PRESSES_BEGAN_DOWN_ARROW")
-                onDownArrow?()
-                handled = true
-            case .select:
-                print("THL_PRESSES_BEGAN_SELECT")
-                onSelect?()
-                handled = true
-            case .playPause:
-                print("THL_PRESSES_BEGAN_PLAY_PAUSE")
-                onPlayPause?()
-                handled = true
-            case .menu:
-                print("THL_PRESSES_BEGAN_MENU")
-                if let onMenu {
-                    onMenu()
-                    handled = true
-                }
-            default:
-                break
-            }
-        }
-        if !handled {
-            super.pressesBegan(presses, with: event)
-        }
+        super.pressesBegan(presses, with: event)
     }
 }

@@ -62,6 +62,14 @@ public final class LocalStore: ObservableObject {
     private let cachedCategoriesKey = "thl_tv_cached_categories"
     private let cachedHomeDramasKey = "thl_tv_cached_home_dramas"
 
+    private var isStandardStore: Bool { defaults === UserDefaults.standard }
+
+    private var catalogCacheURL: URL {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("thl_tv_catalog_cache.json")
+    }
+
     public init(defaults: UserDefaults = .standard, cloudUpload: @escaping (LocalStore) -> Void = { ICloudSyncService.shared.scheduleUpload(store: $0) }) {
         self.usesOfficialAccount = defaults === UserDefaults.standard
         self.defaults = defaults
@@ -77,15 +85,30 @@ public final class LocalStore: ObservableObject {
             defaults.set("hongguo", forKey: currentSourceKey)
         }
 
-        if let data = defaults.data(forKey: cachedCategoriesKey),
-           let cats = try? JSONDecoder().decode([CatalogCategory].self, from: data) {
-            cachedCategories = cats
+        if isStandardStore {
+            struct CatalogCache: Codable {
+                let categories: [CatalogCategory]
+                let dramas: [Drama]
+            }
+            if let data = try? Data(contentsOf: catalogCacheURL),
+               let cache = try? JSONDecoder().decode(CatalogCache.self, from: data) {
+                cachedCategories = cache.categories
+                cachedHomeDramas = cache.dramas
+            }
+            // 关键：彻底从 defaults 中删除历史写入的超大剧集列表，消除 CFPreferences 崩溃
+            defaults.removeObject(forKey: cachedCategoriesKey)
+            defaults.removeObject(forKey: cachedHomeDramasKey)
+        } else {
+            if let data = defaults.data(forKey: cachedCategoriesKey),
+               let cats = try? JSONDecoder().decode([CatalogCategory].self, from: data) {
+                cachedCategories = cats
+            }
+            if let data = defaults.data(forKey: cachedHomeDramasKey),
+               let dramas = try? JSONDecoder().decode([Drama].self, from: data) {
+                cachedHomeDramas = dramas
+            }
         }
 
-        if let data = defaults.data(forKey: cachedHomeDramasKey),
-           let dramas = try? JSONDecoder().decode([Drama].self, from: data) {
-            cachedHomeDramas = dramas
-        }
         searchHistory = defaults.stringArray(forKey: searchHistoryKey) ?? []
         danmakuEnabled = defaults.object(forKey: danmakuKey) as? Bool ?? true
 
@@ -152,21 +175,30 @@ public final class LocalStore: ObservableObject {
 
     public func clearAccountCatalogCache() {
         cachedHomeDramas = []; cachedCategories = []
+        if isStandardStore {
+            try? FileManager.default.removeItem(at: catalogCacheURL)
+        }
         defaults.removeObject(forKey: cachedHomeDramasKey)
         defaults.removeObject(forKey: cachedCategoriesKey)
     }
 
     public func saveCachedCatalog(categories: [CatalogCategory], dramas: [Drama]) {
-        if !categories.isEmpty {
-            self.cachedCategories = categories
-            if let data = try? JSONEncoder().encode(categories) {
+        if !categories.isEmpty { self.cachedCategories = categories }
+        if !dramas.isEmpty { self.cachedHomeDramas = Array(dramas.prefix(36)) }
+        if isStandardStore {
+            struct CatalogCache: Codable {
+                let categories: [CatalogCategory]
+                let dramas: [Drama]
+            }
+            let cache = CatalogCache(categories: self.cachedCategories, dramas: self.cachedHomeDramas)
+            if let data = try? JSONEncoder().encode(cache) {
+                try? data.write(to: catalogCacheURL, options: .atomic)
+            }
+        } else {
+            if !categories.isEmpty, let data = try? JSONEncoder().encode(categories) {
                 defaults.set(data, forKey: cachedCategoriesKey)
             }
-        }
-        if !dramas.isEmpty {
-            let prefixDramas = Array(dramas.prefix(36))
-            self.cachedHomeDramas = prefixDramas
-            if let data = try? JSONEncoder().encode(prefixDramas) {
+            if !dramas.isEmpty, let data = try? JSONEncoder().encode(self.cachedHomeDramas) {
                 defaults.set(data, forKey: cachedHomeDramasKey)
             }
         }

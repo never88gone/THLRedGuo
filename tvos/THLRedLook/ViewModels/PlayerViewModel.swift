@@ -121,6 +121,7 @@ public final class PlayerViewModel: ObservableObject {
     private var lastObservedPosition = 0.0
     private static let audioSessionQueue = DispatchQueue(label: "THLRedLook.AudioSession")
     private let initialPreloadedPlan: PlaybackPlan?
+    private let isFeedMode: Bool
 
     public init(
         drama: Drama,
@@ -132,6 +133,7 @@ public final class PlayerViewModel: ObservableObject {
         initialShowDrawer: Bool = false,
         initialRestoreFocusTarget: PlayerOverlayFocusTarget? = nil,
         preloadedPlan: PlaybackPlan? = nil,
+        isFeedMode: Bool = false,
         repository: NativeRepository = .shared,
         preloadingRepository: NativeRepository? = nil,
         store: LocalStore = .shared,
@@ -146,6 +148,7 @@ public final class PlayerViewModel: ObservableObject {
         self.keepControlsVisible = keepControlsVisible
         self.restoreFocusTarget = initialRestoreFocusTarget
         self.initialPreloadedPlan = preloadedPlan
+        self.isFeedMode = isFeedMode
         self.repository = repository
         self.preloadingRepository = preloadingRepository ?? .preloading
         self.store = store
@@ -256,10 +259,12 @@ public final class PlayerViewModel: ObservableObject {
                         self.allEpisodes = detail.episodes
                     }
                 }
-                Task { [weak self] in
-                    try? await Task.sleep(nanoseconds: 1_200_000_000)
-                    guard let self, !self.closed else { return }
-                    await self.loadSeasons()
+                if !self.isFeedMode {
+                    Task { [weak self] in
+                        try? await Task.sleep(nanoseconds: 1_200_000_000)
+                        guard let self, !self.closed else { return }
+                        await self.loadSeasons()
+                    }
                 }
             }
             return
@@ -283,7 +288,7 @@ public final class PlayerViewModel: ObservableObject {
             }
             await preparePlayback(episodeIndex: currentEpisodeIndex, seekTo: currentTime)
             guard !Task.isCancelled, !closed else { return }
-            if !self.drama.id.starts(with: "test_") {
+            if !self.drama.id.starts(with: "test_") && !self.isFeedMode {
                 Task { [weak self] in
                     try? await Task.sleep(nanoseconds: 1_200_000_000)
                     guard let self, !self.closed else { return }
@@ -836,7 +841,8 @@ public final class PlayerViewModel: ObservableObject {
                 }
             })
         }
-        initializationTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { [weak self] _ in
+        let initTimeout: TimeInterval = isFeedMode ? 10.0 : 30.0
+        initializationTimer = Timer.scheduledTimer(withTimeInterval: initTimeout, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.player === av, self.isLoading, !self.closed else { return }
                 self.requestRecovery(reason: "视频初始化超时")

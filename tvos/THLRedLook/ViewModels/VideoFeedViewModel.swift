@@ -165,8 +165,9 @@ public final class VideoFeedViewModel: ObservableObject {
 
     public func preloadAround(index: Int) {
         guard preloadEnabled, index >= 0 && index < items.count else { return }
-        // 优先预热当前项、下一部、下两部以及上一部
-        let offsets = [0, 1]
+        // 关键：当前项(index)由前台 TVPlayerView 直接独占解析与起播，后台仅预热下一部(1)和下下部(2)
+        // 彻底杜绝前后台双向重复解析同一部短剧导致红果官方接口 429 风控与连接池死锁
+        let offsets = [1, 2]
         for offset in offsets {
             let targetIdx = index + offset
             guard targetIdx >= 0 && targetIdx < items.count else { continue }

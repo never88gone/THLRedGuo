@@ -179,8 +179,12 @@ public final class VideoCacheManager: NSObject {
                 }
             }
 
-            // 关键：不使用在 tvOS 容易失败的 preroll，直接以静音模式在后台 playImmediately 真实拉取前 3 秒分片
-            player.playImmediately(atRate: 1.0)
+            // 优化：避免在后台调用 playImmediately 抢占 tvOS 有限的硬件解码器导致前台卡死
+            player.preroll(atRate: 0.0) { [weak self] _ in
+                self?.queue.async {
+                    self?.finishWarmup(for: key, restoreAudio: false)
+                }
+            }
 
             let timeout = DispatchWorkItem { [weak self] in
                 self?.finishWarmup(for: key, restoreAudio: false)
