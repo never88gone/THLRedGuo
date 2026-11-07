@@ -3,7 +3,7 @@
 <p align="left">
   <a href="https://github.com/never88gone/THLRedGuo/stargazers"><img src="https://img.shields.io/github/stars/never88gone/THLRedGuo?style=flat-square&logo=github&color=e02424" alt="GitHub Stars" /></a>
   <a href="https://github.com/never88gone/THLRedGuo/network/members"><img src="https://img.shields.io/github/forks/never88gone/THLRedGuo?style=flat-square&logo=github" alt="GitHub Forks" /></a>
-  <img src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20tvOS%20%7C%20Windows%20%7C%20macOS-blue?style=flat-square" alt="Supported Platforms" />
+  <img src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20tvOS%20%7C%20HarmonyOS%20%7C%20Windows%20%7C%20macOS-blue?style=flat-square" alt="Supported Platforms" />
   <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.44+-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter SDK" /></a>
   <a href="https://testflight.apple.com/join/rkvvdp7J"><img src="https://img.shields.io/badge/TestFlight-Public%20Beta-black?style=flat-square&logo=apple" alt="Apple TestFlight" /></a>
   <a href="https://t.me/tanghulutvos"><img src="https://img.shields.io/badge/Telegram-Group-26A5E4?style=flat-square&logo=telegram&logoColor=white" alt="Telegram Group" /></a>
@@ -16,23 +16,24 @@
 > 本项目仅用于学习交流网络框架与架构设计，出于法律合规与安全考虑，已移除目标平台的核心签名参数（Secret/Salt），不提供开箱即用的破解功能。
 
 > ⚠️ **免责声明 (Disclaimer)**：
-> 1. **仅供学习研究**：本项目仅供编程技术交流、Flutter 跨平台与 Apple tvOS 原生应用架构研究使用，严禁用于任何商业牟利或侵权用途；
+> 1. **仅供学习研究**：本项目仅供编程技术交流、Flutter 跨平台、Apple tvOS 原生与 HarmonyOS NEXT 原生应用架构研究使用，严禁用于任何商业牟利或侵权用途；
 > 2. **纯客户端工具，无内容存储**：本项目为纯本地端侧播放器工具，无需注册登录即可直接使用；开发者不搭建、不运营任何流媒体服务器，不提供、不存储、不分发任何音视频资源；
 > 3. **网络数据版权归属**：应用中所有可访问的数据源均来源于第三方网络公开平台，其版权与知识产权均归原版权方所有，请自觉支持正版内容；
 > 4. **责任限制**：用户使用本软件及自配数据源产生的一切法律责任及版权纠纷均由使用者自行承担，与本项目及其代码贡献者无关。
 
-**糖葫芦Haw**（工程标识：`THLRedLook`，包名 / Application ID：`com.never88gone.redlook`）是一款基于 **Flutter + Apple tvOS 原生** 打造的全平台独立流媒体与短剧聚合应用。
+**糖葫芦Haw**（工程标识：`THLRedLook`，包名 / Application ID：`com.never88gone.redlook` / `com.never88gone.airdrop`）是一款基于 **Flutter + Apple tvOS 原生 + HarmonyOS NEXT 原生** 打造的全平台独立流媒体与短剧聚合应用。
 
 应用内无需注册账号或登录。数据请求、签名和解析由设备端 JS 数据源完成，媒体解码、流式解密等底层能力由客户端提供，无需搭建远程中转或中心化代理服务。
 
 ## JS 数据源
 
-应用内置官方 `assets/sources/hongguo.js`，也可在数据源管理页面导入兼容的 JS 数据源。iOS、iPadOS 与 tvOS 的浏览和在线播放均通过 JS 数据源工作，用户无需准备或导入 Android APK。
+应用内置官方 `assets/sources/hongguo.js`，也可在数据源管理页面导入兼容的 JS 数据源。iOS、iPadOS、tvOS 与 HarmonyOS 的浏览和在线播放均通过 JS 数据源工作，用户无需准备或导入 Android APK。
 
 独立导入请使用 [发布版 hongguo.js](https://github.com/never88gone/THLRedGuo/releases/download/official-source/hongguo.js)。
 
 - **iOS / iPadOS**：进入「设置 → JS 数据源插件管理」管理数据源。
 - **tvOS**：进入「设置 → 站源管理」查看当前 JS 版本、导入数据源网址和执行诊断。
+- **HarmonyOS**：支持在鸿蒙端原生执行 JS 数据源，由内置轻量 JS 引擎直连官方 API。
 
 收藏、历史和播放进度保存在设备端，并可通过 iCloud 在支持的平台间同步。
 
@@ -64,6 +65,12 @@
 | 剧集详情与选集 | 竖屏沉浸式播放 | 横屏全屏影院模式 |
 | :---: | :---: | :---: |
 | <img src="assets/screenshots/mobile_detail.png" width="180" alt="剧集详情" /> | <img src="assets/screenshots/mobile_player_portrait.png" width="180" alt="竖屏播放" /> | <img src="assets/screenshots/mobile_player_fullscreen.png" width="260" alt="横屏播放" /> |
+
+### 🔴 HarmonyOS NEXT 鸿蒙原生端 (Huawei)
+
+| 鸿蒙端首页与分类流式浏览 | 鸿蒙端短剧选集与沉浸播放 |
+| :---: | :---: |
+| <img src="assets/screenshots/harmonyos_home.png" width="220" alt="鸿蒙端首页" /> | <img src="assets/screenshots/harmonyos_player.png" width="220" alt="鸿蒙端播放器" /> |
 
 ### 📱 iPhone Duo 双屏折叠设备适配 (iOS)
 
@@ -104,6 +111,7 @@
 | **Android** | 适配手机、折叠屏与老旧设备，兼容 Android 7.1+（API 25+），支持竖屏短剧滑动手势、画中画（PiP）浮窗、arm64-v8a / armeabi-v7a / x86_64 三架构 | 原生 Flutter + NDK 编译，输出 APK / AAB |
 | **Android TV** | 自动识别大屏电视模式，锁定横屏影院布局，完整适配遥控器方向键与焦点移动 | 共用 Flutter 源码，自适应电视 UI 布局 |
 | **iOS / iPadOS** | 适配 iPhone、iPad 与 iPhone Duo 双屏折叠设备，原生画中画（PiP）小窗播放与后台接续、深色模式自适应、原生手势返回与低功耗下载 | 支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装，或通过 Xcode 编译打包 |
+| **HarmonyOS NEXT** | 华为鸿蒙原生端，适配 HarmonyOS NEXT 手机与折叠屏。采用纯 ArkTS + ArkUI 声明式架构，集成 OpenSSL CENC 硬件级流式解密与 AVPlayer 原生硬解，具备无限滚动分页、分类检索、短剧榜单、沉浸推荐流与本地追剧历史 | 独立 HarmonyOS 原生工程（`harmonyos/`），基于 DevEco Studio + Hvigor 构建，输出已签名 HAP 安装包 |
 | **macOS** | 桌面端大屏响应式三栏/分栏布局，键盘方向键与快捷键全面支持 | macOS App / PKG 安装包 |
 | **Windows** | 基于 `media_kit` / libmpv 硬件解码，集成专属 Shader 画质增强滤镜 | 独立免安装绿色包 / 便携目录（含完整 DLL 与运行环境） |
 | **Apple tvOS** | 独立原生工程（`tvos/`），纯 SwiftUI + Siri Remote 焦点引擎 + AVKit 原生渲染打造，具备完整客厅大屏交互与原生影院体验 | 独立 Xcode 工程，输出 tvOS IPA；支持 [Apple TestFlight](https://testflight.apple.com/join/rkvvdp7J) 一键安装 |
@@ -119,7 +127,7 @@ Windows 硬件解码采用兼容拷贝路径，也可在播放设置中切换软
 ## 核心功能介绍
 
 ### 📺 首页探索与热播排行
-- **发现页（Flutter / tvOS）**：直接读取红果手机 App「找剧」的全部、真人剧、漫剧、AI剧分类与数据；瀑布流滚动自动加载下一页，失败后可重试；
+- **发现页（Flutter / tvOS / HarmonyOS）**：直接读取红果手机 App「找剧」的全部、真人剧、漫剧、AI剧分类与数据；瀑布流滚动自动加载下一页，失败后可重试；
 - **手机版短剧榜单**：读取手机 App 返回的总榜与真人剧、漫剧、AI 剧分类榜，保留官方排序和指标。
 
 ### 🔍 智能搜索与联想
@@ -135,7 +143,7 @@ Windows 硬件解码采用兼容拷贝路径，也可在播放设置中切换软
 ### ⚡ 影院级视听与播放控制
 - **系统级画中画 (PiP) 浮窗观影**：支持 iOS 与 Android 系统级原生画中画小窗播放，切出应用不中断观影，点击浮窗秒级还原跳转回播放器页面；
 - **沉浸式视频流推荐与无限翻页**：满宽贴底进度条直达屏幕边缘，去除多余按钮与翻页阻断，支持上下滑动平滑无限轮转切剧；
-- **iOS/tvOS 加密短剧流式播放**：支持边加载边解密、平滑拖拽与连续切集；短暂分段请求失败自动重试，播放中断时保留进度恢复，并可导出故障诊断；
+- **iOS / tvOS / HarmonyOS 加密短剧流式播放**：支持边加载边解密、平滑拖拽与连续切集；短暂分段请求失败自动重试，播放中断时保留进度恢复，并可导出故障诊断；
 - **完整分集取流**：通过官方 App 接口解析完整分集，不将网页公共试看视频作为在线播放兜底；未取得完整片源时保留真实错误供重试和诊断。
 - **清晰度智能与手动切换**：默认优先播放可用的 1080P，片源不可用时回退到其他实际档位；清晰度菜单显示当前分集返回的档位，手动切换保留播放进度；
 - **实时弹幕互动**：弹幕随播放时间轴滚动渲染，支持在播放菜单中随时开启或关闭弹幕；
@@ -172,6 +180,8 @@ Windows 硬件解码采用兼容拷贝路径，也可在播放设置中切换软
 
 ## 构建说明
 
+### Flutter 跨平台客户端 (Android / iOS / Windows / macOS)
+
 ```bash
 # 获取依赖
 fvm flutter pub get
@@ -196,6 +206,19 @@ fvm flutter build windows --release
 
 Windows 产物位于 `build/windows/x64/runner/Release/`，分发时需保留整个目录中的 DLL、`data` 和其他运行依赖。首次构建会下载并校验固定版本的 libmpv 和 ANGLE，需要能够访问 GitHub Releases。
 
+### 鸿蒙原生端 (HarmonyOS NEXT)
+
+```bash
+# 进入鸿蒙工程目录
+cd harmonyos
+
+# 执行模块编译打包已签名 HAP
+hvigorw --mode module -p module=entry@default -p product=default assembleHap
+
+# 编译生成的签名 HAP 产物位于：
+# harmonyos/entry/build/default/outputs/default/entry-default-signed.hap
+```
+
 ---
 
 ## 📈 Star 历史趋势 (Star History)
@@ -207,4 +230,3 @@ Windows 产物位于 `build/windows/x64/runner/Release/`，分发时需保留整
    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=never88gone/THLRedGuo&type=Date" />
  </picture>
 </a>
-
