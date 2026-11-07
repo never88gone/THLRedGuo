@@ -179,13 +179,6 @@ public final class VideoCacheManager: NSObject {
                 }
             }
 
-            // 优化：避免在后台调用 playImmediately 抢占 tvOS 有限的硬件解码器导致前台卡死
-            player.preroll(atRate: 0.0) { [weak self] _ in
-                self?.queue.async {
-                    self?.finishWarmup(for: key, restoreAudio: false)
-                }
-            }
-
             let timeout = DispatchWorkItem { [weak self] in
                 self?.finishWarmup(for: key, restoreAudio: false)
             }
@@ -211,8 +204,9 @@ public final class VideoCacheManager: NSObject {
 
         if let player = players[key] {
             player.pause()
-            // 静音预热会推进少量播放时间，拉取成功后归零，保证用户切入时从第 0 秒无缝起播
-            player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+            if player.status == .readyToPlay {
+                player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+            }
             player.automaticallyWaitsToMinimizeStalling = true
             if restoreAudio {
                 player.isMuted = false
