@@ -1919,7 +1919,11 @@ final class RemoteNavigationTests: XCTestCase {
         wait("feed drawer selected episode") { self.yaoSnapshots().contains { $0.hasFocus && $0.identifier.hasPrefix("drawer.episode.") } }
         let selectedEpisode = try XCTUnwrap(yaoSnapshots().first { $0.hasFocus && $0.identifier.hasPrefix("drawer.episode.") })
         let number = Int(selectedEpisode.identifier.split(separator: ".").last!)!
-        press(.right, focus: "drawer.episode.\(number + 1)")
+        if number % 5 == 0 {
+            press(.down, focus: "drawer.episode.\(number + 1)")
+        } else {
+            press(.right, focus: "drawer.episode.\(number + 1)")
+        }
         press(.select)
         _ = feedReady()
         XCTAssertTrue(app.staticTexts["player.episode"].label.contains("第 \(number + 1) 集"))

@@ -452,12 +452,11 @@ jobs:
           fi
           bj_time=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M')
 
-          # 确保历史版本被永久记录保留：每次构建使用包含独立构建号的专用 Tag
-          # 例如：v1.0.0+263111609，语义化版本 1.0.0 不变，每个构建独立形成历史 Release
+          # 保持单一固定 Release 滚动覆盖：固定维护同一个 Release（如 v1.0.0），每次打包只覆盖更新里面的安装包与构建记录，不每次新建 Release
           if [ "${{ github.ref_type }}" = "tag" ]; then
             tag="${{ github.ref_name }}"
           else
-            tag="v${base_version}+${latest_build}"
+            tag="v${base_version}"
           fi
 
           # 如果已存在该 Release，安全清理本次被替换平台的历史旧包（防止历史过期安装包堆积）
@@ -547,16 +546,15 @@ jobs:
             printf '本次发布产物的完整性哈希已记录于 [SHA256SUMS.txt](%s/SHA256SUMS.txt)。\n' "$base_url"
           } > notes.md
 
-          # 上传与更新 Release，并确保最新的 Release 被标记为 Latest
+          # 上传与更新单一固定 Release，覆盖更新安装包与构建记录说明，不抢占正式版标记
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "更新已有 Release: $tag"
             gh release upload "$tag" release/* --clobber
-            gh release edit "$tag" --title "糖葫芦Haw v${base_version} (Build ${latest_build})" --notes-file notes.md --target "${{ github.sha }}" --latest
+            gh release edit "$tag" --title "糖葫芦Haw v${base_version} (Build ${latest_build})" --notes-file notes.md --target "${{ github.sha }}"
           else
-            echo "创建新 Release: $tag (Target: ${{ github.sha }})"
+            echo "创建固定 Release: $tag (Target: ${{ github.sha }})"
             gh release create "$tag" release/* \
               --title "糖葫芦Haw v${base_version} (Build ${latest_build})" \
               --notes-file notes.md \
-              --target "${{ github.sha }}" \
-              --latest
+              --target "${{ github.sha }}"
           fi

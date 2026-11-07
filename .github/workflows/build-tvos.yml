@@ -184,9 +184,9 @@ jobs:
             tag="${{ github.ref_name }}"
             base_version="${tag#v}"
           else
-            # 优先关联当前最新 Release（如 v1.0.0+263111609）
-            tag=$(gh release view --json tagName --jq .tagName 2>/dev/null || echo "v1.0.0")
-            base_version="1.0.0"
+            version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
+            base_version="${version%%+*}"
+            tag="v${base_version}"
           fi
 
           echo "准备上传 tvOS 产物至 Release: $tag"
