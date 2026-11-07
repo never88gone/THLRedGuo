@@ -31,9 +31,14 @@ export class PlayerController {
     autoAdvance: true
   };
   private callback: PlaybackCallback | null = null;
+  private onCompletedCallback: (() => void) | null = null;
 
   public setListener(cb: PlaybackCallback): void {
     this.callback = cb;
+  }
+
+  public setOnCompleted(cb: () => void): void {
+    this.onCompletedCallback = cb;
   }
 
   public setSurfaceId(id: string): void {
@@ -220,7 +225,9 @@ export class PlayerController {
   }
 
   private onPlaybackCompleted(): void {
-    // 连播回调逻辑
+    if (this.onCompletedCallback) {
+      this.onCompletedCallback();
+    }
   }
 
   private notify(): void {
