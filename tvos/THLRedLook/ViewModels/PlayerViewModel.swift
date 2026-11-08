@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import AVKit
+import MediaPlayer
 import Combine
 import SwiftUI
 
@@ -216,6 +217,7 @@ public final class PlayerViewModel: ObservableObject {
         guard !isVisible else { return }
         isVisible = true
         closed = false
+        setupRemoteCommands()
         if progressSaveTimer == nil { startProgressSaveTimer() }
 
         // 若当前画中画活跃，且与正在播放的剧集一致，无缝复用现有播放器收归全屏
@@ -366,6 +368,7 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     private func releasePlayer() {
+        teardownRemoteCommands()
         resetDanmaku()
         initializationTimer?.invalidate()
         initializationTimer = nil
@@ -394,6 +397,54 @@ public final class PlayerViewModel: ObservableObject {
             CENCMP4Decryptor.shared.removePlaybackCache(at: url)
             decryptedURL = nil
         }
+    }
+
+    // MARK: - 系统媒体远程控制（接管后台音频与 Siri Remote 实体按键）
+    private var remoteCommandTargets: [Any] = []
+
+    private func setupRemoteCommands() {
+        teardownRemoteCommands()
+        let commandCenter = MPRemoteCommandCenter.shared()
+
+        let playTarget = commandCenter.playCommand.addTarget { [weak self] _ in
+            guard let self, !self.closed else { return .commandFailed }
+            NSLog("🎬 [MPRemoteCommandCenter] 收到系统 playCommand")
+            if !self.playIntent {
+                self.togglePlayPause()
+            }
+            return .success
+        }
+        remoteCommandTargets.append((commandCenter.playCommand, playTarget))
+
+        let pauseTarget = commandCenter.pauseCommand.addTarget { [weak self] _ in
+            guard let self, !self.closed else { return .commandFailed }
+            NSLog("🎬 [MPRemoteCommandCenter] 收到系统 pauseCommand")
+            if self.playIntent {
+                self.togglePlayPause()
+            }
+            return .success
+        }
+        remoteCommandTargets.append((commandCenter.pauseCommand, pauseTarget))
+
+        let toggleTarget = commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+            guard let self, !self.closed else { return .commandFailed }
+            NSLog("🎬 [MPRemoteCommandCenter] 收到系统 togglePlayPauseCommand")
+            self.togglePlayPause()
+            return .success
+        }
+        remoteCommandTargets.append((commandCenter.togglePlayPauseCommand, toggleTarget))
+
+        commandCenter.playCommand.isEnabled = true
+        commandCenter.pauseCommand.isEnabled = true
+        commandCenter.togglePlayPauseCommand.isEnabled = true
+    }
+
+    private func teardownRemoteCommands() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.playCommand.removeTarget(nil)
+        commandCenter.pauseCommand.removeTarget(nil)
+        commandCenter.togglePlayPauseCommand.removeTarget(nil)
+        remoteCommandTargets.removeAll()
     }
 
     private func configureAudioSession() async {
@@ -697,6 +748,8 @@ public final class PlayerViewModel: ObservableObject {
         releasePlayerObservers()
         let av: AVPlayer
         if let existing = player {
+            existing.pause()
+            existing.rate = 0
             existing.replaceCurrentItem(with: item)
             av = existing
         } else {
@@ -976,7 +1029,7 @@ public final class PlayerViewModel: ObservableObject {
 
     public func togglePlayPause() {
         let now = Date()
-        guard now.timeIntervalSince(lastTogglePlayPauseTime) > 0.25 else {
+        guard now.timeIntervalSince(lastTogglePlayPauseTime) > 0.3 else {
             return
         }
         lastTogglePlayPauseTime = now
@@ -991,11 +1044,16 @@ public final class PlayerViewModel: ObservableObject {
         }
         guard let p = player else { return }
         if playIntent {
+            NSLog("🎬 [PlayerVM] togglePlayPause: 当前为播放状态，主动切换为暂停")
             playIntent = false
             p.pause()
+            p.rate = 0
             isPlaying = false
             isBuffering = false
+            bufferingDebounceTimer?.invalidate()
+            bufferingDebounceTimer = nil
         } else {
+            NSLog("🎬 [PlayerVM] togglePlayPause: 当前为暂停状态，主动切换为播放")
             isSceneActive = true
             playIntent = true
             if reachedEnd {

@@ -326,7 +326,7 @@ public struct TVPlayerView: View {
                         }
                     },
                     onSelect: { viewModel.showControls() },
-                    onPlayPause: { viewModel.togglePlayPause() },
+                    onPlayPause: nil,
                     onMenu: { onRemoteMenuPressed() }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -472,6 +472,7 @@ public struct TVPlayerView: View {
                 }
             }
             .onPlayPauseCommand {
+                guard !viewModel.isControlsVisible else { return }
                 viewModel.togglePlayPause()
             }
             .onExitCommand(perform: onRemoteMenuPressed)

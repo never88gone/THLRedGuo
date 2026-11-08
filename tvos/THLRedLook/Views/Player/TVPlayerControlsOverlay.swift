@@ -457,6 +457,8 @@ public struct TVPlayerControlsOverlay: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
+        .focusSection()
+        .defaultFocus($focusedControl, .playPause)
         .onExitCommand {
             NSLog("🎬 [Overlay] 遥控器按下 Menu 键，拦截模态退出，仅收起控制栏")
             withAnimation(.easeInOut(duration: 0.2)) {

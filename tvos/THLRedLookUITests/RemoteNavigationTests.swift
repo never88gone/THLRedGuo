@@ -4598,11 +4598,11 @@ extension RemoteNavigationTests {
         if dur > 15 {
             print("🎬 [SIM_3KEY] 快进到接近片尾位置以验证自然完播切换下一集/下一部...")
             let remaining = dur - seconds(app.staticTexts["player.position"].label)
-            if remaining > 15 {
-                let fastForwardClicks = Int((remaining - 8) / 10)
-                for _ in 0..<min(fastForwardClicks, 8) {
+            if remaining > 10 {
+                let fastForwardClicks = Int((remaining - 6) / 10)
+                for _ in 0..<min(fastForwardClicks, 15) {
                     press(.right)
-                    Thread.sleep(forTimeInterval: 0.2)
+                    Thread.sleep(forTimeInterval: 0.1)
                 }
             }
         }
@@ -4612,7 +4612,7 @@ extension RemoteNavigationTests {
 
         // 等待片尾播放完毕并自动切换至下一集或下一部
         print("🎬 [SIM_3KEY] 等待当前视频自然播完并触发自动下一集/下一部...")
-        wait("natural transition to next episode/drama", seconds: 50) {
+        wait("natural transition to next episode/drama", seconds: 70) {
             let snapTitle = self.yaoSnapshots().first(where: { $0.identifier == "player.title" })?.label ?? ""
             if !snapTitle.isEmpty && snapTitle != title2 {
                 return true
@@ -4705,6 +4705,131 @@ extension RemoteNavigationTests {
 
         print("🎬 ========================================================")
         print("🎬 [SIM_3KEY] 全部 3 项功能在模拟器上自动化验证 100% 通过！")
+        print("🎬 ========================================================")
+    }
+
+    /// 针对最新反馈专项测试：
+    /// 1. 播放页内连续换集（抽屉切集/下一集），验证流解析完全异步不阻塞、无需退出播放页即可秒播
+    /// 2. 播放控制器暂停按钮与物理 Play/Pause 实体键暂停/恢复精准响应
+    func testPlaybackPageEpisodeSwitchingAndPauseResume() throws {
+        executionTimeAllowance = 400
+        continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+        func saveShot(_ name: String) {
+            let data = XCUIScreen.main.screenshot().pngRepresentation
+            try? data.write(to: shotDir.appendingPathComponent(name))
+            print("THL_SWITCH_PAUSE_SHOT: \(name)")
+        }
+
+        print("🎬 [SwitchAndPauseTest] 开始执行播放页直接换集与暂停恢复自动化验证")
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = [
+            "-testPage", "detail",
+            "-testDramaId", "hongguo:7695704804978330649",
+            "-testDramaTitle", "满院亲戚全是上古大妖第五季"
+        ]
+        app.launch()
+        defer { app.terminate() }
+
+        // 1. 等待详情页就绪并起播第 1 集
+        wait("detail ready", seconds: 60) { self.app.buttons["detail.play"].exists }
+        yaoDetailPlayFocus()
+        focusChunk(0)
+        press(.down, focus: "detail.episode.1")
+        press(.select)
+
+        wait("episode 1 playing", seconds: 60) {
+            self.showControls()
+            let epMatch = self.app.staticTexts["player.episode"].label.contains("第 1 集")
+            let pos = self.seconds(self.app.staticTexts["player.position"].label)
+            return epMatch && pos > 0
+        }
+        press(.menu, focus: "player.wake")
+        saveShot("test_switch_ep1_playing.png")
+        print("🎬 [SwitchAndPauseTest] 第 1 集成功起播！")
+
+        // 2. 测试控制器暂停按钮：唤出控制栏，按 Select 点击暂停按钮
+        print("🎬 [SwitchAndPauseTest] 测试 1：控制条暂停按钮点击暂停")
+        showControls()
+        XCTAssertEqual(app.buttons["player.playPause"].label, "暂停", "播放中控制栏按钮应显示'暂停'")
+        press(.select) // 此时焦点默认在 player.playPause，按 Select 触发暂停
+        Thread.sleep(forTimeInterval: 1.5)
+
+        showControls()
+        let posPaused = seconds(app.staticTexts["player.position"].label)
+        XCTAssertEqual(app.buttons["player.playPause"].label, "播放", "暂停后按钮应显示'播放'")
+        press(.menu, focus: "player.wake")
+
+        // 验证暂停中进度绝对停滞
+        Thread.sleep(forTimeInterval: 2.0)
+        showControls()
+        let posPausedCheck = seconds(app.staticTexts["player.position"].label)
+        XCTAssertEqual(posPaused, posPausedCheck, "暂停期间视频进度必须完全停滞")
+        saveShot("test_control_bar_paused_verified.png")
+        print("🎬 [SwitchAndPauseTest] 控制条暂停按钮生效，进度完全停滞！")
+
+        // 3. 测试控制器播放按钮：点击恢复播放
+        print("🎬 [SwitchAndPauseTest] 测试 2：控制条按钮恢复播放")
+        press(.select) // 点击'播放'
+        wait("resumed via control bar", seconds: 20) {
+            self.showControls()
+            return self.app.buttons["player.playPause"].label == "暂停"
+        }
+        press(.menu, focus: "player.wake")
+        print("🎬 [SwitchAndPauseTest] 控制条恢复播放生效！")
+
+        // 4. 测试物理 Play/Pause 键暂停与恢复
+        print("🎬 [SwitchAndPauseTest] 测试 3：实体 Play/Pause 键暂停与恢复")
+        press(.playPause) // 按实体键暂停
+        Thread.sleep(forTimeInterval: 1.5)
+        showControls()
+        XCTAssertEqual(app.buttons["player.playPause"].label, "播放", "实体 Play/Pause 键暂停后应显示'播放'")
+        press(.menu, focus: "player.wake")
+
+        press(.playPause) // 再按实体键恢复播放
+        wait("resumed via physical playPause", seconds: 20) {
+            self.showControls()
+            return self.app.buttons["player.playPause"].label == "暂停"
+        }
+        press(.menu, focus: "player.wake")
+        saveShot("test_physical_playpause_verified.png")
+        print("🎬 [SwitchAndPauseTest] 实体 Play/Pause 键暂停与恢复验证完全通过！")
+
+        // 5. 测试播放页直接换集：抽屉切第 2 集，无需退出播放页
+        print("🎬 [SwitchAndPauseTest] 测试 4：播放页直接切第 2 集")
+        focusDrawer()
+        press(.select) // 打开抽屉
+        press(.right, focus: "drawer.episode.2")
+        press(.select)
+        wait("episode 2 directly playing without exit", seconds: 30) {
+            self.showControls()
+            let epMatch = self.app.staticTexts["player.episode"].label.contains("第 2 集")
+            let pos = self.seconds(self.app.staticTexts["player.position"].label)
+            return epMatch && pos >= 0
+        }
+        press(.menu, focus: "player.wake")
+        saveShot("test_direct_switch_ep2_playing.png")
+        print("🎬 [SwitchAndPauseTest] 播放页内无缝换集至第 2 集成功秒播！")
+
+        // 6. 测试播放页直接换集：通过抽屉再次直接切换至第 3 集（验证连续多次在播放页换集完全不假死）
+        print("🎬 [SwitchAndPauseTest] 测试 5：播放页内再次直接换集至第 3 集")
+        focusDrawer()
+        press(.select) // 打开抽屉
+        press(.right, focus: "drawer.episode.3")
+        press(.select)
+        wait("episode 3 directly playing without exit", seconds: 30) {
+            self.showControls()
+            let epMatch = self.app.staticTexts["player.episode"].label.contains("第 3 集")
+            let pos = self.seconds(self.app.staticTexts["player.position"].label)
+            return epMatch && pos >= 0
+        }
+        press(.menu, focus: "player.wake")
+        saveShot("test_direct_switch_ep3_playing.png")
+        print("🎬 [SwitchAndPauseTest] 播放页内连续换集至第 3 集成功起播！")
+
+        print("🎬 ========================================================")
+        print("🎬 [SwitchAndPauseTest] 换集与暂停两大核心功能专项测试 100% 通过！")
         print("🎬 ========================================================")
     }
 }

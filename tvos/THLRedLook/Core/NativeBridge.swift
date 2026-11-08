@@ -571,7 +571,6 @@ public actor NativeBridge {
             if ((status === 0 || res.error === "RESPONSE_NOT_UTF8") && (res.error || res.errorDetail)) {
                 var netErr = new Error("网络请求失败: " + (res.errorDetail || res.error || "未知网络错误"));
                 netErr.code = res.error || "HTTP_0";
-                if (netErr.code === "CANCELLED") globalThis.__hongguoCancelled = true;
                 netErr.category = res.category || "network_timeout";
                 netErr.isNetworkError = true;
                 throw netErr;
@@ -723,24 +722,27 @@ public actor NativeBridge {
         let snapshotGetter = self.accountSnapshot
 
         return await withCheckedContinuation { continuation in
-            executionQueue.async {
-                let runSem = DispatchSemaphore(value: 0)
-                let isResumed = NSLock()
-                var resumed = false
-                func safeResume(_ value: [String: Any]?) {
-                    isResumed.lock()
-                    defer { isResumed.unlock() }
-                    guard !resumed else { return }
-                    resumed = true
-                    context.setObject(nil, forKeyedSubscript: doneKey as NSString)
-                    if expectedAccountRevision != snapshotGetter().revision {
-                        continuation.resume(returning: nil)
-                    } else {
-                        continuation.resume(returning: value)
-                    }
-                    runSem.signal()
+            let isResumed = NSLock()
+            var resumed = false
+            func safeResume(_ value: [String: Any]?) {
+                isResumed.lock()
+                defer { isResumed.unlock() }
+                guard !resumed else { return }
+                resumed = true
+                context.setObject(nil, forKeyedSubscript: doneKey as NSString)
+                if expectedAccountRevision != snapshotGetter().revision {
+                    continuation.resume(returning: nil)
+                } else {
+                    continuation.resume(returning: value)
                 }
+            }
 
+            // 15 秒超时保护，彻底消除 JS 挂死导致的协同等待
+            DispatchQueue.global().asyncAfter(deadline: .now() + 15.0) {
+                safeResume(["ok": false, "error": "JS 执行无响应或超时", "code": "TIMEOUT"])
+            }
+
+            executionQueue.async {
                 let onDone: @convention(block) (String) -> Void = { jsonStr in
                     var resultData: [String: Any]? = nil
                     if let data = jsonStr.data(using: .utf8),
@@ -769,17 +771,12 @@ public actor NativeBridge {
                             category: errCat,
                             code: errCode
                         }));
+                    } finally {
+                        globalThis.__hongguoCancelled = false;
                     }
                 })();
                 """
                 context.evaluateScript(wrapper)
-
-                // 15 秒超时保护，彻底消除 JS 挂死导致的协同等待
-                DispatchQueue.global().asyncAfter(deadline: .now() + 15.0) {
-                    safeResume(["ok": false, "error": "JS 执行无响应或超时", "code": "TIMEOUT"])
-                }
-
-                _ = runSem.wait(timeout: .now() + 15.5)
             }
         }
     }
