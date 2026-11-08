@@ -3669,6 +3669,27 @@ extension RemoteNavigationTests {
         press(.menu)
         wait("returns to catalog card 0", seconds: 30) { self.app.buttons["catalog.result.0"].hasFocus }
 
+        // 8.5 再次进入同一个短剧卡片 0 启动播放，验证退出播放再进去绝不黑屏且正常推进播放
+        press(.select)
+        wait("re-enter detail ready", seconds: 60) { self.app.buttons["detail.play"].hasFocus }
+        press(.select)
+        wait("re-enter player starts without black screen", seconds: 30) { self.app.buttons["player.wake"].exists }
+        wait("re-enter drama playing and progressing", seconds: 60) {
+            if self.app.buttons["player.wake"].exists {
+                let wakeValue = (self.app.buttons["player.wake"].value as? String) ?? ""
+                if wakeValue.contains("已播放") && wakeValue.contains("播放中") { return true }
+            }
+            if self.app.staticTexts["player.position"].exists {
+                return self.seconds(self.app.staticTexts["player.position"].label) > 0
+            }
+            return false
+        }
+        press(.menu)
+        if self.app.buttons["player.wake"].exists { press(.menu) }
+        wait("re-enter returns to detail view", seconds: 30) { self.app.buttons["detail.play"].exists }
+        press(.menu)
+        wait("returns to catalog card 0 again", seconds: 30) { self.app.buttons["catalog.result.0"].hasFocus }
+
         // 9. 移动到第二个短剧卡片并启动播放，验证连续切换不同短剧无卡死
         press(.right, focus: "catalog.result.1")
         let secondTitle = app.buttons["catalog.result.1"].label

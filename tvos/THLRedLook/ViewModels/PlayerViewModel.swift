@@ -218,7 +218,8 @@ public final class PlayerViewModel: ObservableObject {
         if progressSaveTimer == nil { startProgressSaveTimer() }
 
         // 若当前画中画活跃，且与正在播放的剧集一致，无缝复用现有播放器收归全屏
-        if let activePipPlayer = TVPictureInPictureCoordinator.shared.activePlayer,
+        if TVPictureInPictureCoordinator.shared.isPictureInPictureActive,
+           let activePipPlayer = TVPictureInPictureCoordinator.shared.activePlayer,
            let session = TVPictureInPictureCoordinator.shared.currentSession {
             if session.drama.id == self.drama.id {
                 let currentSeconds = CMTimeGetSeconds(activePipPlayer.currentTime())
@@ -359,6 +360,7 @@ public final class PlayerViewModel: ObservableObject {
         toastHideTimer?.invalidate()
         toastHideTimer = nil
         releasePlayer()
+        TVPictureInPictureCoordinator.shared.unregisterPlaybackContext()
         plan = nil
     }
 

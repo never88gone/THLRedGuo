@@ -139,6 +139,16 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         }
     }
 
+    /// 退出全屏播放器时清理上下文（画中画未激活时彻底释放对播放器和会话的强引用）
+    public func unregisterPlaybackContext() {
+        if !isPictureInPictureActive && !isStartingPiP {
+            self.activeController = nil
+            self.activePlayer = nil
+            self.currentSession = nil
+            self.globalHostView?.detachPlayer()
+        }
+    }
+
     // MARK: - 触发操作
 
     public func startPictureInPicture(

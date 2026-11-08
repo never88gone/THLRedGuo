@@ -114,6 +114,9 @@ public struct TVPlayerView: View {
         if let player = viewModel.player {
             AVPlayerView(
                 player: player,
+                isPlaying: viewModel.wantsPlayback,
+                playbackRate: Double(viewModel.playbackRate),
+                videoBackgroundStyle: 0,
                 onPipControllerReady: { pip in
                     viewModel.bindPictureInPictureController(pip)
                 }
