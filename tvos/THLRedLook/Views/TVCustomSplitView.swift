@@ -30,7 +30,7 @@ public struct TVCustomSplitView<Sidebar: View, Detail: View>: View {
             if columnVisibility != .detailOnly {
                 HStack(spacing: 0) {
                     sidebar()
-                        .frame(width: 380)
+                        .frame(width: 310)
                         .background(
                             Material.regular
                         )
@@ -43,7 +43,7 @@ public struct TVCustomSplitView<Sidebar: View, Detail: View>: View {
                                 .stroke(Color.white.opacity(0.14), lineWidth: 1.2)
                         )
                         .shadow(color: Color.black.opacity(0.85), radius: 36, x: 12, y: 0)
-                        .padding(.leading, 48)
+                        .padding(.leading, 38)
                         .padding(.vertical, 36)
                         .transition(.move(edge: .leading).combined(with: .opacity))
                         .focusSection()

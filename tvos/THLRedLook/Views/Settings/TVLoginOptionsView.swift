@@ -67,55 +67,129 @@ public struct TVLoginOptionsView: View {
                         .foregroundColor(TVColors.textSecondary)
                 }
 
-                // 扫码模式切换按钮（大屏纯扫码，彻底剥离账号密码与短信验证码输入）
+                // 扫码模式切换卡片（大屏纯扫码，沉浸精致焦点与红果品牌高光）
                 VStack(spacing: 16) {
+                    let isOfficialFocused = (focus == .officialQR)
                     Button {
                         switchMode(.officialQR)
                     } label: {
                         HStack(spacing: 16) {
                             Image(systemName: "qrcode.viewfinder")
-                                .font(.system(size: 28))
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundColor(isOfficialFocused ? .white : (selectedMode == .officialQR ? TVColors.primary : Color.white.opacity(0.8)))
+                                .frame(width: 36)
+
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("红果 App 扫码")
-                                    .font(.system(size: 24, weight: .bold))
+                                    .font(.system(size: 22, weight: isOfficialFocused || selectedMode == .officialQR ? .bold : .semibold))
+                                    .foregroundColor(isOfficialFocused ? .white : TVColors.textPrimary)
                                 Text("官方推荐 · 手机红果扫一扫")
-                                    .font(.system(size: 15))
-                                    .foregroundColor(TVColors.textSecondary)
+                                    .font(.system(size: 14, weight: .regular))
+                                    .foregroundColor(isOfficialFocused ? Color.white.opacity(0.85) : TVColors.textSecondary)
                             }
                             Spacer()
                             if selectedMode == .officialQR {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(TVColors.primaryHover)
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundColor(isOfficialFocused ? .white : TVColors.primaryHover)
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(
+                                    isOfficialFocused
+                                        ? AnyShapeStyle(
+                                            LinearGradient(
+                                                colors: [TVColors.buttonFocusedGradStart, TVColors.buttonFocusedGradEnd],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        : (selectedMode == .officialQR ? AnyShapeStyle(Color.white.opacity(0.10)) : AnyShapeStyle(Color.white.opacity(0.04)))
+                                )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(
+                                    isOfficialFocused ? Color.white : (selectedMode == .officialQR ? TVTheme.primary.opacity(0.6) : Color.white.opacity(0.08)),
+                                    lineWidth: isOfficialFocused ? 2.5 : 1.0
+                                )
+                        )
+                        .scaleEffect(isOfficialFocused ? 1.04 : 1.0)
+                        .shadow(
+                            color: isOfficialFocused ? TVColors.focusedShadowStrong : Color.clear,
+                            radius: isOfficialFocused ? 14 : 0,
+                            x: 0,
+                            y: isOfficialFocused ? 4 : 0
+                        )
+                        .animation(TVTheme.focusSpringAnimation, value: isOfficialFocused)
                     }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focusEffectDisabled()
                     .focused($focus, equals: .officialQR)
                     .accessibilityIdentifier("hongguo-login-qr")
 
+                    let isHawFocused = (focus == .hawQR)
                     Button {
                         switchMode(.hawQR)
                     } label: {
                         HStack(spacing: 16) {
                             Image(systemName: "iphone.and.arrow.forward")
-                                .font(.system(size: 28))
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundColor(isHawFocused ? .white : (selectedMode == .hawQR ? TVColors.primary : Color.white.opacity(0.8)))
+                                .frame(width: 36)
+
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("手机糖葫芦 Haw 扫码")
-                                    .font(.system(size: 24, weight: .bold))
+                                    .font(.system(size: 22, weight: isHawFocused || selectedMode == .hawQR ? .bold : .semibold))
+                                    .foregroundColor(isHawFocused ? .white : TVColors.textPrimary)
                                 Text("同一局域网内手机 Haw 快速授权")
-                                    .font(.system(size: 15))
-                                    .foregroundColor(TVColors.textSecondary)
+                                    .font(.system(size: 14, weight: .regular))
+                                    .foregroundColor(isHawFocused ? Color.white.opacity(0.85) : TVColors.textSecondary)
                             }
                             Spacer()
                             if selectedMode == .hawQR {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(TVColors.primaryHover)
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundColor(isHawFocused ? .white : TVColors.primaryHover)
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(
+                                    isHawFocused
+                                        ? AnyShapeStyle(
+                                            LinearGradient(
+                                                colors: [TVColors.buttonFocusedGradStart, TVColors.buttonFocusedGradEnd],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        : (selectedMode == .hawQR ? AnyShapeStyle(Color.white.opacity(0.10)) : AnyShapeStyle(Color.white.opacity(0.04)))
+                                )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(
+                                    isHawFocused ? Color.white : (selectedMode == .hawQR ? TVTheme.primary.opacity(0.6) : Color.white.opacity(0.08)),
+                                    lineWidth: isHawFocused ? 2.5 : 1.0
+                                )
+                        )
+                        .scaleEffect(isHawFocused ? 1.04 : 1.0)
+                        .shadow(
+                            color: isHawFocused ? TVColors.focusedShadowStrong : Color.clear,
+                            radius: isHawFocused ? 14 : 0,
+                            x: 0,
+                            y: isHawFocused ? 4 : 0
+                        )
+                        .animation(TVTheme.focusSpringAnimation, value: isHawFocused)
                     }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focusEffectDisabled()
                     .focused($focus, equals: .hawQR)
                     .accessibilityIdentifier("hongguo-login-haw-pair")
                 }
@@ -143,22 +217,89 @@ public struct TVLoginOptionsView: View {
 
                 Spacer()
 
-                // 底部操作按钮
+                // 底部操作按钮（采用全局统一高奢焦点按钮）
                 HStack(spacing: 24) {
+                    let isRefreshFocused = (focus == .refresh)
                     Button {
                         refreshCode()
                     } label: {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 18, weight: .bold))
                             Text(selectedMode == .officialQR && model.remaining > 0 ? "刷新 (\(model.remaining)s)" : "刷新二维码")
+                                .font(.system(size: 18, weight: .bold))
                         }
+                        .foregroundColor(isRefreshFocused ? .white : TVColors.textPrimary)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(
+                                    isRefreshFocused
+                                        ? AnyShapeStyle(LinearGradient(colors: [TVColors.buttonFocusedGradStart, TVColors.buttonFocusedGradEnd], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        : AnyShapeStyle(Color.white.opacity(0.08))
+                                )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(
+                                    isRefreshFocused ? Color.white : Color.white.opacity(0.14),
+                                    lineWidth: isRefreshFocused ? 2.5 : 1.0
+                                )
+                        )
+                        .scaleEffect(isRefreshFocused ? 1.06 : 1.0)
+                        .shadow(
+                            color: isRefreshFocused ? TVColors.focusedShadowStrong : Color.clear,
+                            radius: isRefreshFocused ? 12 : 0,
+                            x: 0,
+                            y: isRefreshFocused ? 3 : 0
+                        )
+                        .animation(TVTheme.focusSpringAnimation, value: isRefreshFocused)
                     }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focusEffectDisabled()
                     .focused($focus, equals: .refresh)
                     .accessibilityIdentifier(selectedMode == .officialQR ? "hongguo-qr-refresh" : "haw-account-pair-refresh")
 
-                    Button("返回") {
+                    let isDismissFocused = (focus == .dismiss)
+                    Button {
                         cleanupAndDismiss()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .bold))
+                            Text("返回")
+                                .font(.system(size: 18, weight: .bold))
+                        }
+                        .foregroundColor(isDismissFocused ? .white : TVColors.textPrimary)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(
+                                    isDismissFocused
+                                        ? AnyShapeStyle(LinearGradient(colors: [TVColors.buttonFocusedGradStart, TVColors.buttonFocusedGradEnd], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        : AnyShapeStyle(Color.white.opacity(0.08))
+                                )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(
+                                    isDismissFocused ? Color.white : Color.white.opacity(0.14),
+                                    lineWidth: isDismissFocused ? 2.5 : 1.0
+                                )
+                        )
+                        .scaleEffect(isDismissFocused ? 1.06 : 1.0)
+                        .shadow(
+                            color: isDismissFocused ? TVColors.focusedShadowStrong : Color.clear,
+                            radius: isDismissFocused ? 12 : 0,
+                            x: 0,
+                            y: isDismissFocused ? 3 : 0
+                        )
+                        .animation(TVTheme.focusSpringAnimation, value: isDismissFocused)
                     }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focusEffectDisabled()
                     .focused($focus, equals: .dismiss)
                     .accessibilityIdentifier("hongguo-login-cancel")
                 }

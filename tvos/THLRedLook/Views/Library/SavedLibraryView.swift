@@ -50,16 +50,59 @@ public struct SavedLibraryView: View {
                 HStack {
                     Text("我的").font(.system(size: 42, weight: .bold))
                     Spacer()
+                    let isAccountFocused = (focusedTarget == .account)
                     Button {
                         if account.loggedIn { showingAccountMenu = true } else { showingLogin = true }
                     } label: {
-                        HStack(spacing: 16) {
+                        HStack(spacing: 12) {
                             if account.loggedIn {
                                 avatar
-                                Text(account.account?.nickname ?? "红果用户").lineLimit(1)
-                            } else { Label("登录", systemImage: "person.crop.circle") }
-                        }.font(.system(size: 29, weight: .semibold))
+                                    .frame(width: 36, height: 36)
+                                    .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1.2))
+                                Text(account.account?.nickname ?? "红果用户")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(isAccountFocused ? .white : TVColors.textPrimary)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(isAccountFocused ? .white.opacity(0.8) : TVColors.textMuted)
+                            } else {
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundColor(isAccountFocused ? .white : TVColors.primary)
+                                Text("登录")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(isAccountFocused ? .white : TVColors.textPrimary)
+                            }
+                        }
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(
+                                    isAccountFocused
+                                        ? AnyShapeStyle(TVColors.prominentGradient)
+                                        : AnyShapeStyle(Color.white.opacity(0.08))
+                                )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(
+                                    isAccountFocused ? Color.white : Color.white.opacity(0.14),
+                                    lineWidth: isAccountFocused ? 2.5 : 1.0
+                                )
+                        )
+                        .scaleEffect(isAccountFocused ? 1.05 : 1.0)
+                        .shadow(
+                            color: isAccountFocused ? TVColors.focusedShadowStrong : Color.clear,
+                            radius: isAccountFocused ? 14 : 0,
+                            x: 0,
+                            y: isAccountFocused ? 4 : 0
+                        )
+                        .animation(TVTheme.focusSpringAnimation, value: isAccountFocused)
                     }
+                    .buttonStyle(TVZeroHighlightButtonStyle())
+                    .focusEffectDisabled()
                     .focused($focusedTarget, equals: .account)
                     .accessibilityIdentifier(account.loggedIn ? "hongguo-account-menu" : "hongguo-account-login")
                     .onMoveCommand { direction in

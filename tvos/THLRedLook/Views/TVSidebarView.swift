@@ -26,34 +26,34 @@ public struct TVSidebarView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // 顶部 Logo 与应用名称区（采用真实 App 图标，与全局品牌视觉统一）
-            HStack(spacing: 16) {
+            HStack(spacing: 14) {
                 Image("applogo")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 56, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .frame(width: 50, height: 50)
+                    .clipShape(RoundedRectangle(cornerRadius: 13))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14)
+                        RoundedRectangle(cornerRadius: 13)
                             .stroke(Color.white.opacity(0.18), lineWidth: 1.2)
                     )
                     .shadow(color: TVTheme.primary.opacity(0.4), radius: 10, x: 0, y: 4)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("糖葫芦")
-                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .font(.system(size: 26, weight: .black, design: .rounded))
                         .foregroundColor(.white)
-                        .tracking(1.2)
+                        .tracking(1.1)
                     Text("红果短剧")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(TVTheme.textSecondary)
                 }
             }
-            .padding(.horizontal, 26)
-            .padding(.top, 40)
-            .padding(.bottom, 32)
+            .padding(.horizontal, 20)
+            .padding(.top, 38)
+            .padding(.bottom, 28)
 
-            // Tab 导航列表（垂直排列）
-            VStack(alignment: .leading, spacing: 12) {
+            // Tab 导航列表（垂直排列，增加单项高度使客厅遥控器操作更易聚焦且舒适）
+            VStack(alignment: .leading, spacing: 14) {
                 ForEach(TVAppTab.allCases) { tab in
                     let isFocused = (focusedNavTab.wrappedValue == tab)
                     TVSidebarTabButton(
@@ -73,7 +73,7 @@ public struct TVSidebarView: View {
                     .accessibilityIdentifier("nav.\(tab.rawValue)")
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
             .focusSection()
             .defaultFocus(focusedNavTab, selectedTab)
 
@@ -88,7 +88,7 @@ public struct TVSidebarView: View {
                     .font(.system(size: 11, weight: .regular))
                     .foregroundColor(Color.white.opacity(0.3))
             }
-            .padding(.horizontal, 26)
+            .padding(.horizontal, 20)
             .padding(.bottom, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -183,8 +183,9 @@ public struct TVSidebarTabButton: View {
 
                 Spacer()
             }
-            .padding(.vertical, 14)
-            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+            .padding(.horizontal, 18)
+            .frame(minHeight: 64)
             .background(
                 RoundedRectangle(cornerRadius: 18)
                     .fill(buttonBackgroundStyle)

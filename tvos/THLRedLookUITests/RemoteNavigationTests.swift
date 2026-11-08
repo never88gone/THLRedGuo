@@ -333,7 +333,11 @@ final class RemoteNavigationTests: XCTestCase {
         if app.buttons["nav.library"].hasFocus { remote.press(.right) }
         wait("library sidebar focused") { self.app.buttons["library.tab.history"].hasFocus }
         press(.right)
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
         press(.up, focus: "hongguo-account-login")
+        let shotLoginBtn = XCUIScreen.main.screenshot()
+        try? shotLoginBtn.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_library_login_button_focused.png"))
         press(.select)
         wait("login chooser focused") { self.app.buttons["hongguo-login-qr"].hasFocus }
         // 一体化大屏扫码中心：打开即展示官方扫码二维码，无需二次跳转
@@ -356,7 +360,11 @@ final class RemoteNavigationTests: XCTestCase {
         if app.buttons["nav.library"].hasFocus { remote.press(.right) }
         wait("library sidebar focused") { self.app.buttons["library.tab.history"].hasFocus }
         press(.right)
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
         press(.up, focus: "hongguo-account-login")
+        let shotLoginBtn = XCUIScreen.main.screenshot()
+        try? shotLoginBtn.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_library_login_button_focused.png"))
         press(.select)
 
         wait("login chooser starts at official QR", seconds: 30) {
@@ -370,8 +378,6 @@ final class RemoteNavigationTests: XCTestCase {
         XCTAssertFalse(app.buttons["hongguo-login-password"].exists, "tvOS 端无账号密码输入")
 
         // 截图记录全新大屏扫码登录中心（官方 App 扫码获焦态）
-        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
-        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
         let shotOfficial = XCUIScreen.main.screenshot()
         try? shotOfficial.pngRepresentation.write(to: shotDir.appendingPathComponent("tvos_login_unified_official_qr.png"))
 
