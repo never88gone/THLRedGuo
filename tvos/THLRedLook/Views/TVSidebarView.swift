@@ -26,33 +26,33 @@ public struct TVSidebarView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // 顶部 Logo 与应用名称区（采用真实 App 图标，与全局品牌视觉统一）
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 Image("applogo")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 50, height: 50)
-                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 11))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 13)
+                        RoundedRectangle(cornerRadius: 11)
                             .stroke(Color.white.opacity(0.18), lineWidth: 1.2)
                     )
-                    .shadow(color: TVTheme.primary.opacity(0.4), radius: 10, x: 0, y: 4)
+                    .shadow(color: TVTheme.primary.opacity(0.4), radius: 8, x: 0, y: 3)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text("糖葫芦")
-                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundColor(.white)
-                        .tracking(1.1)
+                        .tracking(1.0)
                     Text("红果短剧")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(TVTheme.textSecondary)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 38)
-            .padding(.bottom, 28)
+            .padding(.horizontal, 16)
+            .padding(.top, 36)
+            .padding(.bottom, 24)
 
-            // Tab 导航列表（垂直排列，增加单项高度使客厅遥控器操作更易聚焦且舒适）
+            // Tab 导航列表（垂直排列，列表单项高度显著提升，适配客厅大屏遥控聚焦）
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(TVAppTab.allCases) { tab in
                     let isFocused = (focusedNavTab.wrappedValue == tab)
@@ -73,23 +73,23 @@ public struct TVSidebarView: View {
                     .accessibilityIdentifier("nav.\(tab.rawValue)")
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .focusSection()
             .defaultFocus(focusedNavTab, selectedTab)
 
             Spacer()
 
             // 底部版本与平台标识
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("THLRedLook v1.0.0")
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundColor(Color.white.opacity(0.45))
-                Text("Apple TVOS • 原生独立播放")
+                Text("Apple TVOS • 原生播放")
                     .font(.system(size: 11, weight: .regular))
                     .foregroundColor(Color.white.opacity(0.3))
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 32)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onPlayPauseCommand {
@@ -170,9 +170,9 @@ public struct TVSidebarTabButton: View {
 
     public var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
+            HStack(spacing: 14) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundColor(iconColor)
                     .frame(width: 36)
 
@@ -183,9 +183,9 @@ public struct TVSidebarTabButton: View {
 
                 Spacer()
             }
-            .padding(.vertical, 18)
-            .padding(.horizontal, 18)
-            .frame(minHeight: 64)
+            .padding(.vertical, 20)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 76)
             .background(
                 RoundedRectangle(cornerRadius: 18)
                     .fill(buttonBackgroundStyle)
