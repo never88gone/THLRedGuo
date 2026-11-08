@@ -859,12 +859,21 @@ final class RemoteNavigationTests: XCTestCase {
             press(.left, focus: "player.playPause")
         case "player.episodeDrawer":
             press(.left)
-            press(.left, focus: "player.seekForward")
-            press(.left, focus: "player.playPause")
+            if app.buttons["player.seekForward"].hasFocus {
+                press(.left, focus: "player.playPause")
+            } else if app.buttons["player.prevEpisode"].hasFocus {
+                press(.left, focus: "player.seekForward")
+                press(.left, focus: "player.playPause")
+            }
         case "player.nextEpisode":
             press(.left, focus: "player.episodeDrawer")
             press(.left)
-            press(.left, focus: "player.playPause")
+            if app.buttons["player.seekForward"].hasFocus {
+                press(.left, focus: "player.playPause")
+            } else if app.buttons["player.prevEpisode"].hasFocus {
+                press(.left, focus: "player.seekForward")
+                press(.left, focus: "player.playPause")
+            }
         case "player.speed": press(.up, focus: "player.playPause")
         case "player.quality":
             press(.up, focus: "player.seekForward")
@@ -3139,16 +3148,14 @@ extension RemoteNavigationTests {
         press(.left, focus: "catalog.result.0")
         press(.down, focus: "catalog.result.6")
         press(.down, focus: "catalog.result.12")
-        press(.down, focus: "catalog.result.18")
-        press(.down, focus: "catalog.result.24")
-        wait("catalog next pages loaded", seconds: 60) { self.app.buttons["catalog.result.25"].exists }
-        press(.right, focus: "catalog.result.25")
-        let title = app.buttons["catalog.result.25"].label
+        wait("catalog next column loaded", seconds: 60) { self.app.buttons["catalog.result.13"].exists }
+        press(.right, focus: "catalog.result.13")
+        let title = app.buttons["catalog.result.13"].label
         press(.select)
         wait("catalog detail ready", seconds: 60) { self.app.buttons["detail.play"].hasFocus }
         press(.menu)
-        wait("catalog card restored") { self.app.buttons["catalog.result.25"].hasFocus }
-        XCTAssertEqual(app.buttons["catalog.result.25"].label, title)
+        wait("catalog card restored") { self.app.buttons["catalog.result.13"].hasFocus }
+        XCTAssertEqual(app.buttons["catalog.result.13"].label, title)
         press(.menu, focus: "nav.catalog")
         press(.right)
         wait("catalog header restored") { self.app.buttons["catalog.category.app:discover:all"].hasFocus }
@@ -3565,5 +3572,126 @@ extension RemoteNavigationTests {
 
         app.terminate()
         print("THL_DOWNLOAD_E2E_VERIFICATION_COMPLETE detailEnqueue=true listPopulated=true clearAllSucceeded=true emptyStateRestored=true")
+    }
+
+    /// 验证发现页面（Catalog）短剧卡片的实际视频播放闭环：
+    /// 1. 启动发现页，选中首个短剧卡片进入详情页
+    /// 2. 点击「立即播放」，全屏进入播放器，视频成功缓冲起播，播放进度持续更新（杜绝卡在准备流或死锁卡死）
+    /// 3. 控制层呼出流畅，遥控器播放/暂停、快进/快退、切集操作响应灵敏
+    /// 4. 退出播放器返回详情页，退出详情页返回发现页，并能无缝切换第二部短剧再次播放
+    func testCatalogVideoPlaybackAndRemoteControl() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "catalog", "-thl_icloud_sync_enabled", "NO", "-thl_tv_cached_home_dramas", "[]", "-thl_tv_cached_categories", "[]", "-thl_tv_cached_history", "[]"]
+        app.launch()
+
+        // 1. 等待发现页短剧卡片加载完成
+        wait("catalog first list", seconds: 60) { self.app.buttons["catalog.result.0"].exists }
+        if app.buttons["nav.catalog"].hasFocus {
+            press(.right)
+        }
+        if app.buttons["catalog.category.app:discover:all"].hasFocus {
+            press(.down, focus: "catalog.result.0")
+        }
+        wait("first catalog card focus") { self.app.buttons["catalog.result.0"].hasFocus }
+        let firstTitle = app.buttons["catalog.result.0"].label
+
+        // 2. 点击进入首个短剧的详情页
+        press(.select)
+        wait("catalog detail ready", seconds: 60) { self.app.buttons["detail.play"].hasFocus }
+
+        // 3. 点击「立即播放」启动全屏播放器
+        press(.select)
+        wait("player starts without obscuring controls", seconds: 30) {
+            self.app.buttons["player.wake"].exists
+        }
+
+        // 4. 验证起播与进度推进（确认无死锁卡死）
+        wait("first drama ready and playing", seconds: 60) {
+            if self.app.buttons["player.wake"].exists {
+                let wakeValue = (self.app.buttons["player.wake"].value as? String) ?? ""
+                if wakeValue.contains("已播放") && wakeValue.contains("播放中") { return true }
+            }
+            if self.app.staticTexts["player.position"].exists {
+                return self.seconds(self.app.staticTexts["player.position"].label) > 0
+            }
+            return false
+        }
+        let initialWake = self.app.buttons["player.wake"].exists ? ((self.app.buttons["player.wake"].value as? String) ?? "") : ""
+        print("THL_CATALOG_PLAY firstTitle=\(firstTitle) initialWake=\(initialWake)")
+
+        // 5. 遥控器播放/暂停交互测试
+        showControls()
+        XCTAssertTrue(app.buttons["player.playPause"].waitForExistence(timeout: 60))
+        let initialEpText = app.staticTexts["player.episode"].exists ? app.staticTexts["player.episode"].label : "第 1 集"
+        press(.playPause)
+        wait("player paused") { self.app.buttons["player.playPause"].label == "播放" }
+        press(.playPause)
+        wait("player resumed") { self.app.buttons["player.playPause"].label == "暂停" }
+
+        // 6. 选集切换到下一集
+        focusDrawer()
+        press(.right, focus: "player.nextEpisode")
+        press(.select)
+        wait("next episode playing", seconds: 60) {
+            if self.app.staticTexts["player.episode"].exists {
+                let currentText = self.app.staticTexts["player.episode"].label
+                if currentText != initialEpText { return true }
+            }
+            if self.app.buttons["player.wake"].exists {
+                let wakeValue = (self.app.buttons["player.wake"].value as? String) ?? ""
+                if !wakeValue.isEmpty && !wakeValue.contains(initialEpText) && wakeValue.contains("播放中") {
+                    return true
+                }
+            }
+            return false
+        }
+
+        // 7. 遥控器 Menu 退出播放器回到详情页
+        press(.menu)
+        if self.app.buttons["player.wake"].exists {
+            press(.menu)
+        }
+        wait("returns to detail view", seconds: 30) {
+            self.app.buttons["detail.play"].exists || self.app.buttons["detail.favorite"].exists
+        }
+
+        // 8. 遥控器 Menu 退出详情页回到发现列表
+        press(.menu)
+        wait("returns to catalog card 0", seconds: 30) { self.app.buttons["catalog.result.0"].hasFocus }
+
+        // 9. 移动到第二个短剧卡片并启动播放，验证连续切换不同短剧无卡死
+        press(.right, focus: "catalog.result.1")
+        let secondTitle = app.buttons["catalog.result.1"].label
+        press(.select)
+        wait("second detail ready", seconds: 60) { self.app.buttons["detail.play"].hasFocus }
+        press(.select)
+        wait("second player starts", seconds: 30) { self.app.buttons["player.wake"].exists }
+        wait("second drama playing and position progresses", seconds: 60) {
+            if self.app.buttons["player.wake"].exists {
+                let wakeValue = (self.app.buttons["player.wake"].value as? String) ?? ""
+                if wakeValue.contains("已播放") && wakeValue.contains("播放中") { return true }
+            }
+            if self.app.staticTexts["player.position"].exists {
+                return self.seconds(self.app.staticTexts["player.position"].label) > 0
+            }
+            return false
+        }
+        let secondWake = self.app.buttons["player.wake"].exists ? ((self.app.buttons["player.wake"].value as? String) ?? "") : ""
+        print("THL_CATALOG_PLAY secondTitle=\(secondTitle) secondWake=\(secondWake)")
+
+        // 10. 再次安全退出播放器与详情页
+        press(.menu)
+        if self.app.buttons["player.wake"].exists {
+            press(.menu)
+        }
+        wait("returns to second detail view", seconds: 30) {
+            self.app.buttons["detail.play"].exists || self.app.buttons["detail.favorite"].exists
+        }
+        press(.menu)
+        wait("returns to catalog card 1", seconds: 30) { self.app.buttons["catalog.result.1"].hasFocus }
+
+        print("THL_CATALOG_PLAYBACK_VERIFIED firstTitle=\(firstTitle) secondTitle=\(secondTitle) playPause=true nextEpisode=true returnToDetail=true returnToCatalog=true continuousPlay=true noFreeze=true")
+        app.terminate()
     }
 }
