@@ -722,6 +722,7 @@ public final class PlayerViewModel: ObservableObject {
                     self.bufferingDebounceTimer = nil
                     self.isBuffering = false
                     self.isSeamlessTransitioning = false
+                    self.isLoading = false
                 } else if buffering && !self.isSeamlessTransitioning {
                     if self.bufferingDebounceTimer == nil {
                         self.bufferingDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: false) { [weak self] _ in
@@ -826,6 +827,7 @@ public final class PlayerViewModel: ObservableObject {
                     } else { self.stableRecoverySeconds = 0 }
                 }
                 self.currentTime = seconds
+                if self.isLoading { self.isLoading = false }
                 if abs(seconds - self.lastObservedPosition) > 0.05 {
                     self.lastObservedPosition = seconds
                     self.lastProgressTime = Date()

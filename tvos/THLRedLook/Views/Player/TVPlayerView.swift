@@ -151,11 +151,16 @@ public struct TVPlayerView: View {
 
     @ViewBuilder
     private var loadingOverlayView: some View {
-        if (viewModel.isLoading || viewModel.isBuffering || isSwitchingFeed) && !viewModel.isSeamlessTransitioning {
+        let isActuallyPlaying = viewModel.isPlaying || (viewModel.player?.timeControlStatus == .playing)
+        let shouldShowLoading = viewModel.isLoading && !isActuallyPlaying
+        let shouldShowBuffering = viewModel.isBuffering && !isActuallyPlaying
+        let shouldShowSwitching = isSwitchingFeed && !isActuallyPlaying
+
+        if (shouldShowLoading || shouldShowBuffering || shouldShowSwitching) && !viewModel.isSeamlessTransitioning {
             VStack(spacing: 16) {
                 ProgressView()
                     .scaleEffect(1.8)
-                Text(isSwitchingFeed ? "正在切换推荐…" : viewModel.isLoading ? "正在准备视频流..." : "正在缓冲...")
+                Text(shouldShowSwitching ? "正在切换推荐…" : shouldShowLoading ? "正在准备视频流..." : "正在缓冲...")
                     .font(.headline)
                     .foregroundColor(.white)
             }

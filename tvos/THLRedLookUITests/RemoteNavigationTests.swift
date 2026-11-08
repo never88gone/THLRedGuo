@@ -3794,4 +3794,110 @@ extension RemoteNavigationTests {
 
         print("THL_NATURAL_NEXT_VERIFIED drama=7695704804978330649 ep1ToEp2=true progressivePlay=true noFreeze=true")
     }
+
+    func testContinuousPlaybackFiveMinutesWithAutoNextEpisodes() throws {
+        executionTimeAllowance = 600
+        continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+        func saveShot(_ name: String) {
+            let data = XCUIScreen.main.screenshot().pngRepresentation
+            try? data.write(to: shotDir.appendingPathComponent(name))
+            print("THL_5MIN_SCREENSHOT: \(name)")
+        }
+
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7695704804978330649", "-testDramaTitle", "满院亲戚全是上古大妖第五季"]
+        app.launch()
+        defer { app.terminate() }
+
+        // 1. 等待详情页就绪并聚焦播放按钮
+        wait("5-minute test: detail ready", seconds: 60) { self.app.buttons["detail.play"].exists }
+        yaoDetailPlayFocus()
+
+        // 2. 选集至第 1 集并启动播放
+        focusChunk(0)
+        press(.down, focus: "detail.episode.1")
+        press(.select)
+
+        // 3. 验证第 1 集成功起播
+        wait("episode 1 playing", seconds: 60) {
+            self.showControls()
+            return self.app.staticTexts["player.episode"].label.contains("第 1 集") && self.seconds(self.app.staticTexts["player.position"].label) > 0
+        }
+        press(.menu, focus: "player.wake") // 收起控制浮层，让视频全屏无遮挡纯净播放
+
+        // 4. 连续播放 5 分钟（300秒），每 60 秒做一次采样验证并截屏
+        let startTime = Date()
+        let targetDuration: TimeInterval = 300.0 // 5 分钟
+        var lastCapturedMinute = 0
+        var highestObservedEpisode = 1
+        var lastObservedPosition = 0
+        var stallCount = 0
+
+        while Date().timeIntervalSince(startTime) < targetDuration {
+            let elapsed = Date().timeIntervalSince(startTime)
+            let currentMinute = Int(elapsed / 60)
+
+            // 每隔 60 秒检查并截屏一次
+            if currentMinute > lastCapturedMinute {
+                lastCapturedMinute = currentMinute
+                saveShot("tvos_5min_continuous_minute_\(currentMinute).png")
+                print("THL_5MIN_PROGRESS: elapsed=\(Int(elapsed))s minute=\(currentMinute) highestEp=\(highestObservedEpisode)")
+            }
+
+            // 周期性唤出微检状态并立即收回
+            showControls()
+            let epLabel = app.staticTexts["player.episode"].label
+            let posSec = seconds(app.staticTexts["player.position"].label)
+
+            // 提取当前集数
+            if let match = epLabel.range(of: "第 (\\d+) 集", options: .regularExpression) {
+                let epStr = epLabel[match].replacingOccurrences(of: "第 ", with: "").replacingOccurrences(of: " 集", with: "")
+                if let epNum = Int(epStr) {
+                    if epNum > highestObservedEpisode {
+                        print("THL_5MIN_EPISODE_TRANSITION: from=\(highestObservedEpisode) to=\(epNum) at=\(Int(elapsed))s")
+                        highestObservedEpisode = epNum
+                    }
+                }
+            }
+
+            // 检查是否有异常卡住（连续多次检查进度不推进且未在连播过渡）
+            if posSec == lastObservedPosition {
+                stallCount += 1
+                XCTAssertLessThan(stallCount, 25, "Playback stalled at position \(posSec) for too long")
+            } else {
+                stallCount = 0
+                lastObservedPosition = posSec
+            }
+
+            // 严格验证浮层未异常遮挡：播放中绝不可出现“正在准备视频流”
+            let loadingText = app.staticTexts["正在准备视频流..."]
+            XCTAssertFalse(loadingText.exists, "正在准备视频流 overlay must NOT be visible during active playback")
+
+            press(.menu, focus: "player.wake")
+            Thread.sleep(forTimeInterval: 5.0)
+        }
+
+        // 采样最终 5 分钟结束截图
+        saveShot("tvos_5min_continuous_final.png")
+
+        let totalElapsed = Date().timeIntervalSince(startTime)
+        print("THL_5MIN_COMPLETED: totalSeconds=\(Int(totalElapsed)) highestEpisode=\(highestObservedEpisode)")
+        XCTAssertGreaterThanOrEqual(totalElapsed, 300.0, "Must play continuously for at least 300 seconds")
+        XCTAssertGreaterThanOrEqual(highestObservedEpisode, 3, "Must have naturally transitioned through multiple episodes in 5 minutes")
+
+        // 5. 退出播放器并验证详情页选集落点
+        if app.buttons["player.wake"].exists || app.buttons["player.playPause"].exists {
+            press(.menu)
+            if app.buttons["player.wake"].exists || app.buttons["player.playPause"].exists {
+                press(.menu)
+            }
+        }
+        wait("returns to detail page on final episode", seconds: 30) {
+            self.app.buttons["detail.episode.\(highestObservedEpisode)"].exists || self.app.buttons["detail.play"].exists
+        }
+
+        print("THL_5MIN_TEST_SUCCESSFUL elapsed=\(Int(totalElapsed)) autoEpisodes=\(highestObservedEpisode) noFreeze=true noStuckOverlay=true")
+    }
 }
