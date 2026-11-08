@@ -3727,6 +3727,14 @@ extension RemoteNavigationTests {
 
     func testNaturalEpisodePlaybackTransitionsToNextWithoutFreezing() throws {
         continueAfterFailure = false
+        let shotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
+        func saveShot(_ name: String) {
+            let data = XCUIScreen.main.screenshot().pngRepresentation
+            try? data.write(to: shotDir.appendingPathComponent(name))
+            print("THL_SCREENSHOT_CAPTURED: \(name)")
+        }
+
         app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
         app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7695704804978330649", "-testDramaTitle", "满院亲戚全是上古大妖第五季"]
         app.launch()
@@ -3741,11 +3749,12 @@ extension RemoteNavigationTests {
         press(.down, focus: "detail.episode.1")
         press(.select)
 
-        // 3. 验证第 1 集成功起播
+        // 3. 验证第 1 集成功起播并截屏记录
         wait("episode 1 playing", seconds: 60) {
             self.showControls()
             return self.app.staticTexts["player.episode"].label.contains("第 1 集") && self.seconds(self.app.staticTexts["player.position"].label) > 0
         }
+        saveShot("tvos_auto_next_01_ep1_playing.png")
 
         // 4. 获取第一集总时长，并通过快进跳转至距离结尾不足 10 秒的位置
         press(.right, focus: "player.seekForward")
@@ -3755,8 +3764,9 @@ extension RemoteNavigationTests {
         for _ in 0..<skips {
             remote.press(.select)
         }
+        saveShot("tvos_auto_next_02_ep1_near_end.png")
 
-        // 5. 退出控制层，纯粹等待视频自然播放到达末尾并自动过渡到第 2 集
+        // 5. 退出控制层，纯粹等待视频自然播放到达末尾并自动过渡到第 2 集并截屏
         press(.menu, focus: "player.wake")
         wait("advances naturally from episode 1 to 2 without freezing", seconds: 40) {
             self.showControls()
@@ -3764,6 +3774,7 @@ extension RemoteNavigationTests {
             let posSec = self.seconds(self.app.staticTexts["player.position"].label)
             return epText.contains("第 2 集") && posSec >= 2
         }
+        saveShot("tvos_auto_next_03_ep2_auto_transition.png")
 
         // 6. 验证第 2 集进度在持续平稳递增，确认无卡住、无假死
         let initialPos = seconds(app.staticTexts["player.position"].label)
@@ -3772,6 +3783,7 @@ extension RemoteNavigationTests {
             let currentPos = self.seconds(self.app.staticTexts["player.position"].label)
             return currentPos >= initialPos + 2
         }
+        saveShot("tvos_auto_next_04_ep2_progressing.png")
 
         // 7. 遥控器退出播放器，验证详情页焦选在第 2 集
         press(.menu, focus: "player.wake")
