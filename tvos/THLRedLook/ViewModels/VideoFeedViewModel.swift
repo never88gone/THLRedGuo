@@ -59,7 +59,11 @@ public final class VideoFeedViewModel: ObservableObject {
             errorMessage = "暂时没有可播放的推荐，请重试或换一批"
         }
         if items.count < 3 { prefetch() }
-        preloadAround(index: currentIndex)
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            guard let self else { return }
+            self.preloadAround(index: self.currentIndex)
+        }
     }
 
     public func refresh() async {
@@ -145,8 +149,12 @@ public final class VideoFeedViewModel: ObservableObject {
                 hasMore = result.hasMore
                 if items.isEmpty && !hasMore { errorMessage = "暂时没有可播放的推荐，请刷新重试" }
 
-                // 新数据追加后自动预热
-                self.preloadAround(index: self.currentIndex)
+                // 新数据追加后延迟预热
+                Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                    guard let self else { return }
+                    self.preloadAround(index: self.currentIndex)
+                }
             } catch {
                 guard !Task.isCancelled, generation == requestGeneration else { return }
                 let code = (error as NSError).userInfo["sourceErrorCode"] as? String ?? ""
@@ -165,9 +173,9 @@ public final class VideoFeedViewModel: ObservableObject {
 
     public func preloadAround(index: Int) {
         guard preloadEnabled, index >= 0 && index < items.count else { return }
-        // 关键：当前项(index)由前台 TVPlayerView 直接独占解析与起播，后台仅预热下一部(1)和下下部(2)
-        // 彻底杜绝前后台双向重复解析同一部短剧导致红果官方接口 429 风控与连接池死锁
-        let offsets = [1, 2]
+        // 关键：当前项(index)由前台 TVPlayerView 直接独占解析与起播，后台仅预热下一部(1)
+        // 彻底杜绝前后台双向重复解析同一部短剧导致红果官方接口 429 风控与连接池/解码器竞争
+        let offsets = [1]
         for offset in offsets {
             let targetIdx = index + offset
             guard targetIdx >= 0 && targetIdx < items.count else { continue }
@@ -211,7 +219,6 @@ public final class VideoFeedViewModel: ObservableObject {
                     return nil
                 }
                 if let local = prepared.decryptedURL { self.decryptedURLs[dramaId] = local }
-                VideoCacheManager.shared.preload(asset: prepared.asset, for: resolved.url, namespace: "feed")
                 self.feedEpisodes[dramaId] = episodes
                 self.feedPlans[dramaId] = resolved
                 let effectivePlan = resolved

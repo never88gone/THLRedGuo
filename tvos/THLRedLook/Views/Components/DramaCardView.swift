@@ -223,10 +223,10 @@ private struct DramaCardLabel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topTrailing) {
                 // 高质感海报渲染
-                PosterArtworkView(drama: drama, cornerRadius: 14)
+                PosterArtworkView(drama: drama, cornerRadius: 12)
 
                 // VIP 徽章
                 if drama.isVIP {
@@ -266,22 +266,31 @@ private struct DramaCardLabel: View {
                     }
                 }
             }
-            .tvFocusBorder(isFocused: effectiveFocused, cornerRadius: 14, scale: TVTheme.cardScale)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            // 剧集标题
-            Text(drama.title)
-                .font(.system(size: 16, weight: effectiveFocused ? .bold : .medium))
-                .foregroundColor(effectiveFocused ? .white : Color.white.opacity(0.85))
-                .lineLimit(1)
-                .shadow(color: effectiveFocused ? Color.red.opacity(0.4) : Color.clear, radius: 4)
-
-            if let pt = progressText {
-                Text(pt)
-                    .font(.caption2)
-                    .foregroundColor(effectiveFocused ? TVTheme.primary.opacity(0.9) : TVTheme.textMuted)
+            // 剧集标题与进度文字（完整包裹在卡片边框内）
+            VStack(alignment: .leading, spacing: 4) {
+                Text(drama.title)
+                    .font(.system(size: 16, weight: effectiveFocused ? .bold : .medium))
+                    .foregroundColor(effectiveFocused ? .white : Color.white.opacity(0.85))
                     .lineLimit(1)
+                    .shadow(color: effectiveFocused ? Color.red.opacity(0.4) : Color.clear, radius: 4)
+
+                if let pt = progressText {
+                    Text(pt)
+                        .font(.caption2)
+                        .foregroundColor(effectiveFocused ? TVTheme.primary.opacity(0.9) : TVTheme.textMuted)
+                        .lineLimit(1)
+                }
             }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 4)
         }
-        .background(Color.clear)
+        .padding(6)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(effectiveFocused ? Color(red: 0.16, green: 0.14, blue: 0.18).opacity(0.85) : Color.clear)
+        )
+        .tvFocusBorder(isFocused: effectiveFocused, cornerRadius: 16, scale: TVTheme.cardScale)
     }
 }

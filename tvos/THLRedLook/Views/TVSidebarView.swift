@@ -52,8 +52,8 @@ public struct TVSidebarView: View {
             .padding(.top, 36)
             .padding(.bottom, 24)
 
-            // Tab 导航列表（垂直排列，列表单项高度显著提升，适配客厅大屏遥控聚焦）
-            VStack(alignment: .leading, spacing: 14) {
+            // Tab 导航列表（垂直排列，高度调至适中轻盈的 58pt，比例协调优雅）
+            VStack(alignment: .leading, spacing: 12) {
                 ForEach(TVAppTab.allCases) { tab in
                     let isFocused = (focusedNavTab.wrappedValue == tab)
                     TVSidebarTabButton(
@@ -172,20 +172,20 @@ public struct TVSidebarTabButton: View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundColor(iconColor)
-                    .frame(width: 36)
+                    .frame(width: 32)
 
                 Text(tab.title)
-                    .font(.system(size: 22, weight: isFocused || isSelected ? .bold : .semibold))
+                    .font(.system(size: 20, weight: isFocused || isSelected ? .bold : .semibold))
                     .foregroundColor(contentColor)
                     .lineLimit(1)
 
                 Spacer()
             }
-            .padding(.vertical, 20)
+            .padding(.vertical, 14)
             .padding(.horizontal, 16)
-            .frame(minHeight: 76)
+            .frame(minHeight: 58)
             .background(
                 RoundedRectangle(cornerRadius: 18)
                     .fill(buttonBackgroundStyle)

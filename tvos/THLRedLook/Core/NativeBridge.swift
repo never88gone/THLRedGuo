@@ -724,6 +724,7 @@ public actor NativeBridge {
 
         return await withCheckedContinuation { continuation in
             executionQueue.async {
+                let runSem = DispatchSemaphore(value: 0)
                 let isResumed = NSLock()
                 var resumed = false
                 func safeResume(_ value: [String: Any]?) {
@@ -737,6 +738,7 @@ public actor NativeBridge {
                     } else {
                         continuation.resume(returning: value)
                     }
+                    runSem.signal()
                 }
 
                 let onDone: @convention(block) (String) -> Void = { jsonStr in
@@ -776,6 +778,8 @@ public actor NativeBridge {
                 DispatchQueue.global().asyncAfter(deadline: .now() + 15.0) {
                     safeResume(["ok": false, "error": "JS 执行无响应或超时", "code": "TIMEOUT"])
                 }
+
+                _ = runSem.wait(timeout: .now() + 15.5)
             }
         }
     }

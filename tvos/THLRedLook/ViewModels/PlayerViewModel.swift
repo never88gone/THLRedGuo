@@ -433,6 +433,7 @@ public final class PlayerViewModel: ObservableObject {
         saveCurrentProgress(force: true)
         playbackRequestSequence += 1
         playbackGeneration += 1
+        let generation = playbackGeneration
 
         cancelPrefetch()
         if let cached = preloadedEpisode, let url = cached.decryptedURL, url != decryptedURL {
@@ -448,14 +449,24 @@ public final class PlayerViewModel: ObservableObject {
         self.errorMessage = nil
         self.isSeamlessTransitioning = true // 保持当前画面最后一帧，无黑闪
 
-        if let plan = preloadedPlan, plan.isReusable(),
-           let poolPlayer = VideoCacheManager.shared.cachedPlayer(for: plan.url, namespace: "feed") {
-            self.plan = plan
-            self.selectedQuality = plan.quality
-            VideoCacheManager.shared.focusOnVideo(urlString: plan.url, namespace: "feed")
-            startPlaybackWithPlayer(poolPlayer, seekTo: initialPosition)
-            NSLog("🎬 [PlayerVM] switchFeedDrama 命中全链路预载(%@)，实现秒开起播", drama.title)
-            return
+        if let plan = preloadedPlan, plan.isReusable() {
+            if let poolPlayer = VideoCacheManager.shared.cachedPlayer(for: plan.url, namespace: "feed") {
+                self.plan = plan
+                self.selectedQuality = plan.quality
+                VideoCacheManager.shared.focusOnVideo(urlString: plan.url, namespace: "feed")
+                startPlaybackWithPlayer(poolPlayer, seekTo: initialPosition)
+                NSLog("🎬 [PlayerVM] switchFeedDrama 命中全链路预载(%@)，实现秒开起播", drama.title)
+                return
+            } else if let prepared = try? await PlaybackAssetFactory.prepare(plan), generation == self.playbackGeneration, !self.closed {
+                self.plan = plan
+                self.selectedQuality = plan.quality
+                if let local = prepared.decryptedURL { self.decryptedURL = local }
+                let item = AVPlayerItem(asset: prepared.asset)
+                startPlaybackWithItem(item: item, seekTo: initialPosition)
+                self.isSeamlessTransitioning = false
+                NSLog("🎬 [PlayerVM] switchFeedDrama 命中预载Asset(%@)，直接起播", drama.title)
+                return
+            }
         }
 
         await preparePlayback(episodeIndex: initialEpisodeIndex, seekTo: initialPosition)

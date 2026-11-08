@@ -354,7 +354,7 @@ public struct MainTabView: View {
                     if let tab = newTab {
                         if tab == .feed {
                             tabDebounceTask = Task { @MainActor in
-                                try? await Task.sleep(nanoseconds: 120_000_000)
+                                try? await Task.sleep(nanoseconds: 400_000_000)
                                 guard !Task.isCancelled, focusedNavTab == tab else { return }
                                 selectedTab = tab
                             }

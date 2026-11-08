@@ -3600,6 +3600,9 @@ extension RemoteNavigationTests {
             press(.down, focus: "catalog.result.0")
         }
         wait("first catalog card focus") { self.app.buttons["catalog.result.0"].hasFocus }
+        let shotDir = "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots"
+        try? FileManager.default.createDirectory(atPath: shotDir, withIntermediateDirectories: true)
+        try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "\(shotDir)/tvos_catalog_card_focused_wrap_text.png"))
         let firstTitle = app.buttons["catalog.result.0"].label
 
         // 2. 点击进入首个短剧的详情页
