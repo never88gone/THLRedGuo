@@ -512,6 +512,7 @@ public final class PlayerViewModel: ObservableObject {
             preloadedEpisode = nil
             currentEpisodeIndex = episodeIndex
             currentTime = max(0, seekTo)
+            lastObservedPosition = max(0, seekTo)
             duration = 0
             nextEpisodeCountdown = nil
             errorMessage = nil
@@ -550,6 +551,7 @@ public final class PlayerViewModel: ObservableObject {
         guard !closed, generation == playbackGeneration, !Task.isCancelled else { return }
         currentEpisodeIndex = episodeIndex
         currentTime = max(0, seekTo)
+        lastObservedPosition = max(0, seekTo)
         duration = 0
         nextEpisodeCountdown = nil
         if !isSeamlessTransitioning {
@@ -750,12 +752,18 @@ public final class PlayerViewModel: ObservableObject {
                     if seconds.isFinite && seconds > 0 { self.duration = seconds }
                     let size = observed.presentationSize
                     if min(size.width, size.height) > 0 { self.selectedQuality = Int(min(size.width, size.height)) }
-                    if seekTo > 0, self.duration > 0 {
-                        let position = min(seekTo, max(0, self.duration - 1))
+                    let targetSeconds = max(0, seekTo)
+                    if targetSeconds > 0, self.duration > 0 {
+                        let position = min(targetSeconds, max(0, self.duration - 1))
                         await av.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                         guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
                         self.currentTime = position
+                    } else {
+                        await av.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+                        guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
+                        self.currentTime = 0
                     }
+                    self.lastObservedPosition = self.currentTime
                     self.isSeeking = false
                     self.initializationTimer?.invalidate()
                     self.isLoading = false
@@ -778,18 +786,19 @@ public final class PlayerViewModel: ObservableObject {
             if seconds.isFinite && seconds > 0 { self.duration = seconds }
             let size = item.presentationSize
             if min(size.width, size.height) > 0 { self.selectedQuality = Int(min(size.width, size.height)) }
-            if seekTo > 0, self.duration > 0 {
-                let position = min(seekTo, max(0, self.duration - 1))
-                Task {
+            let targetSeconds = max(0, seekTo)
+            Task {
+                if targetSeconds > 0, self.duration > 0 {
+                    let position = min(targetSeconds, max(0, self.duration - 1))
                     await av.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                     guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
                     self.currentTime = position
-                    self.isSeeking = false
-                    self.samplePlaybackClock()
-                    self.lastProgressTime = Date()
-                    if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
+                } else {
+                    await av.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+                    guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
+                    self.currentTime = 0
                 }
-            } else {
+                self.lastObservedPosition = self.currentTime
                 self.isSeeking = false
                 self.samplePlaybackClock()
                 self.lastProgressTime = Date()
@@ -1221,6 +1230,14 @@ public final class PlayerViewModel: ObservableObject {
         nextEpisodeCountdown = nil
         if currentEpisodeIndex < allEpisodes.count {
             isSeamlessTransitioning = true
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                guard let self, !self.closed, self.isSeamlessTransitioning else { return }
+                self.isSeamlessTransitioning = false
+                if !self.isPlaying {
+                    self.isLoading = true
+                }
+            }
             await nextEpisode()
         } else {
             saveCurrentProgress(force: true)

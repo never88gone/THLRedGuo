@@ -3724,4 +3724,62 @@ extension RemoteNavigationTests {
         print("THL_CATALOG_PLAYBACK_VERIFIED firstTitle=\(firstTitle) secondTitle=\(secondTitle) playPause=true nextEpisode=true returnToDetail=true returnToCatalog=true continuousPlay=true noFreeze=true")
         app.terminate()
     }
+
+    func testNaturalEpisodePlaybackTransitionsToNextWithoutFreezing() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7695704804978330649", "-testDramaTitle", "满院亲戚全是上古大妖第五季"]
+        app.launch()
+        defer { app.terminate() }
+
+        // 1. 等待详情页就绪并聚焦播放按钮
+        wait("natural next test: detail ready", seconds: 60) { self.app.buttons["detail.play"].exists }
+        yaoDetailPlayFocus()
+
+        // 2. 选集至第 1 集并启动播放
+        focusChunk(0)
+        press(.down, focus: "detail.episode.1")
+        press(.select)
+
+        // 3. 验证第 1 集成功起播
+        wait("episode 1 playing", seconds: 60) {
+            self.showControls()
+            return self.app.staticTexts["player.episode"].label.contains("第 1 集") && self.seconds(self.app.staticTexts["player.position"].label) > 0
+        }
+
+        // 4. 获取第一集总时长，并通过快进跳转至距离结尾不足 10 秒的位置
+        press(.right, focus: "player.seekForward")
+        let duration = seconds(app.staticTexts["player.duration"].label)
+        XCTAssertGreaterThan(duration, 10, "Episode 1 duration should be greater than 10 seconds")
+        let skips = max(1, (duration - 8) / 10)
+        for _ in 0..<skips {
+            remote.press(.select)
+        }
+
+        // 5. 退出控制层，纯粹等待视频自然播放到达末尾并自动过渡到第 2 集
+        press(.menu, focus: "player.wake")
+        wait("advances naturally from episode 1 to 2 without freezing", seconds: 40) {
+            self.showControls()
+            let epText = self.app.staticTexts["player.episode"].label
+            let posSec = self.seconds(self.app.staticTexts["player.position"].label)
+            return epText.contains("第 2 集") && posSec >= 2
+        }
+
+        // 6. 验证第 2 集进度在持续平稳递增，确认无卡住、无假死
+        let initialPos = seconds(app.staticTexts["player.position"].label)
+        wait("episode 2 position continues advancing", seconds: 20) {
+            self.showControls()
+            let currentPos = self.seconds(self.app.staticTexts["player.position"].label)
+            return currentPos >= initialPos + 2
+        }
+
+        // 7. 遥控器退出播放器，验证详情页焦选在第 2 集
+        press(.menu, focus: "player.wake")
+        press(.menu)
+        wait("returns to detail page on episode 2", seconds: 30) {
+            self.app.buttons["detail.episode.2"].exists
+        }
+
+        print("THL_NATURAL_NEXT_VERIFIED drama=7695704804978330649 ep1ToEp2=true progressivePlay=true noFreeze=true")
+    }
 }

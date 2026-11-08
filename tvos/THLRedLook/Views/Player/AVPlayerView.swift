@@ -65,6 +65,7 @@ public class AVPlayerContainerView: UIView {
 
     private var statusObserver: NSKeyValueObservation?
     private var itemStatusObserver: NSKeyValueObservation?
+    private var currentItemObserver: NSKeyValueObservation?
     private var timeObserver: Any?
     private var bufferStuckTimer: Timer?
 
@@ -180,8 +181,41 @@ public class AVPlayerContainerView: UIView {
     private func setupPlayerObservers(for player: AVPlayer) {
         itemStatusObserver?.invalidate()
         statusObserver?.invalidate()
+        currentItemObserver?.invalidate()
+
+        currentItemObserver = player.observe(\.currentItem, options: [.initial, .new]) { [weak self, weak player] _, _ in
+            DispatchQueue.main.async {
+                guard let self = self, let player = player else { return }
+                self.setupCurrentItemObservers(for: player)
+            }
+        }
+
+        statusObserver = player.observe(\.timeControlStatus, options: [.new]) { [weak self] p, _ in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if p.timeControlStatus == .playing {
+                    self.stopBufferMonitor()
+                    self.onVideoPlaying?()
+                } else if p.timeControlStatus == .waitingToPlayAtSpecifiedRate {
+                    self.startBufferMonitor()
+                } else if p.timeControlStatus == .paused {
+                    self.stopBufferMonitor()
+                }
+            }
+        }
+    }
+
+    private func setupCurrentItemObservers(for player: AVPlayer) {
+        itemStatusObserver?.invalidate()
+        itemStatusObserver = nil
 
         if let item = player.currentItem {
+            if self.playerLayer?.player !== player {
+                self.playerLayer?.player = player
+            }
+            if self.bgPlayerLayer?.player !== player {
+                self.bgPlayerLayer?.player = player
+            }
             itemStatusObserver = item.observe(\.status, options: [.initial, .new]) { [weak self] it, _ in
                 DispatchQueue.main.async {
                     guard let self = self else { return }
@@ -204,20 +238,6 @@ public class AVPlayerContainerView: UIView {
 
             NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
             NotificationCenter.default.addObserver(self, selector: #selector(handleItemDidPlayToEndTime(_:)), name: .AVPlayerItemDidPlayToEndTime, object: item)
-        }
-
-        statusObserver = player.observe(\.timeControlStatus, options: [.new]) { [weak self] p, _ in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                if p.timeControlStatus == .playing {
-                    self.stopBufferMonitor()
-                    self.onVideoPlaying?()
-                } else if p.timeControlStatus == .waitingToPlayAtSpecifiedRate {
-                    self.startBufferMonitor()
-                } else if p.timeControlStatus == .paused {
-                    self.stopBufferMonitor()
-                }
-            }
         }
     }
 
@@ -366,6 +386,7 @@ public class AVPlayerContainerView: UIView {
         stopBufferMonitor()
         statusObserver?.invalidate()
         itemStatusObserver?.invalidate()
+        currentItemObserver?.invalidate()
         if let token = timeObserver {
             player?.removeTimeObserver(token)
         }
