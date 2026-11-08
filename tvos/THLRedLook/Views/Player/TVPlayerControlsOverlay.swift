@@ -463,6 +463,10 @@ public struct TVPlayerControlsOverlay: View {
                 viewModel.hideControls()
             }
         }
+        .onPlayPauseCommand {
+            NSLog("🎬 [Overlay] 响应遥控器 Play/Pause 按键")
+            viewModel.togglePlayPause()
+        }
         .onChange(of: focusedControl) { _, _ in viewModel.showControls() }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {

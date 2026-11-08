@@ -52,6 +52,7 @@ public final class PlayerViewModel: ObservableObject {
     @Published public private(set) var drama: Drama
     @Published public var allEpisodes: [Episode]
     public var keepControlsVisible: Bool = false
+    public var onFeedEndReached: (() -> Void)? = nil
 
     @Published public var isPictureInPictureSupported: Bool = {
         #if targetEnvironment(simulator)
@@ -442,6 +443,10 @@ public final class PlayerViewModel: ObservableObject {
             CENCMP4Decryptor.shared.removePlaybackCache(at: url)
         }
         preloadedEpisode = nil
+        if let old = decryptedURL {
+            CENCMP4Decryptor.shared.removePlaybackCache(at: old)
+            decryptedURL = nil
+        }
         identityVerified = false
         self.drama = drama
         self.allEpisodes = allEpisodes ?? []
@@ -457,15 +462,23 @@ public final class PlayerViewModel: ObservableObject {
                 self.selectedQuality = plan.quality
                 VideoCacheManager.shared.focusOnVideo(urlString: plan.url, namespace: "feed")
                 startPlaybackWithPlayer(poolPlayer, seekTo: initialPosition)
+                self.isSeamlessTransitioning = false
+                self.isLoading = false
                 NSLog("🎬 [PlayerVM] switchFeedDrama 命中全链路预载(%@)，实现秒开起播", drama.title)
                 return
             } else if let prepared = try? await PlaybackAssetFactory.prepare(plan), generation == self.playbackGeneration, !self.closed {
                 self.plan = plan
                 self.selectedQuality = plan.quality
-                if let local = prepared.decryptedURL { self.decryptedURL = local }
+                if let local = prepared.decryptedURL {
+                    if let old = self.decryptedURL, old != local {
+                        CENCMP4Decryptor.shared.removePlaybackCache(at: old)
+                    }
+                    self.decryptedURL = local
+                }
                 let item = AVPlayerItem(asset: prepared.asset)
                 startPlaybackWithItem(item: item, seekTo: initialPosition)
                 self.isSeamlessTransitioning = false
+                self.isLoading = false
                 NSLog("🎬 [PlayerVM] switchFeedDrama 命中预载Asset(%@)，直接起播", drama.title)
                 return
             }
@@ -554,9 +567,8 @@ public final class PlayerViewModel: ObservableObject {
         lastObservedPosition = max(0, seekTo)
         duration = 0
         nextEpisodeCountdown = nil
-        if !isSeamlessTransitioning {
-            isLoading = true
-        }
+        isLoading = true
+        lastProgressTime = Date()
         errorMessage = nil
         let task = Task { [weak self] in
             guard let self else { return }
@@ -754,14 +766,12 @@ public final class PlayerViewModel: ObservableObject {
                     let size = observed.presentationSize
                     if min(size.width, size.height) > 0 { self.selectedQuality = Int(min(size.width, size.height)) }
                     let targetSeconds = max(0, seekTo)
-                    if targetSeconds > 0, self.duration > 0 {
+                    if targetSeconds > 0.5, self.duration > 0 {
                         let position = min(targetSeconds, max(0, self.duration - 1))
                         await av.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                         guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
                         self.currentTime = position
                     } else {
-                        await av.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
-                        guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
                         self.currentTime = 0
                     }
                     self.lastObservedPosition = self.currentTime
@@ -771,8 +781,12 @@ public final class PlayerViewModel: ObservableObject {
                     self.isSeamlessTransitioning = false
                     self.samplePlaybackClock()
                     self.lastProgressTime = Date()
-                    if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
-                    NSLog("[PlayerVM] ready episode=%d duration=%.2f tracks=%d", self.currentEpisodeIndex, self.duration, observed.tracks.count)
+                    if self.playIntent && self.isSceneActive {
+                        av.playImmediately(atRate: self.playbackRate)
+                        av.play()
+                        if self.playbackRate > 0 { av.rate = self.playbackRate }
+                    }
+                    NSLog("🎬 [PlayerVM] readyToPlay episode=%d duration=%.2f tracks=%d rate=%.2f", self.currentEpisodeIndex, self.duration, observed.tracks.count, av.rate)
                 case .failed:
                     self.isSeamlessTransitioning = false
                     self.requestRecovery(reason: observed.error?.localizedDescription ?? "视频流加载失败", error: observed.error)
@@ -780,33 +794,6 @@ public final class PlayerViewModel: ObservableObject {
                     break
                 }
             }
-        }
-        if item.status == .readyToPlay {
-            self.errorMessage = nil
-            let seconds = item.duration.seconds
-            if seconds.isFinite && seconds > 0 { self.duration = seconds }
-            let size = item.presentationSize
-            if min(size.width, size.height) > 0 { self.selectedQuality = Int(min(size.width, size.height)) }
-            let targetSeconds = max(0, seekTo)
-            Task {
-                if targetSeconds > 0, self.duration > 0 {
-                    let position = min(targetSeconds, max(0, self.duration - 1))
-                    await av.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-                    guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
-                    self.currentTime = position
-                } else {
-                    await av.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
-                    guard self.player === av, generation == self.playbackGeneration, !self.closed else { return }
-                    self.currentTime = 0
-                }
-                self.lastObservedPosition = self.currentTime
-                self.isSeeking = false
-                self.samplePlaybackClock()
-                self.lastProgressTime = Date()
-                if self.playIntent && self.isSceneActive { av.playImmediately(atRate: self.playbackRate) }
-            }
-            self.isLoading = false
-            self.isSeamlessTransitioning = false
         }
         timeObserverToken = av.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self, weak av] time in
             Task { @MainActor in
@@ -877,11 +864,21 @@ public final class PlayerViewModel: ObservableObject {
         healthTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.player === av, !self.closed else { return }
-                guard self.playIntent, UIApplication.shared.applicationState == .active, !self.isLoading else {
+                guard self.playIntent, UIApplication.shared.applicationState == .active, !self.isLoading, !self.isSeamlessTransitioning else {
                     self.lastProgressTime = Date()
                     return
                 }
-                if Date().timeIntervalSince(self.lastProgressTime) >= 20 { self.requestRecovery(reason: "视频持续缓冲，正在恢复") }
+                let stallDuration = Date().timeIntervalSince(self.lastProgressTime)
+                if stallDuration >= 3 && av.timeControlStatus != .playing && av.currentItem?.status == .readyToPlay {
+                    NSLog("🎬 [PlayerVM] 检测到播放停滞(%.1fs)，主动推进起播", stallDuration)
+                    av.playImmediately(atRate: self.playbackRate)
+                    av.play()
+                    if self.playbackRate > 0 { av.rate = self.playbackRate }
+                }
+                if stallDuration >= 15 {
+                    NSLog("🎬 [PlayerVM] 播放停滞超过15秒，触发自动恢复")
+                    self.requestRecovery(reason: "视频持续缓冲，正在恢复")
+                }
             }
         }
         resetControlsHideTimer()
@@ -975,7 +972,15 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     // MARK: - 控制与遥控器交互
+    private var lastTogglePlayPauseTime: Date = .distantPast
+
     public func togglePlayPause() {
+        let now = Date()
+        guard now.timeIntervalSince(lastTogglePlayPauseTime) > 0.25 else {
+            return
+        }
+        lastTogglePlayPauseTime = now
+
         if drama.id.starts(with: "test_") {
             playIntent.toggle()
             isPlaying = playIntent
@@ -991,13 +996,28 @@ public final class PlayerViewModel: ObservableObject {
             isPlaying = false
             isBuffering = false
         } else {
+            isSceneActive = true
             playIntent = true
             if reachedEnd {
                 reachedEnd = false
                 seek(to: 0)
             }
             lastProgressTime = Date()
-            if isSceneActive { p.playImmediately(atRate: playbackRate) }
+            p.playImmediately(atRate: playbackRate)
+            p.play()
+            if playbackRate > 0 {
+                p.rate = playbackRate
+            }
+            Task { [weak self, weak p] in
+                guard let self, let p else { return }
+                await self.configureAudioSession()
+                guard !self.closed, self.playIntent else { return }
+                p.playImmediately(atRate: self.playbackRate)
+                p.play()
+                if self.playbackRate > 0 {
+                    p.rate = self.playbackRate
+                }
+            }
         }
         samplePlaybackClock()
         updateActiveDanmakus()
@@ -1120,11 +1140,18 @@ public final class PlayerViewModel: ObservableObject {
         guard active != isSceneActive, !closed else { return }
         isSceneActive = active
         if active {
+            Task { await configureAudioSession() }
             if resumeAfterInterruption {
                 resumeAfterInterruption = false
                 playIntent = true
                 lastProgressTime = Date()
-                if player?.currentItem?.status == .readyToPlay { player?.playImmediately(atRate: playbackRate) }
+                if player?.currentItem?.status == .readyToPlay {
+                    player?.playImmediately(atRate: playbackRate)
+                    player?.play()
+                    if playbackRate > 0 { player?.rate = playbackRate }
+                } else {
+                    player?.play()
+                }
             }
         } else {
             resumeAfterInterruption = playIntent
@@ -1241,6 +1268,8 @@ public final class PlayerViewModel: ObservableObject {
                 }
             }
             await nextEpisode()
+        } else if isFeedMode, let onFeedEndReached {
+            onFeedEndReached()
         } else {
             saveCurrentProgress(force: true)
             reachedEnd = true

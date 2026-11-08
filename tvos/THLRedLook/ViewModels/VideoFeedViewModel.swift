@@ -105,6 +105,7 @@ public final class VideoFeedViewModel: ObservableObject {
         guard requestGeneration == generation, currentIndex == requestedIndex else { return }
         if currentIndex + 1 < items.count {
             currentIndex += 1
+            trimSlidingWindow(around: currentIndex)
             preloadAround(index: currentIndex)
         } else if hasMore && errorMessage == nil {
             errorMessage = "暂未返回新的推荐，请重试或换一批"
@@ -115,6 +116,7 @@ public final class VideoFeedViewModel: ObservableObject {
     public func previous() {
         guard canGoPrevious else { return }
         currentIndex -= 1
+        trimSlidingWindow(around: currentIndex)
         preloadAround(index: currentIndex)
     }
 
@@ -171,8 +173,31 @@ public final class VideoFeedViewModel: ObservableObject {
 
     // MARK: - 全链路异步预解析与预热缓冲 (Preload Pipeline)
 
+    private func trimSlidingWindow(around index: Int) {
+        guard !items.isEmpty else { return }
+        let keepWindowStart = max(0, index - 2)
+        let keepWindowEnd = min(items.count - 1, index + 3)
+        guard keepWindowStart <= keepWindowEnd else { return }
+
+        let keepIds = Set(items[keepWindowStart...keepWindowEnd].map(\.id))
+
+        for (id, task) in resolvingTasks where !keepIds.contains(id) {
+            task.cancel()
+            resolvingTasks.removeValue(forKey: id)
+        }
+        for (id, url) in decryptedURLs where !keepIds.contains(id) {
+            CENCMP4Decryptor.shared.removePlaybackCache(at: url)
+            decryptedURLs.removeValue(forKey: id)
+        }
+        for id in Array(feedPlans.keys) where !keepIds.contains(id) {
+            feedPlans.removeValue(forKey: id)
+            feedEpisodes.removeValue(forKey: id)
+        }
+    }
+
     public func preloadAround(index: Int) {
         guard preloadEnabled, index >= 0 && index < items.count else { return }
+        trimSlidingWindow(around: index)
         // 关键：当前项(index)由前台 TVPlayerView 直接独占解析与起播，后台仅预热下一部(1)
         // 彻底杜绝前后台双向重复解析同一部短剧导致红果官方接口 429 风控与连接池/解码器竞争
         let offsets = [1]
@@ -221,6 +246,7 @@ public final class VideoFeedViewModel: ObservableObject {
                 if let local = prepared.decryptedURL { self.decryptedURLs[dramaId] = local }
                 self.feedEpisodes[dramaId] = episodes
                 self.feedPlans[dramaId] = resolved
+                VideoCacheManager.shared.preload(asset: prepared.asset, for: resolved.url, namespace: "feed")
                 let effectivePlan = resolved
 
                 return effectivePlan

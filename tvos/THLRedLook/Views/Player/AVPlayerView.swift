@@ -86,13 +86,18 @@ public class AVPlayerContainerView: UIView {
     }
 
     @objc private func appDidBecomeActive() {
-        guard let p = self.player, self.shouldPlay else { return }
+        guard let p = self.player else { return }
         // tvOS 在进出后台时可能偶发解绑图层，恢复时自动重新补绑
         if self.playerLayer?.player == nil {
             self.playerLayer?.player = p
         }
         if self.bgPlayerLayer?.player == nil {
             self.bgPlayerLayer?.player = p
+        }
+        if self.shouldPlay && p.timeControlStatus != .playing {
+            p.playImmediately(atRate: Float(playbackRate))
+            p.play()
+            if playbackRate > 0 { p.rate = Float(playbackRate) }
         }
     }
 
@@ -273,6 +278,8 @@ public class AVPlayerContainerView: UIView {
     private func startPlayback(_ p: AVPlayer) {
         p.isMuted = false
         p.playImmediately(atRate: Float(playbackRate))
+        p.play()
+        if playbackRate > 0 { p.rate = Float(playbackRate) }
         if p.timeControlStatus == .waitingToPlayAtSpecifiedRate {
             startBufferMonitor()
         }

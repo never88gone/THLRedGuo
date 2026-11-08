@@ -362,9 +362,6 @@ public struct TVPlayerView: View {
                     .accessibilityLabel("显示播放控制")
                     .accessibilityValue(playbackAccessibilityValue)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onPlayPauseCommand {
-                        viewModel.togglePlayPause()
-                    }
                     .onExitCommand(perform: onRemoteMenuPressed)
                     .onMoveCommand(perform: handlePictureMoveCommand)
 
@@ -447,7 +444,14 @@ public struct TVPlayerView: View {
         content
             .onAppear {
                 isPlayerPresented = true
-                if feedActions != nil { viewModel.restoreSavedProgress() }
+                if feedActions != nil {
+                    viewModel.restoreSavedProgress()
+                    viewModel.onFeedEndReached = { [weak viewModel] in
+                        Task { @MainActor in
+                            _ = await self.nextFeedDrama()
+                        }
+                    }
+                }
                 viewModel.onAppear()
                 viewModel.setSceneActive(scenePhase == .active)
                 if isInteractive && !viewModel.isControlsVisible {
@@ -459,7 +463,13 @@ public struct TVPlayerView: View {
                 viewModel.onDisappear()
             }
             .onChange(of: scenePhase) { _, phase in
-                viewModel.setSceneActive(phase == .active && !isSwitchingFeed)
+                let active = phase == .active && !isSwitchingFeed
+                viewModel.setSceneActive(active)
+                if active && isInteractive && !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible && !viewModel.isQualitySheetVisible {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        activeWakeFocus = .centerWake
+                    }
+                }
             }
             .onPlayPauseCommand {
                 viewModel.togglePlayPause()
@@ -545,7 +555,11 @@ public struct TVPlayerView: View {
             .onChange(of: viewModel.isControlsVisible) { _, isVisible in
                 guard isInteractive else { return }
                 if !isVisible && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible && !viewModel.isQualitySheetVisible {
-                    activeWakeFocus = .centerWake
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if !self.viewModel.isControlsVisible {
+                            self.activeWakeFocus = .centerWake
+                        }
+                    }
                 }
             }
             .onChange(of: isInteractive) { _, interactive in
@@ -575,6 +589,9 @@ public struct TVPlayerView: View {
                         initialPosition: initialPosition,
                         preloadedPlan: preloadedPlan
                     )
+                    if isInteractive && !viewModel.isControlsVisible {
+                        activeWakeFocus = .centerWake
+                    }
                 }
             }
     }
