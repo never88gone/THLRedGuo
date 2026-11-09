@@ -6,17 +6,18 @@ import Combine
 /// 采用双层 AVPlayerLayer (前景等比保持 + 背景动态视频填充与深色毛玻璃蒙版)
 /// 拥有后台恢复重挂载、最后一帧画面保持(无缝平滑硬切)、快进防抖节流、6秒缓冲卡死监控与自动重试机制
 public class AVPlayerContainerView: UIView {
+    public var managesPlayback = true
     public var player: AVPlayer? {
         didSet {
             guard oldValue !== player else { return }
-            oldValue?.pause()
+            if managesPlayback { oldValue?.pause() }
             if let obs = timeObserver {
                 oldValue?.removeTimeObserver(obs)
                 timeObserver = nil
             }
             playerLayer?.player = player
             bgPlayerLayer?.player = player
-            if let newPlayer = player {
+            if managesPlayback, let newPlayer = player {
                 setupTimeObserver(for: newPlayer)
                 setupPlayerObservers(for: newPlayer)
             }
@@ -27,7 +28,7 @@ public class AVPlayerContainerView: UIView {
     public var videoBackgroundStyle: Int = 0
     public var playbackRate: Double = 1.0 {
         didSet {
-            if shouldPlay && abs((player?.rate ?? 0) - Float(playbackRate)) > 0.01 {
+            if managesPlayback && shouldPlay && abs((player?.rate ?? 0) - Float(playbackRate)) > 0.01 {
                 player?.rate = Float(playbackRate)
             }
         }
@@ -39,6 +40,7 @@ public class AVPlayerContainerView: UIView {
 
     public var shouldPlay: Bool = true {
         didSet {
+            guard managesPlayback else { return }
             if shouldPlay {
                 if let p = player {
                     p.rate = Float(playbackRate)
@@ -176,7 +178,7 @@ public class AVPlayerContainerView: UIView {
             playerLayer?.player = p
             bgPlayerLayer?.player = p
         }
-        if shouldPlay {
+        if managesPlayback && shouldPlay {
             player?.rate = Float(playbackRate)
         }
     }
@@ -300,7 +302,7 @@ public class AVPlayerContainerView: UIView {
 
     public func cleanup() {
         stopBufferMonitor()
-        player?.pause()
+        if managesPlayback { player?.pause() }
         if let obs = timeObserver {
             player?.removeTimeObserver(obs)
             timeObserver = nil

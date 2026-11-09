@@ -5183,4 +5183,105 @@ extension RemoteNavigationTests {
         print("🎬 ========================================================")
         app.terminate()
     }
+    func testPlaybackControlsAndNaturalNextAfterRefactor() throws {
+        continueAfterFailure = false
+        executionTimeAllowance = 300
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7695704804978330649", "-testDramaTitle", "满院亲戚全是上古大妖第五季"]
+        app.launch()
+        defer { app.terminate() }
+        wait("detail ready", seconds: 60) { self.app.buttons["detail.play"].exists }
+        yaoDetailPlayFocus(); focusChunk(0)
+        press(.down, focus: "detail.episode.1"); press(.select)
+        func advancing(_ episode: Int) throws {
+            wait("episode \(episode) actually advances", seconds: 60) {
+                self.showControls()
+                return self.app.staticTexts["player.episode"].label.contains("第 \(episode) 集") && self.seconds(self.app.staticTexts["player.position"].label) >= 2 && self.app.buttons["player.playPause"].label == "暂停"
+            }
+            let first = seconds(app.staticTexts["player.position"].label)
+            wait("episode clock keeps advancing", seconds: 15) {
+                self.showControls()
+                return self.seconds(self.app.staticTexts["player.position"].label) >= first + 2
+            }
+            let beforeDismiss = seconds(app.staticTexts["player.position"].label)
+            press(.menu, focus: "player.wake")
+            let checkpoint = try automaticFeedReady(minimum: beforeDismiss)
+            XCTAssertEqual(checkpoint.episode, episode)
+            XCTAssertFalse(app.otherElements["player.quickSeek"].exists)
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "episode-\(episode)-advancing"; shot.lifetime = .keepAlways; add(shot)
+        }
+        try advancing(1)
+        for hardware in [false, true] {
+            showControls()
+            XCTAssertTrue(app.buttons["player.playPause"].hasFocus)
+            press(hardware ? .playPause : .select)
+            wait("paused button state") { self.app.buttons["player.playPause"].label == "播放" }
+            let position = seconds(app.staticTexts["player.position"].label)
+            Thread.sleep(forTimeInterval: 4)
+            XCTAssertEqual(seconds(app.staticTexts["player.position"].label), position)
+            press(hardware ? .playPause : .select)
+            wait("resumed position", seconds: 15) { self.seconds(self.app.staticTexts["player.position"].label) > position }
+        }
+        for episode in [2, 3] {
+            focusDrawer(); press(.select)
+            press(.right, focus: "drawer.episode.\(episode)"); press(.select)
+            try advancing(episode)
+            XCTAssertTrue(app.buttons["player.wake"].hasFocus)
+        }
+        wait("natural episode 3 to 4 without seeking", seconds: 100) {
+            let value = self.app.buttons["player.wake"].value as? String ?? ""
+            return value.contains("第 4 集") && value.contains("播放中")
+        }
+        try advancing(4)
+        press(.playPause)
+        wait("hidden remote pause") { (self.app.buttons["player.wake"].value as? String ?? "").contains("已暂停") }
+        let pausedValue = app.buttons["player.wake"].value as? String
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertEqual(app.buttons["player.wake"].value as? String, pausedValue)
+        press(.playPause)
+        let resumed = try automaticFeedReady()
+        press(.right, focus: "player.wake")
+        let forward = try automaticFeedReady(minimum: resumed.position + 8)
+        press(.left, focus: "player.wake")
+        let rewound = try automaticFeedReady()
+        XCTAssertEqual(rewound.episode, forward.episode)
+        XCTAssertLessThanOrEqual(rewound.position, forward.position - 6)
+
+        print("THL_STRICT_CONTROLS overlayPause=4s remotePause=4s drawer=1to2to3 natural=3to4 actualClock=true menuKeepsProgress=true hiddenPause=3s explicitSeek=true")
+    }
+
+    func testFeedClockSurvivesSwitchAndPauseAfterRefactor() throws {
+        continueAfterFailure = false
+        executionTimeAllowance = 300
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "feed"]
+        app.launch()
+        defer { app.terminate() }
+        var current = try automaticFeedReady()
+        for _ in 0..<3 {
+            let before = current
+            current = try automaticFeedReady(title: before.title, minimum: before.position + 6)
+            press(.down)
+            current = try automaticFeedReady(differentFrom: before.title)
+        }
+        let last = current
+        _ = try automaticFeedReady(title: last.title, minimum: last.position + 8)
+        showControls()
+        press(.playPause)
+        wait("feed paused") { self.app.buttons["player.playPause"].label == "播放" }
+        let position = seconds(app.staticTexts["player.position"].label)
+        Thread.sleep(forTimeInterval: 4)
+        XCTAssertEqual(seconds(app.staticTexts["player.position"].label), position)
+        press(.playPause)
+        wait("feed resumed", seconds: 15) { self.seconds(self.app.staticTexts["player.position"].label) > position }
+        press(.menu, focus: "player.wake")
+        press(.up)
+        let previous = try automaticFeedReady(differentFrom: last.title)
+        _ = try automaticFeedReady(title: previous.title, minimum: previous.position + 6)
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "feed-switch-and-resume"; shot.lifetime = .keepAlways; add(shot)
+        print("THL_STRICT_FEED nextDramas=3 previous=1 pause=4s progressAfterEverySwitch=true")
+    }
+
 }

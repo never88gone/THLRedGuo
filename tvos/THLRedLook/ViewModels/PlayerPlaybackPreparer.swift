@@ -42,7 +42,7 @@ final class PlayerPlaybackPreparer {
 
         if let localURL = DownloadService.shared.completedLocalURL(dramaId: currentDrama.id, episodeId: episode.id) {
             let localPlan = PlaybackPlan(url: localURL.absoluteString, quality: 1080, qualities: [1080])
-            return PreparedPlaybackResult(plan: localPlan, playerItem: AVPlayerItem(url: localURL), decryptedURL: nil)
+            return PreparedPlaybackResult(plan: localPlan, playerItem: AVPlayerItem(url: localURL), decryptedURL: nil, drama: currentDrama, episodes: currentEpisodes)
         }
 
         let resolved = try await repository.resolvePlayback(
@@ -60,6 +60,6 @@ final class PlayerPlaybackPreparer {
         let prepared = try await PlaybackAssetFactory.prepare(resolved)
         let item = AVPlayerItem(asset: prepared.asset)
         item.preferredForwardBufferDuration = 3
-        return PreparedPlaybackResult(plan: resolved, playerItem: item, decryptedURL: prepared.decryptedURL)
+        return PreparedPlaybackResult(plan: resolved, playerItem: item, decryptedURL: prepared.decryptedURL, drama: currentDrama, episodes: currentEpisodes)
     }
 }

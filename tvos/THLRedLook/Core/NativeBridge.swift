@@ -177,16 +177,17 @@ public actor NativeBridge {
         let expectedAccountRevision = accountSnapshot().revision
         let doneKey = "__done_\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
         let snapshotGetter = self.accountSnapshot
+        let worker = executionQueue
 
         return await withCheckedContinuation { continuation in
             let isResumed = NSLock()
             var resumed = false
             func safeResume(_ value: [String: Any]?) {
                 isResumed.lock()
-                defer { isResumed.unlock() }
-                guard !resumed else { return }
+                guard !resumed else { isResumed.unlock(); return }
                 resumed = true
-                context.setObject(nil, forKeyedSubscript: doneKey as NSString)
+                isResumed.unlock()
+                worker.async { context.setObject(nil, forKeyedSubscript: doneKey as NSString) }
                 if expectedAccountRevision != snapshotGetter().revision {
                     continuation.resume(returning: nil)
                 } else {

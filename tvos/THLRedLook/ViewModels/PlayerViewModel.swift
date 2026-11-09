@@ -85,6 +85,9 @@ public final class PlayerViewModel: ObservableObject {
         )
     }
 
+    private var playbackGeneration = 0
+    private var seekSequence = 0
+    private var preparationTask: Task<Void, Never>?
     private var isSeeking = false
     private var isSceneActive = true
     private var resumeAfterInterruption = false
@@ -155,10 +158,9 @@ public final class PlayerViewModel: ObservableObject {
             return
         }
 
-        if let preloaded = initialPreloadedPlan, preloaded.isReusable(),
-           let poolPlayer = VideoCacheManager.shared.cachedPlayer(for: preloaded.url, namespace: "feed") {
+        if let preloaded = initialPreloadedPlan, preloaded.isReusable(), !allEpisodes.isEmpty,
+           let poolPlayer = VideoCacheManager.shared.takePlayer(for: preloaded.url, namespace: "feed") {
             plan = preloaded; selectedQuality = preloaded.quality
-            VideoCacheManager.shared.focusOnVideo(urlString: preloaded.url, namespace: "feed")
             startPlaybackWithPlayer(poolPlayer, seekTo: currentTime); isLoading = false
             return
         }
@@ -176,6 +178,7 @@ public final class PlayerViewModel: ObservableObject {
             return
         }
 
+        playbackGeneration += 1; preparationTask?.cancel(); preparationTask = nil
         closed = true; resumeAfterInterruption = false; isVisible = false
         recoveryCoordinator.cancel()
         prefetchCoordinator.clearPreloaded(currentDecryptedURL: decryptedURL)
@@ -192,86 +195,113 @@ public final class PlayerViewModel: ObservableObject {
         observerManager.release()
         isSeeking = false
         player?.pause()
-        if initialPreloadedPlan == nil { player?.replaceCurrentItem(with: nil) }
+        player?.replaceCurrentItem(with: nil)
         player = nil; isPlaying = false; isBuffering = false
         if let url = decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: url); decryptedURL = nil }
     }
 
     public func preparePlayback(episodeIndex: Int, seekTo: Double = 0) async {
-        guard !closed, episodeIndex > 0, seekTo.isFinite else { return }
-        saveCurrentProgress(force: true); recoveryCoordinator.cancel(); prefetchCoordinator.cancel(); reachedEnd = false
-
-        if let preloaded = prefetchCoordinator.consumePreloaded(for: episodeIndex, currentDecryptedURL: decryptedURL) {
-            currentEpisodeIndex = episodeIndex; currentTime = max(0, seekTo); duration = 0; errorMessage = nil
-            plan = preloaded.plan; selectedQuality = preloaded.plan.quality
-            if let oldDec = decryptedURL, oldDec != preloaded.decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: oldDec) }
-            decryptedURL = preloaded.decryptedURL
-            startPlaybackWithItem(item: preloaded.playerItem, seekTo: seekTo)
-            danmakuManager.updateActiveDanmakus(currentTime: currentTime, duration: duration, plan: plan)
-            return
-        }
-
-        plan = nil; observerManager.release()
-        if !isSeamlessTransitioning { player?.pause(); await remoteCoordinator.configureAudioSession() }
-        guard !closed else { return }
-        currentEpisodeIndex = episodeIndex; currentTime = max(0, seekTo); duration = 0; isLoading = true; errorMessage = nil
-
-        do {
-            let result = try await playbackPreparer.prepareEpisode(drama: drama, allEpisodes: allEpisodes, episodeIndex: episodeIndex, requestedQuality: requestedQuality, avoidURL: recoveryCoordinator.failedURL)
-            guard !closed else { return }
-            plan = result.plan; selectedQuality = result.plan.quality
-            if let old = decryptedURL, old != result.decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: old) }
-            decryptedURL = result.decryptedURL
-            startPlaybackWithItem(item: result.playerItem, seekTo: seekTo)
-            danmakuManager.updateActiveDanmakus(currentTime: currentTime, duration: duration, plan: plan)
-        } catch {
-            guard !closed, !(error is CancellationError) else { return }
-            handlePlaybackError(error: error)
-        }
+        await beginPlayback(episodeIndex: episodeIndex, seekTo: seekTo, recovering: false)
     }
 
-    public func switchFeedDrama(
-        drama: Drama,
-        allEpisodes: [Episode]? = nil,
-        initialEpisodeIndex: Int = 1,
-        initialPosition: Double = 0,
-        preloadedPlan: PlaybackPlan? = nil
-    ) async {
+    private func beginPlayback(episodeIndex: Int, seekTo: Double, recovering: Bool, preserveIntent: Bool = false) async {
+        guard !closed, episodeIndex > 0, seekTo.isFinite else { return }
+        saveCurrentProgress(force: true)
+        playbackGeneration += 1
+        let generation = playbackGeneration
+        preparationTask?.cancel()
+        recoveryCoordinator.cancel()
+        if !recovering { recoveryCoordinator.reset() }
+        if !recovering && !preserveIntent { playIntent = isSceneActive; resumeAfterInterruption = !isSceneActive }
+        prefetchCoordinator.cancel()
+        reachedEnd = false
+        observerManager.release()
+        player?.pause()
+        player?.currentItem?.cancelPendingSeeks()
+        seekSequence += 1; isSeeking = false
+        danmakuManager.reset()
+        currentEpisodeIndex = episodeIndex; currentTime = max(0, seekTo); duration = 0
+        isPlaying = false; isBuffering = false; isLoading = true; errorMessage = nil; plan = nil
+        if !recovering, let preloaded = prefetchCoordinator.consumePreloaded(for: episodeIndex, currentDecryptedURL: decryptedURL) {
+            plan = preloaded.plan; selectedQuality = preloaded.plan.quality
+            let old = decryptedURL
+            decryptedURL = preloaded.decryptedURL
+            startPlaybackWithItem(item: preloaded.playerItem, seekTo: seekTo)
+            if let old, old != decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: old) }
+            return
+        }
+        prefetchCoordinator.clearPreloaded(currentDecryptedURL: decryptedURL)
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await remoteCoordinator.configureAudioSession()
+            guard !closed, generation == playbackGeneration, !Task.isCancelled else { return }
+            do {
+                let result = try await playbackPreparer.prepareEpisode(drama: drama, allEpisodes: allEpisodes, episodeIndex: episodeIndex, requestedQuality: requestedQuality, avoidURL: recoveryCoordinator.failedURL)
+                guard !closed, generation == playbackGeneration, !Task.isCancelled else {
+                    if let url = result.decryptedURL, url != decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: url) }
+                    return
+                }
+                if let resolvedDrama = result.drama { drama = resolvedDrama }
+                if let episodes = result.episodes { allEpisodes = episodes }
+                plan = result.plan; selectedQuality = result.plan.quality
+                let old = decryptedURL
+                decryptedURL = result.decryptedURL
+                startPlaybackWithItem(item: result.playerItem, seekTo: seekTo)
+                if let old, old != decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: old) }
+            } catch {
+                guard !closed, generation == playbackGeneration, !Task.isCancelled, !(error is CancellationError) else { return }
+                handlePlaybackError(error: error)
+            }
+        }
+        preparationTask = task
+        await task.value
+        if generation == playbackGeneration { preparationTask = nil }
+    }
+
+    public func switchFeedDrama(drama: Drama, allEpisodes: [Episode]? = nil, initialEpisodeIndex: Int = 1, initialPosition: Double = 0, preloadedPlan: PlaybackPlan? = nil) async {
         guard !closed else { return }
         saveCurrentProgress(force: true)
+        playbackGeneration += 1; preparationTask?.cancel(); preparationTask = nil
+        recoveryCoordinator.reset()
         prefetchCoordinator.clearPreloaded(currentDecryptedURL: decryptedURL)
+        observerManager.release()
+        player?.pause(); player?.replaceCurrentItem(with: nil)
         if let old = decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: old); decryptedURL = nil }
+        danmakuManager.reset(); isSeeking = false; seekSequence += 1
         self.drama = drama; self.allEpisodes = allEpisodes ?? []
-        self.currentEpisodeIndex = initialEpisodeIndex; self.currentTime = max(0, initialPosition); self.duration = 0
-        self.errorMessage = nil; self.isSeamlessTransitioning = true
-
-        if let plan = preloadedPlan, plan.isReusable(),
-           let poolPlayer = VideoCacheManager.shared.cachedPlayer(for: plan.url, namespace: "feed") {
-            self.plan = plan; self.selectedQuality = plan.quality
-            VideoCacheManager.shared.focusOnVideo(urlString: plan.url, namespace: "feed")
-            startPlaybackWithPlayer(poolPlayer, seekTo: initialPosition)
-            self.isSeamlessTransitioning = false; self.isLoading = false
+        currentEpisodeIndex = initialEpisodeIndex; currentTime = max(0, initialPosition); duration = 0
+        errorMessage = nil; plan = nil; isPlaying = false; isBuffering = false; isLoading = true
+        isSeamlessTransitioning = false; reachedEnd = false; playIntent = isSceneActive
+        if let plan = preloadedPlan, plan.isReusable(), !self.allEpisodes.isEmpty,
+           let cached = VideoCacheManager.shared.takePlayer(for: plan.url, namespace: "feed") {
+            self.plan = plan; selectedQuality = plan.quality
+            startPlaybackWithPlayer(cached, seekTo: initialPosition)
             return
         }
         await preparePlayback(episodeIndex: initialEpisodeIndex, seekTo: initialPosition)
-        self.isSeamlessTransitioning = false
     }
 
-    private func handlePlaybackError(error: Error) {
+    private func handlePlaybackError(error: Error, code: String = "") {
+        guard !closed else { return }
+        let generation = playbackGeneration
         recoveryCoordinator.requestRecovery(
-            reason: error.localizedDescription, error: error, drama: drama, episodeIndex: currentEpisodeIndex, currentTime: currentTime, planURL: plan?.url,
-            onRetry: { [weak self] ep, pos in await self?.preparePlayback(episodeIndex: ep, seekTo: pos) },
+            reason: error.localizedDescription, code: code, error: error, drama: drama, episodeIndex: currentEpisodeIndex, currentTime: currentTime, planURL: plan?.url,
+            onRetry: { [weak self] ep, pos in
+                guard let self, !self.closed, generation == self.playbackGeneration else { return }
+                await self.beginPlayback(episodeIndex: ep, seekTo: pos, recovering: true)
+            },
             onExceeded: { [weak self] msg in
-                self?.player?.pause(); self?.isPlaying = false; self?.isBuffering = false; self?.isLoading = false; self?.errorMessage = msg
+                self?.playIntent = false; self?.observerManager.release(); self?.player?.pause(); self?.isPlaying = false; self?.isBuffering = false; self?.isLoading = false; self?.errorMessage = msg
             }
         )
     }
 
     func requestRecovery(reason: String, code: String = "", error: Error? = nil) {
-        handlePlaybackError(error: error ?? NSError(domain: "THLRedLook.Player", code: -1, userInfo: [NSLocalizedDescriptionKey: reason]))
+        handlePlaybackError(error: error ?? NSError(domain: "THLRedLook.Player", code: -1, userInfo: [NSLocalizedDescriptionKey: reason]), code: code)
     }
 
     func startPlaybackWithItem(item: AVPlayerItem, seekTo: Double) {
+        observerManager.release()
         let av = player ?? AVPlayer(playerItem: item)
         if player != nil { av.pause(); av.rate = 0; av.replaceCurrentItem(with: item) }
         else { av.automaticallyWaitsToMinimizeStalling = true; player = av }
@@ -279,14 +309,17 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     private func startPlaybackWithPlayer(_ cachedPlayer: AVPlayer, seekTo: Double) {
+        observerManager.release(); player?.pause()
         cachedPlayer.isMuted = false; cachedPlayer.automaticallyWaitsToMinimizeStalling = true
         self.player = cachedPlayer
         if let item = cachedPlayer.currentItem { setupObserver(av: cachedPlayer, item: item, seekTo: seekTo) }
     }
 
     private func setupObserver(av: AVPlayer, item: AVPlayerItem, seekTo: Double) {
+        let generation = playbackGeneration
         observerManager.attach(
             to: av, item: item, seekTo: seekTo, playbackRate: playbackRate, isFeedMode: isFeedMode,
+            shouldPlay: { [weak self] in self?.playIntent == true && self?.isSceneActive == true && self?.isSeeking == false },
             onPlayingChanged: { [weak self] playing in
                 guard let self else { return }
                 self.isPlaying = playing && self.playIntent && self.isSceneActive
@@ -310,17 +343,21 @@ public final class PlayerViewModel: ObservableObject {
             },
             onTimeUpdated: { [weak self] sec in
                 guard let self, !self.isSeeking else { return }
+                self.recoveryCoordinator.recordAdvance(sec - self.currentTime, playing: self.playIntent && self.isSceneActive && av.timeControlStatus == .playing)
                 self.currentTime = sec
                 if self.isLoading { self.isLoading = false }
                 let rem = self.duration - sec
                 if sec >= 3 && rem <= 20 && rem > 0 && self.currentEpisodeIndex < self.allEpisodes.count {
                     self.prefetchCoordinator.prefetchNextEpisode(
-                        currentEpisodeIndex: self.currentEpisodeIndex, allEpisodes: self.allEpisodes, drama: self.drama, requestedQuality: self.requestedQuality, generation: 0
+                        currentEpisodeIndex: self.currentEpisodeIndex, allEpisodes: self.allEpisodes, drama: self.drama, requestedQuality: self.requestedQuality, generation: generation
                     )
                 }
                 self.danmakuManager.updateActiveDanmakus(currentTime: self.currentTime, duration: self.duration, plan: self.plan)
             },
-            onItemEnded: { [weak self] in Task { @MainActor in await self?.handlePlayEnded() } },
+            onItemEnded: { [weak self] in Task { @MainActor in
+                guard let self, !self.closed, generation == self.playbackGeneration else { return }
+                await self.handlePlayEnded()
+            } },
             onError: { [weak self] error in self?.handlePlaybackError(error: error) }
         )
         resetControlsHideTimer()
@@ -338,10 +375,11 @@ public final class PlayerViewModel: ObservableObject {
             if reachedEnd { reachedEnd = false; seek(to: 0) }
             p.playImmediately(atRate: playbackRate); p.play()
             if playbackRate > 0 { p.rate = playbackRate }
+            let generation = playbackGeneration
             Task { [weak self, weak p] in
                 guard let self, let p else { return }
                 await self.remoteCoordinator.configureAudioSession()
-                guard !self.closed, self.playIntent else { return }
+                guard !self.closed, self.playIntent, self.player === p, self.isSceneActive, generation == self.playbackGeneration else { return }
                 p.playImmediately(atRate: self.playbackRate); p.play()
                 if self.playbackRate > 0 { p.rate = self.playbackRate }
             }
@@ -381,11 +419,14 @@ public final class PlayerViewModel: ObservableObject {
 
     private func seek(to target: Double) {
         guard let p = player, p.currentItem?.status == .readyToPlay else { return }
+        seekSequence += 1
+        let sequence = seekSequence
+        let generation = playbackGeneration
         isSeeking = true; currentTime = target
         danmakuManager.updateActiveDanmakus(currentTime: currentTime, duration: duration, plan: plan)
         p.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, !self.closed, self.player === p, generation == self.playbackGeneration, sequence == self.seekSequence else { return }
                 self.isSeeking = false; self.samplePlaybackClock()
                 self.danmakuManager.updateActiveDanmakus(currentTime: self.currentTime, duration: self.duration, plan: self.plan)
             }
@@ -403,7 +444,7 @@ public final class PlayerViewModel: ObservableObject {
     public func changeQuality(_ q: Int) async {
         guard qualityOptions.contains(q), q != requestedQuality else { return }
         samplePlaybackClock(); requestedQuality = q
-        await preparePlayback(episodeIndex: currentEpisodeIndex, seekTo: currentTime)
+        await beginPlayback(episodeIndex: currentEpisodeIndex, seekTo: currentTime, recovering: false, preserveIntent: true)
     }
 
     public func nextEpisode() async {
@@ -465,6 +506,8 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     private func handlePlayEnded() async {
+        guard !closed, !reachedEnd else { return }
+        reachedEnd = true
         currentTime = duration
         if currentEpisodeIndex < allEpisodes.count {
             isSeamlessTransitioning = true
@@ -486,6 +529,7 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     public func saveCurrentProgress(force: Bool = false) {
+        guard !isLoading, player?.currentItem?.status == .readyToPlay else { return }
         samplePlaybackClock()
         progressTracker.recordProgress(drama: drama, episode: currentEpisodeIndex, position: currentTime, duration: duration, danmakuId: plan?.danmakuId, force: force)
     }

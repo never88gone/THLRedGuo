@@ -221,7 +221,7 @@ public final class VideoFeedViewModel: ObservableObject {
                     drama: detail.drama,
                     episode: targetEpisode,
                     episodeIndex: targetIndex,
-                    quality: 360
+                    quality: 0
                 )
                 guard !Task.isCancelled else { return nil }
 

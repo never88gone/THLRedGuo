@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 import UIKit
+import JavaScriptCore
 @testable import THLRedLook
 
 @MainActor
@@ -1240,6 +1241,7 @@ final class ContinuousPlaybackTests: XCTestCase {
         let behavior: String
         switch mode {
         case "denied": behavior = "throw Object.assign(new Error('synthetic failure'),{code:'BUSINESS_REJECTED'});"
+        case "slowSecond": behavior = "if(id==='2'){const end=Date.now()+1200;while(Date.now()<end){}}"
         case "slow": behavior = "const stop=Date.now()+4000;while(Date.now()<stop){};"
         case "transientWindow": behavior = "if(!firstFailure)firstFailure=Date.now();if(Date.now()-firstFailure<3000)throw Object.assign(new Error('synthetic temporary outage'),{code:'HTTP_503'});"
         case "retry": behavior = "if(id==='2'&&calls[id]===1)throw Object.assign(new Error('synthetic transient failure'),{code:'HTTP_503'});"
@@ -1281,6 +1283,98 @@ final class ContinuousPlaybackTests: XCTestCase {
         while !condition(), Date() < deadline { try await Task.sleep(nanoseconds: 50_000_000) }
         XCTAssertTrue(condition())
         guard condition() else { throw NSError(domain: "ContinuousPlaybackTests", code: 1) }
+    }
+
+    func testReleasedObserverIgnoresQueuedEndAndStopsClockCallbacks() async throws {
+        let path = try XCTUnwrap(ProcessInfo.processInfo.environment["THL_SYNTHETIC_VIDEO"])
+        let item = AVPlayerItem(url: URL(fileURLWithPath: path))
+        let player = AVPlayer(playerItem: item)
+        let observer = PlayerObserverManager()
+        var events = 0
+        observer.attach(to: player, item: item, seekTo: 0, playbackRate: 1, isFeedMode: false,
+            onPlayingChanged: { _ in events += 1 }, onBufferingChanged: { _ in events += 1 },
+            onReadyToPlay: { _, _ in events += 1 }, onTimeUpdated: { _ in events += 1 },
+            onItemEnded: { events += 1 }, onError: { _ in events += 1 })
+        NotificationCenter.default.post(name: .AVPlayerItemDidPlayToEndTime, object: item)
+        observer.release()
+        player.play()
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+        player.pause()
+        XCTAssertEqual(events, 0)
+    }
+
+    func testDisplayUpdatesCannotResumeModelOwnedPausedPlayer() async throws {
+        let (repository, _) = try await repository(mode: "normal")
+        let model = try model(foreground: repository, preloading: repository)
+        defer { model.onDisappear() }
+        await model.preparePlayback(episodeIndex: 1)
+        try await wait { model.currentTime > 0.5 }
+        let player = try XCTUnwrap(model.player)
+        let container = AVPlayerContainerView()
+        container.managesPlayback = false
+        container.player = player
+        model.togglePlayPause()
+        let position = player.currentTime().seconds
+        for _ in 0..<4 {
+            container.playbackRate = 1
+            NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
+            try await Task.sleep(nanoseconds: 500_000_000)
+        }
+        XCTAssertEqual(player.rate, 0)
+        XCTAssertEqual(player.currentTime().seconds, position, accuracy: 0.1)
+        container.cleanup()
+        await model.selectEpisode(number: 2)
+        try await wait { model.currentEpisodeIndex == 2 && model.currentTime > 0.5 && model.isPlaying }
+        XCTAssertTrue(model.wantsPlayback)
+    }
+
+    func testFeedCacheCannotStopOrEvictTransferredPlayer() async throws {
+        let path = try XCTUnwrap(ProcessInfo.processInfo.environment["THL_SYNTHETIC_VIDEO"])
+        let url = URL(fileURLWithPath: path)
+        let cache = VideoCacheManager.shared
+        cache.preload(asset: AVURLAsset(url: url), for: url.absoluteString, namespace: "test-feed")
+        let player = try XCTUnwrap(cache.takePlayer(for: url.absoluteString, namespace: "test-feed"))
+        let item = player.currentItem
+        player.play()
+        try await wait { player.currentTime().seconds > 0.5 }
+        let position = player.currentTime().seconds
+        cache.clearNamespace("test-feed")
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+        XCTAssertTrue(player.currentItem === item)
+        XCTAssertGreaterThan(player.currentTime().seconds, position + 0.5)
+        XCTAssertFalse(player.isMuted)
+        player.pause()
+    }
+
+    func testNativeBridgeTimeoutDoesNotDeadlockCompletion() async throws {
+        let bridge = NativeBridge(persistentDeviceSession: false)
+        let context = try XCTUnwrap(JSContext())
+        let start = Date()
+        let result = await bridge.evalAsync(context: context, scriptExpr: "(()=>{let end=Date.now()+16000;while(Date.now()<end){};return 1;})()")
+        XCTAssertEqual(result?["code"] as? String, "TIMEOUT")
+        XCTAssertLessThan(Date().timeIntervalSince(start), 17)
+        let next = await bridge.evalAsync(context: context, scriptExpr: "42")
+        XCTAssertEqual((next?["data"] as? NSNumber)?.intValue, 42)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 20)
+    }
+
+    func testNewSelectionWinsOverDelayedPreviousResolution() async throws {
+        let (repository, _) = try await repository(mode: "slowSecond")
+        let model = try model(foreground: repository, preloading: repository)
+        defer { model.onDisappear() }
+        await model.preparePlayback(episodeIndex: 1)
+        try await wait { model.currentTime > 0.5 }
+        let first = Task { await model.selectEpisode(number: 2) }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        let second = Task { await model.selectEpisode(number: 3) }
+        await first.value; await second.value
+        try await wait { model.currentEpisodeIndex == 3 && model.currentTime > 0.5 && model.isPlaying }
+        let item = model.player?.currentItem
+        let position = model.currentTime
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+        XCTAssertEqual(model.currentEpisodeIndex, 3)
+        XCTAssertTrue(model.player?.currentItem === item)
+        XCTAssertGreaterThan(model.currentTime, position + 0.5)
     }
 
     func testPlanExpiryUsesSafetyWindow() {

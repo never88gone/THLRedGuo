@@ -59,6 +59,7 @@ public struct AVPlayerView: UIViewRepresentable {
     }
 
     private func configure(_ container: AVPlayerContainerView) {
+        container.managesPlayback = player == nil
         let targetPlayer: AVPlayer?
         if let directPlayer = player {
             targetPlayer = directPlayer
@@ -84,6 +85,8 @@ public struct AVPlayerView: UIViewRepresentable {
         container.onVideoPlaying = onVideoPlaying
         container.onBufferStuck = onBufferStuck
         container.onTimeUpdate = onTimeUpdate
+
+        guard container.managesPlayback else { return }
 
         if initialProgress > 0 {
             container.syncInitialProgress(initialProgress)

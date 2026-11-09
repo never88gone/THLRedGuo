@@ -10,6 +10,7 @@ final class PlayerPrefetchCoordinator {
     private var prefetchSequence = 0
     private var prefetchAttempts = 0
     private var prefetchRetryAt = Date.distantPast
+    private var targetIdentity = ""
 
     init(preloadingRepository: NativeRepository) {
         self.preloadingRepository = preloadingRepository
@@ -48,6 +49,13 @@ final class PlayerPrefetchCoordinator {
     ) {
         let nextIndex = currentEpisodeIndex + 1
         guard nextIndex <= allEpisodes.count else { return }
+        let identity = "\(drama.id):\(nextIndex):\(requestedQuality):\(generation)"
+        if targetIdentity != identity {
+            cancel()
+            targetIdentity = identity
+            prefetchAttempts = 0
+            prefetchRetryAt = .distantPast
+        }
         guard preloadedEpisode?.episodeIndex != nextIndex, prefetchTask == nil,
               prefetchAttempts < 2, Date() >= prefetchRetryAt else { return }
 

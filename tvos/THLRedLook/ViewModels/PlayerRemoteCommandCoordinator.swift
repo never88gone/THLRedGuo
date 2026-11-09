@@ -4,7 +4,7 @@ import AVFoundation
 
 @MainActor
 final class PlayerRemoteCommandCoordinator {
-    private var remoteCommandTargets: [Any] = []
+    private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
     private static let audioSessionQueue = DispatchQueue(label: "THLRedLook.AudioSession")
 
     func setup(
@@ -42,10 +42,7 @@ final class PlayerRemoteCommandCoordinator {
     }
 
     func teardown() {
-        let commandCenter = MPRemoteCommandCenter.shared()
-        commandCenter.playCommand.removeTarget(nil)
-        commandCenter.pauseCommand.removeTarget(nil)
-        commandCenter.togglePlayPauseCommand.removeTarget(nil)
+        for (command, target) in remoteCommandTargets { command.removeTarget(target) }
         remoteCommandTargets.removeAll()
     }
 

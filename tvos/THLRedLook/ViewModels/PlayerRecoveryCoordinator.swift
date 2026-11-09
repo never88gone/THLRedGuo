@@ -25,6 +25,13 @@ final class PlayerRecoveryCoordinator {
         stableRecoverySeconds = 0.0
     }
 
+    func recordAdvance(_ seconds: Double, playing: Bool) {
+        guard recoveryAttempts > 0 else { return }
+        guard playing, seconds > 0, seconds < 2 else { stableRecoverySeconds = 0; return }
+        stableRecoverySeconds += seconds
+        if stableRecoverySeconds >= 10 { reset() }
+    }
+
     func requestRecovery(
         reason: String,
         code: String = "",
