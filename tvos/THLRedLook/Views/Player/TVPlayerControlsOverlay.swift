@@ -1,27 +1,5 @@
 import SwiftUI
 
-/// 播放器浮层焦点枚举
-public enum PlayerOverlayFocusTarget: Hashable {
-    case back
-    case danmaku
-    case danmakuSettings
-    case speed
-    case quality
-    case seekBackward
-    case playPause
-    case seekForward
-    case prevEpisode
-    case episodeDrawer
-    case nextEpisode
-    case previousDrama
-    case nextDrama
-    case favorite
-    case detail
-    case refreshFeed
-    case social
-    case pip
-}
-
 public struct TVPlayerControlsOverlay: View {
     @ObservedObject var viewModel: PlayerViewModel
     public var forceFocusPlayButton: Bool = false
@@ -47,74 +25,14 @@ public struct TVPlayerControlsOverlay: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // MARK: - 顶部剧集信息条（局部顶部渐变，全屏贴顶铺满；无需返回按钮，由原生 Menu 键直接返回）
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(viewModel.drama.title)
-                            .accessibilityIdentifier("player.title")
-                            .font(.title3)
-                            .bold()
-                            .foregroundColor(TVTheme.textPrimary)
-                        Text("第 \(viewModel.currentEpisodeIndex) 集 · \(PlaybackPlan.qualityLabel(viewModel.selectedQuality))")
-                            .accessibilityIdentifier("player.episode")
-                            .font(.subheadline)
-                            .foregroundColor(TVTheme.textSecondary)
-                    }
-
-                    Spacer()
-                    if let onSocial {
-                        overlayBarButton(title: "点赞与关注", icon: "heart", target: .social, action: onSocial)
-                            .onMoveCommand { direction in
-                                if direction == .down { focusedControl = .playPause }
-                            }
-                    }
-                }
-                .padding(.horizontal, 56)
-                .padding(.top, 42)
-
-                if let feedActions {
-                    Text(feedActions.progressText)
-                        .font(.system(size: 22))
-                        .accessibilityIdentifier("feed.progress")
-                    HStack(spacing: 18) {
-                        overlayBarButton(title: "上一部", icon: "arrow.up", target: .previousDrama, action: feedActions.onPrevious)
-                            .disabled(!feedActions.canGoPrevious)
-                            .opacity(feedActions.canGoPrevious ? 1 : 0.45)
-                        overlayBarButton(title: "下一部", icon: "arrow.down", target: .nextDrama) {
-                            Task { _ = await feedActions.onNext() }
-                        }
-                        .disabled(!feedActions.canGoNext)
-                        .opacity(feedActions.canGoNext ? 1 : 0.45)
-                        overlayBarButton(title: feedActions.isFavorite ? "已收藏" : "收藏", icon: "bookmark", target: .favorite, action: feedActions.onFavorite)
-                        overlayBarButton(title: "剧集详情", icon: "info.circle", target: .detail) {
-                            feedActions.onDetail(viewModel.drama)
-                        }
-                        overlayBarButton(title: "换一批", icon: "arrow.clockwise", target: .refreshFeed, action: feedActions.onRefresh)
-                            .disabled(feedActions.isLoading)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 56)
-                    .padding(.top, 18)
-                    .onMoveCommand { direction in
-                        if direction == .down { focusedControl = .playPause }
-                    }
-                    Text(feedActions.errorMessage ?? "画面模式下按上下键切换短剧，点按显示控制")
-                        .font(.system(size: 22))
-                        .foregroundStyle(feedActions.errorMessage == nil ? .white.opacity(0.8) : .yellow)
-                        .padding(.top, 12)
-                        .lineLimit(2)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding(.bottom, 24)
-            .background(
-                LinearGradient(
-                    colors: [Color.black.opacity(0.88), Color.black.opacity(0.45), Color.clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea(edges: [.top, .horizontal])
+            // MARK: - 顶部剧集信息条
+            TVPlayerTopInfoBar(
+                title: viewModel.drama.title,
+                episodeText: "第 \(viewModel.currentEpisodeIndex) 集 · \(PlaybackPlan.qualityLabel(viewModel.selectedQuality))",
+                onSocial: onSocial,
+                feedActions: feedActions,
+                drama: viewModel.drama,
+                focusedControl: $focusedControl
             )
 
             // 中间纯净视频画面，支持点击收起控制栏（完全透明，不产生任何可见背景色块）

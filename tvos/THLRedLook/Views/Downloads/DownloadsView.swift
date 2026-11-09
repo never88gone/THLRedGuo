@@ -91,7 +91,7 @@ public struct DownloadsView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: 24)
-                                .fill(Color(red: 0.10, green: 0.10, blue: 0.14).opacity(0.7))
+                                .fill(TVColors.downloadsCardBg.opacity(0.7))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 24)

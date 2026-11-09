@@ -47,7 +47,7 @@ public struct TVQualitySelectionDrawer: View {
             }
             .padding(.horizontal, 40).padding(.vertical, 60)
             .frame(width: 680).frame(maxHeight: .infinity)
-            .background(Color(red: 0.08, green: 0.08, blue: 0.1).opacity(0.96))
+            .background(TVColors.drawerBackground)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity).ignoresSafeArea()
         .onExitCommand {

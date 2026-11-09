@@ -55,7 +55,7 @@ public struct SettingsView: View {
             .padding(.vertical, 20)
             .background(
                 RoundedRectangle(cornerRadius: 24)
-                    .fill(Color(red: 0.10, green: 0.10, blue: 0.13).opacity(0.95))
+                    .fill(TVColors.settingsSidebarBg.opacity(0.95))
             )
             .focusSection()
             .onExitCommand {

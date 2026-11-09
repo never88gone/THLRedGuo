@@ -120,7 +120,7 @@ public struct TVSourceBlankStateView: View {
                 }
             }
             .padding(60)
-            .background(Color(white: 0.15))
+            .background(TVColors.darkPlaceholderBg)
             .cornerRadius(24)
         }
     }

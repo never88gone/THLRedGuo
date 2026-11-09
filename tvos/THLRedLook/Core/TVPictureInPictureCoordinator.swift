@@ -3,29 +3,6 @@ import AVKit
 import Combine
 import SwiftUI
 
-/// 画中画活跃会话数据结构
-public struct TVPictureInPictureSession: Equatable {
-    public let drama: Drama
-    public var episodeIndex: Int
-    public let allEpisodes: [Episode]
-    public var currentPosition: Double
-    public var playbackPlan: PlaybackPlan?
-
-    public init(
-        drama: Drama,
-        episodeIndex: Int,
-        allEpisodes: [Episode],
-        currentPosition: Double,
-        playbackPlan: PlaybackPlan? = nil
-    ) {
-        self.drama = drama
-        self.episodeIndex = episodeIndex
-        self.allEpisodes = allEpisodes
-        self.currentPosition = currentPosition
-        self.playbackPlan = playbackPlan
-    }
-}
-
 /// tvOS 原生系统画中画 (Picture in Picture) 全局协调器
 @MainActor
 public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AVPictureInPictureControllerDelegate {

@@ -35,7 +35,7 @@ public struct TVCustomSplitView<Sidebar: View, Detail: View>: View {
                             Material.regular
                         )
                         .background(
-                            Color(red: 0.08, green: 0.07, blue: 0.09).opacity(0.88)
+                            TVColors.splitViewSidebarBg.opacity(0.88)
                         )
                         .cornerRadius(26)
                         .overlay(

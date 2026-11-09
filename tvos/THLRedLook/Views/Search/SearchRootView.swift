@@ -95,11 +95,7 @@ public struct SearchRootView: View {
                                         Circle()
                                             .fill(
                                                 isIconFocused
-                                                    ? AnyShapeStyle(LinearGradient(
-                                                        colors: [Color(red: 0.95, green: 0.22, blue: 0.28), Color(red: 0.78, green: 0.12, blue: 0.18)],
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    ))
+                                                    ? AnyShapeStyle(TVColors.prominentGradient)
                                                     : AnyShapeStyle(Color.white.opacity(0.12))
                                             )
                                             .frame(width: 34, height: 34)

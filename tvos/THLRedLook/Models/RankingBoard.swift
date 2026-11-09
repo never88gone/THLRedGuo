@@ -1,23 +1,5 @@
 import Foundation
 
-public struct RankedDrama: Decodable {
-    public let rank: Int
-    public let drama: Drama
-    public let metric: String
-
-    public init(rank: Int, drama: Drama, metric: String = "") {
-        self.rank = rank
-        self.drama = drama
-        self.metric = metric
-    }
-}
-
-public struct DiscoveryPage<Item> {
-    public let items: [Item]
-    public let page: Int
-    public let hasMore: Bool
-}
-
 public struct RankingBoard: Identifiable, Hashable, Codable {
     public let id: String
     public let name: String
@@ -54,19 +36,5 @@ public struct RankingBoard: Identifiable, Hashable, Codable {
     /// 过滤出适宜在 tvOS 呈现的榜单列表
     public static func filterForTV(_ boards: [RankingBoard]) -> [RankingBoard] {
         boards.filter { $0.isAllowedOnTV }
-    }
-}
-
-public struct DanmakuItem: Identifiable, Hashable, Codable {
-    public let id: String
-    public let text: String
-    public let timeMs: Int64
-    public let color: String
-
-    public init(id: String = UUID().uuidString, text: String, timeMs: Int64, color: String = "#FFFFFF") {
-        self.id = id
-        self.text = text
-        self.timeMs = timeMs
-        self.color = color
     }
 }

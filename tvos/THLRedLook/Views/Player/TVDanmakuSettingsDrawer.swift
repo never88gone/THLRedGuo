@@ -56,7 +56,7 @@ public struct TVDanmakuSettingsDrawer: View {
                             down: "danmaku.font.small",
                             right: "danmaku.switch.off"
                         ) {
-                            if !viewModel.danmakuEnabled { viewModel.toggleDanmaku() }
+                            if !viewModel.danmakuEnabled { viewModel.danmakuEnabled = true }
                         }
                         settingOptionButton(
                             title: "关闭",
@@ -65,7 +65,7 @@ public struct TVDanmakuSettingsDrawer: View {
                             down: "danmaku.font.large",
                             left: "danmaku.switch.on"
                         ) {
-                            if viewModel.danmakuEnabled { viewModel.toggleDanmaku() }
+                            if viewModel.danmakuEnabled { viewModel.danmakuEnabled = false }
                         }
                     }
                 }

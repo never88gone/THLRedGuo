@@ -1,14 +1,6 @@
 import Foundation
 import Combine
 
-protocol ICloudKeyValueStore: AnyObject {
-    func string(forKey key: String) -> String?
-    func set(_ value: Any?, forKey key: String)
-    func synchronize() -> Bool
-}
-
-extension NSUbiquitousKeyValueStore: ICloudKeyValueStore {}
-
 public final class ICloudSyncService: ObservableObject {
     public static let shared = ICloudSyncService()
 

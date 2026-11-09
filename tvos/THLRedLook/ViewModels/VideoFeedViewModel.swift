@@ -2,19 +2,6 @@ import Foundation
 import Combine
 import AVFoundation
 
-public struct VideoFeedItem: Decodable, Identifiable {
-    public let drama: Drama
-    public let episode: Int
-    public let position: Double
-    public var id: String { drama.id }
-}
-
-public struct VideoFeedPage: Decodable {
-    public let items: [VideoFeedItem]
-    public let page: Int
-    public let hasMore: Bool
-}
-
 @MainActor
 public final class VideoFeedViewModel: ObservableObject {
     @Published public private(set) var items: [VideoFeedItem] = []

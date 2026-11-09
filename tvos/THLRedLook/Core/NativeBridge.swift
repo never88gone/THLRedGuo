@@ -1,58 +1,6 @@
 import Foundation
 import JavaScriptCore
 
-private enum SavedGuestSession {
-    static func valid(_ json: String) -> Bool {
-        guard let data = json.data(using: .utf8),
-              let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
-        return ["iid", "device_id"].allSatisfy { key in
-            guard let id = value[key] as? String else { return false }
-            return id.range(of: "^[1-9][0-9]{9,23}$", options: .regularExpression) != nil
-        }
-    }
-
-}
-
-final class HttpTraceHolder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _url = ""
-    private var _method = "GET"
-    private var _status = 0
-    private var _logId = ""
-    private var _snippet = ""
-    private var _tabsSummary = ""
-    private var _guestCreatedAt: TimeInterval = 0
-    private var _guestJSON = ""
-
-    func record(url: String, method: String, status: Int, logId: String, snippet: String, tabsSummary: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        _url = url
-        _method = method
-        _status = status
-        _logId = logId
-        _snippet = snippet
-        _tabsSummary = tabsSummary
-    }
-
-    func recordGuest(json: String, createdAt: TimeInterval) {
-        lock.withLock {
-            _guestJSON = json
-            _guestCreatedAt = createdAt
-        }
-    }
-
-    var guestSnapshot: (json: String, createdAt: TimeInterval) {
-        lock.withLock { (_guestJSON, _guestCreatedAt) }
-    }
-
-    var snapshot: (url: String, method: String, status: Int, logId: String, snippet: String, tabsSummary: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        return (_url, _method, _status, _logId, _snippet, _tabsSummary)
-    }
-}
-
 /// 纯 Swift 原生 CatPawOpen 协议桥接引擎
 /// 基于系统级 JavaScriptCore 运行时与 URLSession 端侧闭环执行 Spider 数据源解析。
 public actor NativeBridge {
@@ -69,19 +17,13 @@ public actor NativeBridge {
     private var successfulPlaybackResolves = 0
     private var lastSuccessfulPlaybackAt: TimeInterval?
     private let timeProvider: @Sendable () -> TimeInterval
-    private let playbackProfileLoader: @Sendable () throws -> HongguoApkProfile?
     private let playbackProfileRevision: @Sendable () -> UInt64
     private var loadedPlaybackProfileRevision: UInt64?
-    private var localPlaybackProfileUnavailable = false
 
-    // 沙盒路径
-    private var baseDirURL: URL
-    private var sourcesDirURL: URL
-
-    // 当前数据源状态
-    private var installedSources: [String: [String: Any]] = [:]
-    private var sourceScripts: [String: String] = [:]
-    private var activeSourceId: String = "hongguo"
+    // 功能子系统协调服务组件（面向对象组合拆分，杜绝扩展）
+    private let sourceRegistry: JSSourceRegistry
+    private let polyfillService: JSPolyfillService
+    private let dramaParser: JSDramaParserService
 
     // JS 运行时上下文缓存
     private var jsContexts: [String: JSContext] = [:]
@@ -90,12 +32,22 @@ public actor NativeBridge {
 
     public func applyLocalPlaybackProfileChange() {
         jsContexts.removeValue(forKey: "hongguo")
-        localPlaybackProfileUnavailable = false
         successfulPlaybackResolves = 0
         lastSuccessfulPlaybackAt = nil
     }
 
-    init(baseDirectory: URL? = nil, httpSession: URLSession? = nil, diagnostics: SourceDiagnostics = .shared, diagnosticContext: String = "日常使用", persistentDeviceSession: Bool = true, deviceDefaults: UserDefaults = .standard, timeProvider: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 }, playbackProfileLoader: @escaping @Sendable () throws -> HongguoApkProfile? = { try HongguoPlaybackProfileVault.load() }, playbackProfileRevision: @escaping @Sendable () -> UInt64 = { HongguoPlaybackProfileVault.revision }, accountSnapshot: @escaping @Sendable () -> (record: HongguoAccountRecord?, revision: UInt64) = { HongguoAccountVault.shared.snapshot }) {
+    init(
+        baseDirectory: URL? = nil,
+        httpSession: URLSession? = nil,
+        diagnostics: SourceDiagnostics = .shared,
+        diagnosticContext: String = "日常使用",
+        persistentDeviceSession: Bool = true,
+        deviceDefaults: UserDefaults = .standard,
+        timeProvider: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 },
+        playbackProfileLoader: @escaping @Sendable () throws -> HongguoApkProfile? = { try HongguoPlaybackProfileVault.load() },
+        playbackProfileRevision: @escaping @Sendable () -> UInt64 = { HongguoPlaybackProfileVault.revision },
+        accountSnapshot: @escaping @Sendable () -> (record: HongguoAccountRecord?, revision: UInt64) = { HongguoAccountVault.shared.snapshot }
+    ) {
         if let httpSession {
             self.httpSession = httpSession
         } else {
@@ -117,183 +69,29 @@ public actor NativeBridge {
         self.deviceDefaults = deviceDefaults
         self.accountSnapshot = accountSnapshot
         self.timeProvider = timeProvider
-        self.playbackProfileLoader = playbackProfileLoader
         self.playbackProfileRevision = playbackProfileRevision
-        let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        self.baseDirURL = baseDirectory ?? cachesDir.appendingPathComponent("THLRedLook_Data")
-        self.sourcesDirURL = self.baseDirURL.appendingPathComponent("sources")
 
-        try? FileManager.default.createDirectory(at: self.sourcesDirURL, withIntermediateDirectories: true)
-
-        // 默认预设官方内置 hongguo 脚本，确保冷启动 0 毫秒处于可用状态
-        self.sourceScripts["hongguo"] = BuiltInHongguoJSContent
-        self.installedSources["hongguo"] = [
-            "id": "hongguo",
-            "name": "官方内置",
-            "version": "1.0.0",
-            "author": "THL"
-        ]
-        self.activeSourceId = "hongguo"
+        let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let baseDir = baseDirectory ?? cachesDir.appendingPathComponent("THLRedLook_Data")
+        self.sourceRegistry = JSSourceRegistry(sourcesDirURL: baseDir.appendingPathComponent("sources"))
+        self.polyfillService = JSPolyfillService(httpSession: self.httpSession, diagnostics: diagnostics, diagnosticContext: diagnosticContext, persistentDeviceSession: persistentDeviceSession, deviceDefaults: deviceDefaults, timeProvider: timeProvider, playbackProfileLoader: playbackProfileLoader, accountSnapshot: accountSnapshot)
+        self.dramaParser = JSDramaParserService(diagnostics: diagnostics, diagnosticContext: diagnosticContext, timeProvider: timeProvider, deviceDefaults: deviceDefaults, persistentDeviceSession: persistentDeviceSession)
     }
 
     /// 保证核心正规初始化严格就绪
     public func ensureInitialized() async throws {
         if isInitialized { return }
-
-        try? FileManager.default.createDirectory(at: sourcesDirURL, withIntermediateDirectories: true)
-
-        let hongguoFile = sourcesDirURL.appendingPathComponent("hongguo.js")
-        let needsUpdate: Bool
-        if let currentScript = try? String(contentsOf: hongguoFile, encoding: .utf8) {
-            needsUpdate = currentScript != BuiltInHongguoJSContent
-        } else {
-            needsUpdate = true
-        }
-        if needsUpdate {
-            try? BuiltInHongguoJSContent.write(to: hongguoFile, atomically: true, encoding: .utf8)
-            NSLog("🎬 [NativeBridge] 已自动同步并更新最新内置官方数据源到沙盒: %@", hongguoFile.path)
-        }
-
-        scanSourcesDirectory()
-
-        if activeSourceId.isEmpty || activeSourceId == "hongguo" || !installedSources.keys.contains(activeSourceId) {
-            activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : (installedSources.keys.first ?? "")
-        }
-
+        sourceRegistry.ensureInitialized()
         isInitialized = true
         NSLog("[Source] app=%@ %@ %@", SourceDiagnostics.version, SourceDiagnostics.sourceRevision, SourceDiagnostics.sourceBundleStatus)
-        NSLog("🎬 [NativeBridge] CatPawOpen Swift 原生核心初始化成功，已装载 %ld 个插件，当前激活源: '%@'", installedSources.count, activeSourceId)
-    }
-
-    /// 扫描沙盒 sources 目录中的所有 JS Spider 脚本
-    private func scanSourcesDirectory() {
-        let previousScripts = sourceScripts
-        defer {
-            jsContexts = jsContexts.filter { entry in
-                guard let script = sourceScripts[entry.key] else { return false }
-                return previousScripts[entry.key] == script
-            }
-        }
-        installedSources.removeAll()
-        sourceScripts.removeAll()
-        let official = BuiltInHongguoJSContent
-        let bundledMeta = extractScriptMeta(script: official, fallbackId: "hongguo") ?? [:]
-
-        let files = (try? FileManager.default.contentsOfDirectory(at: sourcesDirURL, includingPropertiesForKeys: nil)) ?? []
-
-        for file in files where file.pathExtension.lowercased() == "js" {
-            guard var script = try? String(contentsOf: file, encoding: .utf8), !script.isEmpty else {
-                continue
-            }
-            if var meta = extractScriptMeta(script: script, fallbackId: file.deletingPathExtension().lastPathComponent) {
-                let sid = meta["id"] as? String ?? file.deletingPathExtension().lastPathComponent
-                if sid == "hongguo" && script != BuiltInHongguoJSContent &&
-                    !isSourceVersionNewer(meta["version"] as? String ?? "", than: bundledMeta["version"] as? String ?? "") {
-                    script = official
-                    meta = bundledMeta
-                    try? official.write(to: file, atomically: true, encoding: .utf8)
-                    NSLog("🎬 [NativeBridge] 扫描时已将旧版沙盒数据源自动热升级为最新内置官方源")
-                }
-                if sid == "hongguo", let existing = installedSources[sid],
-                   !isSourceVersionNewer(meta["version"] as? String ?? "", than: existing["version"] as? String ?? "") {
-                    continue
-                }
-                installedSources[sid] = meta
-                sourceScripts[sid] = script
-            }
-        }
-
-        if !official.isEmpty, sourceScripts["hongguo"] == nil {
-            var meta = bundledMeta
-            meta["sha256"] = SourceDiagnostics.fingerprint(official)
-            meta["sourceCommit"] = SourceDiagnostics.sourceManifest["sourceCommit"] ?? ""
-            installedSources["hongguo"] = meta
-            sourceScripts["hongguo"] = official
-        }
-        if let script = sourceScripts["hongguo"] {
-            installedSources["hongguo"]?["sha256"] = SourceDiagnostics.fingerprint(script)
-            installedSources["hongguo"]?["sourceCommit"] = script == official ? SourceDiagnostics.sourceManifest["sourceCommit"] ?? "" : ""
-        }
-
-        // 如果存在活跃源但不在已安装列表中，清空或重置
-        if !installedSources.keys.contains(activeSourceId) {
-            activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : (installedSources.keys.first ?? "")
-        }
-    }
-
-    private func isSourceVersionNewer(_ candidate: String, than baseline: String) -> Bool {
-        guard candidate.count <= 128, baseline.count <= 128 else { return false }
-        let pattern = #"^(\d{1,9})\.(\d{1,9})\.(\d{1,9})(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"#
-        guard let expression = try? NSRegularExpression(pattern: pattern) else { return false }
-        func fields(_ value: String) -> [String]? {
-            guard let match = expression.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) else { return nil }
-            return (1...4).map { index in Range(match.range(at: index), in: value).map { String(value[$0]) } ?? "" }
-        }
-        guard let a = fields(candidate), let b = fields(baseline) else { return false }
-        for index in 0..<3 {
-            let left = Int(a[index])!, right = Int(b[index])!
-            if left != right { return left > right }
-        }
-        if a[3].isEmpty || b[3].isEmpty { return a[3].isEmpty && !b[3].isEmpty }
-        let ap = a[3].split(separator: "."), bp = b[3].split(separator: ".")
-        for index in 0..<min(ap.count, bp.count) {
-            let left = ap[index], right = bp[index]
-            if left == right { continue }
-            let an = left.allSatisfy { $0.isASCII && $0.isNumber }, bn = right.allSatisfy { $0.isASCII && $0.isNumber }
-            if an != bn { return !an }
-            if an {
-                let digitsA = left.drop(while: { $0 == "0" }), digitsB = right.drop(while: { $0 == "0" })
-                if digitsA.count != digitsB.count { return digitsA.count > digitsB.count }
-                if digitsA != digitsB { return digitsA.lexicographicallyPrecedes(digitsB) == false }
-            } else { return right.lexicographicallyPrecedes(left) }
-        }
-        return ap.count > bp.count
-    }
-
-    /// 解析 Spider 脚本中的元数据 (meta)
-    private func extractScriptMeta(script: String, fallbackId: String) -> [String: Any]? {
-        let ctx = JSContext()!
-        ctx.evaluateScript("var meta = {}; var spider = { meta: {} };")
-        ctx.evaluateScript(script)
-
-        let metaVal = ctx.evaluateScript("typeof spider !== 'undefined' && spider.meta ? spider.meta : (typeof meta !== 'undefined' ? meta : null);")
-        if let dict = metaVal?.toDictionary() as? [String: Any], let id = dict["id"] as? String, !id.isEmpty {
-            return dict
-        }
-
-        // 正则兜底解析
-        if let match = script.range(of: "id\\s*:\\s*[\"']([^\"']+)[\"']", options: .regularExpression) {
-            let idSubstring = script[match]
-            let id = idSubstring.components(separatedBy: CharacterSet(charactersIn: "\"'"))[1]
-            let nameMatch = script.range(of: "name\\s*:\\s*[\"']([^\"']+)[\"']", options: .regularExpression)
-            let name = nameMatch != nil ? script[nameMatch!].components(separatedBy: CharacterSet(charactersIn: "\"'"))[1] : id
-            let versionMatch = script.range(of: "version\\s*:\\s*[\"']([^\"']+)[\"']", options: .regularExpression)
-            let version = versionMatch.map { String(script[$0]).components(separatedBy: CharacterSet(charactersIn: "\"'"))[1] } ?? ""
-            let authorMatch = script.range(of: "author\\s*:\\s*[\"']([^\"']+)[\"']", options: .regularExpression)
-            let author = authorMatch.map { String(script[$0]).components(separatedBy: CharacterSet(charactersIn: "\"'"))[1] } ?? ""
-            return [
-                "id": id,
-                "name": name,
-                "version": version,
-                "author": author,
-                "description": "自定义 JS 插件"
-            ]
-        }
-
-        return [
-            "id": fallbackId,
-            "name": fallbackId,
-            "version": "1.0.0",
-            "description": "本地 JS 插件"
-        ]
+        NSLog("🎬 [NativeBridge] CatPawOpen Swift 原生核心初始化成功，已装载 %ld 个插件，当前激活源: '%@'", sourceRegistry.installedSources.count, sourceRegistry.activeSourceId)
     }
 
     /// 获取或构建指定数据源的 CatPawOpen JS 运行时上下文
     public func accountRequest(_ action: String, payload: [String: String] = [:]) async throws -> [String: Any] {
-        sourceScripts["__official_account"] = BuiltInHongguoJSContent
+        sourceRegistry.setScript(sourceId: "__official_account", script: BuiltInHongguoJSContent)
         guard let context = getOrCreateContext(sourceId: "__official_account") else { throw HongguoAccountError.invalid }
-        let expression = try spiderExpression("accountRequest", [action, payload])
+        let expression = try dramaParser.spiderExpression("accountRequest", [action, payload])
         guard let response = await evalAsync(context: context, scriptExpr: expression) else { throw HongguoAccountError.invalid }
         guard response["ok"] as? Bool == true, let result = response["data"] as? [String: Any] else {
             let detail = response["error"] as? String ?? ""
@@ -307,9 +105,9 @@ public actor NativeBridge {
     }
 
     public func accountParse(_ action: String, body: String) throws -> [String: Any] {
-        sourceScripts["__official_account"] = BuiltInHongguoJSContent
+        sourceRegistry.setScript(sourceId: "__official_account", script: BuiltInHongguoJSContent)
         guard let context = getOrCreateContext(sourceId: "__official_account") else { throw HongguoAccountError.invalid }
-        let expression = try spiderExpression("accountParse", [action, body])
+        let expression = try dramaParser.spiderExpression("accountParse", [action, body])
         context.exception = nil
         let result = context.evaluateScript(expression)
         if context.exception?.toString()?.contains("ACCOUNT_CHALLENGE_REQUIRED") == true || context.exception?.toString()?.contains("ACCOUNT_SECONDARY_VERIFICATION_REQUIRED") == true { throw HongguoAccountError.challenge }
@@ -331,328 +129,42 @@ public actor NativeBridge {
         if revision != accountRevision { jsContexts.removeAll(); accountRevision = revision }
 
         if sourceId == "hongguo", jsContexts[sourceId]?.evaluateScript("globalThis.__hongguoHasBuiltInSigning === true")?.toBool() != true {
-            let revision = playbackProfileRevision()
-            if loadedPlaybackProfileRevision != revision {
+            let profileRev = playbackProfileRevision()
+            if loadedPlaybackProfileRevision != profileRev {
                 applyLocalPlaybackProfileChange()
-                loadedPlaybackProfileRevision = revision
+                loadedPlaybackProfileRevision = profileRev
             }
         }
         if let existing = jsContexts[sourceId] {
-            if sourceId == "hongguo", localPlaybackProfileUnavailable,
-               sourceScripts[sourceId] == BuiltInHongguoJSContent {
-                refreshSigningCache(existing)
+            if sourceId == "hongguo", polyfillService.localPlaybackProfileUnavailable,
+               sourceRegistry.getScript(sourceId: sourceId) == BuiltInHongguoJSContent {
+                polyfillService.refreshSigningCache(existing)
             }
-            synchronizeGuestSession(existing, sourceId: sourceId)
+            if polyfillService.synchronizeGuestSession(existing, sourceId: sourceId, httpTrace: httpTrace) {
+                successfulPlaybackResolves = 0
+                lastSuccessfulPlaybackAt = nil
+            }
             return existing
         }
 
-        guard let script = sourceScripts[sourceId] else {
-            return nil
-        }
+        guard let script = sourceRegistry.getScript(sourceId: sourceId) else { return nil }
 
         if sourceId == "hongguo" {
             successfulPlaybackResolves = 0
             lastSuccessfulPlaybackAt = nil
         }
-        guard let context = JSContext() else {
-            return nil
-        }
+        guard let context = JSContext() else { return nil }
 
-        let entropy = (0..<64).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
-        context.evaluateScript("globalThis.__hongguoEntropy = '\(entropy)';")
-
-        // 1. 注入控制台日志
-        let logBlock: @convention(block) (String) -> Void = { msg in
-            NSLog("🎬 [CatPawOpen JS:%@] %@", sourceId, msg)
-        }
-        context.setObject(logBlock, forKeyedSubscript: "__console_log" as NSString)
-
-        // 1.5 注入官方设备认证持久化桥接，避免每次冷启动/重新初始化产生额外的设备注册网络延迟
-        let trace = httpTrace
-        trace.recordGuest(json: "", createdAt: 0)
-        let currentTime = timeProvider
-        let persistentSession = persistentDeviceSession
-        let deviceDefaults = deviceDefaults
-        let saveDeviceBlock: @convention(block) (String) -> Void = { json in
-            guard persistentSession, !json.isEmpty else { return }
-            deviceDefaults.set(json, forKey: "thl_tv_hongguo_device_session")
-            let created = currentTime()
-            deviceDefaults.set(created, forKey: "thl_tv_hongguo_guest_created_at")
-            trace.recordGuest(json: json, createdAt: created)
-        }
-        context.setObject(saveDeviceBlock, forKeyedSubscript: "__native_save_device" as NSString)
-
-        let accountSnapshot = self.accountSnapshot
-        let account = accountSnapshot().record
-        let accountDevice = (script == BuiltInHongguoJSContent && account?.hasSession == true ? account?.device : nil).flatMap { try? JSONSerialization.data(withJSONObject: $0) }.map { String(decoding: $0, as: UTF8.self) }
-        if let cachedDevice = accountDevice ?? (persistentDeviceSession ? deviceDefaults.string(forKey: "thl_tv_hongguo_device_session") : nil), SavedGuestSession.valid(cachedDevice) {
-            trace.recordGuest(json: cachedDevice, createdAt: deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at"))
-            context.evaluateScript("""
-            try {
-                var raw = \(cachedDevice.debugDescription);
-                globalThis.__hongguoCachedDevice = typeof raw === 'string' ? JSON.parse(raw) : raw;
-            } catch(_) {}
-            """)
-        }
-
-        // 2. 注入原生高性能 HTTP 请求桥接
-        let trustedAccountSource = script == BuiltInHongguoJSContent
-        let expectedAccountRevision = accountSnapshot().revision
-        let accountActive: @convention(block) () -> Bool = {
-            trustedAccountSource && accountSnapshot().record?.hasSession == true
-        }
-        context.setObject(accountActive, forKeyedSubscript: "__native_account_active" as NSString)
-        context.evaluateScript("Object.defineProperty(globalThis, '__hongguoAccountActive', {get: function(){return !!__native_account_active();}});")
-        let session = httpSession
-        let recorder = diagnostics
-        let diagnosticContext = diagnosticContext
-        let fetchBlock: @convention(block) (String, [String: Any]?) -> [String: Any] = { urlStr, opts in
-            guard let url = URL(string: urlStr) else {
-                return [
-                    "status": 0,
-                    "headers": [:],
-                    "body": "",
-                    "error": "INVALID_URL",
-                    "errorDetail": "无效目标地址: \(urlStr)",
-                    "category": DiagnosticCategory.unknown.rawValue
-                ]
-            }
-            if Task.isCancelled {
-                return ["status": 0, "headers": [:], "body": "", "error": "CANCELLED", "category": "cancelled"]
-            }
-            var req = URLRequest(url: url)
-            let timeout = min(12.0, max(0.001, (opts?["timeoutMs"] as? Double ?? 10000) / 1000))
-            req.timeoutInterval = timeout
-            let method = (opts?["method"] as? String ?? "GET").uppercased()
-            req.httpMethod = method
-            req.httpShouldHandleCookies = false
-            if let headers = opts?["headers"] as? [String: Any] {
-                for (k, v) in headers {
-                    req.setValue(String(describing: v), forHTTPHeaderField: k)
-                }
-            }
-            let accountBusiness = HongguoAccountVault.businessURL(url)
-            if accountBusiness {
-                let account = accountSnapshot()
-                guard expectedAccountRevision == account.revision else {
-                    return ["status": 0, "headers": [:], "body": "", "error": "CANCELLED"]
-                }
-                if account.record?.hasSession == true {
-                    guard trustedAccountSource else {
-                        return ["status": 0, "headers": [:], "body": "", "error": "ACCOUNT_SOURCE_UNTRUSTED"]
-                    }
-                    let cookie = HongguoAccountVault.shared.header(for: url, record: account.record)
-                    guard !cookie.isEmpty else { return ["status": 0, "headers": [:], "body": "", "error": "ACCOUNT_EXPIRED"] }
-                    req.setValue(cookie, forHTTPHeaderField: "Cookie")
-                }
-            }
-            if let body = opts?["body"] as? String {
-                req.httpBody = body.data(using: .utf8)
-            }
-
-            let semaphore = DispatchSemaphore(value: 0)
-            let started = ProcessInfo.processInfo.systemUptime
-            let result = NativeHTTPResult()
-            let task = session.dataTask(with: req) { data, response, error in
-                result.complete(data: data, response: response, error: error)
-                semaphore.signal()
-            }
-            task.resume()
-            let timedOut = semaphore.wait(timeout: .now() + timeout) == .timedOut
-            if timedOut { task.cancel() }
-            let response = result.snapshot(timedOut: timedOut)
-            if accountBusiness && expectedAccountRevision != accountSnapshot().revision {
-                return ["status": 0, "headers": [:], "body": "", "error": "CANCELLED"]
-            }
-
-            var tabsDesc = ""
-            var snippet = ""
-            if !response.body.isEmpty {
-                let trimmed = response.body.trimmingCharacters(in: .whitespacesAndNewlines)
-                snippet = SourceDiagnostics.responseSummary(trimmed)
-                if url.path.contains("/search/tab/v"),
-                   let data = response.body.data(using: .utf8),
-                   let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-                   let tabs = parsed["search_tabs"] as? [[String: Any]] {
-                    let descs = tabs.map { "\($0["tab_type"] ?? -1):\($0["title"] ?? $0["tab_name"] ?? "")((\(($0["data"] as? [Any])?.count ?? 0)条)" }
-                    tabsDesc = "tabs[\(tabs.count)]: [" + descs.joined(separator: ", ") + "]"
-                }
-            }
-
-            let logId = response.headers["x-tt-logid"] ?? response.headers["x-tt-traceid"] ?? response.headers["x-ss-req-ticket"] ?? ""
-            trace.record(
-                url: SourceDiagnostics.desensitizeUrl(url.absoluteString),
-                method: method,
-                status: response.status,
-                logId: logId,
-                snippet: snippet,
-                tabsSummary: tabsDesc
-            )
-
-            recorder.record(
-                url: url,
-                context: diagnosticContext,
-                elapsedMs: Int((ProcessInfo.processInfo.systemUptime - started) * 1000),
-                status: response.status,
-                body: response.body,
-                method: method,
-                headers: response.headers,
-                bodyBytes: response.bodyBytes,
-                errorCode: response.error,
-                error: response.rawError
-            )
-            return [
-                "status": response.status,
-                "headers": response.headers,
-                "body": response.body,
-                "error": response.error,
-                "errorDetail": response.errorDetail,
-                "category": response.category.rawValue
-            ]
-
-        }
-        context.setObject(fetchBlock, forKeyedSubscript: "__native_fetch" as NSString)
-
-        // 3. 注入标准 CatPawOpen 全局垫片 (console, fetch, html.parse)
-        let shims = """
-        var JSON = JSON || {};
-        if (!JSON.stringify) JSON.stringify = function(o) { return "{}"; };
-        if (!JSON.parse) JSON.parse = function(s) { return {}; };
-        (function() {
-          var nativeParse = JSON.parse;
-          JSON.parse = function(text, reviver) {
-            if (typeof text === 'string' && /\\d{15,}/.test(text)) {
-              var output = '';
-              var copied = 0;
-              var quoted = false;
-              var escaped = false;
-              var numberCharacters = '0123456789.eE+-';
-              for (var index = 0; index < text.length; index++) {
-                var character = text[index];
-                if (quoted) {
-                  if (escaped) escaped = false;
-                  else if (character === '\\\\') escaped = true;
-                  else if (character === '"') quoted = false;
-                  continue;
-                }
-                if (character === '"') {
-                  quoted = true;
-                  continue;
-                }
-                if (character !== '-' && (character < '0' || character > '9')) continue;
-                var start = index;
-                while (index < text.length && numberCharacters.indexOf(text[index]) >= 0) index++;
-                var token = text.slice(start, index);
-                if (/^-?[1-9]\\d{14,}$/.test(token)) {
-                  output += text.slice(copied, start) + '"' + token + '"';
-                  copied = index;
-                }
-                index--;
-              }
-              if (copied > 0) text = output + text.slice(copied);
-            }
-            return nativeParse(text, reviver);
-          };
-        })();
-
-        globalThis.console = {
-            log: function() { var args = Array.prototype.slice.call(arguments); __console_log(args.join(" ")); },
-            warn: function() { var args = Array.prototype.slice.call(arguments); __console_log("[WARN] " + args.join(" ")); },
-            error: function() { var args = Array.prototype.slice.call(arguments); __console_log("[ERROR] " + args.join(" ")); },
-            info: function() { var args = Array.prototype.slice.call(arguments); __console_log(args.join(" ")); }
-        };
-
-        globalThis.fetch = async function(url, opts) {
-            opts = opts || {};
-            var res = __native_fetch(String(url), opts);
-            var status = typeof res.status === "number" ? res.status : 0;
-            var respBody = res.body || "";
-            var respHeaders = res.headers || {};
-            if ((status === 0 || res.error === "RESPONSE_NOT_UTF8") && (res.error || res.errorDetail)) {
-                var netErr = new Error("网络请求失败: " + (res.errorDetail || res.error || "未知网络错误"));
-                netErr.code = res.error || "HTTP_0";
-                netErr.category = res.category || "network_timeout";
-                netErr.isNetworkError = true;
-                throw netErr;
-            }
-            return {
-                status: status,
-                ok: status >= 200 && status < 300,
-                headers: respHeaders,
-                body: respBody,
-                text: async function() { return respBody; },
-                json: async function() {
-                    try {
-                        return JSON.parse(respBody || "{}");
-                    } catch(e) {
-                        var jsonErr = new Error("响应数据不是合法 JSON: " + (respBody.slice(0, 100) || "空响应"));
-                        jsonErr.category = "invalid_resp";
-                        throw jsonErr;
-                    }
-                }
-            };
-        };
-
-        var html = (function() {
-            function cleanText(t) { return (t || "").replace(/<[^>]+>/g, "").trim(); }
-            function parseAttrs(str) {
-                var attrs = {};
-                if (!str) return attrs;
-                var re = /([a-zA-Z0-9_\\-:]+)(?:\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'=<>`]+)))?/g;
-                var match;
-                while ((match = re.exec(str)) !== null) {
-                    var key = match[1].toLowerCase();
-                    var val = match[2] !== undefined ? match[2] : (match[3] !== undefined ? match[3] : (match[4] !== undefined ? match[4] : ""));
-                    attrs[key] = val;
-                }
-                return attrs;
-            }
-            function Node(tag, attrs, content) {
-                this.tag = (tag || "").toLowerCase();
-                this.attrs = attrs || {};
-                this.content = content || "";
-            }
-            Node.prototype.text = function() { return cleanText(this.content); };
-            Node.prototype.attr = function(n) { return this.attrs[n.toLowerCase()] || ""; };
-
-            return {
-                parse: function(str) {
-                    str = str || "";
-                    return {
-                        find: function(sel) {
-                            var nodes = [];
-                            var re = /<([a-zA-Z0-9]+)([^>]*)>([\\s\\S]*?)<\\/\\1>/gi;
-                            var m;
-                            while ((m = re.exec(str)) !== null) {
-                                var tag = m[1];
-                                var attrStr = m[2];
-                                var inner = m[3];
-                                var attrs = parseAttrs(attrStr);
-                                nodes.push(new Node(tag, attrs, inner));
-                            }
-                            return {
-                                length: nodes.length,
-                                eq: function(i) { return nodes[i] || new Node("", {}, ""); },
-                                text: function() { return nodes.map(function(n) { return n.text(); }).join(" "); },
-                                attr: function(n) { return nodes.length > 0 ? nodes[0].attr(n) : ""; }
-                            };
-                        }
-                    };
-                }
-            };
-        })();
-        """
-        context.evaluateScript(shims)
-
-        // 4. 执行 Spider 脚本代码
+        polyfillService.setupContext(context: context, sourceId: sourceId, script: script, httpTrace: httpTrace)
         context.evaluateScript(script)
+
         if sourceId == "hongguo", script == BuiltInHongguoJSContent, context.exception == nil {
-            refreshSigningCache(context)
+            polyfillService.refreshSigningCache(context)
         }
         if sourceId == "hongguo" {
             let ready = context.exception == nil && context.evaluateScript("typeof spider !== 'undefined' && typeof spider.play === 'function'")?.toBool() == true
             diagnostics.registerSourceRuntime(context: diagnosticContext, script: script, ready: ready,
-                                              importedVersion: script != BuiltInHongguoJSContent ? installedSources[sourceId]?["version"] as? String : nil)
+                                              importedVersion: script != BuiltInHongguoJSContent ? sourceRegistry.installedSources[sourceId]?["version"] as? String : nil)
         }
         context.evaluateScript("if (typeof spider !== 'undefined' && typeof spider.init === 'function') { spider.init({}); }")
 
@@ -660,63 +172,8 @@ public actor NativeBridge {
         return context
     }
 
-    private func refreshSigningCache(_ context: JSContext) {
-        localPlaybackProfileUnavailable = false
-        guard context.evaluateScript("globalThis.__hongguoHasBuiltInSigning === true")?.toBool() != true else { return }
-        do {
-            if let profile = try playbackProfileLoader() {
-                context.setObject(["configuration": profile.configuration, "sdkVersion": profile.sdkVersion] as NSDictionary,
-                                  forKeyedSubscript: "__hongguoPendingLocalProfile" as NSString)
-                context.evaluateScript("""
-                try { globalThis.__hongguoUseLocalApkProfile(globalThis.__hongguoPendingLocalProfile); }
-                catch (_) { globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_INVALID'; }
-                delete globalThis.__hongguoPendingLocalProfile;
-                """)
-            }
-        } catch HongguoProfileStorageError.invalidProfile {
-            context.evaluateScript("globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_INVALID';")
-        } catch {
-            localPlaybackProfileUnavailable = true
-            context.evaluateScript("globalThis.__hongguoProfileErrorCode = 'LOCAL_PROFILE_UNAVAILABLE';")
-        }
-    }
-
-    private func synchronizeGuestSession(_ context: JSContext, sourceId: String) {
-        let account = accountSnapshot().record
-        if account?.hasSession == true && account?.device != nil { return }
-        guard persistentDeviceSession, sourceId == "hongguo",
-              let latest = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session"),
-              SavedGuestSession.valid(latest) else { return }
-        let created = deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at")
-        let current = httpTrace.guestSnapshot
-        let currentCreated = current.createdAt
-        if latest == current.json {
-            if created > currentCreated { httpTrace.recordGuest(json: latest, createdAt: created) }
-            return
-        }
-        guard created <= 0 || currentCreated <= 0 || created >= currentCreated else { return }
-        let applied = context.evaluateScript("""
-        (function() {
-            if (typeof HongguoApp === 'undefined' || typeof HongguoApp.resetGuestSession !== 'function') return false;
-            HongguoApp.resetGuestSession();
-            globalThis.__hongguoCachedDevice = JSON.parse(\(latest.debugDescription));
-            return true;
-        })()
-        """)?.toBool() == true
-        guard applied else { return }
-        httpTrace.recordGuest(json: latest, createdAt: created)
-        successfulPlaybackResolves = 0
-        lastSuccessfulPlaybackAt = nil
-        diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "游客会话同步", sessionStatus: "请求前载入其他运行环境更新的游客会话，保留搜索和详情缓存"))
-    }
-
-    private func spiderExpression(_ method: String, _ arguments: [Any]) throws -> String {
-        let data = try JSONSerialization.data(withJSONObject: arguments, options: [.fragmentsAllowed])
-        return "spider.\(method).apply(spider, \(String(decoding: data, as: UTF8.self)))"
-    }
-
-    /// 在 JS 运行时中异步评估 Promise 并等待结果（使用专用后台队列，避免阻塞主线程及协同线程池）
-    private func evalAsync(context: JSContext, scriptExpr: String) async -> [String: Any]? {
+    /// 在 JS 运行时中异步评估 Promise 并等待结果
+    func evalAsync(context: JSContext, scriptExpr: String) async -> [String: Any]? {
         let expectedAccountRevision = accountSnapshot().revision
         let doneKey = "__done_\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
         let snapshotGetter = self.accountSnapshot
@@ -737,7 +194,6 @@ public actor NativeBridge {
                 }
             }
 
-            // 15 秒超时保护，彻底消除 JS 挂死导致的协同等待
             DispatchQueue.global().asyncAfter(deadline: .now() + 15.0) {
                 safeResume(["ok": false, "error": "JS 执行无响应或超时", "code": "TIMEOUT"])
             }
@@ -781,92 +237,6 @@ public actor NativeBridge {
         }
     }
 
-    private func playbackFailure(code: String, message: String, episode: Int) -> NSError {
-        let trace = httpTrace.snapshot
-        let upstream = ["EMPTY_RESPONSE", "RESPONSE_NOT_UTF8"].contains(code) ? diagnostics.entries.last {
-            $0.context == diagnosticContext && $0.errorCode == code && $0.stage == "播放解析"
-        } : nil
-        let category: DiagnosticCategory
-        let description: String
-        if code.hasPrefix("LOCAL_PROFILE_") {
-            category = .configuration
-            description = code == "LOCAL_PROFILE_UNAVAILABLE" ? "本机签名缓存暂不可访问，请稍后重试" : "数据源签名配置不可用，请更新数据源后重试"
-        } else if code == "MEDIA_URL_EXPIRED" {
-            category = .invalidResponse
-            description = "本集媒体地址已经过期，请重新获取"
-        } else if code.hasPrefix("MEDIA_HTTP_") {
-            category = .httpError
-            description = "本集媒体节点拒绝当前地址或暂不可用"
-        } else if code == "HTTP_429" {
-            category = .httpError
-            description = "官方播放接口请求过于频繁，请稍后再试"
-        } else if code.hasPrefix("HTTP_") {
-            category = .httpError
-            description = "官方播放接口请求失败"
-        } else if code.hasPrefix("DNS") { category = .dnsError; description = "播放接口域名解析失败" }
-        else if code.hasPrefix("TIMEOUT") || code == "ETIMEDOUT" { category = .networkTimeout; description = "播放接口请求超时" }
-        else if ["BUSINESS_REJECTED", "SECURITY_BLOCKED"].contains(code) { category = .businessRejected; description = "官方播放接口暂时拒绝当前请求" }
-        else if code == "EMPTY_RESPONSE" { category = .invalidResponse; description = "官方播放接口连接成功，但没有返回播放数据" }
-        else if code == "RESPONSE_NOT_UTF8" { category = .invalidResponse; description = "官方播放接口返回了无法解码的数据" }
-        else { category = .invalidResponse; description = "官方暂未返回可用的当前分集播放流" }
-        let detail = SourceDiagnostics.redact(message.isEmpty ? description : message)
-        let created = httpTrace.guestSnapshot.createdAt
-        let age = created > 0 ? String(max(0, Int(timeProvider() - created))) + "秒" : "未记录"
-        let lastSuccess = lastSuccessfulPlaybackAt.map { String(max(0, Int(timeProvider() - $0))) + "秒前" } ?? "本次运行尚未成功"
-        let sessionStatus = "游客会话创建距今：\(age)；本桥接成功取流：\(successfulPlaybackResolves)次；最近成功：\(lastSuccess)"
-        let advice = code.hasPrefix("LOCAL_PROFILE_") ? description : upstream?.suggestion ?? "请保留当前剧集与集数，并在设置的数据源诊断中扫码导出报告。"
-        diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "播放取流 第\(episode)集", host: upstream?.host ?? URL(string: trace.url)?.host ?? "", url: upstream?.url ?? trace.url, method: upstream?.method ?? trace.method, logId: upstream?.logId ?? trace.logId, status: upstream?.status ?? trace.status, errorCode: code, category: category, errorDetail: detail, suggestion: advice, responseSnippet: upstream?.responseSnippet ?? trace.snippet, sessionStatus: sessionStatus, bodyBytes: upstream?.bodyBytes, contentType: upstream?.contentType ?? "", contentEncoding: upstream?.contentEncoding ?? "", declaredBodyBytes: upstream?.declaredBodyBytes))
-        return NSError(domain: "CatPawOpen.Playback", code: -2, userInfo: [NSLocalizedDescriptionKey: detail + "（" + code + "）", "diagnosticCode": code, "diagnosticCategory": category.rawValue, "diagnosticAdvice": advice, "diagnosticSession": sessionStatus])
-    }
-
-    /// 将 vod_* 数据结构转换为应用统一的 Drama 字典
-    private func mapVodToDrama(vod: [String: Any], sourceId: String) -> [String: Any] {
-        let vid = vod["vod_id"] as? String ?? "\(vod["id"] ?? UUID().uuidString)"
-        let title = (vod["vod_name"] as? String) ?? (vod["title"] as? String) ?? "短剧 \(vid)"
-        var cover = (vod["vod_pic"] as? String) ?? (vod["cover"] as? String) ?? (vod["cover_url"] as? String) ?? (vod["series_cover"] as? String) ?? ""
-        cover = cover.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cover.hasPrefix("//") {
-            cover = "https:" + cover
-        }
-        let desc = (vod["vod_content"] as? String) ?? (vod["desc"] as? String) ?? ""
-        let remark = (vod["vod_remarks"] as? String) ?? (vod["remarks"] as? String) ?? ""
-        let year = (vod["vod_year"] as? String) ?? ""
-
-        var epCount = 0
-        if let match = remark.range(of: "(\\d+)", options: .regularExpression) {
-            epCount = Int(remark[match]) ?? 0
-        }
-
-        let isHongguo = sourceId.isEmpty || sourceId == "hongguo" || vid.hasPrefix("hongguo:")
-        var rawTags: [String] = []
-        if let tagList = vod["tags"] as? [String] {
-            rawTags = tagList
-        } else if let tagStr = (vod["vod_tag"] as? String) ?? (vod["tags"] as? String) {
-            rawTags = tagStr.components(separatedBy: CharacterSet(charactersIn: "·,，/ ")).filter { !$0.isEmpty }
-        }
-        let cleanTags = rawTags.filter { t in
-            let lower = t.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            return !lower.contains("vip") && !lower.contains("付费")
-        }
-
-        return [
-            "id": vid.hasPrefix("\(sourceId):") ? vid : "\(sourceId):\(vid)",
-            "source": sourceId,
-            "sourceId": vid.hasPrefix("\(sourceId):") ? String(vid.dropFirst(sourceId.count + 1)) : vid,
-            "title": title,
-            "description": desc,
-            "cover": cover,
-            "episodes": vod["vod_episodes"] as? Int ?? epCount,
-            "category": vod["vod_category"] as? String ?? "短剧",
-            "heat": vod["vod_heat"] as? String ?? "",
-            "views": vod["vod_views"] as? String ?? "",
-            "onlineDate": year,
-            "tags": isHongguo ? cleanTags : rawTags,
-            "releaseStatus": vod["vod_release_status"] as? String ?? remark,
-            "vip": isHongguo ? false : (vod["vip"] as? Bool ?? false)
-        ]
-    }
-
     /// 处理所有业务操作 Action 请求
     public func request(action: String, payload: [String: Any]) async throws -> [String: Any] {
         try Task.checkCancellation()
@@ -877,310 +247,91 @@ public actor NativeBridge {
         switch action {
         case "initialize":
             try await ensureInitialized()
-            return [
-                "ok": true,
-                "data": [
-                    "version": "1.0.0",
-                    "standalone": true,
-                    "allSources": true
-                ]
-            ]
+            return ["ok": true, "data": ["version": "1.0.0", "standalone": true, "allSources": true]]
 
         case "jsSource.identity":
-            let script = sourceScripts["hongguo"] ?? ""
+            let script = sourceRegistry.getScript(sourceId: "hongguo") ?? ""
             let ready = getOrCreateContext(sourceId: "hongguo") != nil
-            return ["id": "hongguo", "sha256": SourceDiagnostics.fingerprint(script),
-                    "bundleSha256": SourceDiagnostics.sourceHash, "runtimeReady": ready,
-                    "sourceCommit": installedSources["hongguo"]?["sourceCommit"] as? String ?? "",
-                    "version": installedSources["hongguo"]?["version"] as? String ?? "",
-                    "origin": script == BuiltInHongguoJSContent ? "bundled" : "imported"]
+            return [
+                "id": "hongguo", "sha256": SourceDiagnostics.fingerprint(script),
+                "bundleSha256": SourceDiagnostics.sourceHash, "runtimeReady": ready,
+                "sourceCommit": sourceRegistry.installedSources["hongguo"]?["sourceCommit"] as? String ?? "",
+                "version": sourceRegistry.installedSources["hongguo"]?["version"] as? String ?? "",
+                "origin": script == BuiltInHongguoJSContent ? "bundled" : "imported"
+            ]
 
         case "jsSource.list":
-            return [
-                "items": Array(installedSources.values),
-                "active": activeSourceId
-            ]
+            return ["items": Array(sourceRegistry.installedSources.values), "active": sourceRegistry.activeSourceId]
 
         case "jsSource.setActive":
             let source = payload["source"] as? String ?? ""
-            if installedSources.keys.contains(source) {
-                activeSourceId = source
-                return ["ok": true, "active": activeSourceId]
-            }
-            return ["ok": false, "active": activeSourceId]
+            let ok = sourceRegistry.setActiveSourceId(source)
+            return ["ok": ok, "active": sourceRegistry.activeSourceId]
 
         case "jsSource.getActive":
-            return [
-                "active": activeSourceId,
-                "meta": installedSources[activeSourceId] ?? [:]
-            ]
+            return ["active": sourceRegistry.activeSourceId, "meta": sourceRegistry.installedSources[sourceRegistry.activeSourceId] ?? [:]]
 
         case "jsSource.saveAndLoad":
             let script = payload["script"] as? String ?? ""
             let fileName = payload["fileName"] as? String ?? "custom.js"
             let autoSelect = (payload["autoSelect"] as? Bool) ?? true
-            guard !script.isEmpty else {
-                throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "脚本内容为空"])
-            }
-            let targetFile = sourcesDirURL.appendingPathComponent(fileName)
-            try script.write(to: targetFile, atomically: true, encoding: .utf8)
-            scanSourcesDirectory()
-            let fileId = fileName.replacingOccurrences(of: ".js", with: "")
-            if let targetMeta = installedSources.values.first(where: {
-                let sid = ($0["id"] as? String) ?? ""
-                return sid == "hongguo" || sid == fileId
-            }) {
-                let targetId = targetMeta["id"] as? String ?? activeSourceId
-                if autoSelect || targetId == "hongguo" || activeSourceId.isEmpty {
-                    activeSourceId = targetId
-                }
-            } else if autoSelect, installedSources[fileId] != nil {
-                activeSourceId = fileId
-            }
-            return ["ok": true, "active": activeSourceId]
+            let active = try sourceRegistry.saveAndLoad(script: script, fileName: fileName, autoSelect: autoSelect)
+            return ["ok": true, "active": active]
 
         case "jsSource.scan":
-            scanSourcesDirectory()
-            return ["ok": true, "count": installedSources.count]
+            sourceRegistry.scanSourcesDirectory()
+            return ["ok": true, "count": sourceRegistry.installedSources.count]
 
         case "jsSource.remove":
-            let sourceId = (payload["source"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !sourceId.isEmpty, sourceId.lowercased() != "hongguo" else {
-                return ["ok": false, "reason": "官方内置源受保护或源标识为空"]
-            }
-
-            var removedAny = false
-            // 1. 精确删除 sourceId.js
-            let exactFile = sourcesDirURL.appendingPathComponent("\(sourceId).js")
-            if FileManager.default.fileExists(atPath: exactFile.path) {
-                try? FileManager.default.removeItem(at: exactFile)
-                removedAny = true
-            }
-
-            // 2. 遍历 sourcesDirURL 目录中的所有 js 文件，彻底匹配并清理
-            if let files = try? FileManager.default.contentsOfDirectory(at: sourcesDirURL, includingPropertiesForKeys: nil) {
-                for file in files where file.pathExtension.lowercased() == "js" {
-                    let baseName = file.deletingPathExtension().lastPathComponent
-                    if baseName == "hongguo" { continue }
-                    if baseName == sourceId {
-                        try? FileManager.default.removeItem(at: file)
-                        removedAny = true
-                        continue
-                    }
-                    if let script = try? String(contentsOf: file, encoding: .utf8), !script.isEmpty {
-                        if let meta = extractScriptMeta(script: script, fallbackId: baseName) {
-                            let sid = (meta["id"] as? String) ?? baseName
-                            if sid == sourceId {
-                                try? FileManager.default.removeItem(at: file)
-                                removedAny = true
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. 清除内存上下文与脚本缓存
-            installedSources.removeValue(forKey: sourceId)
-            sourceScripts.removeValue(forKey: sourceId)
+            let sourceId = payload["source"] as? String ?? ""
+            let result = sourceRegistry.removeSource(sourceId: sourceId)
             jsContexts.removeValue(forKey: sourceId)
-
-            // 4. 若删除的是当前活跃源，安全回退至官方内置源或首选可用源
-            scanSourcesDirectory()
-            if activeSourceId == sourceId || !installedSources.keys.contains(activeSourceId) {
-                activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : (installedSources.keys.first ?? "")
-            }
-            return ["ok": true, "removed": removedAny, "active": activeSourceId]
+            return ["ok": true, "removed": result.removed, "active": result.active]
 
         case "jsSource.clearAll":
-            // 清空所有非官方内置的自定义数据源插件
-            if let files = try? FileManager.default.contentsOfDirectory(at: sourcesDirURL, includingPropertiesForKeys: nil) {
-                for file in files where file.pathExtension.lowercased() == "js" {
-                    let baseName = file.deletingPathExtension().lastPathComponent
-                    if baseName.lowercased() != "hongguo" {
-                        try? FileManager.default.removeItem(at: file)
-                    }
-                }
-            }
-            installedSources.removeAll()
-            sourceScripts.removeAll()
             jsContexts.removeAll()
-            scanSourcesDirectory()
-            activeSourceId = installedSources.keys.contains("hongguo") ? "hongguo" : ""
-            return ["ok": true, "active": activeSourceId]
+            let active = sourceRegistry.clearAll()
+            return ["ok": true, "active": active]
 
         case "jsSource.resetOfficial":
-            // 完整重置官方数据源沙盒文件、清空网络缓存与失效的官方设备会话凭据
             deviceDefaults.set("", forKey: "thl_tv_hongguo_device_session")
             httpSession.configuration.urlCache?.removeAllCachedResponses()
             URLCache.shared.removeAllCachedResponses()
             jsContexts.removeAll()
-            sourceScripts.removeValue(forKey: "hongguo")
-
-            let hongguoFile = sourcesDirURL.appendingPathComponent("hongguo.js")
-            let script = BuiltInHongguoJSContent
-            if !script.isEmpty {
-                try? script.write(to: hongguoFile, atomically: true, encoding: .utf8)
-                sourceScripts["hongguo"] = script
-            }
-            scanSourcesDirectory()
-            activeSourceId = "hongguo"
-            return ["ok": true, "active": activeSourceId]
+            let active = sourceRegistry.resetOfficial()
+            return ["ok": true, "active": active]
 
         case "categories":
-            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? activeSourceId
+            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? sourceRegistry.activeSourceId
             guard !targetSrc.isEmpty, let ctx = getOrCreateContext(sourceId: targetSrc) else {
                 return ["items": [["id": "", "name": "全部"]]]
             }
-
-            let res = await evalAsync(context: ctx, scriptExpr: targetSrc == "hongguo" ? "spider.home(true)" : "spider.home()")
-            guard res?["ok"] as? Bool == true else {
-                throw SourceAPIError.sourceUnavailable(res?["error"] as? String ?? "分类请求失败，请重试")
+            return try await dramaParser.parseCategories(ctx: ctx, targetSrc: targetSrc) { [weak self] c, expr in
+                guard let self else { return nil }
+                return await self.evalAsync(context: c, scriptExpr: expr)
             }
-            var items: [[String: Any]] = targetSrc == "hongguo" ? [] : [["id": "", "name": "全部"]]
-
-            if let data = res?["data"] as? [String: Any],
-               let classes = (data["class"] as? [[String: Any]]) ?? (data["classes"] as? [[String: Any]]) {
-                for c in classes {
-                    let tid = c["type_id"] as? String ?? ""
-                    let tname = c["type_name"] as? String ?? tid
-                    if !tid.isEmpty {
-                        items.append(["id": tid, "name": tname])
-                    }
-                }
-            }
-            guard !items.isEmpty else { throw SourceAPIError.parseError("未返回找剧分类") }
-            return ["items": items]
 
         case "catalog":
-            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? activeSourceId
+            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? sourceRegistry.activeSourceId
             guard !targetSrc.isEmpty, let ctx = getOrCreateContext(sourceId: targetSrc) else {
                 return ["items": [], "hasMore": false, "page": 1]
             }
-            let query = (payload["query"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let cat = payload["category"] as? String ?? ""
-            let pg = payload["page"] as? Int ?? 1
-
-            if !query.isEmpty {
-                let scriptExpr = try spiderExpression("search", [query, false, pg])
-                let evaluated = await evalAsync(context: ctx, scriptExpr: scriptExpr)
-                guard let res = evaluated, res["ok"] as? Bool == true else {
-                    let errMsg = evaluated?["error"] as? String ?? "JS 执行无响应或超时"
-                    let rawCat = evaluated?["category"] as? String ?? ""
-                    let rawCode = evaluated?["code"] as? String ?? ""
-                    let errCat: DiagnosticCategory
-                    if rawCode.hasPrefix("LOCAL_PROFILE_") {
-                        errCat = .configuration
-                    } else if let parsedCat = DiagnosticCategory(rawValue: rawCat), rawCat != "js_error" {
-                        errCat = parsedCat
-                    } else if errMsg.contains("网络") || errMsg.contains("DNS") {
-                        errCat = .dnsError
-                    } else if ["SEARCH_TAB_MISSING", "INVALID_SEARCH_CURSOR", "INVALID_RESPONSE"].contains(rawCode) {
-                        errCat = .invalidResponse
-                    } else if rawCode == "SEARCH_REJECTED" || rawCode == "BUSINESS_REJECTED" || rawCode == "GUEST_REGISTRATION_FAILED" || errMsg.contains("官方搜索") || errMsg.contains("官方会话") {
-                        errCat = .businessRejected
-                        if persistentDeviceSession { deviceDefaults.set("", forKey: "thl_tv_hongguo_device_session") }
-                        ctx.evaluateScript("delete globalThis.__hongguoCachedDevice; if (typeof Ae !== 'undefined') Ae = null;")
-                    } else {
-                        errCat = .jsError
-                    }
-                    let errDetail = "搜索执行失败: \(errMsg)"
-                    let advice = SourceDiagnostics.advice(SourceDiagnosticEntry(context: diagnosticContext, stage: "搜索执行", errorCode: rawCode, category: errCat, errorDetail: errDetail))
-                    let trace = httpTrace.snapshot
-                    let hasCached = persistentDeviceSession && !(deviceDefaults.string(forKey: "thl_tv_hongguo_device_session") ?? "").isEmpty
-                    let sessionStatus = hasCached ? "使用本地缓存设备凭据" : "全新游客会话"
-                    diagnostics.add(SourceDiagnosticEntry(
-                        context: diagnosticContext,
-                        stage: "搜索执行",
-                        host: URL(string: trace.url)?.host ?? "reading.snssdk.com",
-                        url: trace.url,
-                        method: trace.method,
-                        logId: trace.logId,
-                        status: trace.status,
-                        errorCode: rawCode.isEmpty ? errCat.tag : rawCode,
-                        category: errCat,
-                        errorDetail: errMsg,
-                        suggestion: advice,
-                        responseSnippet: trace.snippet,
-                        searchTabsSummary: trace.tabsSummary,
-                        sessionStatus: sessionStatus
-                    ))
-                    throw NSError(domain: "CatPawOpen", code: -1, userInfo: [
-                        NSLocalizedDescriptionKey: errMsg,
-                        "diagnosticCategory": errCat.rawValue,
-                        "diagnosticCode": rawCode.isEmpty ? errCat.tag : rawCode,
-                        "diagnosticAdvice": advice,
-                        "diagnosticUrl": trace.url,
-                        "diagnosticLogId": trace.logId,
-                        "diagnosticSnippet": trace.snippet,
-                        "diagnosticTabs": trace.tabsSummary,
-                        "diagnosticSession": sessionStatus
-                    ])
-                }
-                var searchItems: [[String: Any]] = []
-                var searchHasMore = false
-                if let data = res["data"] as? [String: Any] {
-                    let pageCount = (data["pagecount"] as? Int) ?? (data["pageCount"] as? Int) ?? pg
-                    searchHasMore = pg < pageCount
-                    let list = data["list"] as? [[String: Any]] ?? []
-                    for vod in list {
-                        searchItems.append(mapVodToDrama(vod: vod, sourceId: targetSrc))
-                    }
-                } else if let list = res["data"] as? [[String: Any]] {
-                    for vod in list {
-                        searchItems.append(mapVodToDrama(vod: vod, sourceId: targetSrc))
-                    }
-                }
-                return [
-                    "items": searchItems,
-                    "hasMore": searchHasMore,
-                    "page": pg
-                ]
+            return try await dramaParser.parseCatalog(ctx: ctx, targetSrc: targetSrc, payload: payload, httpTrace: httpTrace) { [weak self] c, expr in
+                guard let self else { return nil }
+                return await self.evalAsync(context: c, scriptExpr: expr)
             }
-
-            let scriptExpr = try spiderExpression("category", [cat, pg, false, ["initialBatch": 12]])
-            let res = await evalAsync(context: ctx, scriptExpr: scriptExpr)
-            guard res?["ok"] as? Bool == true else {
-                throw SourceAPIError.sourceUnavailable(res?["error"] as? String ?? "发现数据请求失败，请重试")
-            }
-
-            var dramas: [[String: Any]] = []
-            var hasMore = false
-
-            if let data = res?["data"] as? [String: Any] {
-                let list = data["list"] as? [[String: Any]] ?? []
-                for vod in list {
-                    dramas.append(mapVodToDrama(vod: vod, sourceId: targetSrc))
-                }
-                let pageCount = (data["pagecount"] as? Int) ?? (data["pageCount"] as? Int) ?? 1
-                hasMore = data["hasMore"] as? Bool ?? (pg < pageCount)
-            }
-            return [
-                "items": dramas,
-                "hasMore": hasMore,
-                "page": pg
-            ]
 
         case "search":
-            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? activeSourceId
+            let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? sourceRegistry.activeSourceId
             let query = payload["query"] as? String ?? ""
             guard !targetSrc.isEmpty, !query.isEmpty, let ctx = getOrCreateContext(sourceId: targetSrc) else {
                 return ["items": []]
             }
-
-            let scriptExpr = try spiderExpression("search", [query, false, 1])
+            let scriptExpr = try dramaParser.spiderExpression("search", [query, false, 1])
             let res = await evalAsync(context: ctx, scriptExpr: scriptExpr)
-
             var dramas: [[String: Any]] = []
-            if let data = res?["data"] as? [String: Any] {
-                let list = data["list"] as? [[String: Any]] ?? []
-                for vod in list {
-                    dramas.append(mapVodToDrama(vod: vod, sourceId: targetSrc))
-                }
-            } else if let list = res?["data"] as? [[String: Any]] {
-                for vod in list {
-                    dramas.append(mapVodToDrama(vod: vod, sourceId: targetSrc))
-                }
-            }
+            let list = (res?["data"] as? [String: Any])?["list"] as? [[String: Any]] ?? (res?["data"] as? [[String: Any]]) ?? []
+            for vod in list { dramas.append(dramaParser.mapVodToDrama(vod: vod, sourceId: targetSrc)) }
             return ["items": dramas]
 
         case "detail":
@@ -1190,196 +341,64 @@ public actor NativeBridge {
             }
             let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
                 ?? (dramaDict["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-                ?? activeSourceId
+                ?? sourceRegistry.activeSourceId
             guard !targetSrc.isEmpty, let ctx = getOrCreateContext(sourceId: targetSrc) else {
                 throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "数据源未就绪"])
             }
-
-            let scriptExpr = try spiderExpression("detail", [dramaId])
-            let evaluated = await evalAsync(context: ctx, scriptExpr: scriptExpr)
-            guard let res = evaluated, res["ok"] as? Bool == true else {
-                let errMsg = evaluated?["error"] as? String ?? "详情解析无响应或异常"
-                let errCat = DiagnosticCategory(rawValue: evaluated?["category"] as? String ?? "") ?? (errMsg.contains("网络") ? .dnsError : .jsError)
-                let advice = SourceDiagnostics.advice(SourceDiagnosticEntry(context: diagnosticContext, stage: "详情解析", category: errCat, errorDetail: errMsg))
-                diagnostics.add(SourceDiagnosticEntry(
-                    context: diagnosticContext,
-                    stage: "详情解析",
-                    errorCode: errCat.tag,
-                    category: errCat,
-                    errorDetail: errMsg,
-                    suggestion: advice
-                ))
-                throw NSError(domain: "CatPawOpen", code: -1, userInfo: [NSLocalizedDescriptionKey: "【\(errCat.tag)】\(errMsg)"])
+            return try await dramaParser.parseDetail(ctx: ctx, targetSrc: targetSrc, dramaDict: dramaDict, dramaId: dramaId) { [weak self] c, expr in
+                guard let self else { return nil }
+                return await self.evalAsync(context: c, scriptExpr: expr)
             }
-
-            var freshDrama = dramaDict
-            var chapters: [[String: Any]] = []
-
-            if let data = res["data"] as? [String: Any] {
-                let vod: [String: Any]
-                if let list = data["list"] as? [[String: Any]], let first = list.first {
-                    vod = first
-                } else if let v = data["vod"] as? [String: Any] {
-                    vod = v
-                } else {
-                    vod = data
-                }
-
-                let mapped = vod["vod_id"] != nil || vod["id"] != nil
-                    ? mapVodToDrama(vod: vod, sourceId: targetSrc) : [:]
-                for (k, v) in mapped {
-                    if let str = v as? String, !str.isEmpty {
-                        freshDrama[k] = str
-                    } else if let num = v as? Int, num > 0 {
-                        freshDrama[k] = num
-                    } else if let b = v as? Bool {
-                        freshDrama[k] = b
-                    } else if let arr = v as? [String] {
-                        freshDrama[k] = arr
-                    } else if freshDrama[k] == nil {
-                        freshDrama[k] = v
-                    }
-                }
-
-                let isHongguo = targetSrc.isEmpty || targetSrc == "hongguo" || (freshDrama["id"] as? String ?? "").hasPrefix("hongguo:")
-                if isHongguo {
-                    freshDrama["vip"] = false
-                    if let currentTags = freshDrama["tags"] as? [String] {
-                        freshDrama["tags"] = currentTags.filter { t in
-                            let lower = t.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                            return !lower.contains("vip") && !lower.contains("付费")
-                        }
-                    }
-                }
-
-                // 解析 CatPawOpen 规范标准选集串: vod_play_url ("第1集$url1#第2集$url2" 或带线路 "线路$$$第1集$url1#...")
-                if let playUrls = vod["vod_play_url"] as? String, !playUrls.isEmpty {
-                    let routes = playUrls.components(separatedBy: "$$$")
-                    let mainRoute = routes.last ?? playUrls
-                    let eps = mainRoute.components(separatedBy: "#")
-
-                    for (idx, epStr) in eps.enumerated() {
-                        let parts = epStr.components(separatedBy: "$")
-                        let epTitle = parts.first?.isEmpty == false ? parts.first! : "第 \(idx + 1) 集"
-                        let epUrl = parts.count > 1 ? parts[1] : ""
-                        chapters.append([
-                            "id": "\(dramaId)_\(idx + 1)",
-                            "title": epTitle,
-                            "currentEpisode": idx + 1,
-                            "index": idx + 1,
-                            "vip": false,
-                            "url": epUrl
-                        ])
-                    }
-                }
-            }
-
-            return [
-                "drama": freshDrama,
-                "chapters": chapters,
-                "episodes": chapters,
-                "warning": ""
-            ]
 
         case "resolve":
             let dramaDict = payload["drama"] as? [String: Any] ?? [:]
             let targetSrc = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
                 ?? (dramaDict["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-                ?? activeSourceId
+                ?? sourceRegistry.activeSourceId
             let epIndex = payload["index"] as? Int ?? 1
             let dramaId = dramaDict["id"] as? String ?? "1"
-
-            var targetUrl = ""
-            var targetHeaders: [String: String] = [:]
-            var contentKey = ""
-            var expiresAt: Int64 = 0
-            var mediaBytes: Int64 = 0
-            var danmakuId = ""
-            var reportedQuality = 0
-            var reportedQualities: [Int] = []
-
-            if !targetSrc.isEmpty, let ctx = getOrCreateContext(sourceId: targetSrc) {
-                let chapterDict = payload["chapter"] as? [String: Any]
-                let rawUrl = (chapterDict?["url"] as? String) ?? "\(dramaId)/\(epIndex)"
-
-                let flags: [[String: Any]] = [[
-                    "quality": payload["quality"] as? Int ?? 0,
-                    "seriesId": dramaDict["sourceId"] as? String ?? dramaId.components(separatedBy: ":").last ?? "",
-                    "avoidUrl": payload["avoidUrl"] as? String ?? ""
-                ]]
-                let scriptExpr = try spiderExpression("play", ["", rawUrl, flags])
-                let started = Date()
-                let res = await evalAsync(context: ctx, scriptExpr: scriptExpr)
-                try Task.checkCancellation()
-                let data = res?["data"] as? [String: Any]
-                guard res?["ok"] as? Bool == true,
-                      let data, let url = data["url"] as? String,
-                      !url.isEmpty, !url.contains("example.com") else {
-                    let code = SourceDiagnostics.safeCode(res?["code"] ?? data?["error"])
-                    if code == "CANCELLED" { throw CancellationError() }
-                    let guest = httpTrace.guestSnapshot
-                    if targetSrc == "hongguo", persistentDeviceSession, code == "EMPTY_RESPONSE", payload["guestSynchronizationAttempted"] as? Bool != true, !guest.json.isEmpty {
-                        let failures = diagnostics.entries.filter { $0.context == diagnosticContext && $0.stage == "播放解析" && $0.at >= started }
-                        if failures.count == 4, failures.allSatisfy({ $0.status == 200 && $0.bodyBytes == 0 && $0.errorCode == "EMPTY_RESPONSE" }) {
-                            let latest = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session")
-                            let latestCreated = deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at")
-                            let updated = latest.map {
-                                SavedGuestSession.valid($0) && $0 != guest.json &&
-                                    (latestCreated <= 0 || guest.createdAt <= 0 || latestCreated >= guest.createdAt)
-                            } ?? false
-                            if updated {
-                                diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "游客会话同步", sessionStatus: "已载入其他请求更新的游客会话"))
-                                var retry = payload
-                                retry["guestSynchronizationAttempted"] = true
-                                return try await request(action: "resolve", payload: retry)
-                            }
-                        }
-                    }
-                    throw playbackFailure(code: code.isEmpty ? "NO_STREAM_URL" : code, message: res?["error"] as? String ?? "", episode: epIndex)
+            guard !targetSrc.isEmpty, let ctx = getOrCreateContext(sourceId: targetSrc) else {
+                throw dramaParser.playbackFailure(code: "SOURCE_UNAVAILABLE", message: "播放数据源尚未就绪", episode: epIndex, httpTrace: httpTrace, successfulPlaybackResolves: successfulPlaybackResolves, lastSuccessfulPlaybackAt: lastSuccessfulPlaybackAt)
+            }
+            let chapterDict = payload["chapter"] as? [String: Any]
+            let rawUrl = (chapterDict?["url"] as? String) ?? "\(dramaId)/\(epIndex)"
+            let flags: [[String: Any]] = [[
+                "quality": payload["quality"] as? Int ?? 0,
+                "seriesId": dramaDict["sourceId"] as? String ?? dramaId.components(separatedBy: ":").last ?? "",
+                "avoidUrl": payload["avoidUrl"] as? String ?? ""
+            ]]
+            let started = timeProvider()
+            let scriptExpr = try dramaParser.spiderExpression("play", ["", rawUrl, flags])
+            let res = await evalAsync(context: ctx, scriptExpr: scriptExpr)
+            try Task.checkCancellation()
+            let data = res?["data"] as? [String: Any]
+            guard res?["ok"] as? Bool == true, let data, let url = data["url"] as? String, !url.isEmpty, !url.contains("example.com") else {
+                let code = SourceDiagnostics.safeCode(res?["code"] ?? data?["error"])
+                if code == "CANCELLED" { throw CancellationError() }
+                if let retried = try await tryGuestSyncRetry(targetSrc: targetSrc, code: code, payload: payload, started: started) {
+                    return retried
                 }
-                successfulPlaybackResolves += 1
-                lastSuccessfulPlaybackAt = timeProvider()
-                targetUrl = url
-                danmakuId = data["danmakuId"] as? String ?? ""
-                contentKey = data["decryptionKey"] as? String ?? ""
-                expiresAt = (data["expiresAt"] as? NSNumber)?.int64Value ?? 0
-                mediaBytes = (data["mediaBytes"] as? NSNumber)?.int64Value ?? 0
-                reportedQuality = data["quality"] as? Int ?? 0
-                reportedQualities = data["qualities"] as? [Int] ?? []
-                targetHeaders = (data["header"] as? [String: String]) ?? (data["headers"] as? [String: String]) ?? [:]
+                throw dramaParser.playbackFailure(code: code.isEmpty ? "NO_STREAM_URL" : code, message: res?["error"] as? String ?? "", episode: epIndex, httpTrace: httpTrace, successfulPlaybackResolves: successfulPlaybackResolves, lastSuccessfulPlaybackAt: lastSuccessfulPlaybackAt)
             }
-            guard !targetUrl.isEmpty else {
-                throw playbackFailure(code: "SOURCE_UNAVAILABLE", message: "播放数据源尚未就绪", episode: epIndex)
-            }
+            successfulPlaybackResolves += 1
+            lastSuccessfulPlaybackAt = timeProvider()
+            let targetHeaders = (data["header"] as? [String: String]) ?? (data["headers"] as? [String: String]) ?? [:]
+            let contentKey = data["decryptionKey"] as? String ?? ""
+            var detectedQuality = data["quality"] as? Int ?? 0
+            if url.contains("4k") || url.contains("2160p") { detectedQuality = 2160 }
+            else if url.contains("1080p") { detectedQuality = 1080 }
+            else if url.contains("720p") { detectedQuality = 720 }
+            else if url.contains("480p") { detectedQuality = 480 }
 
-            if PlaybackPlan.isPublicPreviewURL(targetUrl) {
-                throw playbackFailure(code: "PREVIEW_STREAM_REJECTED", message: "公共试看地址不能用于完整分集播放，请重新获取官方片源", episode: epIndex)
-            }
-            if !contentKey.isEmpty && contentKey.range(of: "^[0-9a-fA-F]{32}$", options: .regularExpression) == nil {
-                throw NSError(domain: "CatPawOpen", code: -3, userInfo: [NSLocalizedDescriptionKey: "站源内容密钥无效"])
-            }
-            var detectedQuality = reportedQuality
-            if targetUrl.contains("4k") || targetUrl.contains("2160p") {
-                detectedQuality = 2160
-            } else if targetUrl.contains("1080p") {
-                detectedQuality = 1080
-            } else if targetUrl.contains("720p") {
-                detectedQuality = 720
-            } else if targetUrl.contains("480p") {
-                detectedQuality = 480
-            } else if targetUrl.contains("360p") {
-                detectedQuality = 360
-            }
-
-            let effectiveQuality = detectedQuality
+            let reportedQualities = data["qualities"] as? [Int] ?? []
             return [
-                "url": targetUrl,
+                "url": url,
                 "headers": targetHeaders,
                 "decryptionKey": contentKey,
-                "expiresAt": expiresAt,
-                "danmakuId": danmakuId,
-                "mediaBytes": mediaBytes,
-                "quality": effectiveQuality,
+                "expiresAt": (data["expiresAt"] as? NSNumber)?.int64Value ?? 0,
+                "danmakuId": data["danmakuId"] as? String ?? "",
+                "mediaBytes": (data["mediaBytes"] as? NSNumber)?.int64Value ?? 0,
+                "quality": detectedQuality,
                 "qualities": reportedQualities.isEmpty ? (detectedQuality > 0 ? [detectedQuality] : []) : reportedQualities,
                 "session": "\(Date().timeIntervalSince1970)"
             ]
@@ -1389,7 +408,7 @@ public actor NativeBridge {
             guard id.hasPrefix("hongguo:"), let context = getOrCreateContext(sourceId: "hongguo") else {
                 throw NSError(domain: "THLRedLook.Danmaku", code: -1, userInfo: [NSLocalizedDescriptionKey: "本集暂不支持弹幕"])
             }
-            let expression = try spiderExpression("danmaku", [id, payload["startMs"] as? Int64 ?? 0, payload["durationMs"] as? Int64 ?? 0])
+            let expression = try dramaParser.spiderExpression("danmaku", [id, payload["startMs"] as? Int64 ?? 0, payload["durationMs"] as? Int64 ?? 0])
             guard let response = await evalAsync(context: context, scriptExpr: expression), response["ok"] as? Bool == true,
                   let result = response["data"] as? [String: Any], result["items"] is [[String: Any]] else {
                 throw NSError(domain: "THLRedLook.Danmaku", code: -2, userInfo: [NSLocalizedDescriptionKey: "官方弹幕暂不可用"])
@@ -1398,7 +417,7 @@ public actor NativeBridge {
 
         case "rankingBoards", "rankings", "recommendations", "suggestions", "seriesSeasons", "feed":
             let source = (payload["source"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-                ?? (activeSourceId.isEmpty ? "hongguo" : activeSourceId)
+                ?? (sourceRegistry.activeSourceId.isEmpty ? "hongguo" : sourceRegistry.activeSourceId)
             guard let context = getOrCreateContext(sourceId: source) else {
                 throw NSError(domain: "THLRedLook.Source", code: -1, userInfo: [NSLocalizedDescriptionKey: "数据源不可用"])
             }
@@ -1412,7 +431,7 @@ public actor NativeBridge {
             case "feed": arguments = [page, payload["session"] as? String ?? ""]
             default: arguments = []
             }
-            let expression = try spiderExpression(action, arguments)
+            let expression = try dramaParser.spiderExpression(action, arguments)
             let evaluated = await evalAsync(context: context, scriptExpr: expression)
             guard evaluated?["ok"] as? Bool == true, let result = evaluated?["data"] as? [String: Any] else {
                 let message = evaluated?["error"] as? String ?? "官方列表响应超时，请重试"
@@ -1423,7 +442,7 @@ public actor NativeBridge {
             if action == "rankingBoards" || action == "suggestions" { return result }
             let rows = result["list"] as? [[String: Any]] ?? []
             let items: [[String: Any]] = rows.map { vod in
-                let drama = mapVodToDrama(vod: vod, sourceId: source)
+                let drama = dramaParser.mapVodToDrama(vod: vod, sourceId: source)
                 if action == "rankings" {
                     return ["rank": vod["vod_rank"] as? Int ?? 0, "drama": drama, "metric": vod["vod_metric"] as? String ?? ""]
                 }
@@ -1447,49 +466,22 @@ public actor NativeBridge {
             return ["ok": true]
         }
     }
-}
 
-private final class NativeHTTPResult: @unchecked Sendable {
-    private let lock = NSLock()
-    private var status = 0
-    private var headers: [String: String] = [:]
-    private var body = ""
-    private var bodyBytes = 0
-    private var error = ""
-    private var rawError: Error?
-    private var category: DiagnosticCategory = .unknown
-    private var errorDetail: String = ""
-
-    func complete(data: Data?, response: URLResponse?, error: Error?) {
-        lock.lock()
-        defer { lock.unlock() }
-        self.rawError = error
-        status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        if let response = response as? HTTPURLResponse {
-            for (key, value) in response.allHeaderFields {
-                headers[String(describing: key).lowercased()] = String(describing: value)
-            }
-        }
-        bodyBytes = data?.count ?? 0
-        if let data { body = String(data: data, encoding: .utf8) ?? "" }
-        self.error = SourceDiagnostics.networkCode(error)
-        if error == nil, status == 200, bodyBytes > 0, body.isEmpty {
-            self.error = "RESPONSE_NOT_UTF8"
-            category = .invalidResponse
-            errorDetail = "收到 \(bodyBytes) 字节正文，但无法按 UTF-8 解码"
-            return
-        }
-        let classified = SourceDiagnostics.classify(error: error, httpStatus: status, body: body)
-        self.category = classified.category
-        self.errorDetail = classified.reason
-    }
-
-    func snapshot(timedOut: Bool) -> (status: Int, headers: [String: String], body: String, bodyBytes: Int, error: String, errorDetail: String, category: DiagnosticCategory, rawError: Error?) {
-        lock.lock()
-        defer { lock.unlock() }
-        if timedOut {
-            return (0, [:], "", 0, "TIMEOUT:-1001", "网络请求超时 (12s)", .networkTimeout, NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
-        }
-        return (status, headers, body, bodyBytes, error, errorDetail, category, rawError)
+    private func tryGuestSyncRetry(targetSrc: String, code: String, payload: [String: Any], started: TimeInterval) async throws -> [String: Any]? {
+        guard targetSrc == "hongguo", persistentDeviceSession, code == "EMPTY_RESPONSE",
+              payload["guestSynchronizationAttempted"] as? Bool != true, !httpTrace.guestSnapshot.json.isEmpty else { return nil }
+        let startDate = Date(timeIntervalSince1970: started)
+        let failures = diagnostics.entries.filter { $0.context == diagnosticContext && $0.stage == "播放解析" && $0.at >= startDate }
+        guard failures.count == 4 else { return nil }
+        let allEmpty = failures.allSatisfy { $0.status == 200 && $0.bodyBytes == 0 && $0.errorCode == "EMPTY_RESPONSE" }
+        guard allEmpty, let latest = deviceDefaults.string(forKey: "thl_tv_hongguo_device_session") else { return nil }
+        guard SavedGuestSession.valid(latest), latest != httpTrace.guestSnapshot.json else { return nil }
+        let latestCreated = deviceDefaults.double(forKey: "thl_tv_hongguo_guest_created_at")
+        let guestCreated = httpTrace.guestSnapshot.createdAt
+        guard latestCreated <= 0 || guestCreated <= 0 || latestCreated >= guestCreated else { return nil }
+        diagnostics.add(SourceDiagnosticEntry(context: diagnosticContext, stage: "游客会话同步", sessionStatus: "已载入其他请求更新的游客会话"))
+        var retry = payload
+        retry["guestSynchronizationAttempted"] = true
+        return try await request(action: "resolve", payload: retry)
     }
 }

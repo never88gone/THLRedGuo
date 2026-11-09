@@ -1,53 +1,5 @@
 import SwiftUI
 
-public enum TVAppTab: String, CaseIterable, Identifiable {
-    case catalog = "catalog"
-    case feed = "feed"
-    case rankings = "rankings"
-    case search = "search"
-    case library = "library"
-    case downloads = "downloads"
-    case settings = "settings"
-
-    public var id: String { rawValue }
-
-    public var title: String {
-        switch self {
-        case .catalog: return "发现"
-        case .feed: return "推荐"
-        case .rankings: return "榜单"
-        case .search: return "搜索"
-        case .library: return "我的"
-        case .downloads: return "下载"
-        case .settings: return "设置"
-        }
-    }
-
-    public var icon: String {
-        switch self {
-        case .catalog: return "sparkles.tv"
-        case .feed: return "play.rectangle.fill"
-        case .rankings: return "chart.bar.fill"
-        case .search: return "magnifyingglass"
-        case .library: return "person.crop.circle.fill"
-        case .downloads: return "arrow.down.circle.fill"
-        case .settings: return "gearshape.fill"
-        }
-    }
-
-    public var nextTab: TVAppTab? {
-        let all = TVAppTab.allCases
-        guard let idx = all.firstIndex(of: self), idx + 1 < all.count else { return nil }
-        return all[idx + 1]
-    }
-
-    public var prevTab: TVAppTab? {
-        let all = TVAppTab.allCases
-        guard let idx = all.firstIndex(of: self), idx > 0 else { return nil }
-        return all[idx - 1]
-    }
-}
-
 public struct MainTabView: View {
     @StateObject private var lanService = LanSyncService.shared
     @StateObject private var store = LocalStore.shared
@@ -378,7 +330,23 @@ public struct MainTabView: View {
             }
         }
         .onAppear {
-            parseLaunchMode()
+            TVLaunchCoordinator.shared.parseLaunchMode(
+                store: store,
+                columnVisibility: $columnVisibility,
+                selectedTab: $selectedTab,
+                focusedNavTab: $focusedNavTab,
+                settingsInitialCategory: $settingsInitialCategory,
+                isSettingsActiveDemo: $isSettingsActiveDemo,
+                isCardFocusedDemo: $isCardFocusedDemo,
+                catalogInitialCategory: $catalogInitialCategory,
+                feedFocusTrigger: $feedFocusTrigger,
+                deepLinkQuery: $deepLinkQuery,
+                directPlayerEpisodes: $directPlayerEpisodes,
+                directPlayerControls: $directPlayerControls,
+                directPlayerDrawer: $directPlayerDrawer,
+                directPlayerDrama: $directPlayerDrama,
+                directDetailDrama: $directDetailDrama
+            )
         }
         .onChange(of: selectedTab) { _, tab in
             if tab == .feed { feedFocusTrigger += 1 }
@@ -502,231 +470,5 @@ public struct MainTabView: View {
         default:
             break
         }
-    }
-
-    private func parseLaunchMode() {
-        UserDefaults.standard.removeObject(forKey: "testPage")
-        let testPage = ProcessInfo.processInfo.environment["TEST_PAGE"]
-            ?? getArgument(named: "-testPage")
-
-        guard let page = testPage?.trimmingCharacters(in: .whitespacesAndNewlines), !page.isEmpty else {
-            // 默认启动模式：展开侧边栏并聚焦当前 Tab
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = selectedTab
-            }
-            return
-        }
-
-        switch page {
-        case "cleanBlank", "catalog":
-            selectedTab = .catalog
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .catalog
-            }
-        case "importFlow", "settings", "settings_sources":
-            selectedTab = .settings
-            settingsInitialCategory = .sources
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .settings
-            }
-        case "settings_cache", "settings_about", "settings_help", "settings_contact", "settings_sync", "settings_release_notes":
-            selectedTab = .settings
-            if page == "settings_help" {
-                settingsInitialCategory = .help
-            } else if page == "settings_contact" {
-                settingsInitialCategory = .contact
-            } else if page == "settings_about" {
-                settingsInitialCategory = .about
-            } else if page == "settings_cache" {
-                settingsInitialCategory = .cache
-            } else if page == "settings_sync" {
-                settingsInitialCategory = .sync
-            } else if page == "settings_release_notes" {
-                settingsInitialCategory = .releaseNotes
-            }
-            columnVisibility = .detailOnly
-            focusedNavTab = nil
-        case "settingsActive":
-            selectedTab = .settings
-            isSettingsActiveDemo = true
-            columnVisibility = .detailOnly
-            focusedNavTab = nil
-        case "cardFocused":
-            selectedTab = .catalog
-            isCardFocusedDemo = true
-            columnVisibility = .detailOnly
-            focusedNavTab = nil
-        case "catalog_real":
-            selectedTab = .catalog
-            catalogInitialCategory = "app:discover:playlet"
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .catalog
-            }
-        case "catalog_comic":
-            selectedTab = .catalog
-            catalogInitialCategory = "app:discover:motion_comic"
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .catalog
-            }
-        case "feed":
-            selectedTab = .feed
-            columnVisibility = .detailOnly
-            focusedNavTab = nil
-            feedFocusTrigger += 1
-        case "recommendations":
-            selectedTab = .catalog
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .catalog
-            }
-        case "recommendations_comic":
-            selectedTab = .catalog
-            catalogInitialCategory = "app:discover:motion_comic"
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .catalog
-            }
-        case "rankings":
-            selectedTab = .rankings
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .rankings
-            }
-        case "search":
-            selectedTab = .search
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .search
-            }
-            Task {
-                await JSSourceService.shared.initialize()
-                await MainActor.run {
-                    let q = self.deepLinkQuery ?? "万妖图录"
-                    store.addSearchKeyword(q)
-                    store.addSearchKeyword("万妖图录")
-                    store.addSearchKeyword("逆袭")
-                    store.addSearchKeyword("总裁")
-                    self.deepLinkQuery = q
-                }
-            }
-        case "library":
-            selectedTab = .library
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .library
-            }
-            Task {
-                await JSSourceService.shared.initialize()
-                let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
-                guard !sourceId.isEmpty else { return }
-                let hasActiveHistory = store.history.contains { $0.drama.source.lowercased() == sourceId.lowercased() }
-                let hasActiveFollows = store.followedDramas.contains { $0.source.lowercased() == sourceId.lowercased() }
-                if !CommandLine.arguments.contains("-noLibraryFixtures") && !HongguoAccountModel.shared.loggedIn && (!hasActiveHistory || !hasActiveFollows) && !CommandLine.arguments.contains("-openAccountLogin") {
-                    do {
-                        let cat = try await NativeRepository.shared.loadCatalog(source: sourceId, page: 1)
-                        await MainActor.run {
-                            for (idx, item) in cat.items.prefix(2).enumerated() {
-                                if !hasActiveHistory {
-                                    store.recordWatch(drama: item, episode: idx + 1, position: Double((idx + 1) * 35), duration: 120)
-                                }
-                                store.setFollowState(drama: item, state: .watching)
-                            }
-                        }
-                    } catch {
-                        NSLog("[MainTabView] library 预热失败: %@", error.localizedDescription)
-                    }
-                }
-            }
-        case "downloads", "testDownload":
-            selectedTab = .downloads
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .downloads
-            }
-            Task {
-                await JSSourceService.shared.initialize()
-                let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
-                guard !sourceId.isEmpty else { return }
-                let hasActiveJob = DownloadService.shared.jobs.contains { $0.drama.source.lowercased() == sourceId.lowercased() }
-                if !hasActiveJob || page == "testDownload" {
-                    do {
-                        let cat = try await NativeRepository.shared.loadCatalog(source: sourceId, page: 1)
-                        if let first = cat.items.first {
-                            let detail = try await NativeRepository.shared.loadDetail(drama: first)
-                            if let firstEp = detail.episodes.first {
-                                await MainActor.run {
-                                    DownloadService.shared.enqueue(drama: detail.drama, episodes: [firstEp])
-                                }
-                            }
-                        }
-                    } catch {
-                        NSLog("[MainTabView] downloads 触发失败: %@", error.localizedDescription)
-                    }
-                }
-            }
-
-        case "playDownloaded":
-            selectedTab = .downloads
-            columnVisibility = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab = .downloads
-            }
-            Task {
-                await JSSourceService.shared.initialize()
-                let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
-                try? await Task.sleep(nanoseconds: 600_000_000)
-                if let completedJob = DownloadService.shared.jobs.first(where: { $0.isCompleted && (sourceId.isEmpty || $0.drama.source.lowercased() == sourceId.lowercased()) }) {
-                    await MainActor.run {
-                        self.directPlayerEpisodes = [completedJob.episode]
-                        self.directPlayerControls = true
-                        self.directPlayerDrawer = false
-                        self.directPlayerDrama = completedJob.drama
-                    }
-                }
-            }
-        case "detail":
-            if self.directDetailDrama == nil {
-                Task {
-                    await JSSourceService.shared.initialize()
-                    let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
-                    guard !sourceId.isEmpty else { return }
-                    if let cat = try? await NativeRepository.shared.loadCatalog(source: sourceId, page: 1), let first = cat.items.first {
-                        await MainActor.run { self.directDetailDrama = first }
-                    }
-                }
-            }
-        case "player", "controls", "drawer":
-            if self.directPlayerDrama == nil {
-                Task {
-                    await JSSourceService.shared.initialize()
-                    let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId
-                    guard !sourceId.isEmpty else { return }
-                    if let target = (try? await NativeRepository.shared.loadCatalog(source: sourceId, page: 1))?.items.first {
-                        let detail = (try? await NativeRepository.shared.loadDetail(drama: target))
-                            ?? DramaDetail(drama: target, episodes: (1...max(20, target.episodes)).map { Episode(id: "\(target.id)_\($0)", title: "第 \($0) 集", number: $0) }, warning: "")
-                        let eps = !detail.episodes.isEmpty ? detail.episodes : (1...max(20, target.episodes)).map { Episode(id: "\(target.id)_\($0)", title: "第 \($0) 集", number: $0) }
-                        await MainActor.run {
-                            self.directPlayerEpisodes = eps
-                            self.directPlayerDrama = detail.drama
-                        }
-                    }
-                }
-            }
-        default:
-            break
-        }
-    }
-
-    private func getArgument(named name: String) -> String? {
-        let args = CommandLine.arguments
-        if let idx = args.firstIndex(of: name), idx + 1 < args.count {
-            return args[idx + 1]
-        }
-        return nil
     }
 }

@@ -90,6 +90,59 @@ public enum TVColors {
     public static let releaseTimelineDot = Color.red.opacity(0.85)
     public static let releaseTimelineLine = Color.white.opacity(0.12)
     public static let releaseBulletPoint = Color.white.opacity(0.9)
+
+    // MARK: - 设置与侧边栏专用业务色
+    public static let categorySelectedBg = Color(red: 0.22, green: 0.12, blue: 0.16)
+    public static let settingsSidebarBg = Color(red: 0.10, green: 0.10, blue: 0.13)
+    public static let storageFocusedBg = Color(red: 0.22, green: 0.20, blue: 0.26)
+    public static let storageDefaultBg = Color(red: 0.12, green: 0.12, blue: 0.16)
+    public static let contactFocusedBg = Color(red: 0.16, green: 0.18, blue: 0.25)
+    public static let contactDefaultBg = Color(red: 0.10, green: 0.11, blue: 0.15)
+    public static let contactCardFocusedBg = Color(red: 0.18, green: 0.17, blue: 0.22)
+    public static let contactCardDefaultBg = Color(red: 0.11, green: 0.11, blue: 0.15)
+    public static let aboutGradStart = Color(red: 0.22, green: 0.14, blue: 0.18)
+    public static let aboutGradEnd = Color(red: 0.15, green: 0.11, blue: 0.14)
+    public static let aboutCardFocused = Color(red: 0.18, green: 0.18, blue: 0.22)
+    public static let aboutCardDefault = Color(red: 0.11, green: 0.11, blue: 0.14)
+    public static let helpFocusedBg = Color(red: 0.18, green: 0.18, blue: 0.24)
+    public static let helpDefaultBg = Color(red: 0.11, green: 0.11, blue: 0.15)
+    public static let sourcePanelItemBg = Color(red: 0.14, green: 0.14, blue: 0.18)
+    public static let sourceCardFocused = Color(red: 0.24, green: 0.20, blue: 0.26)
+    public static let sourceCardActive = Color(red: 0.18, green: 0.13, blue: 0.16)
+    public static let sourceCardSelected = Color(red: 0.20, green: 0.16, blue: 0.18)
+    public static let sourceCardDefault = Color(red: 0.13, green: 0.13, blue: 0.17)
+    public static let sourceCardInactive = Color(red: 0.12, green: 0.12, blue: 0.15)
+    public static let sourceCardIconBg = Color(red: 0.20, green: 0.20, blue: 0.24)
+    public static let sourceDeleteBg = Color.red.opacity(0.12)
+    public static let sourceDeleteBorder = Color.red.opacity(0.3)
+    public static let sourceDeleteFocusedBg = Color.red.opacity(0.85)
+    public static let darkPlaceholderBg = Color(white: 0.15)
+    public static let textPrimaryLight = Color(white: 0.95)
+    public static let splitViewSidebarBg = Color(red: 0.08, green: 0.07, blue: 0.09)
+
+    // MARK: - 诊断面板与状态指示色
+    public static let diagnosticFailedBg = Color(red: 0.35, green: 0.12, blue: 0.14)
+    public static let diagnosticSuccessBg = Color(red: 0.22, green: 0.20, blue: 0.28)
+    public static let diagnosticFailedText = Color(red: 1.0, green: 0.35, blue: 0.35)
+    public static let diagnosticSuccessText = Color(red: 0.35, green: 0.9, blue: 0.45)
+
+    // MARK: - 剧集详情与播放页微渐变底色
+    public static let detailTopGradient = Color(red: 0.18, green: 0.08, blue: 0.12)
+    public static let detailCardBg = Color(red: 0.15, green: 0.15, blue: 0.18)
+    public static let playerTopGradient = Color(red: 0.12, green: 0.04, blue: 0.08)
+    public static let playerOverlayBg = Color(red: 0.08, green: 0.08, blue: 0.1)
+    public static let cardOverlayBg = Color(red: 0.16, green: 0.14, blue: 0.18)
+    public static let downloadsCardBg = Color(red: 0.10, green: 0.10, blue: 0.14)
+
+    // MARK: - 封面海报缺省 6 套艺术渐变 (按 id 散列选取)
+    public static let coverGradients: [[Color]] = [
+        [Color(red: 0.6, green: 0.1, blue: 0.15), Color(red: 0.15, green: 0.05, blue: 0.08)], // 绯红暗夜
+        [Color(red: 0.15, green: 0.25, blue: 0.6), Color(red: 0.05, green: 0.08, blue: 0.2)], // 极光深蓝
+        [Color(red: 0.55, green: 0.2, blue: 0.55), Color(red: 0.12, green: 0.05, blue: 0.15)], // 霓虹紫魅
+        [Color(red: 0.7, green: 0.45, blue: 0.1), Color(red: 0.2, green: 0.12, blue: 0.05)], // 耀金流光
+        [Color(red: 0.1, green: 0.45, blue: 0.35), Color(red: 0.04, green: 0.15, blue: 0.1)], // 翡翠墨绿
+        [Color(red: 0.3, green: 0.35, blue: 0.45), Color(red: 0.08, green: 0.1, blue: 0.14)]  // 钛灰曜石
+    ]
 }
 
 // MARK: - SwiftUI Color 语义化拓展
@@ -117,14 +170,14 @@ public extension Color {
             Text("TVColors Palette").font(.title.bold()).foregroundColor(.white)
             
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
-                ColorTile(name: "primary", color: TVColors.primary)
-                ColorTile(name: "primaryHover", color: TVColors.primaryHover)
-                ColorTile(name: "activeRed", color: TVColors.activeRed)
-                ColorTile(name: "background", color: TVColors.background)
-                ColorTile(name: "surfaceDark", color: TVColors.surfaceDark)
-                ColorTile(name: "surfaceCard", color: TVColors.surfaceCard)
-                ColorTile(name: "surfaceFocused", color: TVColors.surfaceFocused)
-                ColorTile(name: "vipAccent", color: TVColors.vipAccent)
+                ColorTile_Previews(name: "primary", color: TVColors.primary)
+                ColorTile_Previews(name: "primaryHover", color: TVColors.primaryHover)
+                ColorTile_Previews(name: "activeRed", color: TVColors.activeRed)
+                ColorTile_Previews(name: "background", color: TVColors.background)
+                ColorTile_Previews(name: "surfaceDark", color: TVColors.surfaceDark)
+                ColorTile_Previews(name: "surfaceCard", color: TVColors.surfaceCard)
+                ColorTile_Previews(name: "surfaceFocused", color: TVColors.surfaceFocused)
+                ColorTile_Previews(name: "vipAccent", color: TVColors.vipAccent)
             }
         }
         .padding(40)
@@ -132,7 +185,7 @@ public extension Color {
     .background(TVColors.backgroundGradient)
 }
 
-private struct ColorTile: View {
+private struct ColorTile_Previews: View {
     let name: String
     let color: Color
 

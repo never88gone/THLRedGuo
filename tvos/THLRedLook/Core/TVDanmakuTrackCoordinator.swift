@@ -1,24 +1,4 @@
-import SwiftUI
 import UIKit
-
-// MARK: - 规划化弹幕数据结构
-public struct TVPlannedDanmaku: Identifiable, Equatable {
-    public let id: String
-    public let text: String
-    public let time: Double
-    public let duration: Double
-    public let lane: Int
-    public let width: CGFloat
-
-    public init(id: String, text: String, time: Double, duration: Double, lane: Int, width: CGFloat) {
-        self.id = id
-        self.text = text
-        self.time = time
-        self.duration = duration
-        self.lane = lane
-        self.width = width
-    }
-}
 
 /// 弹幕轨道生命周期管理器：
 /// 1. 严格锁定分配轨道：弹幕一旦被分配轨道，在飞行生命周期内 Y 轴坐标与 lane 绝不改变，彻底消灭上下跳行乱窜；
@@ -130,17 +110,5 @@ public final class TVDanmakuTrackCoordinator {
         flightsById.removeAll()
         laneTailInTimes.removeAll()
         lastObservedTime = 0
-    }
-}
-
-public enum TVDanmakuPlanner {
-    public static func calculateDuration(for id: String, text: String) -> Double {
-        return 8.0
-    }
-
-    public static func plan(danmakus: [DanmakuItem], screenWidth: CGFloat, laneCount: Int = 8, fontSize: CGFloat = 26.0) -> [TVPlannedDanmaku] {
-        let coordinator = TVDanmakuTrackCoordinator()
-        let maxTime = danmakus.map { Double($0.timeMs) / 1000.0 }.max() ?? 0
-        return coordinator.updateAndGetFlights(danmakus: danmakus, currentTime: maxTime, screenWidth: screenWidth, laneCount: laneCount, fontSize: fontSize)
     }
 }
