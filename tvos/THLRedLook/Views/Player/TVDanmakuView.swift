@@ -9,6 +9,7 @@ public struct TVDanmakuView: View {
     public let moving: Bool
     public var style: TVDanmakuStyle = TVDanmakuStyle()
 
+    @Environment(\.displayScale) private var displayScale
     @State private var coordinator = TVDanmakuTrackCoordinator()
 
     public init(
@@ -49,6 +50,7 @@ public struct TVDanmakuView: View {
             .onChange(of: position) { _, _ in refresh(width: width) }
             .onChange(of: style) { _, _ in rebuild(width: width) }
             .onChange(of: width) { _, _ in rebuild(width: width) }
+            .onChange(of: displayScale) { _, _ in rebuild(width: width) }
         }
         .clipped()
         .allowsHitTesting(false)
@@ -85,18 +87,35 @@ public struct TVDanmakuView: View {
         let existing = Dictionary(uniqueKeysWithValues: sprites.map { ($0.flight.id, $0) })
         sprites = flights.map { flight in
             if let sprite = existing[flight.id], sprite.flight == flight { return sprite }
-            let font = UIFont.boldSystemFont(ofSize: style.fontSize)
-            let size = CGSize(width: ceil(flight.width), height: ceil(font.lineHeight) + 8)
-            let renderer = UIGraphicsImageRenderer(size: size)
-            let image = renderer.image { _ in
-                let text = NSAttributedString(string: flight.text, attributes: [
-                    .font: font, .foregroundColor: UIColor.white,
-                    .strokeColor: UIColor.black, .strokeWidth: -3.5
-                ])
-                text.draw(at: CGPoint(x: 8, y: 4))
-            }
-            return Sprite(flight: flight, image: Image(uiImage: image))
+            let image = Self.renderText(flight.text, fontSize: style.fontSize, width: flight.width, scale: displayScale)
+            return Sprite(flight: flight, image: Image(uiImage: image).renderingMode(.original))
         }
+    }
+
+    static func renderText(_ text: String, fontSize: CGFloat, width: CGFloat, scale: CGFloat) -> UIImage {
+        let font = UIFont.boldSystemFont(ofSize: fontSize)
+        let size = CGSize(width: ceil(width), height: ceil(font.lineHeight) + 8)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = false
+        format.preferredRange = .standard
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        return renderer.image { context in
+            let origin = CGPoint(x: 8, y: 4)
+            let outline = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: UIColor.black])
+            context.cgContext.saveGState()
+            context.cgContext.setShadow(offset: CGSize(width: 0, height: 1.5), blur: 3, color: UIColor.black.withAlphaComponent(0.8).cgColor)
+            outline.draw(at: origin)
+            context.cgContext.restoreGState()
+            for offset in [CGPoint(x: 1.5, y: 0), CGPoint(x: -1.5, y: 0),
+                           CGPoint(x: 0, y: 1.5), CGPoint(x: 0, y: -1.5),
+                           CGPoint(x: 1.2, y: 1.2), CGPoint(x: -1.2, y: -1.2),
+                           CGPoint(x: 1.2, y: -1.2), CGPoint(x: -1.2, y: 1.2)] {
+                outline.draw(at: CGPoint(x: origin.x + offset.x, y: origin.y + offset.y))
+            }
+            NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: UIColor.white])
+                .draw(at: origin)
+        }.withRenderingMode(.alwaysOriginal)
     }
 }
 

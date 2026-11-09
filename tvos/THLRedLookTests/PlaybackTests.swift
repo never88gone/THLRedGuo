@@ -1611,6 +1611,62 @@ private final class OnceUnavailablePlaybackProfile: @unchecked Sendable {
 
 @MainActor
 final class DanmakuRenderingTests: XCTestCase {
+    private func rgba(_ image: UIImage) throws -> [UInt8] {
+        let cg = try XCTUnwrap(image.cgImage)
+        let context = try XCTUnwrap(CGContext(data: nil, width: cg.width, height: cg.height,
+            bitsPerComponent: 8, bytesPerRow: cg.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        let bytes = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+        return Array(UnsafeBufferPointer(start: bytes, count: cg.width * cg.height * 4))
+    }
+
+    func testOutlinedTextPreservesSolidWhiteFillAcrossSizesAndScales() throws {
+        let text = "弹幕清晰白字 Aa123"
+        for size: CGFloat in [22, 26, 34] {
+            let font = UIFont.boldSystemFont(ofSize: size)
+            let width = (text as NSString).size(withAttributes: [.font: font]).width + 16
+            for scale: CGFloat in [1, 2] {
+                let image = TVDanmakuView.renderText(text, fontSize: size, width: width, scale: scale)
+                XCTAssertEqual(image.renderingMode, .alwaysOriginal)
+                XCTAssertEqual(image.scale, scale)
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = scale; format.preferredRange = .standard
+                let renderer = UIGraphicsImageRenderer(size: image.size, format: format)
+                let reference = renderer.image { _ in
+                    NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: UIColor.white])
+                        .draw(at: CGPoint(x: 8, y: 4))
+                }
+                let pixels = try rgba(image), plain = try rgba(reference)
+                var white = 0, retained = 0, outerBlack = 0
+                for index in stride(from: 0, to: plain.count, by: 4) {
+                    if plain[index] >= 245 && plain[index + 3] >= 245 {
+                        white += 1
+                        if pixels[index] >= 240 && pixels[index + 1] >= 240 && pixels[index + 2] >= 240 { retained += 1 }
+                    }
+                    if plain[index + 3] < 10 && pixels[index + 3] > 200 && pixels[index] < 10 { outerBlack += 1 }
+                }
+                XCTAssertGreaterThan(white, 100)
+                XCTAssertGreaterThan(outerBlack, 100)
+                let ratio = Double(retained) / Double(max(white, 1))
+                XCTAssertGreaterThan(ratio, 0.98)
+                print("THL_DANMAKU_STYLE size=\(size) scale=\(scale) whiteFillPreserved=\(ratio) outsideBlackPixels=\(outerBlack)")
+                if size == 26 && scale == 2 {
+                    for (name, color) in [("dark", UIColor.black), ("light", UIColor.white), ("colored", UIColor.systemOrange)] {
+                        let comparison = UIGraphicsImageRenderer(size: CGSize(width: image.size.width + 32, height: image.size.height * 2 + 48), format: format).image { context in
+                            color.setFill(); context.fill(CGRect(x: 0, y: 0, width: image.size.width + 32, height: image.size.height * 2 + 48))
+                            image.draw(at: CGPoint(x: 16, y: 12))
+                            image.draw(at: CGPoint(x: 16, y: image.size.height + 24), blendMode: .normal, alpha: 0.75)
+                        }
+                        let attachment = XCTAttachment(image: comparison)
+                        attachment.name = "danmaku-style-\(name)-opacity-1-and-075"
+                        attachment.lifetime = .keepAlways; add(attachment)
+                    }
+                }
+            }
+        }
+    }
+
     func testRenderedTextMovesContinuouslyAndFreezesWhilePaused() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let previous = scene.windows.first { $0.isKeyWindow }
@@ -1618,7 +1674,7 @@ final class DanmakuRenderingTests: XCTestCase {
         let items = [DanmakuItem(id: "render", text: "弹幕连续移动验证", timeMs: 1000)]
         func content(moving: Bool, items: [DanmakuItem]) -> some View {
             TVDanmakuView(danmakus: items, position: 3, anchor: Date(), rate: 1, moving: moving)
-                .background(Color.black).ignoresSafeArea()
+                .foregroundStyle(.red).background(Color.black).ignoresSafeArea()
         }
         let host = UIHostingController(rootView: content(moving: true, items: items))
         window.rootViewController = host
