@@ -1,6 +1,71 @@
 import XCTest
 @testable import THLRedLook
 
+final class DownloadJobStoreTests: XCTestCase {
+    private func fixture() throws -> (UserDefaults, URL) {
+        let name = "THLRedLook.QA.DownloadMetadata." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        addTeardownBlock {
+            defaults.removePersistentDomain(forName: name)
+            try? FileManager.default.removeItem(at: root)
+        }
+        return (defaults, root)
+    }
+
+    private func jobs(_ count: Int) -> [DownloadJob] {
+        let drama = Drama(id: "synthetic:storage", title: "合成下载存储", description: String(repeating: "a", count: 800))
+        return (1...count).map {
+            DownloadJob(id: "fixture-\($0)", drama: drama, episode: Episode(id: "\($0)", title: "\($0)", number: $0), state: "completed", bytes: 1024, total: 1024, progress: 1, quality: 1080, localPath: "/synthetic/\($0).mp4")
+        }
+    }
+
+    func testLargeLegacyDownloadListMigratesWithoutChangingLibraryOrSession() throws {
+        let (defaults, root) = try fixture()
+        let original = jobs(539)
+        let data = try JSONEncoder().encode(original)
+        XCTAssertGreaterThan(data.count, 512_000)
+        XCTAssertLessThan(data.count, 950_000)
+        let history = Data("retained-history-and-progress".utf8)
+        defaults.set(history, forKey: "zgj_tv_history")
+        defaults.set(["favorite": "watching"], forKey: "zgj_tv_follows")
+        defaults.set("synthetic-session", forKey: "thl_tv_hongguo_device_session")
+        defaults.set(data, forKey: DownloadJobStore.legacyKey)
+        let file = root.appendingPathComponent("metadata/jobs.json")
+        try DownloadJobStore(defaults: defaults, fileURL: file).migrateLegacyJobs()
+        XCTAssertNil(defaults.object(forKey: DownloadJobStore.legacyKey))
+        XCTAssertEqual(try Data(contentsOf: file), data)
+        XCTAssertEqual(defaults.data(forKey: "zgj_tv_history"), history)
+        XCTAssertEqual(defaults.dictionary(forKey: "zgj_tv_follows") as? [String: String], ["favorite": "watching"])
+        XCTAssertEqual(defaults.string(forKey: "thl_tv_hongguo_device_session"), "synthetic-session")
+        let restarted = DownloadJobStore(defaults: defaults, fileURL: file)
+        try restarted.migrateLegacyJobs()
+        XCTAssertEqual(try restarted.load(), original)
+    }
+
+    func testDownloadRecordsOverOneMegabyteStayOutOfPreferences() throws {
+        let (defaults, root) = try fixture()
+        let file = root.appendingPathComponent("jobs.json")
+        let original = jobs(1_500)
+        XCTAssertGreaterThan(try JSONEncoder().encode(original).count, 1_048_576)
+        try DownloadJobStore(defaults: defaults, fileURL: file).save(original)
+        XCTAssertNil(defaults.object(forKey: DownloadJobStore.legacyKey))
+        XCTAssertEqual(try DownloadJobStore(defaults: defaults, fileURL: file).load(), original)
+    }
+
+    func testFailedMigrationLeavesLegacyRecordsIntact() throws {
+        let (defaults, root) = try fixture()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let blocker = root.appendingPathComponent("not-a-directory")
+        try Data([1]).write(to: blocker)
+        let data = try JSONEncoder().encode(jobs(1))
+        defaults.set(data, forKey: DownloadJobStore.legacyKey)
+        let store = DownloadJobStore(defaults: defaults, fileURL: blocker.appendingPathComponent("jobs.json"))
+        XCTAssertThrowsError(try store.migrateLegacyJobs())
+        XCTAssertEqual(defaults.data(forKey: DownloadJobStore.legacyKey), data)
+    }
+}
+
 @MainActor
 final class LocalLibraryTests: XCTestCase {
     private func storage() throws -> (UserDefaults, String) {

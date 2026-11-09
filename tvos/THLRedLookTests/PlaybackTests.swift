@@ -1,6 +1,7 @@
 import XCTest
 import AVFoundation
 import UIKit
+import SwiftUI
 import JavaScriptCore
 @testable import THLRedLook
 
@@ -1285,6 +1286,45 @@ final class ContinuousPlaybackTests: XCTestCase {
         guard condition() else { throw NSError(domain: "ContinuousPlaybackTests", code: 1) }
     }
 
+    func testDanmakuClockTracksPlaybackBetweenProgressCallbacks() async throws {
+        let (repository, _) = try await repository(mode: "normal", long: true)
+        let model = try model(foreground: repository, preloading: repository)
+        defer { model.onDisappear() }
+        await model.preparePlayback(episodeIndex: 1)
+        try await wait { model.currentTime > 1 && model.isPlaying }
+        let player = try XCTUnwrap(model.player)
+        func renderedTime() -> Double {
+            TVDanmakuView(danmakus: [], position: model.currentTime,
+                          anchor: model.playbackClockDate, rate: Double(model.playbackRate),
+                          moving: model.isPlaying).playbackTime(at: Date())
+        }
+        var largestError = 0.0
+        var largestStep = 0.0
+        var previousTime = renderedTime()
+        for _ in 0..<120 {
+            try await Task.sleep(nanoseconds: 16_666_667)
+            let time = renderedTime()
+            largestError = max(largestError, abs(time - player.currentTime().seconds))
+            largestStep = max(largestStep, time - previousTime)
+            previousTime = time
+        }
+        XCTAssertLessThan(largestError, 0.1)
+        XCTAssertLessThan(largestStep, 0.15)
+        model.togglePlayPause()
+        let paused = renderedTime()
+        try await Task.sleep(nanoseconds: 1_100_000_000)
+        XCTAssertEqual(renderedTime(), paused, accuracy: 0.1)
+        model.setRate(2)
+        model.togglePlayPause()
+        try await wait { model.isPlaying && player.rate == 2 }
+        try await Task.sleep(nanoseconds: 1_100_000_000)
+        XCTAssertEqual(renderedTime(), player.currentTime().seconds, accuracy: 0.1)
+        model.seekBy(seconds: 12 - model.currentTime)
+        try await wait { player.currentTime().seconds >= 12 && model.currentTime >= 12 }
+        XCTAssertEqual(renderedTime(), player.currentTime().seconds, accuracy: 0.15)
+        print("THL_DANMAKU_CLOCK maxError=\(largestError) maxStep=\(largestStep) pause=true rate2=true seek=true")
+    }
+
     func testReleasedObserverIgnoresQueuedEndAndStopsClockCallbacks() async throws {
         let path = try XCTUnwrap(ProcessInfo.processInfo.environment["THL_SYNTHETIC_VIDEO"])
         let item = AVPlayerItem(url: URL(fileURLWithPath: path))
@@ -1566,5 +1606,65 @@ private final class OnceUnavailablePlaybackProfile: @unchecked Sendable {
         let attempt = lock.withLock { count += 1; return count }
         if attempt == 1 { throw HongguoProfileStorageError.unavailable(-25308) }
         return try HongguoPlaybackProfileVault.load()
+    }
+}
+
+@MainActor
+final class DanmakuRenderingTests: XCTestCase {
+    func testRenderedTextMovesContinuouslyAndFreezesWhilePaused() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previous = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        let items = [DanmakuItem(id: "render", text: "弹幕连续移动验证", timeMs: 1000)]
+        func content(moving: Bool, items: [DanmakuItem]) -> some View {
+            TVDanmakuView(danmakus: items, position: 3, anchor: Date(), rate: 1, moving: moving)
+                .background(Color.black).ignoresSafeArea()
+        }
+        let host = UIHostingController(rootView: content(moving: true, items: items))
+        window.rootViewController = host
+        window.windowLevel = .alert + 1
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; previous?.makeKey() }
+        func capture(_ name: String) throws -> (Double, Int) {
+            let image = UIGraphicsImageRenderer(size: window.bounds.size).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+            let cg = try XCTUnwrap(image.cgImage)
+            let w = cg.width, h = cg.height
+            var pixels = [UInt8](repeating: 0, count: w * h * 4)
+            let context = try XCTUnwrap(CGContext(data: &pixels, width: w, height: h, bitsPerComponent: 8,
+                bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+            var total = 0.0, count = 0
+            for y in 0..<h {
+                for x in 0..<w {
+                    let offset = (y * w + x) * 4
+                    if pixels[offset] > 210 && pixels[offset + 1] > 210 && pixels[offset + 2] > 210 {
+                        total += Double(x); count += 1
+                    }
+                }
+            }
+            return (count > 0 ? total / Double(count) / image.scale : 0, count)
+        }
+        try await Task.sleep(nanoseconds: 150_000_000)
+        let first = try capture("moving-first")
+        try await Task.sleep(nanoseconds: 220_000_000)
+        let second = try capture("moving-second")
+        XCTAssertGreaterThan(first.1, 100)
+        XCTAssertGreaterThan(second.1, 100)
+        XCTAssertGreaterThan(first.0 - second.0, 20)
+        host.rootView = content(moving: false, items: items)
+        try await Task.sleep(nanoseconds: 150_000_000)
+        let paused = try capture("paused-first")
+        try await Task.sleep(nanoseconds: 550_000_000)
+        let still = try capture("paused-second")
+        XCTAssertGreaterThan(paused.1, 100)
+        XCTAssertEqual(still.0, paused.0, accuracy: 1)
+        host.rootView = content(moving: false, items: [])
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(try capture("cleared").1, 0)
+        print("THL_DANMAKU_RENDER pixels=\(first.1) movement=\(first.0-second.0) pauseDrift=\(abs(still.0-paused.0)) cleared=true")
     }
 }

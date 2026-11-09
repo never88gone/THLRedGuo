@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A90100012D00000100000001 /* DownloadJobStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90100012D00000100000001 /* DownloadJobStore.swift */; };
 		41C37EC749EC58A53B9BAD6B /* AVPlayerContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759A6D2A08A5A853ED0D0C8E /* AVPlayerContainerView.swift */; };
 		CA93C7032E714C4DBD595936 /* AboutCompactInfoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A23B44F66966D28BA1F1D63 /* AboutCompactInfoCard.swift */; };
 		0756A4B02161B912F4A95657 /* AboutDisclaimerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4743ED0DE7585F4755B14622 /* AboutDisclaimerCard.swift */; };
@@ -265,6 +266,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B90100012D00000100000001 /* DownloadJobStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadJobStore.swift; sourceTree = "<group>"; };
 		759A6D2A08A5A853ED0D0C8E /* AVPlayerContainerView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AVPlayerContainerView.swift; sourceTree = "<group>"; };
 		0A23B44F66966D28BA1F1D63 /* AboutCompactInfoCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AboutCompactInfoCard.swift; sourceTree = "<group>"; };
 		4743ED0DE7585F4755B14622 /* AboutDisclaimerCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AboutDisclaimerCard.swift; sourceTree = "<group>"; };
@@ -769,6 +771,7 @@
 				F4C07BD5FD8B42DAB56D1F2E /* PlaybackAssetFactory.swift */,
 				B10000132C00000100000001 /* LanSyncService.swift */,
 				B10000142C00000100000001 /* DownloadService.swift */,
+				B90100012D00000100000001 /* DownloadJobStore.swift */,
 				B70F9F945791042E6F2FE9F1 /* CENCMediaDownloader.swift */,
 				F30C46674D4352DBF7CD9CB5 /* ApkProfileImportServer.swift */,
 			);
@@ -1387,6 +1390,7 @@
 				46A67D6BBFE54AF28CD2FBE5 /* PlaybackAssetFactory.swift in Sources */,
 				A10000132C00000100000001 /* LanSyncService.swift in Sources */,
 				A10000142C00000100000001 /* DownloadService.swift in Sources */,
+				A90100012D00000100000001 /* DownloadJobStore.swift in Sources */,
 				A10000152C00000100000001 /* HomeViewModel.swift in Sources */,
 				A10000162C00000100000001 /* SearchViewModel.swift in Sources */,
 				A10000172C00000100000001 /* DetailViewModel.swift in Sources */,

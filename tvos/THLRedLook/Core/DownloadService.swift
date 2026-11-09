@@ -10,7 +10,7 @@ public final class DownloadService: NSObject, ObservableObject, URLSessionDownlo
     private var taskMap: [String: URLSessionDownloadTask] = [:]
     private var resolvingTasks: [String: Task<Void, Never>] = [:]
     private var jobDecryptionKeys: [String: String] = [:]
-    private let storageKey = "zgj_tv_download_jobs"
+    private let jobStore = DownloadJobStore.shared
     private let maxConcurrentDownloads = 2
     private var lastProgressUpdateTime: [String: Date] = [:]
 
@@ -38,8 +38,8 @@ public final class DownloadService: NSObject, ObservableObject, URLSessionDownlo
     }
 
     private func loadJobs() {
-        if let data = UserDefaults.standard.data(forKey: storageKey),
-           let list = try? JSONDecoder().decode([DownloadJob].self, from: data) {
+        do {
+            let list = try jobStore.load()
             self.jobs = list.map { job in
                 var j = job
                 if j.state == "downloading" {
@@ -64,13 +64,14 @@ public final class DownloadService: NSObject, ObservableObject, URLSessionDownlo
                 }
                 return j
             }
+        } catch {
+            NSLog("[DownloadService] 读取下载记录失败，原记录已保留")
         }
     }
 
     private func saveJobs() {
-        if let data = try? JSONEncoder().encode(jobs) {
-            UserDefaults.standard.set(data, forKey: storageKey)
-        }
+        do { try jobStore.save(jobs) }
+        catch { NSLog("[DownloadService] 保存下载记录失败，未覆盖已有记录") }
     }
 
     /// 检查指定短剧集是否已有本地离线文件
@@ -236,7 +237,7 @@ public final class DownloadService: NSObject, ObservableObject, URLSessionDownlo
                     downloadTask.taskDescription = jobId
                     self.taskMap[jobId] = downloadTask
                     downloadTask.resume()
-                    NSLog("📥 [DownloadService] 启动下载任务: jobId=%@, remoteURL=%@", jobId, remoteURL.absoluteString)
+                    NSLog("📥 [DownloadService] 启动下载任务: jobId=%@", jobId)
                 }
             } catch {
                 if Task.isCancelled { return }
@@ -297,7 +298,7 @@ public final class DownloadService: NSObject, ObservableObject, URLSessionDownlo
                 try? FileManager.default.removeItem(at: stagingURL)
             }
             do {
-                NSLog("📥 [DownloadService] 暂存成功，开始落盘与解密: id=%@, hexKey='%@'", id, hexKey)
+                NSLog("📥 [DownloadService] 暂存成功，开始落盘与解密: id=%@", id)
                 try CENCMP4Decryptor.shared.decryptDownloadedFile(at: stagingURL, hexKey: hexKey, destinationURL: targetURL)
 
                 let fileAttrs = try FileManager.default.attributesOfItem(atPath: targetURL.path)

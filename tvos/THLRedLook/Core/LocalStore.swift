@@ -62,6 +62,10 @@ public final class LocalStore: ObservableObject {
         self.usesOfficialAccount = defaults === UserDefaults.standard
         self.defaults = defaults
         self.cloudUpload = cloudUpload
+        if isStandardStore {
+            do { try DownloadJobStore.shared.migrateLegacyJobs() }
+            catch { NSLog("[Storage] 下载记录迁移未完成，原记录已保留") }
+        }
         loadFromStorage()
     }
 

@@ -11,7 +11,9 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var isPlaying: Bool = false
     @Published public private(set) var wantsPlayback: Bool = true
     @Published public private(set) var isBuffering: Bool = false
-    @Published public var currentTime: Double = 0
+    @Published public var currentTime: Double = 0 {
+        didSet { playbackClockDate = Date() }
+    }
     @Published public var duration: Double = 0
     @Published public var currentEpisodeIndex: Int
     @Published public var plan: PlaybackPlan?
@@ -35,7 +37,7 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var allEpisodes: [Episode]
     public var keepControlsVisible: Bool = false
     public var onFeedEndReached: (() -> Void)? = nil
-    public var playbackClockDate = Date()
+    public private(set) var playbackClockDate = Date()
 
     // 独立功能服务组件（根据功能拆分，杜绝扩展）
     let danmakuManager: PlayerDanmakuManager
@@ -484,7 +486,7 @@ public final class PlayerViewModel: ObservableObject {
 
     private func samplePlaybackClock() {
         guard !isSeeking, let sec = player?.currentTime().seconds, sec.isFinite else { return }
-        currentTime = max(0, sec); playbackClockDate = Date()
+        currentTime = max(0, sec)
     }
 
     public func showControls() {

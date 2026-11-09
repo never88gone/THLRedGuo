@@ -5285,6 +5285,46 @@ extension RemoteNavigationTests {
         print("THL_STRICT_FEED nextDramas=3 previous=1 pause=4s progressAfterEverySwitch=true")
     }
 
+    func testPreservedLibraryStartupAndDanmakuPlayback() throws {
+        continueAfterFailure = false
+        executionTimeAllowance = 300
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        defer { app.terminate() }
+        for index in 1...3 {
+            app.launchArguments = []
+            app.launch()
+            XCTAssertTrue(app.buttons["nav.catalog"].waitForExistence(timeout: 30))
+            Thread.sleep(forTimeInterval: 3)
+            XCTAssertEqual(app.state, .runningForeground)
+            expandedPlaybackShot("startup-\(index)")
+            app.terminate()
+        }
+        app.launchArguments = ["-testPage", "downloads"]
+        app.launch()
+        XCTAssertTrue(app.buttons["nav.downloads"].waitForExistence(timeout: 30))
+        expandedPlaybackShot("download-metadata-preserved")
+        app.terminate()
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7694896136963755032", "-testDramaTitle", "雾锁情迷", "-thl_tv_danmaku_enabled", "YES", "-thl_icloud_sync_enabled", "NO"]
+        app.launch()
+        XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 60))
+        yaoDetailPlayFocus(); focusChunk(0)
+        press(.down, focus: "detail.episode.1"); press(.select)
+        let playing = try automaticFeedReady(episode: 1)
+        showControls()
+        XCTAssertTrue(app.buttons["player.danmaku"].label.contains("开"))
+        press(.menu, focus: "player.wake")
+        _ = try automaticFeedReady(title: playing.title, minimum: playing.position + 18, episode: 1)
+        expandedPlaybackShot("danmaku-playing")
+        try expandedPauseResume(title: playing.title, episode: 1, hidden: true)
+        _ = try automaticFeedReady(title: playing.title, minimum: playing.position + 28, episode: 1)
+        expandedPlaybackShot("danmaku-resumed")
+        press(.down)
+        let next = try automaticFeedReady(title: playing.title, minimum: 2, episode: 2)
+        _ = try automaticFeedReady(title: playing.title, minimum: next.position + 12, episode: 2)
+        expandedPlaybackShot("danmaku-next-episode")
+        print("THL_STARTUP_DANMAKU coldLaunches=3 downloadList=true pauseResume=true episodes=2 clearUserData=false")
+    }
+
     private func expandedPlaybackShot(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name

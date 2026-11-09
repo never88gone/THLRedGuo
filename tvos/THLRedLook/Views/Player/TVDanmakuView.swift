@@ -1,6 +1,6 @@
 import SwiftUI
+import UIKit
 
-// MARK: - 大屏弹幕渲染主视图
 public struct TVDanmakuView: View {
     public let danmakus: [DanmakuItem]
     public let position: Double
@@ -29,59 +29,74 @@ public struct TVDanmakuView: View {
 
     public var body: some View {
         GeometryReader { proxy in
-            let w = proxy.size.width > 0 ? proxy.size.width : 1920
-
-            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !moving)) { timeline in
-                let time = position + (moving ? min(0.75, max(0, timeline.date.timeIntervalSince(anchor))) * rate : 0)
-                let flights = coordinator.updateAndGetFlights(
-                    danmakus: danmakus,
-                    currentTime: time,
-                    screenWidth: w,
-                    laneCount: style.laneCount,
-                    fontSize: style.fontSize
-                )
-
+            let width = proxy.size.width
+            TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !moving)) { timeline in
+                let time = playbackTime(at: timeline.date)
                 ZStack(alignment: .topLeading) {
-                    ForEach(flights) { item in
+                    ForEach(sprites, id: \.flight.id) { sprite in
+                        let item = sprite.flight
                         let age = time - item.time
-                        if age >= 0 && age < item.duration {
-                            let progress = age / item.duration
-                            let trackHeight = style.fontSize * 1.85 + 10
-                            let yPosition = CGFloat(item.lane) * trackHeight + 54
-
-                            danmakuItemView(item: item)
-                                .position(
-                                    x: w + item.width / 2 - (w + item.width) * progress,
-                                    y: yPosition
-                                )
+                        if age >= 0, age < item.duration {
+                            let x = width + item.width / 2 - (width + item.width) * age / item.duration
+                            let y = CGFloat(item.lane) * (style.fontSize * 1.85 + 10) + 54
+                            sprite.image.opacity(style.opacity).position(x: x, y: y)
                         }
                     }
                 }
             }
+            .onAppear { refresh(width: width) }
+            .onChange(of: danmakus) { _, _ in refresh(width: width) }
+            .onChange(of: position) { _, _ in refresh(width: width) }
+            .onChange(of: style) { _, _ in rebuild(width: width) }
+            .onChange(of: width) { _, _ in rebuild(width: width) }
         }
         .clipped()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    @ViewBuilder
-    private func danmakuItemView(item: TVPlannedDanmaku) -> some View {
-        Text(item.text)
-            .font(.system(size: style.fontSize, weight: .bold))
-            .foregroundColor(TVColors.textPrimary.opacity(style.opacity))
-            // 8 方向 1.5pt 高对比度深黑描边（强光、白底、复杂背景下字体轮廓极其锐利清爽）
-            .shadow(color: .black.opacity(style.opacity), radius: 0, x: 1.5, y: 0)
-            .shadow(color: .black.opacity(style.opacity), radius: 0, x: -1.5, y: 0)
-            .shadow(color: .black.opacity(style.opacity), radius: 0, x: 0, y: 1.5)
-            .shadow(color: .black.opacity(style.opacity), radius: 0, x: 0, y: -1.5)
-            .shadow(color: .black.opacity(style.opacity * 0.95), radius: 0, x: 1.2, y: 1.2)
-            .shadow(color: .black.opacity(style.opacity * 0.95), radius: 0, x: -1.2, y: -1.2)
-            .shadow(color: .black.opacity(style.opacity * 0.95), radius: 0, x: 1.2, y: -1.2)
-            .shadow(color: .black.opacity(style.opacity * 0.95), radius: 0, x: -1.2, y: 1.2)
-            // 外部柔和深影增强大屏立体感
-            .shadow(color: .black.opacity(style.opacity * 0.8), radius: 3, x: 0, y: 1.5)
-            .fixedSize()
-            .frame(width: item.width)
+    @State private var sprites: [Sprite] = []
+
+    private struct Sprite {
+        let flight: TVPlannedDanmaku
+        let image: Image
+    }
+
+    func playbackTime(at date: Date) -> Double {
+        position + (moving ? min(0.75, max(0, date.timeIntervalSince(anchor))) * rate : 0)
+    }
+
+    private func rebuild(width: CGFloat) {
+        coordinator.reset()
+        sprites = []
+        refresh(width: width)
+    }
+
+    private func refresh(width: CGFloat) {
+        guard !danmakus.isEmpty else {
+            coordinator.reset()
+            sprites = []
+            return
+        }
+        let flights = coordinator.updateAndGetFlights(
+            danmakus: danmakus, currentTime: position, screenWidth: width,
+            laneCount: style.laneCount, fontSize: style.fontSize
+        )
+        let existing = Dictionary(uniqueKeysWithValues: sprites.map { ($0.flight.id, $0) })
+        sprites = flights.map { flight in
+            if let sprite = existing[flight.id], sprite.flight == flight { return sprite }
+            let font = UIFont.boldSystemFont(ofSize: style.fontSize)
+            let size = CGSize(width: ceil(flight.width), height: ceil(font.lineHeight) + 8)
+            let renderer = UIGraphicsImageRenderer(size: size)
+            let image = renderer.image { _ in
+                let text = NSAttributedString(string: flight.text, attributes: [
+                    .font: font, .foregroundColor: UIColor.white,
+                    .strokeColor: UIColor.black, .strokeWidth: -3.5
+                ])
+                text.draw(at: CGPoint(x: 8, y: 4))
+            }
+            return Sprite(flight: flight, image: Image(uiImage: image))
+        }
     }
 }
 
