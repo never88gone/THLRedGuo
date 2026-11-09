@@ -1996,7 +1996,7 @@ final class RemoteNavigationTests: XCTestCase {
         let position: Int
     }
 
-    private func automaticFeedReady(title expected: String? = nil, differentFrom previous: String? = nil, minimum: Int = 1) throws -> FeedCheckpoint {
+    private func automaticFeedReady(title expected: String? = nil, differentFrom previous: String? = nil, minimum: Int = 1, episode expectedEpisode: Int? = nil) throws -> FeedCheckpoint {
         var checkpoint: FeedCheckpoint?
         let regex = try NSRegularExpression(pattern: "^(.*) · 第 ([0-9]+) 集 · 已播放 ([0-9]+) 秒 · 播放中$")
         wait("feed automatically plays with picture focus", seconds: 120) {
@@ -2008,7 +2008,8 @@ final class RemoteNavigationTests: XCTestCase {
                   let positionRange = Range(match.range(at: 3), in: value),
                   let episode = Int(value[episodeRange]), let position = Int(value[positionRange]) else { return false }
             let title = String(value[titleRange])
-            guard expected == nil || title == expected, previous == nil || title != previous, position >= minimum else { return false }
+            guard expected == nil || title == expected, previous == nil || title != previous,
+                  expectedEpisode == nil || episode == expectedEpisode, position >= minimum else { return false }
             checkpoint = FeedCheckpoint(title: title, episode: episode, position: position)
             return true
         }
@@ -5282,6 +5283,130 @@ extension RemoteNavigationTests {
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = "feed-switch-and-resume"; shot.lifetime = .keepAlways; add(shot)
         print("THL_STRICT_FEED nextDramas=3 previous=1 pause=4s progressAfterEverySwitch=true")
+    }
+
+    private func expandedPlaybackShot(_ name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    private func expandedPauseResume(title: String, episode: Int, hidden: Bool) throws {
+        if !hidden { showControls() }
+        press(hidden ? .playPause : .select)
+        wait("expanded pause state") {
+            if hidden { return (self.app.buttons["player.wake"].value as? String ?? "").contains("已暂停") }
+            return self.app.buttons["player.playPause"].label == "播放"
+        }
+        Thread.sleep(forTimeInterval: 0.8)
+        func position() -> String {
+            hidden ? (app.buttons["player.wake"].value as? String ?? "") : app.staticTexts["player.position"].label
+        }
+        let paused = position()
+        XCTAssertFalse(paused.isEmpty)
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertEqual(position(), paused, "Paused playback must not advance")
+        press(hidden ? .playPause : .select)
+        if !hidden { press(.menu, focus: "player.wake") }
+        let resumed = try automaticFeedReady(title: title, episode: episode)
+        _ = try automaticFeedReady(title: title, minimum: resumed.position + 3, episode: episode)
+        print("THL_EXPANDED_PAUSE title=\(title) episode=\(episode) hidden=\(hidden) stationary=3s resumedClock=true")
+    }
+
+    private func expandedDramaControls(id: String, title: String) throws {
+        continueAfterFailure = false
+        executionTimeAllowance = 600
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:" + id, "-testDramaTitle", title]
+        app.launch()
+        defer { app.terminate() }
+        wait("expanded detail ready", seconds: 60) { self.app.buttons["detail.play"].exists }
+        yaoDetailPlayFocus(); focusChunk(0)
+        press(.down, focus: "detail.episode.1"); press(.select)
+        let first = try automaticFeedReady(episode: 1)
+        _ = try automaticFeedReady(title: first.title, minimum: first.position + 3, episode: 1)
+        let started = Date()
+        for (button, episode) in [(XCUIRemote.Button.down, 2), (.down, 3), (.up, 2), (.down, 3)] {
+            press(button)
+            let value = app.buttons["player.wake"].value as? String ?? ""
+            print("THL_EXPANDED_RAPID title=\(first.title) target=\(episode) elapsed=\(Date().timeIntervalSince(started)) state=\(value)")
+        }
+        let selected = try automaticFeedReady(title: first.title, minimum: 2, episode: 3)
+        _ = try automaticFeedReady(title: first.title, minimum: selected.position + 6, episode: 3)
+        expandedPlaybackShot("\(id)-rapid-episode-3")
+        try expandedPauseResume(title: first.title, episode: 3, hidden: true)
+        try expandedPauseResume(title: first.title, episode: 3, hidden: false)
+        focusDrawer(); press(.select)
+        wait("expanded drawer current episode") { self.app.buttons["drawer.episode.3"].hasFocus }
+        press(.right, focus: "drawer.episode.4"); press(.select)
+        wait("expanded selected episode ready", seconds: 60) {
+            self.showControls()
+            return self.app.staticTexts["player.episode"].label.contains("第 4 集") && self.seconds(self.app.staticTexts["player.position"].label) >= 2
+        }
+        let duration = seconds(app.staticTexts["player.duration"].label)
+        XCTAssertGreaterThan(duration, 10)
+        press(.menu, focus: "player.wake")
+        _ = try automaticFeedReady(title: first.title, minimum: 4, episode: 4)
+        expandedPlaybackShot("\(id)-drawer-episode-4")
+        wait("expanded natural episode 4 to 5", seconds: Double(duration) + 60) {
+            let value = self.app.buttons["player.wake"].value as? String ?? ""
+            return value.contains("第 5 集") && value.contains("播放中")
+        }
+        let next = try automaticFeedReady(title: first.title, minimum: 2, episode: 5)
+        _ = try automaticFeedReady(title: first.title, minimum: next.position + 6, episode: 5)
+        expandedPlaybackShot("\(id)-natural-episode-5")
+        print("THL_EXPANDED_DRAMA id=\(id) title=\(first.title) rapid=1to2to3to2to3 hiddenPause=true overlayPause=true drawer=3to4 natural=4to5 duration=\(duration) seekToEnd=false")
+    }
+
+    func testExpandedWusuoRapidPauseAndNaturalNext() throws {
+        try expandedDramaControls(id: "7694896136963755032", title: "雾锁情迷")
+    }
+
+    func testExpandedJuexingRapidPauseAndNaturalNext() throws {
+        try expandedDramaControls(id: "7673742740500270105", title: "觉醒伪神：神明弃我我自为神")
+    }
+
+    func testExpandedWangmaRapidPauseAndNaturalNext() throws {
+        try expandedDramaControls(id: "7694653385668037657", title: "王妈在顾家当保姆后全家只会搞笑了")
+    }
+
+    func testExpandedFeedContinuousSwitchesAndReturn() throws {
+        continueAfterFailure = false
+        executionTimeAllowance = 600
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "feed"]
+        app.launch()
+        defer { app.terminate() }
+        var current = try automaticFeedReady()
+        var titles = [current.title]
+        for index in 1...8 {
+            _ = try automaticFeedReady(title: current.title, minimum: current.position + 5, episode: current.episode)
+            press(.down)
+            current = try automaticFeedReady(differentFrom: current.title)
+            titles.append(current.title)
+            if [2, 5, 8].contains(index) {
+                try expandedPauseResume(title: current.title, episode: current.episode, hidden: index != 5)
+                expandedPlaybackShot("feed-forward-\(index)")
+            }
+        }
+        for index in stride(from: 7, through: 5, by: -1) {
+            press(.up)
+            current = try automaticFeedReady(title: titles[index])
+            _ = try automaticFeedReady(title: current.title, minimum: current.position + 4, episode: current.episode)
+        }
+        for (button, index) in [(XCUIRemote.Button.down, 6), (.down, 7), (.up, 6)] {
+            press(button)
+            print("THL_EXPANDED_FEED_RAPID target=\(index) state=\(app.buttons["player.wake"].value as? String ?? "")")
+        }
+        current = try automaticFeedReady(title: titles[6])
+        _ = try automaticFeedReady(title: current.title, minimum: current.position + 8, episode: current.episode)
+        expandedPlaybackShot("feed-rapid-return")
+        press(.menu, focus: "nav.feed")
+        press(.right)
+        current = try automaticFeedReady(title: titles[6])
+        _ = try automaticFeedReady(title: current.title, minimum: current.position + 4, episode: current.episode)
+        print("THL_EXPANDED_FEED unique=\(Set(titles).count) forward=8 backward=3 rapid=downDownUp pause=3 sidebarReturn=true actualClock=true titles=\(titles)")
     }
 
 }
