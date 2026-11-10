@@ -2323,7 +2323,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                     ],
                   ),
             body: pictureInPicture
-                ? _videoPane(context, topPadding: 0.0)
+                ? _videoPane(context, topPadding: MediaQuery.paddingOf(context).top)
                 : SafeArea(
                     top: false,
                     bottom: !fullscreen,
