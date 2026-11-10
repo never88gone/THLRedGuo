@@ -659,6 +659,10 @@ class HongguoAccountService {
       for (final item in result['items'] as List) {
         final row = Map<String, dynamic>.from(item as Map);
         details[row['id'].toString()] = row;
+        final bookId = row['book_id']?.toString() ?? '';
+        if (bookId.isNotEmpty && bookId != row['id'].toString()) {
+          details[bookId] = row;
+        }
       }
     }
     _check(revision);

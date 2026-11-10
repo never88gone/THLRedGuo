@@ -2819,12 +2819,13 @@ spider.accountParse = function (action, text) {
     const stamp = value => { const n = integer(value); return n < 10000000000 ? n * 1000 : n; };
     const series = row => {
       const video = row.video_data && typeof row.video_data === 'object' ? row.video_data : row;
-      const id = String(video.series_id || row.series_id || row.book_id || '');
+      const bookId = String(row.book_id || '');
+      const id = String(bookId || video.series_id || row.series_id || '');
       if (!/^\d{1,30}$/.test(id)) return null;
-      return { id, title: String(row.series_title || video.title || row.book_name || ''),
-        cover: cleanCoverUrl(String(row.series_cover_url || video.cover || video.cover_url || video.thumb_url || row.thumb_url || '')),
+      return { id, book_id: bookId || undefined, title: String(row.series_title || video.series_title || video.series_name || video.title || row.title || row.book_name || row.name || ''),
+        cover: cleanCoverUrl(String(row.series_cover_url || row.series_cover || video.series_cover || video.cover || video.cover_url || video.thumb_url || row.thumb_url || row.cover || '')),
         description: String(row.series_intro || video.video_desc || row.abstract || ''),
-        episodes: integer(video.episode_cnt || video.episode_count || row.episode_cnt),
+        episodes: integer(video.episode_cnt || video.episode_count || row.episode_cnt || row.episode_count),
         updatedAt: stamp(row.collect_time) };
     };
     let rows;
