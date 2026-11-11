@@ -153,6 +153,9 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _pictureInPictureActive = false;
   bool _pictureInPictureRequested = false;
   bool _pictureInPictureHandlerInstalled = false;
+  bool _lastNativePipAutoEnter = false;
+  int _lastNativePipWidth = 0;
+  int _lastNativePipHeight = 0;
   int? _pipOriginalIndex;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   String _loadingMessage = '正在准备播放';
@@ -165,7 +168,10 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _rotating = false;
   bool _television = false;
   AppOrientationController? _orientationController;
-  bool get _pictureInPictureVisible => _pictureInPictureActive;
+  bool get _pictureInPictureVisible =>
+      _pictureInPictureActive ||
+      (defaultTargetPlatform == TargetPlatform.android &&
+          _pictureInPictureRequested);
   bool get _canUsePictureInPicture =>
       !_television &&
       widget.store.playbackPreferences.pictureInPicture &&
@@ -364,6 +370,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             _aspectRatio = size.width / size.height;
           });
           _scheduleSystemUi();
+          _syncNativePictureInPictureConfig();
         }
       }),
     );
@@ -583,6 +590,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (!_closed && mounted) {
       setState(() {});
     }
+    _syncNativePictureInPictureConfig();
   }
 
   void _syncPictureInPictureSession() {
@@ -630,6 +638,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       },
       onPictureInPictureStatusChanged: (active, error, position) {
         if (mounted && !_closed) {
+          if (active) {
+            _dismissOverlaysForPictureInPicture();
+          }
           if (error != null && error.isNotEmpty) {
             _notice('画中画提示: ${_localizePipError(error)}');
           }
@@ -665,6 +676,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             requested: false,
             delayHiddenPause: !active,
           );
+          _syncNativePictureInPictureConfig();
         }
       },
     );
@@ -726,6 +738,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     } else {
       assign();
     }
+    _syncNativePictureInPictureConfig();
     if (_pictureInPictureVisible ||
         _lifecycleState == AppLifecycleState.resumed ||
         _lifecycleState == AppLifecycleState.inactive) {
@@ -745,6 +758,72 @@ class _PlayerScreenState extends State<PlayerScreen>
         }
       });
     }
+  }
+
+  void _dismissOverlaysForPictureInPicture() {
+    _interactions.cancel();
+    if (!mounted || _closed) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.clearSnackBars();
+    messenger?.removeCurrentSnackBar();
+    final route = ModalRoute.of(context);
+    if (route != null && route.isActive && !route.isCurrent) {
+      Navigator.of(context).popUntil((item) => item == route);
+    }
+    if (_panelOpen) {
+      setState(() => _panelOpen = false);
+    }
+  }
+
+  (int, int) _pictureInPictureAspectDimensions() {
+    final rawRatio = _aspectRatio.isFinite && _aspectRatio > 0
+        ? _aspectRatio
+        : 16 / 9;
+    final ratio = rawRatio.clamp(1 / 2.39, 2.39).toDouble();
+    final width = ratio >= 1 ? (1000 * ratio).round() : 1000;
+    final height = ratio >= 1 ? 1000 : (1000 / ratio).round();
+    return (width, height);
+  }
+
+  bool get _shouldAutoEnterPictureInPicture =>
+      defaultTargetPlatform == TargetPlatform.android &&
+      !widget.feed &&
+      !_closed &&
+      _canUsePictureInPicture &&
+      !_loading &&
+      _error == null &&
+      _openedIndex == _index &&
+      _playIntent;
+
+  void _syncNativePictureInPictureConfig({bool force = false}) {
+    if (defaultTargetPlatform != TargetPlatform.android || widget.feed) {
+      return;
+    }
+    final autoEnter = _shouldAutoEnterPictureInPicture;
+    final dimensions = _pictureInPictureAspectDimensions();
+    final width = dimensions.$1;
+    final height = dimensions.$2;
+    if (!force &&
+        autoEnter == _lastNativePipAutoEnter &&
+        width == _lastNativePipWidth &&
+        height == _lastNativePipHeight) {
+      return;
+    }
+    _lastNativePipAutoEnter = autoEnter;
+    _lastNativePipWidth = width;
+    _lastNativePipHeight = height;
+    final sourceRect = autoEnter ? _pictureInPictureSourceRect() : null;
+    final arguments = <String, dynamic>{
+      'autoEnter': autoEnter,
+      'width': width,
+      'height': height,
+      if (sourceRect != null) ...sourceRect,
+    };
+    unawaited(
+      AppDevice.channel
+          .invokeMethod<dynamic>('updatePictureInPictureConfig', arguments)
+          .catchError((Object _) => null),
+    );
   }
 
   void _applyLifecycleVisibility({bool pauseWhenHidden = true}) {
@@ -813,24 +892,20 @@ class _PlayerScreenState extends State<PlayerScreen>
       return;
     }
     if (_pictureInPictureRequested) {
-      _notice('正在启动画中画，请稍候...');
+      if (defaultTargetPlatform != TargetPlatform.android) {
+        _notice('正在启动画中画，请稍候...');
+      }
       return;
     }
-    if (_panelOpen) {
-      setState(() => _panelOpen = false);
-    }
-    _interactions.cancel();
+    _dismissOverlaysForPictureInPicture();
     final wasPlaying = _player.state.playing;
     if (Platform.isIOS && wasPlaying) {
       await _player.pause();
     }
-    final rawRatio = _aspectRatio.isFinite && _aspectRatio > 0
-        ? _aspectRatio
-        : 16 / 9;
-    final ratio = rawRatio.clamp(1 / 2.39, 2.39).toDouble();
-    final width = ratio >= 1 ? (1000 * ratio).round() : 1000;
-    final height = ratio >= 1 ? 1000 : (1000 / ratio).round();
-    _notice('正在启动画中画...');
+    final (width, height) = _pictureInPictureAspectDimensions();
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      _notice('正在启动画中画...');
+    }
     _setPictureInPictureStatus(requested: true);
 
     await WidgetsBinding.instance.endOfFrame;
@@ -983,13 +1058,37 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     final topLeft = renderObject.localToGlobal(Offset.zero);
     final size = renderObject.size;
+    if (size.width <= 0 || size.height <= 0) return null;
+    final rawRatio = _aspectRatio.isFinite && _aspectRatio > 0
+        ? _aspectRatio
+        : size.width / size.height;
+    final targetRatio = rawRatio.clamp(1 / 2.39, 2.39).toDouble();
+    final containerRatio = size.width / size.height;
+    late final double dx;
+    late final double dy;
+    late final double videoWidth;
+    late final double videoHeight;
+    if (containerRatio > targetRatio) {
+      videoHeight = size.height;
+      videoWidth = size.height * targetRatio;
+      dx = (size.width - videoWidth) / 2;
+      dy = 0;
+    } else {
+      videoWidth = size.width;
+      videoHeight = size.width / targetRatio;
+      dx = 0;
+      dy = (size.height - videoHeight) / 2;
+    }
     final ratio =
         MediaQuery.maybeOf(paneContext)?.devicePixelRatio ??
         View.of(paneContext).devicePixelRatio;
-    final left = (topLeft.dx * ratio).round().clamp(0, 100000);
-    final top = (topLeft.dy * ratio).round().clamp(0, 100000);
-    final right = ((topLeft.dx + size.width) * ratio).round().clamp(0, 100000);
-    final bottom = ((topLeft.dy + size.height) * ratio).round().clamp(
+    final left = ((topLeft.dx + dx) * ratio).round().clamp(0, 100000);
+    final top = ((topLeft.dy + dy) * ratio).round().clamp(0, 100000);
+    final right = ((topLeft.dx + dx + videoWidth) * ratio).round().clamp(
+      0,
+      100000,
+    );
+    final bottom = ((topLeft.dy + dy + videoHeight) * ratio).round().clamp(
       0,
       100000,
     );
@@ -1309,6 +1408,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     unawaited(_playIntent ? _player.play() : _player.pause());
     if (!_playIntent) unawaited(_saveProgress(flush: true));
     _syncDanmaku();
+    _syncNativePictureInPictureConfig();
   }
 
   final int _watchAccountRevision = HongguoAccountSession.shared.revision;
@@ -1657,6 +1757,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           _syncDanmaku();
           _acknowledgeHandoff();
           _menuRevision.value++;
+          _syncNativePictureInPictureConfig();
           if (_pictureInPictureActive) {
             _syncPictureInPictureSession();
           }
@@ -1708,6 +1809,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                   : '无法播放这一集，请重试或换一集。';
               widget.handoff?.fail(_error!);
             });
+            _syncNativePictureInPictureConfig();
           }
         }
       } else if (prepared != null && !installed) {
@@ -2187,6 +2289,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       PipManager.instance.retainPlaybackResource(_encryptedPlayback.close);
     }
     _closed = true;
+    _syncNativePictureInPictureConfig(force: true);
     unawaited(_player.pause().catchError((Object _) {}));
     final enhancementClosed = _enhancement.close();
     LanController.current?.detachPlayback(_lanIdentity);
@@ -2323,7 +2426,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                     ],
                   ),
             body: pictureInPicture
-                ? _videoPane(context, topPadding: MediaQuery.paddingOf(context).top)
+                ? _videoPane(context)
                 : SafeArea(
                     top: false,
                     bottom: !fullscreen,

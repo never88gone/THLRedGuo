@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart' as kit;
 import 'package:video_player/video_player.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/core/player/playback_diagnostics.dart';
 import 'package:THLRedLook/core/player/playback_preferences.dart';
 import 'package:THLRedLook/core/player/playback_recovery.dart';
@@ -865,8 +868,12 @@ class LunaExoPlayer implements Player {
     } else if (c != null && c.value.isInitialized) {
       w = c.value.size.width.toInt();
       h = c.value.size.height.toInt();
-      decoder = 'MediaCodec';
-      hwActive = _decoderMode == PlaybackDecoderMode.hardware;
+      final resolved = resolveAndroidExoCodecDiagnostics(
+        await _queryAndroidMediaCodecDiagnostics(),
+        _decoderMode,
+      );
+      decoder = resolved.decoder;
+      hwActive = resolved.hwActive;
       if (c.value.buffered.isNotEmpty) {
         final last = c.value.buffered.last.end;
         final pos = c.value.position;
@@ -1146,6 +1153,33 @@ class LunaExoPlayer implements Player {
     stream.dispose();
   }
 
+  Future<Map<String, dynamic>?> _queryAndroidMediaCodecDiagnostics() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return null;
+    }
+    final cached = _androidCodecDiagCache[this];
+    if (cached != null) return cached;
+    try {
+      final raw = await AppDevice.channel
+          .invokeMapMethod<String, dynamic>('mediaCodecDiagnostics')
+          .timeout(const Duration(milliseconds: 500));
+      if (raw != null && raw.isNotEmpty) {
+        final normalized = Map<String, dynamic>.from(raw);
+        _androidCodecDiagCache[this] = normalized;
+        return normalized;
+      }
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    } on TimeoutException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
   void _safeAdd<T>(StreamController<T> ctl, T value) {
     if (!ctl.isClosed) ctl.add(value);
   }
@@ -1209,4 +1243,58 @@ class LunaExoVideoView extends StatelessWidget {
       },
     );
   }
+}
+
+final Expando<Map<String, dynamic>> _androidCodecDiagCache =
+    Expando<Map<String, dynamic>>('_androidCodecDiagCache');
+
+@visibleForTesting
+({String decoder, bool hwActive}) resolveAndroidExoCodecDiagnostics(
+  Map<String, dynamic>? diag,
+  PlaybackDecoderMode mode,
+) {
+  final hwFallback = mode == PlaybackDecoderMode.hardware;
+  if (diag == null || diag.isEmpty) {
+    return (decoder: 'MediaCodec', hwActive: hwFallback);
+  }
+  String? trimOrNull(Object? value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+
+  final hevcHw = trimOrNull(diag['hevcHardware']);
+  final avcHw = trimOrNull(diag['avcHardware']);
+  final hevcSw = trimOrNull(diag['hevcSoftware']);
+  final avcSw = trimOrNull(diag['avcSoftware']);
+  final hw = trimOrNull(diag['hardware']);
+  final refreshRate = diag['refreshRate'] is num
+      ? (diag['refreshRate'] as num).toDouble()
+      : null;
+
+  final hasHw = hevcHw != null || avcHw != null;
+  final hwActive = hwFallback && hasHw;
+
+  final codecParts = <String>[];
+  if (hevcHw != null) {
+    codecParts.add('HEVC:$hevcHw');
+  } else if (hevcSw != null) {
+    codecParts.add('HEVC:$hevcSw(仅软解)');
+  }
+  if (avcHw != null) {
+    codecParts.add('AVC:$avcHw');
+  } else if (avcSw != null) {
+    codecParts.add('AVC:$avcSw(仅软解)');
+  }
+
+  final envParts = <String>[
+    ?hw,
+    if (refreshRate != null && refreshRate.isFinite && refreshRate > 0)
+      '${refreshRate.toStringAsFixed(0)}Hz',
+  ];
+  final envLabel = envParts.isEmpty ? '' : ' [${envParts.join(' · ')}]';
+  final codecLabel = codecParts.isEmpty ? '' : ' (${codecParts.join(' / ')})';
+  return (
+    decoder: 'MediaCodec$envLabel$codecLabel',
+    hwActive: hwActive,
+  );
 }

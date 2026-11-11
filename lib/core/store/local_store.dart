@@ -1186,6 +1186,9 @@ class LocalStore extends ChangeNotifier {
     final updates = dramas.toList();
     return _queue(() async {
       if (locked || epoch != _epoch) return;
+      _accountLibrary.updateDramas(
+        updates.where((drama) => allowsSource(drama.source)),
+      );
       final changes = <String, Object>{};
       final favorites = Map.of(_favorites);
       final history = Map.of(_history);

@@ -17,6 +17,7 @@ import 'package:THLRedLook/pages/player/player_page.dart';
 import 'package:THLRedLook/pages/settings/playback_settings_page.dart';
 import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/views/player/player_bottom_bar_view.dart';
+import 'package:THLRedLook/views/player/player_viewport_view.dart';
 
 class _MockRepo extends AppRepository {
   @override
@@ -839,6 +840,120 @@ void main() {
 
           expect(find.byType(PlayerScreen), findsOneWidget);
         } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+
+    testWidgets(
+      '11. Android 画中画防遮挡验证：开启 PiP 立即关闭弹窗/SnackBar、隐藏控条且 topPadding=0，退出播放器关闭 autoEnter',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        final calls = <MethodCall>[];
+        try {
+          SharedPreferences.setMockInitialValues({});
+          final preferences = await SharedPreferences.getInstance();
+          preferences.setString(
+            'playback_preferences',
+            jsonEncode({'pictureInPicture': true}),
+          );
+          final store = LocalStore(preferences);
+          const mockDrama = Drama(
+            id: 'test_pip_android_11',
+            title: 'Android 画中画无遮挡验证短剧',
+            source: 'hongguo',
+            sourceId: '7694896136963755032',
+            cover: 'https://mock.snssdk.com/cover.png',
+            episodes: 5,
+          );
+          final mockDetail = DramaDetail(mockDrama, [
+            Episode(const {
+              'url': 'https://mock.snssdk.com/video/mp4/test_pip_drama.mp4',
+              'title': '第 1 集',
+            }, 1),
+          ]);
+          final mockPlayer = _MockPlayer();
+          final mockRepo = _MockRepo();
+          final messenger =
+              TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+          messenger.setMockMethodCallHandler(AppDevice.channel, (call) async {
+            calls.add(call);
+            if (call.method == 'pictureInPictureStatus') {
+              return {'supported': true, 'active': false};
+            }
+            if (call.method == 'updatePictureInPictureConfig') {
+              return {'supported': true, 'active': false};
+            }
+            if (call.method == 'enterPictureInPicture') {
+              return {'supported': true, 'active': true, 'requested': true};
+            }
+            return null;
+          });
+
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.dark(),
+              home: MediaQuery(
+                data: const MediaQueryData(
+                  size: Size(412, 915),
+                  padding: EdgeInsets.only(top: 48),
+                ),
+                child: PlayerScreen(
+                  detail: mockDetail,
+                  initialIndex: 0,
+                  repository: mockRepo,
+                  store: store,
+                  playerFactory: () => mockPlayer,
+                  videoBuilder: (controls) => Stack(children: [controls]),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 300));
+
+          // 唤起底部面板（如倍速），模拟用户开着面板触发画中画，以及通知提示
+          final bar = tester.widget<PlayerBottomBarView>(
+            find.byType(PlayerBottomBarView).first,
+          );
+          bar.onSpeed();
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('sheet-speed-1.5')), findsOneWidget);
+
+          // 若收到系统级画中画激活事件，正在展示的底部面板也必须立刻关闭且界面无控制层、topPadding=0
+          final activeMsg = const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('pictureInPictureChanged', {'active': true}),
+          );
+          await messenger.handlePlatformMessage(
+            'duanju/device',
+            activeMsg,
+            null,
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byKey(const ValueKey('sheet-speed-1.5')), findsNothing);
+          expect(find.byType(PlayerBottomBarView), findsNothing);
+          expect(find.byKey(const ValueKey('player-pip-restore-btn')), findsNothing);
+          final viewport = tester.widget<PlayerViewportView>(
+            find.byType(PlayerViewportView),
+          );
+          expect(viewport.topPadding, 0.0);
+          expect(viewport.pictureInPictureVisible, isTrue);
+
+          // 销毁播放器时必须关闭原生 autoEnterEnabled，避免退出后误进 PiP
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          final updateCalls = calls
+              .where((c) => c.method == 'updatePictureInPictureConfig')
+              .toList();
+          expect(updateCalls, isNotEmpty);
+          final lastArgs = Map<String, dynamic>.from(
+            updateCalls.last.arguments as Map,
+          );
+          expect(lastArgs['autoEnter'], isFalse);
+        } finally {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(AppDevice.channel, null);
           debugDefaultTargetPlatformOverride = null;
         }
       },

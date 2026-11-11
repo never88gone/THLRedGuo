@@ -16,6 +16,8 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
+import android.media.MediaCodecInfo
+import android.media.MediaCodecList
 import android.net.ConnectivityManager
 import android.net.Uri
 import android.util.Rational
@@ -30,6 +32,10 @@ class MainActivity : FlutterActivity() {
     private var thermalHeadroom: Double? = null
     private var deviceChannel: MethodChannel? = null
     private var televisionMode = false
+    private var pipAutoEnterEnabled = false
+    private var pipAspectWidth = 16
+    private var pipAspectHeight = 9
+    private var pipSourceRect: Rect? = null
 
     @Suppress("DEPRECATION")
     private fun isTelevisionDevice(): Boolean {
@@ -66,6 +72,73 @@ class MainActivity : FlutterActivity() {
     override fun setRequestedOrientation(requestedOrientation: Int) {
         super.setRequestedOrientation(
             if (televisionMode) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else requestedOrientation
+        )
+    }
+
+    private fun isSoftwareCodec(info: MediaCodecInfo): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return info.isSoftwareOnly
+        }
+        val lower = info.name.lowercase()
+        return lower.startsWith("omx.google.") ||
+            lower.startsWith("c2.android.") ||
+            lower.startsWith("omx.ffmpeg.") ||
+            lower.contains(".sw.") ||
+            lower.contains("google.")
+    }
+
+    private fun pickDecodersForMime(
+        codecs: Array<MediaCodecInfo>,
+        mimeType: String,
+    ): Pair<String?, String?> {
+        var hardwareCodec: String? = null
+        var softwareCodec: String? = null
+        for (info in codecs) {
+            if (info.isEncoder) continue
+            val supportsMime = info.supportedTypes.any { it.equals(mimeType, ignoreCase = true) }
+            if (!supportsMime) continue
+            val isHw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                info.isHardwareAccelerated && !isSoftwareCodec(info)
+            } else {
+                !isSoftwareCodec(info)
+            }
+            if (isHw) {
+                if (hardwareCodec == null) hardwareCodec = info.name
+            } else {
+                if (softwareCodec == null) softwareCodec = info.name
+            }
+        }
+        return hardwareCodec to softwareCodec
+    }
+
+    @Suppress("DEPRECATION")
+    private fun currentDisplayRefreshRate(): Double? {
+        return runCatching {
+            val rate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                display?.refreshRate
+            } else {
+                windowManager.defaultDisplay?.refreshRate
+            }
+            rate?.toDouble()?.takeIf { it.isFinite() && it > 0.0 }
+        }.getOrNull()
+    }
+
+    private fun mediaCodecDiagnostics(): Map<String, Any?> {
+        val codecs = runCatching {
+            MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+        }.getOrDefault(emptyArray())
+        val (hevcHw, hevcSw) = pickDecodersForMime(codecs, "video/hevc")
+        val (avcHw, avcSw) = pickDecodersForMime(codecs, "video/avc")
+        return mapOf(
+            "hardware" to Build.HARDWARE,
+            "board" to Build.BOARD,
+            "model" to Build.MODEL,
+            "sdkInt" to Build.VERSION.SDK_INT,
+            "refreshRate" to currentDisplayRefreshRate(),
+            "hevcHardware" to hevcHw,
+            "hevcSoftware" to hevcSw,
+            "avcHardware" to avcHw,
+            "avcSoftware" to avcSw,
         )
     }
 
@@ -168,6 +241,22 @@ class MainActivity : FlutterActivity() {
                             ))
                         }
                         "pictureInPictureStatus" -> result.success(pictureInPictureStatus())
+                        "updatePictureInPictureConfig" -> {
+                            val autoEnter = call.argument<Boolean>("autoEnter") ?: false
+                            val width = call.argument<Int>("width") ?: 16
+                            val height = call.argument<Int>("height") ?: 9
+                            result.success(
+                                updatePictureInPictureConfig(
+                                    autoEnter = autoEnter,
+                                    width = width,
+                                    height = height,
+                                    left = call.argument<Int>("left"),
+                                    top = call.argument<Int>("top"),
+                                    right = call.argument<Int>("right"),
+                                    bottom = call.argument<Int>("bottom"),
+                                )
+                            )
+                        }
                         "enterPictureInPicture" -> {
                             val width = call.argument<Int>("width") ?: 16
                             val height = call.argument<Int>("height") ?: 9
@@ -243,6 +332,9 @@ class MainActivity : FlutterActivity() {
                                 result.error("invalid_url", "播放地址为空", null)
                             }
                         }
+                        "mediaCodecDiagnostics" -> {
+                            result.success(mediaCodecDiagnostics())
+                        }
                         else -> result.notImplemented()
                     }
                 }
@@ -261,6 +353,72 @@ class MainActivity : FlutterActivity() {
         )
     }
 
+    private fun parsePipSourceRect(
+        left: Int?,
+        top: Int?,
+        right: Int?,
+        bottom: Int?
+    ): Rect? {
+        if (left == null || top == null || right == null || bottom == null) {
+            return null
+        }
+        if (right <= left || bottom <= top) {
+            return null
+        }
+        return Rect(left, top, right, bottom)
+    }
+
+    private fun buildPictureInPictureParams(
+        width: Int,
+        height: Int,
+        sourceRect: Rect?,
+        autoEnter: Boolean
+    ): PictureInPictureParams {
+        val safeWidth = width.coerceIn(1, 10000)
+        val safeHeight = height.coerceIn(1, 10000)
+        val builder = PictureInPictureParams.Builder()
+        builder.setAspectRatio(Rational(safeWidth, safeHeight))
+        if (sourceRect != null && sourceRect.width() > 0 && sourceRect.height() > 0) {
+            builder.setSourceRectHint(sourceRect)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setAutoEnterEnabled(autoEnter)
+            builder.setSeamlessResizeEnabled(true)
+        }
+        return builder.build()
+    }
+
+    private fun updatePictureInPictureConfig(
+        autoEnter: Boolean,
+        width: Int,
+        height: Int,
+        left: Int?,
+        top: Int?,
+        right: Int?,
+        bottom: Int?
+    ): Map<String, Any> {
+        pipAutoEnterEnabled = autoEnter
+        pipAspectWidth = width.coerceIn(1, 10000)
+        pipAspectHeight = height.coerceIn(1, 10000)
+        pipSourceRect = parsePipSourceRect(left, top, right, bottom)
+        if (!pictureInPictureSupported() || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return pictureInPictureStatus()
+        }
+        runCatching {
+            if (!isInPictureInPictureMode) {
+                setPictureInPictureParams(
+                    buildPictureInPictureParams(
+                        width = pipAspectWidth,
+                        height = pipAspectHeight,
+                        sourceRect = pipSourceRect,
+                        autoEnter = pipAutoEnterEnabled,
+                    )
+                )
+            }
+        }
+        return pictureInPictureStatus()
+    }
+
     private fun enterPlayerPictureInPicture(
         width: Int,
         height: Int,
@@ -270,21 +428,42 @@ class MainActivity : FlutterActivity() {
         bottom: Int?
     ): Map<String, Any> {
         if (!pictureInPictureSupported()) return pictureInPictureStatus()
-        val safeWidth = width.coerceIn(1, 10000)
-        val safeHeight = height.coerceIn(1, 10000)
+        pipAutoEnterEnabled = true
+        pipAspectWidth = width.coerceIn(1, 10000)
+        pipAspectHeight = height.coerceIn(1, 10000)
+        val rect = parsePipSourceRect(left, top, right, bottom)
+        if (rect != null) {
+            pipSourceRect = rect
+        }
         return runCatching {
-            val builder = PictureInPictureParams.Builder()
-            builder.setAspectRatio(Rational(safeWidth, safeHeight))
-            if (left != null && top != null && right != null && bottom != null &&
-                right > left && bottom > top) {
-                builder.setSourceRectHint(Rect(left, top, right, bottom))
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                builder.setAutoEnterEnabled(true)
-            }
-            val entered = enterPictureInPictureMode(builder.build())
+            val params = buildPictureInPictureParams(
+                width = pipAspectWidth,
+                height = pipAspectHeight,
+                sourceRect = pipSourceRect,
+                autoEnter = true,
+            )
+            val entered = enterPictureInPictureMode(params)
             pictureInPictureStatus() + ("requested" to entered)
         }.getOrElse { pictureInPictureStatus() }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S &&
+            pipAutoEnterEnabled &&
+            !isTelevisionDevice() &&
+            pictureInPictureSupported() &&
+            !isInPictureInPictureMode
+        ) {
+            enterPlayerPictureInPicture(
+                width = pipAspectWidth,
+                height = pipAspectHeight,
+                left = pipSourceRect?.left,
+                top = pipSourceRect?.top,
+                right = pipSourceRect?.right,
+                bottom = pipSourceRect?.bottom,
+            )
+        }
     }
 
     override fun onPictureInPictureModeChanged(
@@ -299,6 +478,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        pipAutoEnterEnabled = false
         deviceChannel?.setMethodCallHandler(null)
         deviceChannel = null
         super.cleanUpFlutterEngine(flutterEngine)

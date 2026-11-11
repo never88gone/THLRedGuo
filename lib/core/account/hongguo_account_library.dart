@@ -33,6 +33,51 @@ class HongguoAccountLibrary extends ChangeNotifier {
   WatchEntry? watched(String value) => _history[id(value)];
   bool following(String value) => _favorites.containsKey(id(value));
   Drama? favorite(String value) => _favorites[id(value)];
+
+  void updateDramas(Iterable<Drama> dramas) {
+    if (!active) return;
+    var changed = false;
+    for (final drama in dramas) {
+      if (drama.source != 'hongguo' && !drama.id.startsWith('hongguo:')) {
+        continue;
+      }
+      final keys = <String>{
+        if (id(drama.id).isNotEmpty) id(drama.id),
+        if (drama.cleanSourceId.isNotEmpty) drama.cleanSourceId,
+      };
+      for (final key in keys) {
+        final fav = _favorites[key];
+        if (fav != null) {
+          final merged = fav.merge(drama);
+          if (merged.title != fav.title ||
+              merged.cover != fav.cover ||
+              merged.episodes != fav.episodes ||
+              merged.description != fav.description) {
+            _favorites[key] = merged;
+            changed = true;
+          }
+        }
+        final hist = _history[key];
+        if (hist != null) {
+          final merged = hist.drama.merge(drama);
+          if (merged.title != hist.drama.title ||
+              merged.cover != hist.drama.cover ||
+              merged.episodes != hist.drama.episodes ||
+              merged.description != hist.drama.description) {
+            _history[key] = WatchEntry(
+              drama: merged,
+              episode: hist.episode,
+              position: hist.position,
+              duration: hist.duration,
+              updatedAt: hist.updatedAt,
+            );
+            changed = true;
+          }
+        }
+      }
+    }
+    if (changed) notifyListeners();
+  }
   void _accountChanged() {
     if (_revision == service.session.revision) return;
     _revision = service.session.revision;

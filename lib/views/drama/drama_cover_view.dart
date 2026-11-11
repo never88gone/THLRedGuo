@@ -420,7 +420,7 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
         errorBuilder: (_, _, _) => _failed(null),
       );
     }
-    return _failed(null);
+    return _coverFailed ? _failed(null) : widget.placeholder;
   }
 
   Widget _buildImage(String path) {

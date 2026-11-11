@@ -636,6 +636,99 @@ class HongguoAccountService {
     session.confirm(account, revision);
   }
 
+  String _pickNonEmptyText(Iterable<Object?> values) {
+    for (final value in values) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty) return text;
+    }
+    return '';
+  }
+
+  int _pickPositiveInt(Iterable<Object?> values) {
+    for (final value in values) {
+      final parsed = intValue(value);
+      if (parsed > 0) return parsed;
+    }
+    return 0;
+  }
+
+  void _indexDetailRow(
+    Map<String, Map<String, dynamic>> details,
+    Map<String, dynamic> incoming,
+  ) {
+    final keys = <String>{
+      for (final key in ['id', 'book_id', 'series_id'])
+        if ((incoming[key]?.toString().trim() ?? '').isNotEmpty)
+          incoming[key].toString().trim(),
+    };
+    for (final key in keys) {
+      final existing = details[key];
+      if (existing == null) {
+        details[key] = incoming;
+      } else {
+        details[key] = {
+          ...existing,
+          ...incoming,
+          'title': _pickNonEmptyText([incoming['title'], existing['title']]),
+          'cover': _pickNonEmptyText([incoming['cover'], existing['cover']]),
+          'description': _pickNonEmptyText([
+            incoming['description'],
+            existing['description'],
+          ]),
+          'episodes': _pickPositiveInt([
+            incoming['episodes'],
+            existing['episodes'],
+          ]),
+        };
+      }
+    }
+  }
+
+  Map<String, dynamic>? _resolveDetailForRow(
+    Map<String, Map<String, dynamic>> details,
+    Map<String, dynamic> row,
+  ) {
+    for (final key in [row['id'], row['book_id'], row['series_id']]) {
+      final id = key?.toString().trim() ?? '';
+      if (id.isNotEmpty && details.containsKey(id)) {
+        return details[id];
+      }
+    }
+    return null;
+  }
+
+  bool _isFatalAccountFailure(HongguoAccountFailure failure, int revision) {
+    return !session.loggedIn ||
+        revision != session.revision ||
+        failure.code == 'CANCELLED' ||
+        failure.code == 'SESSION_INVALID' ||
+        failure.code == 'ACCOUNT_CHALLENGE_REQUIRED' ||
+        failure.code == 'ACCOUNT_SECONDARY_VERIFICATION_REQUIRED';
+  }
+
+  void _recordLibraryDiagnostic({
+    required String stage,
+    required int total,
+    int resolved = 0,
+    int fallbackCount = 0,
+    String errorCode = '',
+    String message = '',
+  }) {
+    SourceDiagnostics.shared.add(
+      SourceDiagnosticEntry(
+        at: DateTime.now(),
+        context: '红果账号列表补全',
+        stage: stage,
+        errorCode: errorCode,
+        errorTitle: errorCode.isNotEmpty ? '批量剧集资料未完整匹配' : '',
+        errorMessage: message.isNotEmpty
+            ? message
+            : '总数=$total, 详情匹配=$resolved, 单条补全=$fallbackCount',
+        sessionStatus: 'loggedIn=${session.loggedIn}',
+      ),
+    );
+  }
+
   Future<List<WatchEntry>> library({required bool history}) async {
     if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
     final revision = session.revision;
@@ -649,38 +742,122 @@ class HongguoAccountService {
         .map((v) => Map<String, dynamic>.from(v as Map))
         .toList();
     final details = <String, Map<String, dynamic>>{};
+    var batchErrorCode = '';
     for (var offset = 0; offset < rows.length; offset += 50) {
-      final result = await _call(
-        'libraryDetails',
-        {'ids': rows.skip(offset).take(50).map((v) => v['id']).join(',')},
-        null,
-        revision,
-      );
-      for (final item in result['items'] as List) {
-        final row = Map<String, dynamic>.from(item as Map);
-        details[row['id'].toString()] = row;
-        final bookId = row['book_id']?.toString() ?? '';
-        if (bookId.isNotEmpty && bookId != row['id'].toString()) {
-          details[bookId] = row;
+      final chunkIds = rows
+          .skip(offset)
+          .take(50)
+          .map((v) => v['id'].toString())
+          .where((v) => v.isNotEmpty)
+          .join(',');
+      if (chunkIds.isEmpty) continue;
+      try {
+        final result = await _call(
+          'libraryDetails',
+          {'ids': chunkIds},
+          null,
+          revision,
+        );
+        for (final item in result['items'] as List) {
+          _indexDetailRow(details, Map<String, dynamic>.from(item as Map));
         }
+      } on HongguoAccountFailure catch (failure) {
+        if (_isFatalAccountFailure(failure, revision)) rethrow;
+        batchErrorCode = failure.code;
+      } catch (_) {
+        _check(revision);
+        batchErrorCode = 'BATCH_DETAIL_FAILED';
       }
     }
+
+    final missingIndices = <int>[];
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows[i];
+      final detail = _resolveDetailForRow(details, row);
+      final title = _pickNonEmptyText([detail?['title'], row['title']]);
+      final cover = _pickNonEmptyText([detail?['cover'], row['cover']]);
+      final episodes = _pickPositiveInt([
+        detail?['episodes'],
+        row['episodes'],
+      ]);
+      if (title.isEmpty || cover.isEmpty || episodes <= 0) {
+        missingIndices.add(i);
+      }
+    }
+
+    var fallbackSucceeded = 0;
+    const maxFallbackItems = 24;
+    const concurrency = 4;
+    final fallbackTargets = missingIndices.take(maxFallbackItems).toList();
+    for (var start = 0; start < fallbackTargets.length; start += concurrency) {
+      final batch = fallbackTargets.skip(start).take(concurrency).toList();
+      await Future.wait(
+        batch.map((index) async {
+          final row = rows[index];
+          final candidates = <String>[
+            for (final key in ['series_id', 'id', 'book_id'])
+              if ((row[key]?.toString().trim() ?? '').isNotEmpty)
+                row[key].toString().trim(),
+          ];
+          final seenCandidates = <String>{};
+          for (final candidate in candidates) {
+            if (!seenCandidates.add(candidate)) continue;
+            try {
+              final single = await _call(
+                'libraryDetail',
+                {'id': candidate},
+                null,
+                revision,
+              );
+              final items = single['items'] as List? ?? const [];
+              if (items.isNotEmpty) {
+                final rawDetail = Map<String, dynamic>.from(items.first as Map);
+                rawDetail.putIfAbsent('id', () => row['id']);
+                rawDetail.putIfAbsent('series_id', () => candidate);
+                if ((row['book_id']?.toString() ?? '').isNotEmpty) {
+                  rawDetail.putIfAbsent('book_id', () => row['book_id']);
+                }
+                _indexDetailRow(details, rawDetail);
+                final title = _pickNonEmptyText([rawDetail['title']]);
+                final cover = _pickNonEmptyText([rawDetail['cover']]);
+                final episodes = _pickPositiveInt([rawDetail['episodes']]);
+                if (title.isNotEmpty || cover.isNotEmpty || episodes > 0) {
+                  fallbackSucceeded++;
+                  break;
+                }
+              }
+            } on HongguoAccountFailure catch (failure) {
+              if (_isFatalAccountFailure(failure, revision)) rethrow;
+            } catch (_) {
+              _check(revision);
+            }
+          }
+        }),
+      );
+    }
+
     _check(revision);
-    return rows.map((row) {
-      final detail = details[row['id'].toString()] ?? row;
+    var resolvedCount = 0;
+    final entries = rows.map((row) {
+      final detail = _resolveDetailForRow(details, row);
       final id = row['id'].toString();
-      final title = detail['title']?.toString() ?? '';
+      final title = _pickNonEmptyText([detail?['title'], row['title']]);
+      final cover = _pickNonEmptyText([detail?['cover'], row['cover']]);
+      final description = _pickNonEmptyText([
+        detail?['description'],
+        row['description'],
+      ]);
+      final episodes = _pickPositiveInt([detail?['episodes'], row['episodes']]);
+      if (title.isNotEmpty) resolvedCount++;
       return WatchEntry(
         drama: Drama(
           id: 'hongguo:$id',
           source: 'hongguo',
           sourceId: id,
           title: title.isEmpty ? '剧集$id' : title,
-          cover: detail['cover']?.toString() ?? '',
-          description: detail['description']?.toString() ?? '',
-          episodes: intValue(detail['episodes']) > 0
-              ? intValue(detail['episodes'])
-              : intValue(row['episodes']),
+          cover: cover,
+          description: description,
+          episodes: episodes,
         ),
         episode: intValue(row['episode']),
         position: (row['positionMs'] as num? ?? 0) / 1000,
@@ -690,6 +867,18 @@ class HongguoAccountService {
         ),
       );
     }).toList();
+
+    if (rows.isNotEmpty &&
+        (batchErrorCode.isNotEmpty || missingIndices.isNotEmpty)) {
+      _recordLibraryDiagnostic(
+        stage: history ? 'history' : 'favorites',
+        total: rows.length,
+        resolved: resolvedCount,
+        fallbackCount: fallbackSucceeded,
+        errorCode: batchErrorCode,
+      );
+    }
+    return entries;
   }
 
   Future<void> setFollowing(Drama drama, bool follow) async {

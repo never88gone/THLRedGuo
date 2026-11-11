@@ -307,7 +307,9 @@ class Drama {
       id: id,
       source: fresh.source.isEmpty ? source : fresh.source,
       sourceId: fresh.sourceId.isEmpty ? sourceId : fresh.sourceId,
-      title: fresh.title.isEmpty || fresh.title == '短剧' ? title : fresh.title,
+      title: _isPlaceholderTitle(fresh.title) && !_isPlaceholderTitle(title)
+          ? title
+          : fresh.title,
       description: fresh.description.isEmpty ? description : fresh.description,
       cover: fresh.cover.isEmpty ? cover : fresh.cover,
       episodes: fresh.episodes > 0 ? fresh.episodes : episodes,
@@ -328,6 +330,13 @@ class Drama {
           ? releaseStatus
           : fresh.releaseStatus,
     );
+  }
+
+  static bool _isPlaceholderTitle(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ||
+        trimmed == '短剧' ||
+        RegExp(r'^剧集\s*\d+$').hasMatch(trimmed);
   }
 }
 

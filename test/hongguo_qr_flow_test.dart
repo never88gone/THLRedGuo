@@ -2,16 +2,21 @@ import 'test_helpers/official_source_fixture.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:THLRedLook/core/account/hongguo_account_library.dart';
 import 'package:THLRedLook/core/account/hongguo_account_service.dart';
 import 'package:THLRedLook/core/account/hongguo_social_models.dart';
+import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/core/account/hongguo_account_session.dart';
 import 'package:THLRedLook/core/js/hongguo_guest_session.dart';
 import 'package:THLRedLook/core/account/account_transfer_payload.dart';
 import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
+import 'package:THLRedLook/views/drama/drama_cover_view.dart';
 
 class _Reply extends Stream<List<int>> implements HttpClientResponse {
   _Reply(this.payload, [List<String> cookies = const [], this.statusCode = 200])
@@ -1303,4 +1308,242 @@ void main() {
       );
     }
   });
+  test('追剧详情匹配增强：multi-detail 键值错位匹配、失败单条兜底补全与 history 不被 0 集覆盖', () async {
+    final session = HongguoAccountSession();
+    await session.bindProfile('synthetic-library-fallback');
+    final cookies = HongguoAccountCookies()
+      ..merge(Uri.parse('https://hongguoduanju.com/'), [
+        'sessionid=synthetic-library-fallback; Path=/; Secure',
+      ]);
+    await session.accept(cookies, {
+      'id': '123',
+      'nickname': '测试用户',
+    }, expectedRevision: session.revision);
+    final service = HongguoAccountService(session: session);
+    addTearDown(service.dispose);
+
+    // 场景 1: multi-detail 返回嵌套 detail_list，且 book_id 与内层 video_data.series_id 不一致
+    // 场景 2: multi-detail 报错时记诊断并走单条兜底，同时 history episode_count=0 不覆盖已获取总集数
+    var failMultiDetail = false;
+    await HttpOverrides.runZoned(
+      () async {
+        final follows = await service.library(history: false);
+        expect(follows.length, 2);
+        expect(follows[0].drama.title, '急诊摸鱼王5');
+        expect(follows[0].drama.episodes, 120);
+        expect(follows[0].drama.cover, 'https://example.test/cover_a.jpg');
+        expect(follows[1].drama.title, '单条兜底补全剧');
+        expect(follows[1].drama.episodes, 88);
+        expect(follows[1].drama.cover, 'https://example.test/cover_b.jpg');
+
+        failMultiDetail = true;
+        final hist = await service.library(history: true);
+        expect(hist.single.drama.title, '我合成了全世界啊第3季');
+        expect(hist.single.drama.episodes, 351);
+        expect(hist.single.drama.cover, 'https://example.test/cover_c.jpg');
+        expect(
+          SourceDiagnostics.shared.entries.any(
+            (e) => e.context == '红果账号列表补全' && e.stage == 'history',
+          ),
+          isTrue,
+        );
+      },
+      createHttpClient: (_) => _Client((uri, headers) {
+        if (uri.path.contains('/bookshelf/')) {
+          return _Reply({
+            'code': 0,
+            'data': {
+              'video_shelf_info': [
+                {
+                  'book_id': '7688558312157088793',
+                  'series_id': '7688558312157099001',
+                  'book_type': 2,
+                  'collect_time': 1700000100,
+                },
+                {
+                  'series_id': '7688558312157099002',
+                  'book_type': 2,
+                  'collect_time': 1700000000,
+                },
+              ],
+            },
+          });
+        }
+        if (uri.path.contains('/read_progress/')) {
+          return _Reply({
+            'code': 0,
+            'video_data': [
+              {
+                'series_id': '7688558312157099003',
+                'vid': '1234567890123456789',
+                'vid_index': 15,
+                'current_play_time': 30000,
+                'current_total_time': 90000,
+                'episode_count': 0,
+                'last_watch_time': 1700000200,
+              },
+            ],
+          });
+        }
+        if (uri.path.contains('/multi-detail/')) {
+          if (failMultiDetail) {
+            return _Reply({'code': 1001, 'message': 'temp error'});
+          }
+          return _Reply({
+            'code': 0,
+            'data': {
+              'detail_list': [
+                {
+                  'book_id': '999999999999999999',
+                  'video_data': {
+                    'series_id': '7688558312157099001',
+                    'series_title': '急诊摸鱼王5',
+                    'series_cover': 'https://example.test/cover_a.jpg',
+                    'episode_cnt': 120,
+                  },
+                },
+              ],
+            },
+          });
+        }
+        if (uri.path.contains('/video_detail/')) {
+          final body = jsonDecode(headers.value('synthetic-body')!) as Map;
+          if (body['series_id'] == '7688558312157099003') {
+            return _Reply({
+              'code': 0,
+              'data': {
+                'video_data': {
+                  'series_id': '7688558312157099003',
+                  'series_title': '我合成了全世界啊第3季',
+                  'series_cover': 'https://example.test/cover_c.jpg',
+                  'episode_cnt': 351,
+                },
+              },
+            });
+          }
+          expect(body['series_id'], '7688558312157099002');
+          return _Reply({
+            'code': 0,
+            'data': {
+              'video_data': {
+                'series_id': '7688558312157099002',
+                'series_title': '单条兜底补全剧',
+                'series_cover': 'https://example.test/cover_b.jpg',
+                'episode_cnt': 88,
+              },
+            },
+          });
+        }
+        return _Reply({'code': 0, 'data': []});
+      }),
+    );
+  });
+
+  test('LocalStore.refreshDrama 自动回补 HongguoAccountLibrary 中的追剧与历史占位记录', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final session = HongguoAccountSession();
+    await session.bindProfile('synthetic-library-sync');
+    final cookies = HongguoAccountCookies()
+      ..merge(Uri.parse('https://hongguoduanju.com/'), [
+        'sessionid=synthetic-library-sync; Path=/; Secure',
+      ]);
+    await session.accept(cookies, {
+      'id': '123',
+      'nickname': '测试',
+    }, expectedRevision: session.revision);
+    final service = HongguoAccountService(session: session);
+    final library = HongguoAccountLibrary(service: service);
+    addTearDown(() {
+      library.dispose();
+    });
+    final store = LocalStore(prefs, accountLibrary: library);
+
+    await HttpOverrides.runZoned(
+      () async {
+        final initial = await library.load(false, refresh: true);
+        expect(initial.single.drama.title, '剧集7688558312157099009');
+        expect(initial.single.drama.episodes, 0);
+        expect(initial.single.drama.cover, isEmpty);
+
+        const fresh = Drama(
+          id: 'hongguo:7688558312157099009',
+          source: 'hongguo',
+          sourceId: '7688558312157099009',
+          title: '详情回补完整剧名',
+          cover: 'https://example.test/fresh_cover.jpg',
+          episodes: 99,
+        );
+        await store.refreshDrama(fresh);
+
+        final updated = library.entries(false);
+        expect(updated.single.drama.title, '详情回补完整剧名');
+        expect(updated.single.drama.episodes, 99);
+        expect(updated.single.drama.cover, 'https://example.test/fresh_cover.jpg');
+
+        // 验证反向 merge 不会被占位名称退化覆盖
+        final kept = updated.single.drama.merge(
+          const Drama(
+            id: 'hongguo:7688558312157099009',
+            source: 'hongguo',
+            title: '剧集7688558312157099009',
+          ),
+        );
+        expect(kept.title, '详情回补完整剧名');
+      },
+      createHttpClient: (_) => _Client((uri, _) {
+        if (uri.path.contains('/bookshelf/')) {
+          return _Reply({
+            'code': 0,
+            'data': {
+              'video_shelf_info': [
+                {
+                  'series_id': '7688558312157099009',
+                  'book_type': 2,
+                  'collect_time': 1700000000,
+                },
+              ],
+            },
+          });
+        }
+        return _Reply({'code': 0, 'data': null});
+      }),
+    );
+  });
+
+  testWidgets('CachedCoverImage 当无封面 URL 且未出错时显示安静占位而非重试海报按钮', (
+    tester,
+  ) async {
+    final repo = _EmptyCoverRepo();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 120,
+            height: 160,
+            child: CachedCoverImage(
+              drama: const Drama(
+                id: 'hongguo:123',
+                source: 'hongguo',
+                title: '无图测试短剧',
+              ),
+              repository: repo,
+              placeholder: const Center(child: Text('无封面占位')),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('无封面占位'), findsOneWidget);
+    expect(find.byTooltip('重试海报'), findsNothing);
+  });
+}
+
+class _EmptyCoverRepo extends AppRepository {
+  @override
+  Future<String> cover(Drama drama, {bool force = false}) async => '';
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
