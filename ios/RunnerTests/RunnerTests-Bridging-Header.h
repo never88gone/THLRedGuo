@@ -1,0 +1,1 @@
+#import "../Runner/SafePluginRegistry.h"

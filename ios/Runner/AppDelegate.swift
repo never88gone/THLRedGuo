@@ -25,16 +25,54 @@ import CoreMedia
   private var currentPipMetadata: [String: Any]?
   private var pipEndObserver: NSObjectProtocol?
   private var pipReplaceStatusObservation: NSKeyValueObservation?
+  private var icloudObserver: NSObjectProtocol?
+  private var terminateObserver: NSObjectProtocol?
+  private var pipSessionId: UInt64 = 0
+
+  deinit {
+    if let observer = icloudObserver {
+      NotificationCenter.default.removeObserver(observer)
+    }
+    if let observer = terminateObserver {
+      NotificationCenter.default.removeObserver(observer)
+    }
+  }
+
+  func handleSceneTeardown() {
+    THLAppLifecycleGuard.markEngineStopping()
+    if Thread.isMainThread {
+      cleanUpPip()
+    } else {
+      DispatchQueue.main.async { [weak self] in
+        self?.cleanUpPip()
+      }
+    }
+  }
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    THLAppLifecycleGuard.markEngineActive()
+    if terminateObserver == nil {
+      terminateObserver = NotificationCenter.default.addObserver(
+        forName: Notification.Name("NSApplicationWillTerminateNotification"),
+        object: nil,
+        queue: .main
+      ) { [weak self] _ in
+        self?.handleSceneTeardown()
+      }
+    }
     do {
       try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
       try AVAudioSession.sharedInstance().setActive(true)
     } catch {}
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  override func applicationWillTerminate(_ application: UIApplication) {
+    handleSceneTeardown()
+    super.applicationWillTerminate(application)
   }
 
   override func application(
@@ -48,14 +86,19 @@ import CoreMedia
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
-    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "EncryptedMediaStream") {
+    THLAppLifecycleGuard.markEngineActive()
+    let registry = SafePluginRegistry(
+      target: engineBridge.pluginRegistry,
+      disabledLifecyclePlugins: ["FlutterForegroundTaskPlugin"]
+    )
+    GeneratedPluginRegistrant.register(with: registry)
+    if let registrar = registry.registrar(forPlugin: "EncryptedMediaStream") {
       let channel = FlutterMethodChannel(name: "duanju/encrypted_stream", binaryMessenger: registrar.messenger())
       channel.setMethodCallHandler { [weak self] call, result in
         self?.encryptedMediaStream.handle(call, result: result)
       }
     }
-    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "DeviceSettings") {
+    if let registrar = registry.registrar(forPlugin: "DeviceSettings") {
       let channel = FlutterMethodChannel(name: "duanju/device", binaryMessenger: registrar.messenger())
       self.deviceChannel = channel
       channel.setMethodCallHandler { [weak self] call, result in
@@ -88,9 +131,14 @@ import CoreMedia
                 return try HongguoApkImporter(url: url).extract()
               }.value
               try HongguoPlaybackProfileVault.save(profile)
-              result(try HongguoPlaybackProfileVault.metadata())
+              let metadata = try HongguoPlaybackProfileVault.metadata()
+              await MainActor.run {
+                result(metadata)
+              }
             } catch {
-              result(FlutterError(code: "APK_IMPORT_FAILED", message: error.localizedDescription, details: nil))
+              await MainActor.run {
+                result(FlutterError(code: "APK_IMPORT_FAILED", message: error.localizedDescription, details: nil))
+              }
             }
           }
           return
@@ -187,7 +235,7 @@ import CoreMedia
           return
         }
         if call.method == "stopPictureInPicture" {
-          let positionMs = Int((self.pipPlayer?.currentTime().seconds ?? 0) * 1000)
+          let positionMs = self.currentPipPositionMs()
           self.pipController?.stopPictureInPicture()
           self.cleanUpPip()
           result(["stopped": true, "position": positionMs])
@@ -214,7 +262,7 @@ import CoreMedia
       }
     }
 
-    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ICloudSync") {
+    if let registrar = registry.registrar(forPlugin: "ICloudSync") {
       let icloudChannel = FlutterMethodChannel(name: "duanju/icloud", binaryMessenger: registrar.messenger())
       self.icloudChannel = icloudChannel
       icloudChannel.setMethodCallHandler { call, result in
@@ -244,7 +292,11 @@ import CoreMedia
         }
       }
 
-      NotificationCenter.default.addObserver(
+      if let oldObserver = self.icloudObserver {
+        NotificationCenter.default.removeObserver(oldObserver)
+        self.icloudObserver = nil
+      }
+      self.icloudObserver = NotificationCenter.default.addObserver(
         forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
         object: nil,
         queue: .main
@@ -323,17 +375,34 @@ import CoreMedia
         popover.permittedArrowDirections = []
       }
       diagnosticsExportPending = true
-      activity.completionWithItemsHandler = { [weak self] _, completed, _, error in
-        self?.diagnosticsExportPending = false
-        try? FileManager.default.removeItem(at: directory)
-        if error != nil {
-          result(FlutterError(code: "EXPORT_FAILED", message: "日志导出未完成，请重试", details: nil))
+      var replySent = false
+      let replyOnce: (Any?) -> Void = { payload in
+        if Thread.isMainThread {
+          guard !replySent else { return }
+          replySent = true
+          result(payload)
         } else {
-          result(["completed": completed])
+          DispatchQueue.main.async {
+            guard !replySent else { return }
+            replySent = true
+            result(payload)
+          }
+        }
+      }
+      activity.completionWithItemsHandler = { [weak self] _, completed, _, error in
+        DispatchQueue.main.async {
+          self?.diagnosticsExportPending = false
+          try? FileManager.default.removeItem(at: directory)
+          if error != nil {
+            replyOnce(FlutterError(code: "EXPORT_FAILED", message: "日志导出未完成，请重试", details: nil))
+          } else {
+            replyOnce(["completed": completed])
+          }
         }
       }
       presenter.present(activity, animated: true)
     } catch {
+      diagnosticsExportPending = false
       try? FileManager.default.removeItem(at: directory)
       result(FlutterError(code: "EXPORT_FAILED", message: "无法生成诊断日志文件", details: nil))
     }
@@ -364,7 +433,23 @@ import CoreMedia
     }
   }
 
+  private func currentPipPositionMs() -> Int {
+    guard let seconds = pipPlayer?.currentTime().seconds,
+          seconds.isFinite,
+          seconds >= 0 else {
+      return 0
+    }
+    return Int(min(seconds * 1000.0, Double(Int.max)))
+  }
+
   private func cleanUpPip() {
+    if !Thread.isMainThread {
+      DispatchQueue.main.async { [weak self] in
+        self?.cleanUpPip()
+      }
+      return
+    }
+    self.pipSessionId &+= 1
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
     self.pipCheckTimer?.invalidate()
@@ -382,11 +467,13 @@ import CoreMedia
       self.pipEndObserver = nil
     }
     self.pipPlayer?.pause()
+    self.pipPlayer?.replaceCurrentItem(with: nil)
     self.pipPlayer = nil
     self.pipPlayerLayer?.removeFromSuperlayer()
     self.pipPlayerLayer = nil
     self.pipContainerView?.removeFromSuperview()
     self.pipContainerView = nil
+    self.pipController?.delegate = nil
     self.pipController = nil
   }
 
@@ -465,6 +552,7 @@ import CoreMedia
     logPip("startPip: url=\(url.absoluteString), pos=\(positionMs), speed=\(speed), sourceRect=\(String(describing: sourceRect))")
     ensureAudioSessionConfigured()
     self.cleanUpPip()
+    let sessionId = self.pipSessionId
 
     var assetOptions: [String: Any] = [:]
     if !url.isFileURL && !headers.isEmpty {
@@ -481,6 +569,7 @@ import CoreMedia
     self.observePipItemEnd(playerItem)
 
     guard let rootVC = self.activeRootViewController else {
+      self.cleanUpPip()
       result([
         "supported": true,
         "active": false,
@@ -525,7 +614,7 @@ import CoreMedia
 
     var hasStartedPip = false
     let attemptStartPip: () -> Void = { [weak self] in
-      guard let self = self, !hasStartedPip else { return }
+      guard let self = self, self.pipSessionId == sessionId, !hasStartedPip else { return }
       guard let pipCtrl = self.pipController else { return }
 
       let isPossible = pipCtrl.isPictureInPicturePossible
@@ -550,86 +639,81 @@ import CoreMedia
       pipCtrl.startPictureInPicture()
     }
 
-    // 监听 playerItem 状态，在 readyToPlay 时进行 seek 和播放
     self.pipItemStatusObservation = playerItem.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
-      guard let self = self else { return }
-      switch item.status {
-      case .readyToPlay:
-        self.pipItemStatusObservation?.invalidate()
-        self.pipItemStatusObservation = nil
+      DispatchQueue.main.async {
+        guard let self = self, self.pipSessionId == sessionId else { return }
+        switch item.status {
+        case .readyToPlay:
+          self.pipItemStatusObservation?.invalidate()
+          self.pipItemStatusObservation = nil
 
-        var hasTriggeredPlay = false
-        let beginPlayAndObserve = { [weak self] in
-          guard let self = self, !hasTriggeredPlay else { return }
-          hasTriggeredPlay = true
-          self.logPip("beginPlayAndObserve: start playing and observing")
-          self.pipPlayer?.playImmediately(atRate: speed)
+          var hasTriggeredPlay = false
+          let beginPlayAndObserve = { [weak self] in
+            guard let self = self, self.pipSessionId == sessionId, !hasTriggeredPlay else { return }
+            hasTriggeredPlay = true
+            self.logPip("beginPlayAndObserve: start playing and observing")
+            self.pipPlayer?.playImmediately(atRate: speed)
 
-          // 1. 监听 isReadyForDisplay：首帧画面渲染到屏幕
-          self.pipReadyForDisplayObservation = self.pipPlayerLayer?.observe(\.isReadyForDisplay, options: [.new, .initial]) { _, _ in
-            DispatchQueue.main.async {
-              attemptStartPip()
+            self.pipReadyForDisplayObservation = self.pipPlayerLayer?.observe(\.isReadyForDisplay, options: [.new, .initial]) { _, _ in
+              DispatchQueue.main.async {
+                attemptStartPip()
+              }
+            }
+
+            self.pipObservation = self.pipController?.observe(\.isPictureInPicturePossible, options: [.new, .initial]) { _, _ in
+              DispatchQueue.main.async {
+                attemptStartPip()
+              }
+            }
+
+            self.pipCheckTimer?.invalidate()
+            self.pipCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] timer in
+              guard let self = self, self.pipSessionId == sessionId else {
+                timer.invalidate()
+                return
+              }
+              if hasStartedPip || (self.pipController?.isPictureInPictureActive ?? false) {
+                timer.invalidate()
+              } else {
+                attemptStartPip()
+              }
             }
           }
 
-          // 2. 监听 isPictureInPicturePossible：系统通道就绪
-          self.pipObservation = self.pipController?.observe(\.isPictureInPicturePossible, options: [.new, .initial]) { _, _ in
-            DispatchQueue.main.async {
-              attemptStartPip()
-            }
-          }
-
-          // 3. 轻量轮询保底（每 200ms 检测一次）
-          self.pipCheckTimer?.invalidate()
-          self.pipCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] timer in
-            guard let self = self else {
-              timer.invalidate()
-              return
-            }
-            if hasStartedPip || (self.pipController?.isPictureInPictureActive ?? false) {
-              timer.invalidate()
-            } else {
-              attemptStartPip()
-            }
-          }
-        }
-
-        if positionMs > 0 {
-          let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
-          DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            beginPlayAndObserve()
-          }
-          let tolerance = CMTime(value: 500, timescale: 1000)
-          player.seek(to: seekTime, toleranceBefore: tolerance, toleranceAfter: tolerance) { _ in
-            DispatchQueue.main.async {
+          if positionMs > 0 {
+            let seekTime = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
               beginPlayAndObserve()
             }
-          }
-        } else {
-          DispatchQueue.main.async {
+            let tolerance = CMTime(value: 500, timescale: 1000)
+            player.seek(to: seekTime, toleranceBefore: tolerance, toleranceAfter: tolerance) { _ in
+              DispatchQueue.main.async {
+                beginPlayAndObserve()
+              }
+            }
+          } else {
             beginPlayAndObserve()
           }
+        case .failed:
+          self.pipItemStatusObservation?.invalidate()
+          self.pipItemStatusObservation = nil
+          let errorMsg = item.error?.localizedDescription ?? "视频加载异常"
+          self.logPip("AVPlayerItem failed: \(errorMsg)")
+          self.cleanUpPip()
+          self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: [
+            "active": false,
+            "error": "画中画视频加载失败: \(errorMsg)"
+          ])
+        case .unknown:
+          break
+        @unknown default:
+          break
         }
-      case .failed:
-        self.pipItemStatusObservation?.invalidate()
-        self.pipItemStatusObservation = nil
-        let errorMsg = item.error?.localizedDescription ?? "视频加载异常"
-        self.logPip("AVPlayerItem failed: \(errorMsg)")
-        self.cleanUpPip()
-        self.deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: [
-          "active": false,
-          "error": "画中画视频加载失败: \(errorMsg)"
-        ])
-      case .unknown:
-        break
-      @unknown default:
-        break
       }
     }
 
-    // 8 秒超时保护
     let timeoutItem = DispatchWorkItem { [weak self] in
-      guard let self = self else { return }
+      guard let self = self, self.pipSessionId == sessionId else { return }
       if !(self.pipController?.isPictureInPictureActive ?? false) {
         self.logPip("Start PiP timeout (8s)")
         self.cleanUpPip()
@@ -646,6 +730,7 @@ import CoreMedia
   }
 
   func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+    guard pictureInPictureController === self.pipController else { return }
     logPip("didStartPictureInPicture triggered successfully!")
     self.pipTimeoutWorkItem?.cancel()
     self.pipTimeoutWorkItem = nil
@@ -663,7 +748,11 @@ import CoreMedia
     _ pictureInPictureController: AVPictureInPictureController,
     restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
   ) {
-    let positionMs = Int((pipPlayer?.currentTime().seconds ?? 0) * 1000)
+    guard pictureInPictureController === self.pipController else {
+      completionHandler(false)
+      return
+    }
+    let positionMs = currentPipPositionMs()
     logPip("restoreUserInterfaceForPictureInPictureStopWithCompletionHandler: pos=\(positionMs)")
     var args: [String: Any] = [
       "position": positionMs,
@@ -675,13 +764,35 @@ import CoreMedia
     if let metadata = self.currentPipMetadata {
       args["detail"] = metadata
     }
-    deviceChannel?.invokeMethod("restorePictureInPictureUI", arguments: args, result: { _ in
-      completionHandler(true)
+    var completed = false
+    let completeOnce: (Bool) -> Void = { value in
+      if Thread.isMainThread {
+        guard !completed else { return }
+        completed = true
+        completionHandler(value)
+      } else {
+        DispatchQueue.main.async {
+          guard !completed else { return }
+          completed = true
+          completionHandler(value)
+        }
+      }
+    }
+    guard !THLAppLifecycleGuard.isEngineStopping(), let channel = deviceChannel else {
+      completeOnce(true)
+      return
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+      completeOnce(true)
+    }
+    channel.invokeMethod("restorePictureInPictureUI", arguments: args, result: { _ in
+      completeOnce(true)
     })
   }
 
   func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-    let positionMs = Int((pipPlayer?.currentTime().seconds ?? 0) * 1000)
+    guard pictureInPictureController === self.pipController else { return }
+    let positionMs = currentPipPositionMs()
     logPip("didStopPictureInPicture at pos=\(positionMs)")
     deviceChannel?.invokeMethod("pictureInPictureChanged", arguments: ["active": false, "position": positionMs])
     cleanUpPip()
@@ -693,6 +804,7 @@ import CoreMedia
     _ pictureInPictureController: AVPictureInPictureController,
     failedToStartPictureInPictureWithError error: Error
   ) {
+    guard pictureInPictureController === self.pipController else { return }
     let err = error as NSError
     logPip("failedToStartPictureInPictureWithError: domain=\(err.domain), code=\(err.code), desc=\(err.localizedDescription), userInfo=\(err.userInfo)")
     self.pipTimeoutWorkItem?.cancel()

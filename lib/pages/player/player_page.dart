@@ -2290,7 +2290,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     _closed = true;
     _syncNativePictureInPictureConfig(force: true);
-    unawaited(_player.pause().catchError((Object _) {}));
+    if (_player is LunaExoPlayer) {
+      _player.prepareForDispose();
+    }
     final enhancementClosed = _enhancement.close();
     LanController.current?.detachPlayback(_lanIdentity);
     widget.handoff?.fail('接收端已退出播放');
@@ -2322,6 +2324,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     final closing = _operations.catchError((Object _) {}).then((_) async {
       await _interactions.pendingRates.catchError((Object _) {});
       await enhancementClosed.catchError((Object _) {});
+      if (_player is! LunaExoPlayer) {
+        await _player.pause().catchError((Object _) {});
+      }
       await _player.dispose();
       if (!retainStream) await _encryptedPlayback.close();
     });

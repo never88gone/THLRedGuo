@@ -15,6 +15,7 @@
 		7C87A42D257BCD5D165F17BC /* HongguoApkProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96BACBB04435C0919C878806 /* HongguoApkProfile.swift */; };
 		814765F2AB9434E086902002 /* CENCStreamIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814765F2AB9434E086902001 /* CENCStreamIndex.swift */; };
 		814765F2AB9434E086902004 /* EncryptedMediaStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814765F2AB9434E086902003 /* EncryptedMediaStream.swift */; };
+		814765F2AB9434E086902007 /* SafePluginRegistry.m in Sources */ = {isa = PBXBuildFile; fileRef = 814765F2AB9434E086902006 /* SafePluginRegistry.m */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
@@ -62,6 +63,9 @@
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
 		814765F2AB9434E086902001 /* CENCStreamIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CENCStreamIndex.swift; sourceTree = "<group>"; };
 		814765F2AB9434E086902003 /* EncryptedMediaStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptedMediaStream.swift; sourceTree = "<group>"; };
+		814765F2AB9434E086902005 /* SafePluginRegistry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SafePluginRegistry.h; sourceTree = "<group>"; };
+		814765F2AB9434E086902006 /* SafePluginRegistry.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SafePluginRegistry.m; sourceTree = "<group>"; };
+		814765F2AB9434E086902008 /* RunnerTests-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RunnerTests-Bridging-Header.h"; sourceTree = "<group>"; };
 		96BACBB04435C0919C878806 /* HongguoApkProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HongguoApkProfile.swift; path = ../shared/apple/HongguoApkProfile.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
@@ -102,6 +106,7 @@
 			isa = PBXGroup;
 			children = (
 				331C807B294A618700263BE5 /* RunnerTests.swift */,
+				814765F2AB9434E086902008 /* RunnerTests-Bridging-Header.h */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -162,6 +167,8 @@
 				814765F2AB9434E086902001 /* CENCStreamIndex.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				814765F2AB9434E086902005 /* SafePluginRegistry.h */,
+				814765F2AB9434E086902006 /* SafePluginRegistry.m */,
 				38651745308B80FE001D48EC /* Runner.entitlements */,
 			);
 			path = Runner;
@@ -411,6 +418,7 @@
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 				7C87A42D257BCD5D165F17BC /* HongguoApkProfile.swift in Sources */,
 				AE5A724CAB5C292A4C10BD40 /* HongguoPlaybackProfileVault.swift in Sources */,
+				814765F2AB9434E086902007 /* SafePluginRegistry.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -536,6 +544,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OBJC_BRIDGING_HEADER = "RunnerTests/RunnerTests-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
@@ -555,6 +564,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = thlredlook_iOS_dis;
+				SWIFT_OBJC_BRIDGING_HEADER = "RunnerTests/RunnerTests-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
 			};
@@ -571,6 +581,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.never88gone.redlook.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "RunnerTests/RunnerTests-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
 			};

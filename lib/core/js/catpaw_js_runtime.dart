@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -10,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'hongguo_guest_session.dart';
 import '../account/hongguo_account_session.dart';
 import 'hongguo_playback_profile.dart';
+import 'safe_jscore_runtime.dart';
 
 import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
 
@@ -125,7 +127,8 @@ class CatPawJsRuntime {
   static void resetDeviceSessionForTesting([String? session]) =>
       HongguoGuestSession.shared.resetForTesting(session);
 
-  late final JavascriptRuntime _rt;
+  JavascriptRuntime? _runtime;
+  JavascriptRuntime get _rt => _runtime!;
   final http.Client _httpClient;
   final bool _isOwnedClient;
   final SourceDiagnostics diagnostics;
@@ -186,8 +189,13 @@ class CatPawJsRuntime {
     if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
     _localProfileUnavailable = false;
     _supportsSigningCache = false;
-    if (persistentDeviceSession) await guestSessions.preload();
-    _rt = getJavascriptRuntime(xhr: false);
+    if (persistentDeviceSession) {
+      await guestSessions.preload();
+      if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
+    }
+    _runtime = (Platform.isIOS || Platform.isMacOS)
+        ? SafeJavascriptCoreRuntime()
+        : getJavascriptRuntime(xhr: false);
     _injectGlobals();
     final result = _rt.evaluate(script);
     if (result.isError) {
@@ -200,10 +208,12 @@ class CatPawJsRuntime {
         'true';
     if (HongguoPlaybackProfile.supported && !builtInSigning) {
       final bundled = await rootBundle.loadString('assets/sources/hongguo.js');
+      if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
       if (sha256.convert(utf8.encode(script)) ==
           sha256.convert(utf8.encode(bundled))) {
         _supportsSigningCache = true;
         await _refreshSigningCache();
+        if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
       }
     }
     _officialSource =
@@ -218,6 +228,7 @@ class CatPawJsRuntime {
         final bundled = await rootBundle.loadString(
           'assets/sources/hongguo.js',
         );
+        if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
         _trustedAccountSource =
             sha256.convert(utf8.encode(script)) ==
             sha256.convert(utf8.encode(bundled));
@@ -225,6 +236,7 @@ class CatPawJsRuntime {
         _trustedAccountSource = false;
       }
     }
+    if (_isDisposed) throw StateError('CatPawJsRuntime 已被释放');
     _ready = true;
   }
 
@@ -339,7 +351,7 @@ try {
   }
 
   void cancelPending() {
-    if (_isDisposed || !_ready) return;
+    if (_isDisposed || !_ready || _runtime == null) return;
     _cancellation++;
     _cancelSignal.complete();
     _cancelSignal = Completer<void>();
@@ -356,7 +368,7 @@ globalThis.__fetchPendingQueue = [];
 
   void _cleanup() {
     try {
-      _rt.dispose();
+      _runtime?.dispose();
     } catch (_) {}
     if (_isOwnedClient) {
       _httpClient.close();
@@ -1041,7 +1053,7 @@ globalThis.__native_save_device = function(json) {
     dynamic rawResult;
 
     while (true) {
-      if (cancellation != _cancellation) {
+      if (_isDisposed || cancellation != _cancellation) {
         throw CatPawSourceFailure.playback('cancelled');
       }
       if (stopwatch.elapsed > timeout) {
@@ -1101,6 +1113,9 @@ globalThis.__native_save_device = function(json) {
       _syncSavedDevice();
       _rt.executePendingJob();
       await Future.delayed(const Duration(milliseconds: 10));
+      if (_isDisposed || cancellation != _cancellation) {
+        throw CatPawSourceFailure.playback('cancelled');
+      }
     }
 
     _syncSavedDevice();
