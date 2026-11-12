@@ -5,11 +5,14 @@ public struct AnchorDramaGridView: View {
     public let dramas: [Drama]
     public let onSelectDrama: (Drama) -> Void
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 28), count: 5)
-    @FocusState private var focusedCardId: String?
+    private let focus: FocusState<AnchorHeaderFocus?>.Binding
+    private let onUpCommand: () -> Void
 
-    public init(dramas: [Drama], onSelectDrama: @escaping (Drama) -> Void) {
+    public init(dramas: [Drama], focus: FocusState<AnchorHeaderFocus?>.Binding, onSelectDrama: @escaping (Drama) -> Void, onUpCommand: @escaping () -> Void) {
         self.dramas = dramas
         self.onSelectDrama = onSelectDrama
+        self.focus = focus
+        self.onUpCommand = onUpCommand
     }
 
     public var body: some View {
@@ -35,11 +38,12 @@ public struct AnchorDramaGridView: View {
                         ForEach(dramas) { drama in
                             DramaCardView(
                                 drama: drama,
-                                isFocused: focusedCardId == drama.id
+                                isFocused: focus.wrappedValue == .drama(drama.id),
+                                onUpCommand: dramas.prefix(columns.count).contains(where: { $0.id == drama.id }) ? onUpCommand : nil
                             ) {
                                 onSelectDrama(drama)
                             }
-                            .focused($focusedCardId, equals: drama.id)
+                            .focused(focus, equals: .drama(drama.id))
                             .accessibilityIdentifier("anchor.drama.\(drama.id)")
                         }
                     }

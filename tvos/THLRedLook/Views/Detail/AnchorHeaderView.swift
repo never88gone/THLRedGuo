@@ -6,18 +6,23 @@ public struct AnchorHeaderView: View {
     public let isFollowed: Bool
     public let followEnabled: Bool
     public let onToggleFollow: () -> Void
-    @FocusState private var focusedButton: AnchorHeaderFocus?
+    private let focus: FocusState<AnchorHeaderFocus?>.Binding
+    private let onDownCommand: () -> Void
 
     public init(
         anchor: Anchor,
         isFollowed: Bool,
         followEnabled: Bool = true,
-        onToggleFollow: @escaping () -> Void
+        focus: FocusState<AnchorHeaderFocus?>.Binding,
+        onToggleFollow: @escaping () -> Void,
+        onDownCommand: @escaping () -> Void
     ) {
         self.anchor = anchor
         self.isFollowed = isFollowed
         self.followEnabled = followEnabled
         self.onToggleFollow = onToggleFollow
+        self.focus = focus
+        self.onDownCommand = onDownCommand
     }
 
     public var body: some View {
@@ -54,20 +59,21 @@ public struct AnchorHeaderView: View {
                             RoundedRectangle(cornerRadius: 14)
                                 .fill(
                                     isFollowed
-                                        ? (focusedButton == .follow ? TVColors.surfaceFocused : TVColors.surfaceCard)
-                                        : (focusedButton == .follow ? TVColors.activeRedHighlight : TVColors.activeRed)
+                                        ? (focus.wrappedValue == .follow ? TVColors.surfaceFocused : TVColors.surfaceCard)
+                                        : (focus.wrappedValue == .follow ? TVColors.activeRedHighlight : TVColors.activeRed)
                                 )
                         )
                         .foregroundColor(TVColors.textPrimary)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.white.opacity(focusedButton == .follow ? 0.9 : 0.2), lineWidth: 2)
+                                .stroke(Color.white.opacity(focus.wrappedValue == .follow ? 0.9 : 0.2), lineWidth: 2)
                         )
                     }
                     .buttonStyle(TVZeroHighlightButtonStyle())
-                    .focused($focusedButton, equals: .follow)
+                    .focused(focus, equals: .follow)
                     .accessibilityIdentifier("anchor.follow")
                     .disabled(!followEnabled)
+                    .onMoveCommand { if $0 == .down { onDownCommand() } }
                 }
 
                 HStack(spacing: 28) {
@@ -86,7 +92,7 @@ public struct AnchorHeaderView: View {
         .padding(.horizontal, 60)
         .padding(.top, 40)
         .padding(.bottom, 20)
-        .defaultFocus($focusedButton, .follow)
+        .focusSection()
     }
 
     @ViewBuilder

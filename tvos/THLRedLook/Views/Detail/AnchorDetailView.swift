@@ -15,7 +15,9 @@ public struct AnchorDetailView: View {
     @State private var writing = false
     @State private var generation = 0
     @State private var detailDismissedAt = Date.distantPast
-    @FocusState private var actionFocus: String?
+    @FocusState private var actionFocus: AnchorHeaderFocus?
+    @State private var lastDramaID: String?
+    @State private var loadedRevision: UInt64?
 
     public init(anchor: Anchor, relatedDrama: Drama? = nil) {
         initialAnchor = anchor; self.relatedDrama = relatedDrama; profileRequest = nil; allowsWrites = true; onFollowingChanged = nil
@@ -23,6 +25,17 @@ public struct AnchorDetailView: View {
 
     init(anchor: Anchor, profileRequest: @escaping (String) async throws -> Anchor, allowsWrites: Bool, onFollowingChanged: (() -> Void)? = nil) {
         initialAnchor = anchor; relatedDrama = nil; self.profileRequest = profileRequest; self.allowsWrites = allowsWrites; self.onFollowingChanged = onFollowingChanged
+    }
+
+    private var followEnabled: Bool {
+        guard let anchor else { return false }
+        return allowsWrites && !loading && !writing && anchor.following != nil && (anchor.canFollow == true || anchor.following == true)
+    }
+
+    private var dramaFocus: AnchorHeaderFocus? {
+        let dramas = anchor?.dramas ?? []
+        if let id = lastDramaID, dramas.contains(where: { $0.id == id }) { return .drama(id) }
+        return dramas.first.map { .drama($0.id) }
     }
 
     public var body: some View {
@@ -33,24 +46,41 @@ public struct AnchorDetailView: View {
                     AnchorHeaderView(
                         anchor: anchor,
                         isFollowed: anchor.following == true,
-                        followEnabled: allowsWrites && !loading && !writing && anchor.following != nil && (anchor.canFollow == true || anchor.following == true),
-                        onToggleFollow: { Task { await toggleFollow(anchor) } }
+                        followEnabled: followEnabled,
+                        focus: $actionFocus,
+                        onToggleFollow: { Task { await toggleFollow(anchor) } },
+                        onDownCommand: { actionFocus = error == nil ? dramaFocus : .retry }
                     )
                 }
                 if loading || writing { ProgressView(writing ? "正在确认关注状态" : "正在获取主播资料").accessibilityIdentifier("anchor.loading") }
                 if let error {
                     Text(error).foregroundStyle(.orange).accessibilityIdentifier("anchor.error")
                     Button("重试") { Task { await load() } }.disabled(loading || writing)
-                        .focused($actionFocus, equals: "retry").accessibilityIdentifier("anchor.retry")
+                        .focused($actionFocus, equals: .retry).accessibilityIdentifier("anchor.retry")
+                        .onMoveCommand { direction in
+                            if direction == .up && followEnabled { actionFocus = .follow }
+                            if direction == .down { actionFocus = dramaFocus }
+                        }
                 }
                 if let anchor {
-                    AnchorDramaGridView(dramas: anchor.dramas, onSelectDrama: { selectedDrama = $0 })
+                    AnchorDramaGridView(dramas: anchor.dramas, focus: $actionFocus, onSelectDrama: {
+                        lastDramaID = $0.id; selectedDrama = $0
+                    }, onUpCommand: {
+                        if error != nil { actionFocus = .retry }
+                        else if followEnabled { actionFocus = .follow }
+                    })
                 }
                 Spacer(minLength: 0)
             }
         }
-        .fullScreenCover(item: $selectedDrama, onDismiss: { detailDismissedAt = Date() }) { DramaDetailView(drama: $0) }
-        .task(id: HongguoAccountVault.shared.snapshot.revision) { anchor = nil; await load() }
+        .defaultFocus($actionFocus, followEnabled ? .follow : dramaFocus)
+        .fullScreenCover(item: $selectedDrama, onDismiss: {
+            detailDismissedAt = Date()
+            DispatchQueue.main.async { actionFocus = dramaFocus }
+        }) { DramaDetailView(drama: $0) }
+        .task(id: HongguoAccountVault.shared.snapshot.revision) {
+            if loadedRevision != HongguoAccountVault.shared.snapshot.revision { anchor = nil; await load() }
+        }
         .onDisappear { generation += 1 }
         .onExitCommand {
             guard selectedDrama == nil, Date().timeIntervalSince(detailDismissedAt) > 0.5 else { return }
@@ -69,10 +99,11 @@ public struct AnchorDetailView: View {
             else { result = try await AnchorService.shared.fetchAnchorDetail(anchorId: initialAnchor.id, dramas: dramas) }
             guard ticket == generation, revision == HongguoAccountVault.shared.snapshot.revision else { return }
             anchor = result
+            loadedRevision = revision
         } catch {
             guard ticket == generation, revision == HongguoAccountVault.shared.snapshot.revision else { return }
             self.error = error.localizedDescription
-            actionFocus = "retry"
+            actionFocus = .retry
         }
         if ticket == generation { loading = false }
     }

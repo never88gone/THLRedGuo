@@ -15,7 +15,12 @@ final class RemoteNavigationTests: XCTestCase {
         app.launch()
         defer { app.terminate(); app.launchEnvironment.removeValue(forKey: "THL_ACCOUNT_COLLECTION_FIXTURE") }
         XCTAssertTrue(app.buttons["library.tab.anchors"].waitForExistence(timeout: 40))
-        if app.buttons["nav.library"].hasFocus { press(.right) }
+        if app.buttons["nav.library"].exists && app.buttons["nav.library"].hasFocus { press(.right) }
+        if app.buttons["library.tab.history"].hasFocus {
+            press(.down, focus: "library.tab.follows")
+            press(.down, focus: "library.tab.liked")
+            press(.down, focus: "library.tab.anchors")
+        }
         wait("anchors sidebar focused") { self.app.buttons["library.tab.anchors"].hasFocus }
         press(.right, focus: "library.anchor.100")
         press(.down)
@@ -43,8 +48,15 @@ final class RemoteNavigationTests: XCTestCase {
         press(.right, focus: "library.card.episode:200")
         press(.down)
         wait("liked second page") { self.app.buttons["library.card.episode:212"].exists }
+        press(.down, focus: "library.card.episode:210")
+        press(.right, focus: "library.card.episode:211")
+        press(.right, focus: "library.card.episode:212")
+        press(.select)
+        XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 45))
+        press(.menu)
+        wait("liked second page return focus and rows retained") { self.app.buttons["library.card.episode:212"].hasFocus }
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "collection-pages-fixture"; attachment.lifetime = .keepAlways; add(attachment)
-        print("THL_COLLECTION_TV fixture=true followsPagination=true likesPagination=true pageRetry=true anchorReturnFocus=true imagesDisabled=true")
+        print("THL_COLLECTION_TV fixture=true followsPagination=true likesPagination=true pageRetry=true anchorReturnFocus=true likedSecondPageReturnFocus=true imagesDisabled=true")
     }
 
     func testOwnerCollectionPagesReadOnly() throws {
@@ -55,7 +67,7 @@ final class RemoteNavigationTests: XCTestCase {
         app.launch()
         defer { app.terminate() }
         XCTAssertTrue(app.buttons["hongguo-account-menu"].waitForExistence(timeout: 40))
-        if app.buttons["nav.library"].hasFocus { press(.right) }
+        if app.buttons["nav.library"].exists && app.buttons["nav.library"].hasFocus { press(.right) }
         wait("owner library focused") { self.app.buttons["library.tab.history"].hasFocus }
         press(.down, focus: "library.tab.follows")
         press(.down, focus: "library.tab.liked")
@@ -81,22 +93,34 @@ final class RemoteNavigationTests: XCTestCase {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
         continueAfterFailure = false
         app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
-        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7638987534483082265", "-testDramaTitle", "主播详情验证", "anchor"]
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7638987534483082265", "-testDramaTitle", "主播详情验证"]
         app.launch()
         defer { app.terminate() }
+        XCTAssertTrue(app.buttons["detail.anchor"].waitForExistence(timeout: 50))
+        yaoDetailPlayFocus()
+        press(.right, focus: "detail.favorite")
+        press(.right, focus: "account.social.open")
+        press(.right, focus: "detail.anchor")
+        press(.select)
         XCTAssertTrue(app.buttons["anchor.follow"].waitForExistence(timeout: 50))
         XCTAssertFalse(app.staticTexts["anchor.error"].exists)
-        wait("anchor follow focused") { self.app.buttons["anchor.follow"].hasFocus }
-        press(.down)
         let drama = app.buttons["anchor.drama.hongguo:7638987534483082265"]
-        wait("associated drama focused") { drama.hasFocus }
+        wait("profile initial focus") { self.app.buttons["anchor.follow"].hasFocus || drama.hasFocus }
+        let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "owner-creator-profile"; attachment.lifetime = .keepAlways; add(attachment)
+        let followEnabled = app.buttons["anchor.follow"].isEnabled
+        print("THL_CREATOR followEnabled=\(followEnabled)")
+        if followEnabled {
+            if app.buttons["anchor.follow"].hasFocus { press(.down, focus: drama.identifier) }
+            press(.up, focus: "anchor.follow")
+            press(.down, focus: drama.identifier)
+        } else { XCTAssertTrue(drama.hasFocus) }
         press(.select)
         XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 45))
         press(.menu)
-        XCTAssertTrue(app.buttons["anchor.follow"].waitForExistence(timeout: 15))
+        wait("associated drama return focus") { drama.exists && drama.hasFocus }
         press(.menu)
-        XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 15))
-        print("THL_CREATOR_TV owner=true profile=true associatedDrama=true nestedReturn=true writes=0")
+        wait("creator origin return focus") { self.app.buttons["detail.anchor"].exists && self.app.buttons["detail.anchor"].hasFocus }
+        print("THL_CREATOR_TV owner=true profile=true associatedDrama=true nestedReturnFocus=true writes=0")
     }
 
     func testOwnerCreatorOutcomeAndRemoteReturn() throws {
