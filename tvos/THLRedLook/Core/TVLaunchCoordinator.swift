@@ -132,10 +132,8 @@ final class TVLaunchCoordinator {
             }
         case "library":
             selectedTab.wrappedValue = .library
-            columnVisibility.wrappedValue = .all
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedNavTab.wrappedValue = .library
-            }
+            columnVisibility.wrappedValue = .detailOnly
+            focusedNavTab.wrappedValue = nil
             Task {
                 await JSSourceService.shared.initialize()
                 let sourceId = JSSourceService.shared.activeSourceId.isEmpty ? store.currentSourceId : JSSourceService.shared.activeSourceId

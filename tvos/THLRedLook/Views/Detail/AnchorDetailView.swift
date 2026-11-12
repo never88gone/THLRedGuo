@@ -30,11 +30,12 @@ public struct AnchorDetailView: View {
             TVColors.backgroundGradient.ignoresSafeArea()
             VStack(spacing: 24) {
                 if let anchor {
-                    AnchorHeaderView(anchor: anchor, isFollowed: anchor.following == true,
+                    AnchorHeaderView(
+                        anchor: anchor,
+                        isFollowed: anchor.following == true,
                         followEnabled: allowsWrites && !loading && !writing && anchor.following != nil && (anchor.canFollow == true || anchor.following == true),
-                        onToggleFollow: { Task { await toggleFollow(anchor) } }, onBack: { dismiss() })
-                } else {
-                    Button("返回") { dismiss() }.focused($actionFocus, equals: "back").accessibilityIdentifier("anchor.back")
+                        onToggleFollow: { Task { await toggleFollow(anchor) } }
+                    )
                 }
                 if loading || writing { ProgressView(writing ? "正在确认关注状态" : "正在获取主播资料").accessibilityIdentifier("anchor.loading") }
                 if let error {
@@ -78,15 +79,30 @@ public struct AnchorDetailView: View {
 
     private func toggleFollow(_ current: Anchor) async {
         guard !writing, let following = current.following else { return }
-        let revision = HongguoAccountVault.shared.snapshot.revision
         writing = true; error = nil
-        do {
-            try await account.setProfileFollowing(current, follow: !following)
-            guard revision == HongguoAccountVault.shared.snapshot.revision else { return }
-            onFollowingChanged?()
-            await load()
-        } catch {
-            if revision == HongguoAccountVault.shared.snapshot.revision { self.error = error.localizedDescription }
+        let next = !following
+        let updated = Anchor(
+            id: current.id,
+            name: current.name,
+            avatar: current.avatar,
+            intro: current.intro,
+            followerCount: current.followerCount.map { max(0, $0 + (next ? 1 : -1)) } ?? (next ? 1 : 0),
+            worksCount: current.worksCount,
+            dramas: current.dramas,
+            following: next,
+            canFollow: true,
+            relativeType: current.relativeType
+        )
+        self.anchor = updated
+        _ = await AnchorFollowStore.shared.toggleFollow(anchor: updated)
+        onFollowingChanged?()
+
+        if account.loggedIn {
+            do {
+                try await account.setProfileFollowing(current, follow: next)
+            } catch {
+                NSLog("🎬 [AnchorDetailView] 官方创作者关注协同: %@", error.localizedDescription)
+            }
         }
         writing = false
     }

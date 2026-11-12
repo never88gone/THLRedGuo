@@ -103,7 +103,7 @@ public struct TVPlayerControlsOverlay: View {
                         }
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
+                            case .up: moveUpFromMiddleControls()
                             case .down: focusedControl = .speed
                             case .left: focusedControl = .pip
                             case .right: focusedControl = .playPause
@@ -124,7 +124,7 @@ public struct TVPlayerControlsOverlay: View {
                         .accessibilityLabel(viewModel.wantsPlayback ? "暂停" : "播放")
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
+                            case .up: moveUpFromMiddleControls()
                             case .down: focusedControl = .speed
                             case .left: focusedControl = .seekBackward
                             case .right: focusedControl = .seekForward
@@ -142,7 +142,7 @@ public struct TVPlayerControlsOverlay: View {
                         }
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
+                            case .up: moveUpFromMiddleControls()
                             case .down:
                                 if let plan = viewModel.plan, !plan.qualities.isEmpty {
                                     focusedControl = .quality
@@ -172,7 +172,7 @@ public struct TVPlayerControlsOverlay: View {
                         .opacity(viewModel.currentEpisodeIndex <= 1 ? 0.5 : 1.0)
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
+                            case .up: moveUpFromMiddleControls()
                             case .down:
                                 if let plan = viewModel.plan, !plan.qualities.isEmpty {
                                     focusedControl = .quality
@@ -197,7 +197,7 @@ public struct TVPlayerControlsOverlay: View {
                         }
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
+                            case .up: moveUpFromMiddleControls()
                             case .down: focusedControl = .danmaku
                             case .left:
                                 if viewModel.currentEpisodeIndex > 1 {
@@ -227,7 +227,7 @@ public struct TVPlayerControlsOverlay: View {
                         .opacity(viewModel.currentEpisodeIndex >= viewModel.allEpisodes.count ? 0.5 : 1.0)
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
+                            case .up: moveUpFromMiddleControls()
                             case .down: focusedControl = .danmakuSettings
                             case .left: focusedControl = .episodeDrawer
                             case .right: focusedControl = .pip
@@ -245,7 +245,7 @@ public struct TVPlayerControlsOverlay: View {
                         }
                         .onMoveCommand { dir in
                             switch dir {
-                            case .up: if feedActions != nil { focusedControl = .nextDrama } else if onSocial != nil { focusedControl = .social }
+                            case .up: moveUpFromMiddleControls()
                             case .down: focusedControl = .danmakuSettings
                             case .left:
                                 if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
@@ -473,5 +473,15 @@ public struct TVPlayerControlsOverlay: View {
         let m = total / 60
         let s = total % 60
         return String(format: "%02d:%02d", m, s)
+    }
+
+    private func moveUpFromMiddleControls() {
+        if feedActions != nil {
+            focusedControl = .nextDrama
+        } else if HongguoAccountModel.shared.loggedIn {
+            focusedControl = .like
+        } else if onSocial != nil {
+            focusedControl = .social
+        }
     }
 }

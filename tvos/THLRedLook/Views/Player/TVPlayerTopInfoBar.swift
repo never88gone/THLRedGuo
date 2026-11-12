@@ -156,6 +156,7 @@ public struct TVPlayerTopInfoBar: View {
             .tvFocusBorder(isFocused: isFocused, cornerRadius: 14)
         }
         .buttonStyle(TVZeroHighlightButtonStyle())
+        .focused($focusedControl, equals: target)
         .accessibilityIdentifier("player.\(target)")
         .focusEffectDisabled()
     }

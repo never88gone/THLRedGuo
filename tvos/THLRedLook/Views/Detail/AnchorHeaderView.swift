@@ -6,44 +6,22 @@ public struct AnchorHeaderView: View {
     public let isFollowed: Bool
     public let followEnabled: Bool
     public let onToggleFollow: () -> Void
-    public let onBack: () -> Void
     @FocusState private var focusedButton: AnchorHeaderFocus?
 
     public init(
         anchor: Anchor,
         isFollowed: Bool,
         followEnabled: Bool = true,
-        onToggleFollow: @escaping () -> Void,
-        onBack: @escaping () -> Void
+        onToggleFollow: @escaping () -> Void
     ) {
         self.anchor = anchor
         self.isFollowed = isFollowed
         self.followEnabled = followEnabled
         self.onToggleFollow = onToggleFollow
-        self.onBack = onBack
     }
 
     public var body: some View {
         HStack(alignment: .top, spacing: 40) {
-            // 返回按钮
-            Button(action: onBack) {
-                Image(systemName: "arrow.left")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(focusedButton == .back ? .white : TVColors.textPrimary)
-                    .frame(width: 56, height: 56)
-                    .background(
-                        Circle()
-                            .fill(focusedButton == .back ? TVColors.activeRed : TVColors.surfaceCard)
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(Color.white.opacity(focusedButton == .back ? 0.9 : 0.15), lineWidth: 2)
-                    )
-            }
-            .buttonStyle(TVZeroHighlightButtonStyle())
-            .focused($focusedButton, equals: .back)
-            .accessibilityIdentifier("anchor.back")
-
             // 主播头像
             avatarView
                 .frame(width: 140, height: 140)
@@ -108,7 +86,7 @@ public struct AnchorHeaderView: View {
         .padding(.horizontal, 60)
         .padding(.top, 40)
         .padding(.bottom, 20)
-        .defaultFocus($focusedButton, .back)
+        .defaultFocus($focusedButton, .follow)
     }
 
     @ViewBuilder

@@ -84,17 +84,16 @@ final class RemoteNavigationTests: XCTestCase {
         app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7638987534483082265", "-testDramaTitle", "主播详情验证", "anchor"]
         app.launch()
         defer { app.terminate() }
-        XCTAssertTrue(app.buttons["anchor.back"].waitForExistence(timeout: 50))
-        XCTAssertTrue(app.buttons["anchor.follow"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["anchor.follow"].waitForExistence(timeout: 50))
         XCTAssertFalse(app.staticTexts["anchor.error"].exists)
-        wait("anchor back focused") { self.app.buttons["anchor.back"].hasFocus }
+        wait("anchor follow focused") { self.app.buttons["anchor.follow"].hasFocus }
         press(.down)
         let drama = app.buttons["anchor.drama.hongguo:7638987534483082265"]
         wait("associated drama focused") { drama.hasFocus }
         press(.select)
         XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 45))
         press(.menu)
-        XCTAssertTrue(app.buttons["anchor.back"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["anchor.follow"].waitForExistence(timeout: 15))
         press(.menu)
         XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 15))
         print("THL_CREATOR_TV owner=true profile=true associatedDrama=true nestedReturn=true writes=0")

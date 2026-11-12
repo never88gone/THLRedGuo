@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BF25C45B79344D87A24EB65F /* AnchorAndLikeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C388610AE1A84ACAB31D72BB /* AnchorAndLikeUITests.swift */; };
 		55F90BCBA7AE4B06BC28DD40 /* UserLikeAndAnchorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 943373322BA8443497D7F0C0 /* UserLikeAndAnchorTests.swift */; };
 		97B3ACA0C5BF46CF974732DA /* AnchorHeaderFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41316F24FACF4B569C568A61 /* AnchorHeaderFocus.swift */; };
 		B90A5E68380147CABD81AC11 /* LibraryFocusTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59D63C6082D24104ACD55492 /* LibraryFocusTarget.swift */; };
@@ -281,6 +282,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		C388610AE1A84ACAB31D72BB /* AnchorAndLikeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorAndLikeUITests.swift; sourceTree = "<group>"; };
 		943373322BA8443497D7F0C0 /* UserLikeAndAnchorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserLikeAndAnchorTests.swift; sourceTree = "<group>"; };
 		41316F24FACF4B569C568A61 /* AnchorHeaderFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorHeaderFocus.swift; sourceTree = "<group>"; };
 		59D63C6082D24104ACD55492 /* LibraryFocusTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFocusTarget.swift; sourceTree = "<group>"; };
@@ -578,6 +580,7 @@
 		05D057238BF0376567EE6F32 /* THLRedLookUITests */ = {
 			isa = PBXGroup;
 			children = (
+				C388610AE1A84ACAB31D72BB /* AnchorAndLikeUITests.swift */,
 				FBED0FD0E5E9DBFB8CA8586C /* RemoteNavigationTests.swift */,
 			);
 			path = THLRedLookUITests;
@@ -1251,6 +1254,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BF25C45B79344D87A24EB65F /* AnchorAndLikeUITests.swift in Sources */,
 				DFB5B536F10F369514C3C5B4 /* RemoteNavigationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
