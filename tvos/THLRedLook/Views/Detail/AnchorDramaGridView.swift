@@ -14,7 +14,7 @@ public struct AnchorDramaGridView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("参演短剧作品")
+            Text("关联短剧")
                 .font(.system(size: 28, weight: .bold))
                 .foregroundColor(TVColors.textPrimary)
                 .padding(.horizontal, 60)
@@ -24,7 +24,7 @@ public struct AnchorDramaGridView: View {
                     Image(systemName: "film")
                         .font(.system(size: 48))
                         .foregroundColor(TVColors.textMuted)
-                    Text("暂无相关短剧作品")
+                    Text("暂无可展示的关联短剧")
                         .font(.system(size: 22))
                         .foregroundColor(TVColors.textSecondary)
                 }

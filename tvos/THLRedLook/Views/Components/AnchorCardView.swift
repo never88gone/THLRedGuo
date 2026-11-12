@@ -39,7 +39,7 @@ public struct AnchorCardView: View {
                 .lineLimit(1)
 
             // 粉丝数量
-            Text("粉丝: \(anchor.displayFollowerCount)")
+            Text(anchor.intro.isEmpty ? "主播详情" : anchor.intro)
                 .font(.system(size: 16))
                 .foregroundColor(TVColors.textMuted)
                 .lineLimit(1)
@@ -58,7 +58,7 @@ public struct AnchorCardView: View {
 
     @ViewBuilder
     private var avatarView: some View {
-        if !anchor.avatar.isEmpty, let url = URL(string: anchor.avatar) {
+        if ProcessInfo.processInfo.environment["DISABLE_REMOTE_IMAGES"] != "1", !anchor.avatar.isEmpty, let url = URL(string: anchor.avatar) {
             AsyncImage(url: url) { image in
                 image.resizable().scaledToFill()
             } placeholder: {

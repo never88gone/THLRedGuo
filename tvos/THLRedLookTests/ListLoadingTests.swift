@@ -49,6 +49,61 @@ final class ListLoadingTests: XCTestCase {
         return LocalStore(defaults: defaults)
     }
 
+    func testAccountCollectionsKeepCursorRowsAndRetryRefresh() async {
+        let model = LibraryViewModel(store: store())
+        model.isAccountAvailable = { true }
+        var requests: [Int] = [], failPage = true, failRefresh = false
+        model.followingRequest = { offset, _ in
+            requests.append(offset)
+            if (offset > 0 && failPage) || (offset == 0 && failRefresh) {
+                failPage = false; failRefresh = false; throw HongguoAccountError.network
+            }
+            return HongguoCollectionPage(items: offset == 0 ? [Anchor(id: "1", name: "甲"), Anchor(id: "2", name: "乙")] : [Anchor(id: "2", name: "乙"), Anchor(id: "3", name: "丙")], hasMore: offset == 0, nextOffset: offset == 0 ? 37 : 40)
+        }
+        await model.loadAccount(.anchors)
+        await model.loadAccount(.anchors, more: true)
+        XCTAssertEqual(model.officialAnchors.map(\.id), ["1", "2"])
+        XCTAssertNotNil(model.accountErrors[.anchors])
+        await model.loadAccount(.anchors, more: true)
+        XCTAssertEqual(model.officialAnchors.map(\.id), ["1", "2", "3"])
+        XCTAssertEqual(requests, [0, 37, 37])
+        failRefresh = true
+        await model.loadAccount(.anchors, refresh: true)
+        XCTAssertEqual(model.officialAnchors.count, 3)
+        await model.loadAccount(.anchors)
+        XCTAssertEqual(requests.suffix(2), [0, 0])
+        XCTAssertEqual(model.officialAnchors.count, 2)
+    }
+
+    func testAccountCollectionRejectsStaleOwnerAndStalledCursor() async {
+        let model = LibraryViewModel(store: store())
+        model.isAccountAvailable = { true }
+        var owner: UInt64 = 1
+        model.ownerRevision = { owner }
+        var pending: CheckedContinuation<HongguoCollectionPage<HongguoLikedVideo>, Error>?
+        model.likesRequest = { _ in try await withCheckedThrowingContinuation { pending = $0 } }
+        let task = Task { await model.loadAccount(.liked) }
+        await eventually { pending != nil }
+        owner += 1; model.syncAccountOwner()
+        pending?.resume(returning: HongguoCollectionPage(items: [HongguoLikedVideo(row: ["id":"1", "kind":"episode", "seriesId":"123", "title":"旧数据"])!], hasMore: false, nextOffset: nil))
+        await task.value
+        XCTAssertTrue(model.officialLikes.isEmpty)
+        model.likesRequest = { _ in HongguoCollectionPage(items: [], hasMore: true, nextOffset: 0) }
+        await model.loadAccount(.liked)
+        XCTAssertNotNil(model.accountErrors[.liked])
+    }
+
+    func testOfficialAnchorMigrationAndEpisodeListIdentity() throws {
+        let old = Data("{\"id\":\"1\",\"name\":\"主播\",\"avatar\":\"\",\"intro\":\"\",\"followerCount\":10,\"worksCount\":1,\"dramas\":[]}".utf8)
+        let anchor = try JSONDecoder().decode(Anchor.self, from: old)
+        XCTAssertNil(anchor.following)
+        let official = try XCTUnwrap(Anchor(official: ["id":"1", "name":"主播"]))
+        XCTAssertNil(official.followerCount); XCTAssertNil(official.worksCount)
+        let first = try XCTUnwrap(HongguoLikedVideo(row: ["id":"1", "kind":"episode", "seriesId":"123", "title":"剧"]))
+        let second = try XCTUnwrap(HongguoLikedVideo(row: ["id":"2", "kind":"episode", "seriesId":"123", "title":"剧"]))
+        XCTAssertNotEqual(first.id, second.id); XCTAssertEqual(first.drama?.id, second.drama?.id)
+    }
+
     func testFirstBatchDisplaysWhileCategoryMetadataIsPending() async {
         let provider = ListLoadingProvider()
         provider.holdCategories = true

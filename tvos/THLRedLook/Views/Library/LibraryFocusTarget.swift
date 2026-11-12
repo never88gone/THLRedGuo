@@ -6,6 +6,7 @@ public enum LibraryFocusTarget: Hashable {
     case clearHistory
     case account
     case refresh
+    case loadMore
     case card(String)
     case anchorCard(String)
     case emptyAction

@@ -4,6 +4,7 @@ import SwiftUI
 public struct AnchorHeaderView: View {
     public let anchor: Anchor
     public let isFollowed: Bool
+    public let followEnabled: Bool
     public let onToggleFollow: () -> Void
     public let onBack: () -> Void
     @FocusState private var focusedButton: AnchorHeaderFocus?
@@ -11,11 +12,13 @@ public struct AnchorHeaderView: View {
     public init(
         anchor: Anchor,
         isFollowed: Bool,
+        followEnabled: Bool = true,
         onToggleFollow: @escaping () -> Void,
         onBack: @escaping () -> Void
     ) {
         self.anchor = anchor
         self.isFollowed = isFollowed
+        self.followEnabled = followEnabled
         self.onToggleFollow = onToggleFollow
         self.onBack = onBack
     }
@@ -86,19 +89,15 @@ public struct AnchorHeaderView: View {
                     .buttonStyle(TVZeroHighlightButtonStyle())
                     .focused($focusedButton, equals: .follow)
                     .accessibilityIdentifier("anchor.follow")
+                    .disabled(!followEnabled)
                 }
 
                 HStack(spacing: 28) {
-                    Text("粉丝: \(anchor.displayFollowerCount)")
-                        .font(.system(size: 20))
-                        .foregroundColor(TVColors.textSecondary)
+                    if anchor.followerCount != nil { Text("粉丝: \(anchor.displayFollowerCount)") }
+                    if let count = anchor.worksCount { Text("作品: \(count)") }
+                }.font(.system(size: 20)).foregroundColor(TVColors.textSecondary)
 
-                    Text("短剧作品: \(anchor.worksCount) 部")
-                        .font(.system(size: 20))
-                        .foregroundColor(TVColors.textSecondary)
-                }
-
-                Text(anchor.intro)
+                Text(anchor.intro.isEmpty ? "暂无简介" : anchor.intro)
                     .font(.system(size: 20))
                     .foregroundColor(TVColors.textMuted)
                     .lineLimit(2)
@@ -109,11 +108,12 @@ public struct AnchorHeaderView: View {
         .padding(.horizontal, 60)
         .padding(.top, 40)
         .padding(.bottom, 20)
+        .defaultFocus($focusedButton, .back)
     }
 
     @ViewBuilder
     private var avatarView: some View {
-        if !anchor.avatar.isEmpty, let url = URL(string: anchor.avatar) {
+        if ProcessInfo.processInfo.environment["DISABLE_REMOTE_IMAGES"] != "1", !anchor.avatar.isEmpty, let url = URL(string: anchor.avatar) {
             AsyncImage(url: url) { image in
                 image.resizable().scaledToFill()
             } placeholder: {

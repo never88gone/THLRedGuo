@@ -1,3 +1,4 @@
+import 'hongguo_collection_models.dart';
 import 'hongguo_social_models.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -776,10 +777,7 @@ class HongguoAccountService {
       final detail = _resolveDetailForRow(details, row);
       final title = _pickNonEmptyText([detail?['title'], row['title']]);
       final cover = _pickNonEmptyText([detail?['cover'], row['cover']]);
-      final episodes = _pickPositiveInt([
-        detail?['episodes'],
-        row['episodes'],
-      ]);
+      final episodes = _pickPositiveInt([detail?['episodes'], row['episodes']]);
       if (title.isEmpty || cover.isEmpty || episodes <= 0) {
         missingIndices.add(i);
       }
@@ -962,6 +960,116 @@ class HongguoAccountService {
       null,
       session.revision,
     );
+  }
+
+  (int, String)? _collectionIdentity;
+
+  Future<Anchor> creatorProfile(String userId) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    final result = await _call(
+      'creatorProfile',
+      {'userId': userId},
+      null,
+      revision,
+    );
+    _check(revision);
+    final row = Map<String, dynamic>.from(result['creator'] as Map);
+    if (row['id'] != userId && row['businessId'] != userId) {
+      throw const HongguoAccountFailure('主播资料编号不匹配', 'INVALID_RESPONSE');
+    }
+    return Anchor.fromOfficial(row);
+  }
+
+  Future<HongguoCollectionPage<Anchor>> followingCreators({
+    int offset = 0,
+    int count = 20,
+    int douyinOffset = 0,
+  }) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    var identity = _collectionIdentity;
+    if (identity == null || identity.$1 != revision) {
+      final self = await creatorProfile(session.id);
+      _check(revision);
+      identity = (revision, self.id);
+      _collectionIdentity = identity;
+    }
+    final result = await _call(
+      'followingCreators',
+      {
+        'userId': identity.$2,
+        'offset': offset,
+        'count': count,
+        'followingDouyinOffset': douyinOffset,
+      },
+      null,
+      revision,
+    );
+    _check(revision);
+    return HongguoCollectionPage(
+      (result['creators'] as List)
+          .map((r) => Anchor.fromOfficial(Map<String, dynamic>.from(r as Map)))
+          .toList(),
+      hasMore: result['hasMore'] == true,
+      nextOffset: (result['nextOffset'] as num?)?.toInt(),
+      followingDouyinOffset:
+          (result['followingDouyinNextOffset'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Future<HongguoCollectionPage<HongguoLikedVideo>> likedVideos({
+    int offset = 0,
+    int count = 20,
+  }) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    final result = await _call(
+      'likedVideos',
+      {'offset': offset, 'count': count},
+      null,
+      revision,
+    );
+    _check(revision);
+    return HongguoCollectionPage(
+      (result['items'] as List)
+          .map(
+            (r) =>
+                HongguoLikedVideo.fromJson(Map<String, dynamic>.from(r as Map)),
+          )
+          .toList(),
+      hasMore: result['hasMore'] == true,
+      nextOffset: (result['nextOffset'] as num?)?.toInt(),
+      unsupportedCount: (result['unsupportedCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Future<Anchor> setProfileFollowing(Anchor anchor, bool follow) async {
+    final revision = session.revision;
+    final current = await creatorProfile(anchor.id);
+    _check(revision);
+    if (current.officialFollowing == null || follow && !current.canFollow) {
+      throw const HongguoAccountFailure('当前主播暂不可关注');
+    }
+    await _call(
+      'creatorFollow',
+      {
+        'userId': current.id,
+        'relativeType': current.relativeType,
+        'follow': follow ? '1' : '0',
+      },
+      null,
+      revision,
+    );
+    final confirmed = await creatorProfile(current.id);
+    _check(revision);
+    if (confirmed.officialFollowing != follow) {
+      throw const HongguoAccountFailure(
+        '官方关注状态尚未确认，请刷新后重试',
+        'WRITE_NOT_CONFIRMED',
+      );
+    }
+    return confirmed;
   }
 
   Future<List<HongguoCreator>> creators(Drama drama) async {

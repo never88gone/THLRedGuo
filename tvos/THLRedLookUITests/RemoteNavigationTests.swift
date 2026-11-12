@@ -4,6 +4,102 @@ final class RemoteNavigationTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.never88gone.redlook")
     private let remote = XCUIRemote.shared
 
+    func testAccountCollectionPagesFixture() throws {
+        continueAfterFailure = false
+        let creators: [[String: Any]] = (0..<13).map { ["id": String(100 + $0), "name": "合成主播 \($0)", "description": "官方合成简介", "following": true, "canFollow": true, "worksCount": 2] }
+        let items: [[String: Any]] = (0..<13).map { ["id": String(200 + $0), "kind": "episode", "title": "合成点赞 \($0)", "seriesId": "7638987534483082265", "episode": $0 + 1] }
+        let fixture: [String: Any] = ["creators": creators, "items": items, "pageSize": 10, "failNextPageOnce": true]
+        app.launchEnvironment["THL_ACCOUNT_COLLECTION_FIXTURE"] = String(data: try JSONSerialization.data(withJSONObject: fixture), encoding: .utf8)
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "library", "-noLibraryFixtures"]
+        app.launch()
+        defer { app.terminate(); app.launchEnvironment.removeValue(forKey: "THL_ACCOUNT_COLLECTION_FIXTURE") }
+        XCTAssertTrue(app.buttons["library.tab.anchors"].waitForExistence(timeout: 40))
+        if app.buttons["nav.library"].hasFocus { press(.right) }
+        wait("anchors sidebar focused") { self.app.buttons["library.tab.anchors"].hasFocus }
+        press(.right, focus: "library.anchor.100")
+        press(.down)
+        wait("page failure visible") { self.app.buttons["library.more.retry"].exists }
+        for _ in 0..<5 { if app.buttons["library.more.retry"].hasFocus { break }; press(.down) }
+        XCTAssertTrue(app.buttons["library.more.retry"].hasFocus)
+        press(.select)
+        XCTAssertTrue(app.buttons["library.anchor.112"].waitForExistence(timeout: 15))
+        wait("next page first anchor focused") { self.app.buttons["library.anchor.110"].hasFocus }
+        press(.select)
+        XCTAssertTrue(app.buttons["anchor.follow"].waitForExistence(timeout: 15))
+        press(.menu)
+        wait("second page return focus and rows retained") { self.app.buttons["library.anchor.110"].hasFocus && self.app.buttons["library.anchor.112"].exists }
+        for _ in 0..<4 { if app.buttons["library.tab.anchors"].hasFocus { break }; press(.left) }
+        wait("anchor sidebar return") { self.app.buttons["library.tab.anchors"].hasFocus }
+        press(.right, focus: "library.anchor.100")
+        press(.select)
+        XCTAssertTrue(app.staticTexts["官方合成简介"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["粉丝: 1.3万"].exists)
+        XCTAssertFalse(app.buttons["anchor.follow"].isEnabled)
+        press(.menu)
+        wait("anchor return focus") { self.app.buttons["library.anchor.100"].hasFocus }
+        press(.left, focus: "library.tab.anchors")
+        press(.up, focus: "library.tab.liked")
+        press(.right, focus: "library.card.episode:200")
+        press(.down)
+        wait("liked second page") { self.app.buttons["library.card.episode:212"].exists }
+        let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "collection-pages-fixture"; attachment.lifetime = .keepAlways; add(attachment)
+        print("THL_COLLECTION_TV fixture=true followsPagination=true likesPagination=true pageRetry=true anchorReturnFocus=true imagesDisabled=true")
+    }
+
+    func testOwnerCollectionPagesReadOnly() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "library", "-noLibraryFixtures"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["hongguo-account-menu"].waitForExistence(timeout: 40))
+        if app.buttons["nav.library"].hasFocus { press(.right) }
+        wait("owner library focused") { self.app.buttons["library.tab.history"].hasFocus }
+        press(.down, focus: "library.tab.follows")
+        press(.down, focus: "library.tab.liked")
+        wait("owner like loaded", seconds: 45) { self.app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.card.episode:")).count > 0 }
+        XCTAssertFalse(app.staticTexts["library.error"].exists)
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "library.card.episode:")).firstMatch
+        let id = card.identifier
+        press(.right)
+        wait("like focused") { card.hasFocus }
+        press(.select)
+        XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 50))
+        press(.menu)
+        wait("liked return focus") { self.app.buttons[id].hasFocus }
+        press(.left, focus: "library.tab.liked")
+        press(.down, focus: "library.tab.anchors")
+        wait("empty follows", seconds: 40) { self.app.staticTexts["暂无关注的主播"].exists }
+        XCTAssertFalse(app.staticTexts["library.error"].exists)
+        let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "collection-pages-owner"; attachment.lifetime = .keepAlways; add(attachment)
+        print("THL_COLLECTION_TV owner=true likes=true followsEmpty=true likedDetailReturn=true writes=0")
+    }
+
+    func testOwnerCreatorProfileAndAssociatedDramaReadOnly() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "detail", "-testDramaId", "hongguo:7638987534483082265", "-testDramaTitle", "主播详情验证", "anchor"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["anchor.back"].waitForExistence(timeout: 50))
+        XCTAssertTrue(app.buttons["anchor.follow"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.staticTexts["anchor.error"].exists)
+        wait("anchor back focused") { self.app.buttons["anchor.back"].hasFocus }
+        press(.down)
+        let drama = app.buttons["anchor.drama.hongguo:7638987534483082265"]
+        wait("associated drama focused") { drama.hasFocus }
+        press(.select)
+        XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 45))
+        press(.menu)
+        XCTAssertTrue(app.buttons["anchor.back"].waitForExistence(timeout: 15))
+        press(.menu)
+        XCTAssertTrue(app.buttons["detail.play"].waitForExistence(timeout: 15))
+        print("THL_CREATOR_TV owner=true profile=true associatedDrama=true nestedReturn=true writes=0")
+    }
+
     func testOwnerCreatorOutcomeAndRemoteReturn() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["THL_ACCOUNT_OWNER"] == "1")
         continueAfterFailure = false

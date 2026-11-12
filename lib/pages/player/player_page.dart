@@ -212,6 +212,13 @@ class _PlayerScreenState extends State<PlayerScreen>
   @override
   void initState() {
     super.initState();
+    if (HongguoAccountSocial.shared.active) {
+      unawaited(
+        HongguoAccountSocial.shared
+            .load(widget.detail.drama)
+            .catchError((Object _) {}),
+      );
+    }
     _playbackLease = widget.playbackQueue?.acquire();
     WidgetsBinding.instance.addObserver(this);
     _index = widget.initialIndex;
@@ -2532,89 +2539,112 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   Widget _feedControls() {
-    final anchor = Anchor(
-      id: widget.detail.drama.cleanSourceId,
-      name: widget.detail.drama.category.isNotEmpty
-          ? '${widget.detail.drama.category}精选'
-          : '官方主播',
-      avatar: widget.detail.drama.cover,
-      bio: widget.detail.drama.description.isNotEmpty
-          ? widget.detail.drama.description
-          : '优质短剧创作者',
-    );
     return AnimatedBuilder(
-      animation: widget.store,
-      builder: (context, _) => StreamBuilder<bool>(
-        stream: _player.stream.playing,
-        builder: (context, snapshot) => StreamBuilder<Duration>(
-          stream: _player.stream.position,
-          builder: (context, _) => FeedPlayerOverlay(
-            title: widget.detail.drama.title,
-            episodeText:
-                '第 ${widget.detail.episodes[_index].number} 集 · 共 ${widget.detail.episodes.length} 集',
-            description: widget.detail.drama.description,
-            playing: _player.state.playing,
-            enabled: !_loading && _error == null,
-            following: widget.store.following(widget.detail.drama.id) != null,
-            danmakuEnabled: _danmakuEnabled,
-            position: _player.state.position,
-            duration: _player.state.duration,
-            isLiked: widget.store.isLiked(widget.detail.drama.id),
-            onLike: () {
-              widget.store.toggleLike(widget.detail.drama);
-              if (widget.store.usesAccountLibrary(widget.detail.drama.id)) {
-                final ep = widget.detail.episodes[_index].number;
-                final likeModel = HongguoAccountSocial.shared
-                    .snapshot(widget.detail.drama)
-                    ?.episode(ep);
-                if (likeModel != null) {
-                  HongguoAccountSocial.shared.like(
-                    widget.detail.drama,
-                    likeModel,
-                    !likeModel.liked,
-                  );
+      animation: Listenable.merge([widget.store, HongguoAccountSocial.shared]),
+      builder: (context, _) {
+        final social = HongguoAccountSocial.shared;
+        final creator = social
+            .snapshot(widget.detail.drama)
+            ?.creators
+            .firstOrNull;
+        final anchor = creator == null
+            ? null
+            : Anchor(
+                id: creator.id,
+                name: creator.name,
+                officialFollowing: creator.following,
+                canFollow: creator.canFollow,
+                relativeType: creator.relativeType,
+              );
+        return StreamBuilder<bool>(
+          stream: _player.stream.playing,
+          builder: (context, snapshot) => StreamBuilder<Duration>(
+            stream: _player.stream.position,
+            builder: (context, _) => FeedPlayerOverlay(
+              title: widget.detail.drama.title,
+              episodeText:
+                  '第 ${widget.detail.episodes[_index].number} 集 · 共 ${widget.detail.episodes.length} 集',
+              description: widget.detail.drama.description,
+              playing: _player.state.playing,
+              enabled: !_loading && _error == null,
+              following: widget.store.following(widget.detail.drama.id) != null,
+              danmakuEnabled: _danmakuEnabled,
+              position: _player.state.position,
+              duration: _player.state.duration,
+              isLiked: widget.store.isLiked(widget.detail.drama.id),
+              onLike: () {
+                widget.store.toggleLike(widget.detail.drama);
+                if (widget.store.usesAccountLibrary(widget.detail.drama.id)) {
+                  final ep = widget.detail.episodes[_index].number;
+                  final likeModel = HongguoAccountSocial.shared
+                      .snapshot(widget.detail.drama)
+                      ?.episode(ep);
+                  if (likeModel != null) {
+                    HongguoAccountSocial.shared.like(
+                      widget.detail.drama,
+                      likeModel,
+                      !likeModel.liked,
+                    );
+                  }
                 }
-              }
-            },
-            anchorName: anchor.name,
-            isAnchorFollowed: widget.store.isAnchorFollowed(anchor.id),
-            onToggleFollowAnchor: () {
-              widget.store.toggleFollowAnchor(anchor);
-            },
-            onOpenAnchorDetail: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => AnchorDetailPage(
-                    anchor: anchor,
-                    repository: widget.repository,
-                    store: widget.store,
-                    initialDramas: [widget.detail.drama],
+              },
+              anchorName: anchor?.name ?? '',
+              isAnchorFollowed: creator?.following == true,
+              onToggleFollowAnchor:
+                  creator == null ||
+                      creator.following == null ||
+                      social.busy(widget.detail.drama) ||
+                      (!creator.canFollow && creator.following != true)
+                  ? null
+                  : () => unawaited(
+                      saveUserChange(
+                        context,
+                        () => social.follow(
+                          widget.detail.drama,
+                          creator,
+                          !creator.following!,
+                        ),
+                      ),
+                    ),
+              onOpenAnchorDetail: anchor == null
+                  ? null
+                  : () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => AnchorDetailPage(
+                            anchor: anchor,
+                            repository: widget.repository,
+                            store: widget.store,
+                            initialDramas: [widget.detail.drama],
+                          ),
+                        ),
+                      );
+                    },
+              onTogglePlayback: _togglePlayback,
+              onSeek: (value) => unawaited(
+                _seekTo(
+                  Duration(
+                    milliseconds:
+                        (_player.state.duration.inMilliseconds * value).round(),
                   ),
                 ),
-              );
-            },
-            onTogglePlayback: _togglePlayback,
-            onSeek: (value) => unawaited(
-              _seekTo(
-                Duration(
-                  milliseconds: (_player.state.duration.inMilliseconds * value)
-                      .round(),
+              ),
+              onFavorite: () => unawaited(
+                saveUserChange(
+                  context,
+                  () => widget.store.toggleFavorite(widget.detail.drama),
                 ),
               ),
+              onEpisodes: () =>
+                  unawaited(_openPanel(PlayerMenuSection.episodes)),
+              onDetail: widget.onOpenDetail ?? () {},
+              onDanmaku: () => unawaited(_toggleDanmaku()),
+              onSettings: () =>
+                  unawaited(_openPanel(PlayerMenuSection.settings)),
             ),
-            onFavorite: () => unawaited(
-              saveUserChange(
-                context,
-                () => widget.store.toggleFavorite(widget.detail.drama),
-              ),
-            ),
-            onEpisodes: () => unawaited(_openPanel(PlayerMenuSection.episodes)),
-            onDetail: widget.onOpenDetail ?? () {},
-            onDanmaku: () => unawaited(_toggleDanmaku()),
-            onSettings: () => unawaited(_openPanel(PlayerMenuSection.settings)),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

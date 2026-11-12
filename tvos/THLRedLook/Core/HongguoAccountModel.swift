@@ -319,6 +319,65 @@ final class HongguoAccountModel: ObservableObject {
         }
     }
 
+    private var collectionIdentity: (revision: UInt64, id: String)?
+
+    private func readCollection(_ action: String, payload: [String: String]) async throws -> [String: Any] {
+        guard loggedIn else { throw HongguoAccountError.invalid }
+        let revision = vault.snapshot.revision
+        let result = try await transportService.call(action, payload: payload, owner: attempt, attempt: attempt,
+            existing: true, account: account, cookies: []).result
+        guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+        return result
+    }
+
+    func creatorProfile(_ id: String, dramas: [Drama] = []) async throws -> Anchor {
+        let result = try await readCollection("creatorProfile", payload: ["userId": id])
+        guard let row = result["creator"] as? [String: Any],
+              row["id"] as? String == id || row["businessId"] as? String == id,
+              let anchor = Anchor(official: row, dramas: dramas) else { throw HongguoAccountError.interactionInvalid }
+        return anchor
+    }
+
+    func followingCreators(offset: Int = 0, douyinOffset: Int = 0) async throws -> HongguoCollectionPage<Anchor> {
+        let revision = vault.snapshot.revision
+        if collectionIdentity?.revision != revision {
+            let profile = try await creatorProfile(account?.id ?? "")
+            guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+            collectionIdentity = (revision, profile.id)
+        }
+        let result = try await readCollection("followingCreators", payload: ["userId": collectionIdentity!.id,
+            "offset": String(offset), "count": "20", "followingDouyinOffset": String(douyinOffset)])
+        guard let rows = result["creators"] as? [[String: Any]], let more = result["hasMore"] as? Bool else { throw HongguoAccountError.interactionInvalid }
+        return HongguoCollectionPage(items: rows.compactMap { Anchor(official: $0) }, hasMore: more,
+            nextOffset: result["nextOffset"] as? Int, douyinOffset: result["followingDouyinNextOffset"] as? Int ?? 0)
+    }
+
+    func likedVideos(offset: Int = 0) async throws -> HongguoCollectionPage<HongguoLikedVideo> {
+        let result = try await readCollection("likedVideos", payload: ["offset": String(offset), "count": "20"])
+        guard let rows = result["items"] as? [[String: Any]], let more = result["hasMore"] as? Bool else { throw HongguoAccountError.interactionInvalid }
+        return HongguoCollectionPage(items: rows.compactMap { HongguoLikedVideo(row: $0) }, hasMore: more,
+            nextOffset: result["nextOffset"] as? Int, unsupportedCount: result["unsupportedCount"] as? Int ?? 0)
+    }
+
+    func creators(for drama: Drama) async throws -> [HongguoCreator] {
+        guard loggedIn else { throw HongguoAccountError.invalid }
+        let revision = vault.snapshot.revision
+        let rows = try await readCreators(drama, owner: attempt)
+        guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+        return rows
+    }
+
+    func setProfileFollowing(_ anchor: Anchor, follow: Bool) async throws {
+        try await enqueueSocialWrite {
+            let current = try await self.creatorProfile(anchor.id)
+            guard current.following != nil, current.canFollow == true || !follow else { throw HongguoAccountError.interactionInvalid }
+            _ = try await self.readCollection("creatorFollow", payload: ["userId": current.id,
+                "relativeType": String(current.relativeType ?? 2), "follow": follow ? "1" : "0"])
+            let confirmed = try await self.creatorProfile(current.id)
+            guard confirmed.following == follow else { throw HongguoAccountError.writeNotConfirmed }
+        }
+    }
+
     private func readCreators(_ drama: Drama, owner: Int) async throws -> [HongguoCreator] {
         let result = try await transportService.call("creatorList", payload: ["id": drama.cleanSourceId], owner: owner, attempt: attempt, existing: true, account: account, cookies: []).result
         guard let rows = result["creators"] as? [[String: Any]] else { throw HongguoAccountError.invalid }

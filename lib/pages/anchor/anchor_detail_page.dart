@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-
-import 'package:THLRedLook/core/bridge/core_bridge.dart';
-import 'package:THLRedLook/core/store/local_store.dart';
-import 'package:THLRedLook/models/catalog/models.dart';
-import 'package:THLRedLook/utils/theme/app_colors.dart';
-import 'package:THLRedLook/views/common/widgets.dart';
+import '../../core/account/hongguo_account_service.dart';
+import '../../core/account/hongguo_account_session.dart';
+import '../../core/bridge/core_bridge.dart';
+import '../../core/store/local_store.dart';
+import '../../models/catalog/models.dart';
+import '../detail/detail_page.dart';
 
 class AnchorDetailPage extends StatefulWidget {
   const AnchorDetailPage({
@@ -14,290 +14,214 @@ class AnchorDetailPage extends StatefulWidget {
     required this.store,
     this.initialDramas = const [],
     this.onOpenDrama,
+    this.service,
+    this.onFollowingChanged,
   });
-
   final Anchor anchor;
   final AppRepository repository;
   final LocalStore store;
   final List<Drama> initialDramas;
   final ValueChanged<Drama>? onOpenDrama;
-
+  final HongguoAccountService? service;
+  final VoidCallback? onFollowingChanged;
   @override
   State<AnchorDetailPage> createState() => _AnchorDetailPageState();
 }
 
 class _AnchorDetailPageState extends State<AnchorDetailPage> {
-  late Anchor _anchor;
-  late List<Drama> _dramas;
-  bool _loading = false;
-
+  late final service = widget.service ?? HongguoAccountService();
+  Anchor? profile;
+  String? error;
+  bool loading = true, writing = false;
+  int generation = 0;
+  late int revision = service.session.revision;
   @override
   void initState() {
     super.initState();
-    _anchor = widget.anchor;
-    _dramas = widget.initialDramas;
-    _loadAnchorDramas();
+    service.session.addListener(_accountChanged);
+    _load();
   }
 
-  Future<void> _loadAnchorDramas() async {
-    if (_dramas.isNotEmpty) return;
-    setState(() => _loading = true);
-    try {
-      // 预留主播短剧作品接口，当前先保持空实现或本地占位
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+  void _accountChanged() {
+    if (revision == service.session.revision) return;
+    revision = service.session.revision;
+    generation++;
+    if (mounted) {
+      setState(() {
+        profile = null;
+        error = null;
+        writing = false;
+      });
+      _load();
     }
   }
 
-  void _toggleFollow() {
-    widget.store.toggleFollowAnchor(_anchor);
+  Future<void> _load() async {
+    final ticket = ++generation;
     setState(() {
-      final isNowFollowed = !widget.store.isAnchorFollowed(_anchor.id);
-      _anchor = _anchor.copyWith(isFollowed: isNowFollowed);
+      loading = true;
+      error = null;
     });
+    try {
+      final value = await service.creatorProfile(widget.anchor.id);
+      if (mounted && ticket == generation) setState(() => profile = value);
+    } catch (issue) {
+      if (mounted && ticket == generation) {
+        setState(
+          () => error = issue is HongguoAccountFailure
+              ? issue.message
+              : '主播资料获取失败，请重试',
+        );
+      }
+    } finally {
+      if (mounted && ticket == generation) setState(() => loading = false);
+    }
+  }
+
+  Future<void> _follow() async {
+    final current = profile;
+    if (current == null || writing || current.officialFollowing == null) return;
+    final ticket = ++generation;
+    setState(() {
+      writing = true;
+      error = null;
+    });
+    try {
+      final value = await service.setProfileFollowing(
+        current,
+        !current.officialFollowing!,
+      );
+      if (mounted && ticket == generation) {
+        setState(() => profile = value);
+        widget.onFollowingChanged?.call();
+      }
+    } catch (issue) {
+      if (mounted && ticket == generation) {
+        setState(
+          () => error = issue is HongguoAccountFailure
+              ? issue.message
+              : '关注操作失败，请重试',
+        );
+      }
+    } finally {
+      if (mounted && ticket == generation) setState(() => writing = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    generation++;
+    service.session.removeListener(_accountChanged);
+    if (widget.service == null) service.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isFollowed = widget.store.isAnchorFollowed(_anchor.id) || _anchor.isFollowed;
-
+    final value = profile;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_anchor.name),
+        title: Text(value?.name ?? '主播详情'),
         actions: [
           IconButton(
-            tooltip: '分享主播',
-            icon: const Icon(Icons.share_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('已复制 ${_anchor.name} 的主页链接')),
-              );
-            },
+            key: const ValueKey('anchor-refresh'),
+            onPressed: loading || writing ? null : _load,
+            tooltip: '刷新',
+            icon: const Icon(Icons.refresh),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(16),
-              ),
+      body: ListView(
+        key: const ValueKey('anchor-detail'),
+        padding: const EdgeInsets.all(20),
+        children: [
+          if (loading)
+            const LinearProgressIndicator(key: ValueKey('anchor-loading')),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 36,
-                        backgroundColor: AppColors.hongguoRed.withValues(alpha: 0.15),
-                        child: Text(
-                          _anchor.name.isNotEmpty ? _anchor.name.substring(0, 1) : '主',
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.hongguoRed,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    _anchor.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Icon(
-                                  Icons.verified_rounded,
-                                  size: 18,
-                                  color: AppColors.hongguoOrange,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _anchor.bio.isNotEmpty ? _anchor.bio : '短剧认证创作者',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _statItem(
-                        context,
-                        '粉丝',
-                        _anchor.fansCount > 0 ? '${_anchor.fansCount}' : '1.2w',
-                      ),
-                      _statItem(
-                        context,
-                        '获赞',
-                        '${(_anchor.fansCount * 2.8).toInt()}',
-                      ),
-                      _statItem(
-                        context,
-                        '作品',
-                        _dramas.isNotEmpty ? '${_dramas.length}' : '${_anchor.dramasCount}',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 42,
-                    child: isFollowed
-                        ? OutlinedButton.icon(
-                            key: const ValueKey('anchor-followed-btn'),
-                            onPressed: _toggleFollow,
-                            icon: const Icon(Icons.check_rounded, size: 18),
-                            label: const Text('已关注'),
-                            style: OutlinedButton.styleFrom(
-                              shape: const StadiumBorder(),
-                            ),
-                          )
-                        : FilledButton.icon(
-                            key: const ValueKey('anchor-follow-btn'),
-                            onPressed: _toggleFollow,
-                            icon: const Icon(Icons.add_rounded, size: 18),
-                            label: const Text('关注主播'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.hongguoRed,
-                              foregroundColor: Colors.white,
-                              shape: const StadiumBorder(),
-                            ),
-                          ),
+                  Text(error!, key: const ValueKey('anchor-error')),
+                  TextButton(
+                    key: const ValueKey('anchor-retry'),
+                    onPressed: loading || writing ? null : _load,
+                    child: const Text('重试'),
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    '短剧作品 (${_dramas.length})',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+          if (value != null) ...[
+            const CircleAvatar(radius: 36, child: Icon(Icons.person, size: 40)),
+            const SizedBox(height: 16),
+            Text(
+              value.name,
+              key: const ValueKey('anchor-name'),
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
             ),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator(color: AppColors.hongguoRed)),
-              )
-            else if (_dramas.isEmpty)
+            const SizedBox(height: 12),
+            Text(
+              value.bio.isEmpty ? '暂无简介' : value.bio,
+              key: const ValueKey('anchor-bio'),
+            ),
+            if (value.dramasCount != null)
               Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.movie_creation_outlined,
-                        size: 48,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '该主播暂未发布更多公开作品',
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  '作品 ${value.dramasCount}',
+                  key: const ValueKey('anchor-works-count'),
                 ),
-              )
-            else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  const columns = 3;
-                  final width =
-                      (constraints.maxWidth - 32 - (columns - 1) * 10) / columns;
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 10,
-                      mainAxisExtent: DramaTile.extentFor(context, width),
-                    ),
-                    itemCount: _dramas.length,
-                    itemBuilder: (context, index) {
-                      final drama = _dramas[index];
-                      return DramaTile(
-                        key: ValueKey('anchor-drama-${drama.id}'),
+              ),
+            FilledButton.icon(
+              key: const ValueKey('anchor-official-follow'),
+              onPressed:
+                  loading ||
+                      writing ||
+                      value.officialFollowing == null ||
+                      (!value.canFollow && value.officialFollowing != true)
+                  ? null
+                  : _follow,
+              icon: Icon(
+                value.officialFollowing == true ? Icons.check : Icons.add,
+              ),
+              label: Text(
+                writing
+                    ? '正在确认'
+                    : value.officialFollowing == true
+                    ? '已关注'
+                    : value.officialFollowing == null
+                    ? '关注状态暂不可用'
+                    : '关注',
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (widget.initialDramas.isNotEmpty) ...[
+              Text('关联短剧', style: Theme.of(context).textTheme.titleMedium),
+              for (final drama in widget.initialDramas)
+                ListTile(
+                  key: ValueKey('anchor-drama-${drama.id}'),
+                  title: Text(
+                    widget.repository.catalogUpdates.current(drama).title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => DetailScreen(
                         drama: drama,
                         repository: widget.repository,
-                        onTap: () => widget.onOpenDrama?.call(drama),
-                      );
-                    },
-                  );
-                },
-              ),
-            const SizedBox(height: 24),
+                        store: widget.store,
+                      ),
+                    ),
+                  ),
+                ),
+            ] else
+              const Text('暂无可展示的关联短剧', key: ValueKey('anchor-no-works')),
           ],
-        ),
+        ],
       ),
-    );
-  }
-
-  Widget _statItem(BuildContext context, String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-      ],
     );
   }
 }
