@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/account/hongguo_account_service.dart';
 import '../../core/account/hongguo_account_session.dart';
@@ -39,6 +40,13 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
   void initState() {
     super.initState();
     service.session.addListener(_accountChanged);
+    final isLocal = widget.store.isAnchorFollowed(widget.anchor.id);
+    profile = widget.anchor.copyWith(
+      isFollowed: isLocal,
+      officialFollowing: widget.anchor.officialFollowing ?? isLocal,
+      canFollow: widget.anchor.canFollow,
+    );
+    loading = false;
     _load();
   }
 
@@ -57,6 +65,10 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
   }
 
   Future<void> _load() async {
+    if (!service.session.loggedIn) {
+      if (mounted) setState(() => loading = false);
+      return;
+    }
     final ticket = ++generation;
     setState(() {
       loading = true;
@@ -80,31 +92,46 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
 
   Future<void> _follow() async {
     final current = profile;
-    if (current == null || writing || current.officialFollowing == null) return;
+    if (current == null || writing) return;
+    final isFollowed = current.isFollowed || current.officialFollowing == true;
+    final nextFollowing = !isFollowed;
     final ticket = ++generation;
     setState(() {
-      writing = true;
+      writing = false;
       error = null;
-    });
-    try {
-      final value = await service.setProfileFollowing(
-        current,
-        !current.officialFollowing!,
+      profile = current.copyWith(
+        isFollowed: nextFollowing,
+        officialFollowing: nextFollowing,
       );
-      if (mounted && ticket == generation) {
-        setState(() => profile = value);
-        widget.onFollowingChanged?.call();
-      }
-    } catch (issue) {
-      if (mounted && ticket == generation) {
-        setState(
-          () => error = issue is HongguoAccountFailure
-              ? issue.message
-              : '关注操作失败，请重试',
+    });
+    unawaited(widget.store.setAnchorFollowed(current, nextFollowing));
+    widget.onFollowingChanged?.call();
+    if (service.session.loggedIn) {
+      setState(() => writing = true);
+      try {
+        final value = await service.setProfileFollowing(
+          current,
+          nextFollowing,
         );
+        if (mounted && ticket == generation) {
+          setState(
+            () => profile = value.copyWith(
+              isFollowed: nextFollowing,
+              officialFollowing: nextFollowing,
+            ),
+          );
+        }
+      } catch (issue) {
+        if (mounted && ticket == generation) {
+          setState(
+            () => error = issue is HongguoAccountFailure
+                ? issue.message
+                : '官方账号关注同步失败',
+          );
+        }
+      } finally {
+        if (mounted && ticket == generation) setState(() => writing = false);
       }
-    } finally {
-      if (mounted && ticket == generation) setState(() => writing = false);
     }
   }
 
@@ -174,30 +201,31 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                 ),
               ),
             FilledButton.icon(
-              key: const ValueKey('anchor-official-follow'),
-              onPressed:
-                  loading ||
-                      writing ||
-                      value.officialFollowing == null ||
-                      (!value.canFollow && value.officialFollowing != true)
-                  ? null
-                  : _follow,
+              key: ValueKey(
+                (value.isFollowed || value.officialFollowing == true)
+                    ? 'anchor-followed-btn'
+                    : 'anchor-follow-btn',
+              ),
+              onPressed: writing ? null : _follow,
               icon: Icon(
-                value.officialFollowing == true ? Icons.check : Icons.add,
+                (value.isFollowed || value.officialFollowing == true)
+                    ? Icons.check
+                    : Icons.add,
               ),
               label: Text(
                 writing
                     ? '正在确认'
-                    : value.officialFollowing == true
+                    : (value.isFollowed || value.officialFollowing == true)
                     ? '已关注'
-                    : value.officialFollowing == null
-                    ? '关注状态暂不可用'
                     : '关注',
               ),
             ),
             const SizedBox(height: 24),
             if (widget.initialDramas.isNotEmpty) ...[
-              Text('关联短剧', style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                '短剧作品 (${widget.initialDramas.length})',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               for (final drama in widget.initialDramas)
                 ListTile(
                   key: ValueKey('anchor-drama-${drama.id}'),

@@ -68,6 +68,15 @@ class LocalStore extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Future<void> setAnchorFollowed(Anchor anchor, bool follow) async {
+    if (follow) {
+      _followedAnchors[anchor.id] = anchor.copyWith(isFollowed: true);
+    } else {
+      _followedAnchors.remove(anchor.id);
+    }
+    notifyListeners();
+  }
   final Map<String, FollowState> _followStates = {};
   final Map<String, int> _deletedFollows = {};
   final Map<String, int> _deletedHistory = {};

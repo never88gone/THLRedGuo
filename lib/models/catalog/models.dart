@@ -633,6 +633,9 @@ class Anchor {
     int? fansCount,
     int? dramasCount,
     bool? isFollowed,
+    bool? officialFollowing,
+    bool? canFollow,
+    int? relativeType,
   }) => Anchor(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -641,9 +644,9 @@ class Anchor {
     fansCount: fansCount ?? this.fansCount,
     dramasCount: dramasCount ?? this.dramasCount,
     isFollowed: isFollowed ?? this.isFollowed,
-    officialFollowing: officialFollowing,
-    canFollow: canFollow,
-    relativeType: relativeType,
+    officialFollowing: officialFollowing ?? this.officialFollowing,
+    canFollow: canFollow ?? this.canFollow,
+    relativeType: relativeType ?? this.relativeType,
   );
 
   Map<String, dynamic> toJson() => {
