@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,7 @@ import 'package:THLRedLook/core/engine/dart_core_engine.dart';
 import 'package:THLRedLook/core/js/js_source_models.dart';
 import 'package:THLRedLook/core/js/js_source_service.dart';
 import 'package:THLRedLook/core/storage/app_storage.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/pages/downloads/downloads_page.dart';
 import 'package:THLRedLook/pages/settings/resource_settings_page.dart';
@@ -58,11 +60,20 @@ class _Sources extends AppRepository {
   @override
   Future<String> jsSourceGetActive() async => 'hongguo';
   @override
+  Future<List<DownloadJob>> downloads() async => [];
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (MethodCall methodCall) async => Directory.systemTemp.path,
+        );
+  });
   late Directory sandbox;
   late DartCoreEngine engine;
   setUp(() async {
@@ -74,7 +85,9 @@ void main() {
   tearDown(() async {
     JsSourceService.current?.dispose();
     debugDefaultTargetPlatformOverride = null;
-    if (await sandbox.exists()) await sandbox.delete(recursive: true);
+    try {
+      if (await sandbox.exists()) await sandbox.delete(recursive: true);
+    } catch (_) {}
   });
 
   test(
@@ -128,9 +141,9 @@ void main() {
   );
 
   test(
-    'download cannot manufacture a completed job or a 32-byte video',
+    'download enqueues real jobs without manufacturing fake completed media',
     () async {
-      expect(NativeRepository().supportsDownloads, false);
+      expect(NativeRepository().supportsDownloads, true);
       final result = await engine.dispatch({
         'action': 'enqueueDownloads',
         'drama': {'id': 'hongguo:synthetic', 'source': 'hongguo'},
@@ -141,18 +154,13 @@ void main() {
           },
         ],
       });
-      expect(result['ok'], false);
-      expect(result['error'], contains('尚未实现'));
-      expect(
-        (await engine.dispatch({'action': 'downloads'}))['data']['jobs'],
-        isEmpty,
-      );
-      expect(
-        await Directory(
-          p.join(sandbox.path, 'pure_core', 'downloads'),
-        ).list().toList(),
-        isEmpty,
-      );
+      expect(result['ok'], true);
+      expect(result['data']['added'], 1);
+      final jobs =
+          (await engine.dispatch({'action': 'downloads'}))['data']['jobs']
+              as List;
+      expect(jobs.length, 1);
+      expect(jobs.first['state'], isNot('completed'));
     },
   );
 
@@ -292,14 +300,14 @@ void main() {
     const Size(1280, 720),
     const Size(1920, 1080),
   ]) {
-    testWidgets('Windows settings and unavailable download layout fit $size', (
+    testWidgets('Windows settings and downloads layout fit $size', (
       tester,
     ) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.windows;
       await tester.binding.setSurfaceSize(size);
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final store = LocalStore(await SharedPreferences.getInstance());
-      final repository = NativeRepository()..access = store;
+      final repository = _Sources()..fail = false;
       for (final screen in <Widget>[
         PlaybackSettingsPage(store: store),
         ResourceSettingsScreen(repository: repository, store: store),
@@ -309,8 +317,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       }
-      expect(find.text('当前版本尚未提供下载'), findsOneWidget);
+      expect(find.byType(DownloadsScreen), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
       store.dispose();
       debugDefaultTargetPlatformOverride = null;
     });

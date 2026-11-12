@@ -10,7 +10,7 @@ import 'package:THLRedLook/core/js/catpaw_js_runtime.dart';
 import 'package:THLRedLook/core/js/js_source_models.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/utils/media/cover_decoder.dart';
-import 'package:THLRedLook/core/storage/app_storage.dart';
+import 'package:THLRedLook/core/download/download_manager.dart';
 import 'package:THLRedLook/utils/settings/resource_settings.dart';
 import 'package:THLRedLook/utils/build/app_build.dart';
 
@@ -22,6 +22,7 @@ class DartCoreEngine {
   static final DartCoreEngine instance = DartCoreEngine._();
 
   final CatPawRuntimePool _spiderPool;
+  final DownloadManager _downloadManager = DownloadManager.instance;
   final _activeReads =
       <String, ({int sequence, String source, String scope})>{};
   final _scopeOwners = <String, String>{};
@@ -66,6 +67,12 @@ class DartCoreEngine {
     await Directory(_coversDir).create(recursive: true);
     await Directory(_downloadsDir).create(recursive: true);
     await Directory(_storageDir).create(recursive: true);
+    if (_downloadManager.directory != _downloadsDir) {
+      await _downloadManager.init(
+        _downloadsDir,
+        resolvePlayback: (input) => _resolvePlayback(input),
+      );
+    }
   }
 
   String _scopeFor(String action, Map<String, dynamic> input) =>
@@ -373,25 +380,50 @@ class DartCoreEngine {
         };
 
       case 'downloads':
-        return {'jobs': <Map<String, dynamic>>[]};
+        await _ensureDirectories();
+        return {'jobs': _downloadManager.getJobs()};
       case 'enqueueDownloads':
+        await _ensureDirectories();
+        final drama = Map<String, dynamic>.from(input['drama'] as Map? ?? {});
+        final entries = (input['entries'] as List? ?? [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        final quality = (input['quality'] as num?)?.toInt() ?? 0;
+        final force = input['force'] == true;
+        final added = await _downloadManager.enqueue(
+          drama: drama,
+          entries: entries,
+          quality: quality,
+          force: force,
+        );
+        return {'added': added};
       case 'controlDownloads':
+        await _ensureDirectories();
+        final command = input['command']?.toString() ?? '';
+        final jobId = input['jobId']?.toString() ?? '';
+        await _downloadManager.control(command, jobId: jobId);
+        return {'ok': true};
       case 'controlDownloadBatch':
-        throw UnsupportedError('当前版本尚未实现下载传输与断点续传');
+        await _ensureDirectories();
+        final command = input['command']?.toString() ?? '';
+        final jobIds = (input['jobIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        return await _downloadManager.controlBatch(command, jobIds);
       case 'downloadDirectory':
         await _ensureDirectories();
-        return {'directory': _downloadsDir};
+        return {'directory': _downloadManager.directory};
       case 'storage':
         await _ensureDirectories();
-        return {
-          'directory': _downloadsDir,
-          'usedBytes': await directoryBytes(Directory(_downloadsDir)),
-          'freeBytes': availableDiskBytes(_downloadsDir),
-        };
+        return await _downloadManager.storage();
       case 'moveDownloads':
         throw UnsupportedError('当前版本尚未实现下载目录迁移');
       case 'localPlayback':
-        return {'url': ''};
+        await _ensureDirectories();
+        final drama = Map<String, dynamic>.from(input['drama'] as Map? ?? {});
+        final index = (input['index'] as num?)?.toInt() ?? 1;
+        return await _downloadManager.localPlayback(drama, index);
       // 弹幕支持
       case 'danmaku':
         final episodeId = input['episodeId'] as String? ?? '';

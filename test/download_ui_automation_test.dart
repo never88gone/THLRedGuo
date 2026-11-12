@@ -9,6 +9,17 @@ import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/views/download/download_picker.dart';
 import 'package:THLRedLook/pages/downloads/downloads_page.dart';
 
+class _MockDownloadRepository extends AppRepository {
+  _MockDownloadRepository(this.jobs);
+  final List<DownloadJob> jobs;
+  @override
+  bool get supportsDownloads => true;
+  @override
+  Future<List<DownloadJob>> downloads() async => jobs;
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -110,41 +121,65 @@ void main() {
       await tester.pump();
     });
 
-    test('2. 未接入传输时不能伪造下载成功或离线文件', () async {
-      expect(repository.supportsDownloads, isFalse);
-      await expectLater(
-        repository.enqueueDownloads(testDetail, testEpisodes),
-        throwsA(
-          isA<AppFailure>().having(
-            (error) => error.message,
-            'message',
-            contains('尚未实现'),
-          ),
-        ),
-      );
-      expect(await repository.downloads(), isEmpty);
+    test('2. 接入下载传输后支持选集入队并真实调度', () async {
+      expect(repository.supportsDownloads, isTrue);
+      final added = await repository.enqueueDownloads(testDetail, testEpisodes);
+      expect(added, 3);
+      final jobs = await repository.downloads();
+      expect(jobs.length, 3);
+      expect(jobs.every((j) => j.drama.id == testDrama.id), isTrue);
     });
-    testWidgets('3. Windows 下载入口明确显示尚未提供', (tester) async {
+
+    testWidgets('3. 下载管理页面正常展示任务与标题', (tester) async {
+      final mockRepo = _MockDownloadRepository([
+        DownloadJob(
+          id: 'hongguo:test_drama_888_1',
+          drama: testDrama,
+          episode: testEpisodes[0],
+          state: 'downloading',
+          bytes: 1024,
+          total: 2048,
+          progress: 0.5,
+        ),
+      ]);
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: DownloadsScreen(repository: repository, store: store),
+            body: DownloadsScreen(repository: mockRepo, store: store),
           ),
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('当前版本尚未提供下载'), findsOneWidget);
-      expect(find.text('下载完成'), findsNothing);
+      expect(find.text('当前版本尚未提供下载'), findsNothing);
+      expect(find.text('下载任务'), findsOneWidget);
+      expect(find.text('重生之都市神医'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
     });
-    test('4. 暂停与继续不能伪造任务状态流转', () async {
-      for (final command in ['pauseAll', 'resumeAll']) {
-        await expectLater(
-          repository.controlDownloads(command),
-          throwsA(isA<AppFailure>()),
-        );
-        expect(await repository.downloads(), isEmpty);
-      }
+
+    test('4. 任务暂停、恢复与批量删除自动化测试', () async {
+      await repository.enqueueDownloads(testDetail, testEpisodes);
+      var jobs = await repository.downloads();
+      expect(jobs.length, 3);
+
+      final firstJob = jobs.first;
+      await repository.controlDownloads('pause', id: firstJob.id);
+      jobs = await repository.downloads();
+      expect(jobs.firstWhere((j) => j.id == firstJob.id).state, 'paused');
+
+      await repository.controlDownloads('resume', id: firstJob.id);
+      jobs = await repository.downloads();
+      expect(
+        jobs.firstWhere((j) => j.id == firstJob.id).state,
+        isNot('paused'),
+      );
+
+      final batchResult = await repository.controlDownloadBatch(
+        'remove',
+        jobs.map((j) => j.id).toList(),
+      );
+      expect(batchResult.completed.length, 3);
+      expect(await repository.downloads(), isEmpty);
     });
   });
 }
