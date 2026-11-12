@@ -1,12 +1,9 @@
 import SwiftUI
 
 public struct TVPlayerTopInfoBar: View {
-    @ObservedObject private var likeStore = UserLikeStore.shared
-    @ObservedObject private var accountModel = HongguoAccountModel.shared
     public let title: String
     public let episodeText: String
     public let episodeNumber: Int
-    public let onSocial: (() -> Void)?
     public let feedActions: TVVideoFeedActions?
     public let drama: Drama
     @FocusState.Binding public var focusedControl: PlayerOverlayFocusTarget?
@@ -15,7 +12,6 @@ public struct TVPlayerTopInfoBar: View {
         title: String,
         episodeText: String,
         episodeNumber: Int = 1,
-        onSocial: (() -> Void)?,
         feedActions: TVVideoFeedActions?,
         drama: Drama,
         focusedControl: FocusState<PlayerOverlayFocusTarget?>.Binding
@@ -23,7 +19,6 @@ public struct TVPlayerTopInfoBar: View {
         self.title = title
         self.episodeText = episodeText
         self.episodeNumber = episodeNumber
-        self.onSocial = onSocial
         self.feedActions = feedActions
         self.drama = drama
         self._focusedControl = focusedControl
@@ -43,29 +38,7 @@ public struct TVPlayerTopInfoBar: View {
                         .font(.subheadline)
                         .foregroundColor(TVTheme.textSecondary)
                 }
-
                 Spacer()
-                if accountModel.loggedIn {
-                    let isLiked = likeStore.isLiked(dramaId: drama.id, episode: episodeNumber)
-                    barButton(
-                        title: isLiked ? "已点赞" : "点赞",
-                        icon: isLiked ? "heart.fill" : "heart",
-                        target: .like
-                    ) {
-                        Task {
-                            await likeStore.toggleLike(drama: drama, episode: episodeNumber)
-                        }
-                    }
-                    .onMoveCommand { direction in
-                        if direction == .down { focusedControl = .playPause }
-                    }
-                }
-                if let onSocial {
-                    barButton(title: "点赞与关注", icon: "heart", target: .social, action: onSocial)
-                        .onMoveCommand { direction in
-                            if direction == .down { focusedControl = .playPause }
-                        }
-                }
             }
             .padding(.horizontal, 56)
             .padding(.top, 42)
@@ -74,6 +47,8 @@ public struct TVPlayerTopInfoBar: View {
                 Text(feedActions.progressText)
                     .font(.system(size: 22))
                     .accessibilityIdentifier("feed.progress")
+                    .padding(.horizontal, 56)
+                    .padding(.top, 8)
                 HStack(spacing: 18) {
                     barButton(title: "上一部", icon: "arrow.up", target: .previousDrama, action: feedActions.onPrevious)
                         .disabled(!feedActions.canGoPrevious)
@@ -84,18 +59,6 @@ public struct TVPlayerTopInfoBar: View {
                     .disabled(!feedActions.canGoNext)
                     .opacity(feedActions.canGoNext ? 1 : 0.45)
                     barButton(title: feedActions.isFavorite ? "已收藏" : "收藏", icon: "bookmark", target: .favorite, action: feedActions.onFavorite)
-                    if accountModel.loggedIn {
-                        let isFeedLiked = likeStore.isLiked(dramaId: drama.id, episode: episodeNumber)
-                        barButton(
-                            title: isFeedLiked ? "已点赞" : "点赞",
-                            icon: isFeedLiked ? "heart.fill" : "heart",
-                            target: .like
-                        ) {
-                            Task {
-                                await likeStore.toggleLike(drama: drama, episode: episodeNumber)
-                            }
-                        }
-                    }
                     barButton(title: "剧集详情", icon: "info.circle", target: .detail) {
                         feedActions.onDetail(drama)
                     }
@@ -104,14 +67,15 @@ public struct TVPlayerTopInfoBar: View {
                     Spacer()
                 }
                 .padding(.horizontal, 56)
-                .padding(.top, 18)
+                .padding(.top, 14)
                 .onMoveCommand { direction in
                     if direction == .down { focusedControl = .playPause }
                 }
                 Text(feedActions.errorMessage ?? "画面模式下按上下键切换短剧，点按显示控制")
                     .font(.system(size: 22))
                     .foregroundStyle(feedActions.errorMessage == nil ? .white.opacity(0.8) : .yellow)
-                    .padding(.top, 12)
+                    .padding(.horizontal, 56)
+                    .padding(.top, 8)
                     .lineLimit(2)
             }
         }
