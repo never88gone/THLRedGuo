@@ -90,7 +90,6 @@ public final class AnchorService {
     }
 
     private func extractAnchorName(from drama: Drama) -> String {
-        // 从 tags 中查找可能的演员/作者标签，或根据剧名生成合适的主播名
         for tag in drama.tags {
             if tag.contains("主演") || tag.contains("作者") {
                 return tag.replacingOccurrences(of: "主演：", with: "")
@@ -98,6 +97,17 @@ public final class AnchorService {
                     .replacingOccurrences(of: "作者：", with: "")
                     .replacingOccurrences(of: "作者:", with: "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        for line in drama.description.components(separatedBy: "\n") {
+            if line.contains("主演") || line.contains("演员") {
+                let cleaned = line.replacingOccurrences(of: "主演：", with: "")
+                    .replacingOccurrences(of: "主演:", with: "")
+                    .replacingOccurrences(of: "演员：", with: "")
+                    .replacingOccurrences(of: "演员:", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let firstPart = cleaned.components(separatedBy: CharacterSet(charactersIn: ",，/、 ")).first ?? cleaned
+                if !firstPart.isEmpty { return firstPart }
             }
         }
         return "\(drama.title) 主创团队"

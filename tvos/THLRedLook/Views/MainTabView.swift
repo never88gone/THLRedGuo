@@ -152,7 +152,7 @@ public struct MainTabView: View {
             case "settingsActive":
                 initTab = .settings
                 initSettingsActive = true
-            case "detail":
+            case "detail", "anchor":
                 initDetailDrama = representativeDrama
             case "player", "controls", "drawer", "pipFocused":
                 initPlayerDrama = representativeDrama

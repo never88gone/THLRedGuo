@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		55F90BCBA7AE4B06BC28DD40 /* UserLikeAndAnchorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 943373322BA8443497D7F0C0 /* UserLikeAndAnchorTests.swift */; };
 		97B3ACA0C5BF46CF974732DA /* AnchorHeaderFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41316F24FACF4B569C568A61 /* AnchorHeaderFocus.swift */; };
 		B90A5E68380147CABD81AC11 /* LibraryFocusTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59D63C6082D24104ACD55492 /* LibraryFocusTarget.swift */; };
 		447AEBD78C1443B991EBD8EA /* LibraryTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B852A497FB748A79571DFB8 /* LibraryTab.swift */; };
@@ -280,6 +281,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		943373322BA8443497D7F0C0 /* UserLikeAndAnchorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserLikeAndAnchorTests.swift; sourceTree = "<group>"; };
 		41316F24FACF4B569C568A61 /* AnchorHeaderFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorHeaderFocus.swift; sourceTree = "<group>"; };
 		59D63C6082D24104ACD55492 /* LibraryFocusTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFocusTarget.swift; sourceTree = "<group>"; };
 		9B852A497FB748A79571DFB8 /* LibraryTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTab.swift; sourceTree = "<group>"; };
@@ -622,6 +624,7 @@
 		B10A80F99E2D9849B8980719 /* THLRedLookTests */ = {
 			isa = PBXGroup;
 			children = (
+				943373322BA8443497D7F0C0 /* UserLikeAndAnchorTests.swift */,
 				DDF46F916F921E87B28F33AB /* PlaybackTests.swift */,
 				C1A3B602F4D3468399B31103 /* AccountPairingTests.swift */,
 				PIP000032C00000100000001 /* TVPictureInPictureTests.swift */,
@@ -1229,6 +1232,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				55F90BCBA7AE4B06BC28DD40 /* UserLikeAndAnchorTests.swift in Sources */,
 				BC5B31CB27136862380FB32F /* PlaybackTests.swift in Sources */,
 				C1A3B602F4D3468399B31104 /* AccountPairingTests.swift in Sources */,
 				PIP000042C00000100000001 /* TVPictureInPictureTests.swift in Sources */,

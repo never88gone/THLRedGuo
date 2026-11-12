@@ -50,74 +50,11 @@ public struct SavedLibraryView: View {
     public var body: some View {
         ScrollViewReader { proxy in
             VStack(spacing: 24) {
-                HStack {
-                    Text("我的").font(.system(size: 42, weight: .bold))
-                    Spacer()
-                    let isAccountFocused = (focusedTarget == .account)
-                    Button {
-                        if account.loggedIn { showingAccountMenu = true } else { showingLogin = true }
-                    } label: {
-                        HStack(spacing: 12) {
-                            if account.loggedIn {
-                                avatar
-                                    .frame(width: 36, height: 36)
-                                    .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1.2))
-                                Text(account.account?.nickname ?? "红果用户")
-                                    .font(.system(size: 20, weight: .bold))
-                                    .foregroundColor(isAccountFocused ? .white : TVColors.textPrimary)
-                                    .lineLimit(1)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(isAccountFocused ? .white.opacity(0.8) : TVColors.textMuted)
-                            } else {
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                    .font(.system(size: 22, weight: .bold))
-                                    .foregroundColor(isAccountFocused ? .white : TVColors.primary)
-                                Text("登录")
-                                    .font(.system(size: 20, weight: .bold))
-                                    .foregroundColor(isAccountFocused ? .white : TVColors.textPrimary)
-                            }
-                        }
-                        .padding(.horizontal, 22)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(
-                                    isAccountFocused
-                                        ? AnyShapeStyle(TVColors.prominentGradient)
-                                        : AnyShapeStyle(Color.white.opacity(0.08))
-                                )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18)
-                                .stroke(
-                                    isAccountFocused ? Color.white : Color.white.opacity(0.14),
-                                    lineWidth: isAccountFocused ? 2.5 : 1.0
-                                )
-                        )
-                        .scaleEffect(isAccountFocused ? 1.05 : 1.0)
-                        .shadow(
-                            color: isAccountFocused ? TVColors.focusedShadowStrong : Color.clear,
-                            radius: isAccountFocused ? 14 : 0,
-                            x: 0,
-                            y: isAccountFocused ? 4 : 0
-                        )
-                        .animation(TVTheme.focusSpringAnimation, value: isAccountFocused)
-                    }
-                    .buttonStyle(TVZeroHighlightButtonStyle())
-                    .focusEffectDisabled()
-                    .focused($focusedTarget, equals: .account)
-                    .accessibilityIdentifier(account.loggedIn ? "hongguo-account-menu" : "hongguo-account-login")
-                    .onMoveCommand { direction in
-                        if direction == .up { requestTopNavigation() }
-                        if direction == .down { focus(firstCardTarget, with: proxy) }
-                        if direction == .left { focus(.mainTab(viewModel.selectedTab), with: proxy) }
-                    }
-                }.padding(.horizontal, 48).padding(.top, 28)
+                headerView(proxy: proxy)
 
                 HStack(alignment: .top, spacing: 32) {
                     VStack(alignment: .leading, spacing: 18) {
-                        ForEach(LibraryViewModel.LibraryTab.allCases) { tab in
+                        ForEach(LibraryTab.allCases) { tab in
                             TVCapsuleButton(
                                 title: tab.label,
                                 isSelected: viewModel.selectedTab == tab,
@@ -344,5 +281,78 @@ public struct SavedLibraryView: View {
             guard sequence == focusSequence, selectedDrama == nil else { return }
             focusedTarget = target
         }
+    }
+
+    @ViewBuilder
+    private func headerView(proxy: ScrollViewProxy) -> some View {
+        HStack {
+            Text("我的").font(.system(size: 42, weight: .bold))
+            Spacer()
+            accountButton(proxy: proxy)
+        }
+        .padding(.horizontal, 48)
+        .padding(.top, 28)
+    }
+
+    @ViewBuilder
+    private func accountButton(proxy: ScrollViewProxy) -> some View {
+        let isAccountFocused = (focusedTarget == .account)
+        Button {
+            if account.loggedIn { showingAccountMenu = true } else { showingLogin = true }
+        } label: {
+            accountButtonLabel(isFocused: isAccountFocused)
+        }
+        .buttonStyle(TVZeroHighlightButtonStyle())
+        .focusEffectDisabled()
+        .focused($focusedTarget, equals: .account)
+        .accessibilityIdentifier(account.loggedIn ? "hongguo-account-menu" : "hongguo-account-login")
+        .onMoveCommand { direction in
+            if direction == .up { requestTopNavigation() }
+            if direction == .down { focus(firstCardTarget, with: proxy) }
+            if direction == .left { focus(.mainTab(viewModel.selectedTab), with: proxy) }
+        }
+    }
+
+    @ViewBuilder
+    private func accountButtonLabel(isFocused: Bool) -> some View {
+        HStack(spacing: 12) {
+            if account.loggedIn {
+                avatar
+                    .frame(width: 36, height: 36)
+                    .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1.2))
+                Text(account.account?.nickname ?? "红果用户")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(isFocused ? .white : TVColors.textPrimary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(isFocused ? .white.opacity(0.8) : TVColors.textMuted)
+            } else {
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(isFocused ? .white : TVColors.primary)
+                Text("登录")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(isFocused ? .white : TVColors.textPrimary)
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(isFocused ? AnyShapeStyle(TVColors.prominentGradient) : AnyShapeStyle(Color.white.opacity(0.08)))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(isFocused ? Color.white : Color.white.opacity(0.14), lineWidth: isFocused ? 2.5 : 1.0)
+        )
+        .scaleEffect(isFocused ? 1.05 : 1.0)
+        .shadow(
+            color: isFocused ? TVColors.focusedShadowStrong : Color.clear,
+            radius: isFocused ? 14 : 0,
+            x: 0,
+            y: isFocused ? 4 : 0
+        )
+        .animation(TVTheme.focusSpringAnimation, value: isFocused)
     }
 }

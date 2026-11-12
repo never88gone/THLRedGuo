@@ -33,7 +33,12 @@ final class HongguoAccountModel: ObservableObject {
     private lazy var loginService = HongguoAccountLoginService(transportService: transportService, vault: vault)
 
     var loggedIn: Bool {
-        account?.hasSession == true
+        #if DEBUG
+        if CommandLine.arguments.contains("-mockLoggedIn") || ProcessInfo.processInfo.environment["MOCK_LOGGED_IN"] == "1" {
+            return true
+        }
+        #endif
+        return account?.hasSession == true
     }
 
     func cancel() {

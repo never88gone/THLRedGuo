@@ -296,6 +296,15 @@ public struct DramaDetailView: View {
             if let entry = viewModel.lastWatchEntry {
                 selectedEpisodeNumber = entry.episode
             }
+            #if DEBUG
+            if CommandLine.arguments.contains("anchor") || ProcessInfo.processInfo.environment["TEST_PAGE"] == "anchor" {
+                let anchors = await AnchorService.shared.fetchAnchors(for: currentDrama)
+                if let first = anchors.first {
+                    currentAnchor = first
+                    showingAnchorDetail = true
+                }
+            }
+            #endif
         }
         .onChange(of: viewModel.lastWatchEntry?.episode) { newEp in
             if let ep = newEp {
