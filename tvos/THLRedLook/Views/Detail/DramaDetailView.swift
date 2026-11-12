@@ -16,6 +16,8 @@ public struct DramaDetailView: View {
     @State private var isDescriptionExpanded: Bool = false
     @State private var showingDownloadSuccess: Bool = false
     @State private var appearAnimation: Bool = false
+    @State private var showingAnchorDetail: Bool = false
+    @State private var currentAnchor: Anchor? = nil
     @FocusState private var focusedTarget: DetailFocus?
 
     public var onDismiss: (() -> Void)? = nil
@@ -94,6 +96,15 @@ public struct DramaDetailView: View {
                             resumePosition: $resumePosition,
                             playingEpisodeIndex: $playingEpisodeIndex,
                             showingDownloadSuccess: $showingDownloadSuccess,
+                            onShowAnchor: {
+                                Task {
+                                    let anchors = await AnchorService.shared.fetchAnchors(for: currentDrama)
+                                    if let first = anchors.first {
+                                        currentAnchor = first
+                                        showingAnchorDetail = true
+                                    }
+                                }
+                            },
                             scrollProxy: scrollProxy,
                             onFocus: { target in
                                 focus(target, with: scrollProxy)
@@ -371,6 +382,11 @@ public struct DramaDetailView: View {
                 }
             }
         }
+        .fullScreenCover(isPresented: $showingAnchorDetail) {
+            if let anchor = currentAnchor {
+                AnchorDetailView(anchor: anchor, relatedDrama: currentDrama)
+            }
+        }
         .onExitCommand {
             guard playingEpisodeIndex == nil, Date().timeIntervalSince(playerDismissedAt) > 0.5 else { return }
             if let onDismiss = onDismiss {
@@ -386,6 +402,7 @@ public struct DramaDetailView: View {
         switch target {
         case .play: identifier = "detail_play"
         case .favorite: identifier = "detail_favorite"
+        case .anchor: identifier = "detail_anchor"
         case .followState: identifier = "detail_follow_state"
         case .download: identifier = "detail_download"
         case .season(let index): identifier = "season_card_\(index)"

@@ -1,8 +1,11 @@
 import SwiftUI
 
 public struct TVPlayerTopInfoBar: View {
+    @ObservedObject private var likeStore = UserLikeStore.shared
+    @ObservedObject private var accountModel = HongguoAccountModel.shared
     public let title: String
     public let episodeText: String
+    public let episodeNumber: Int
     public let onSocial: (() -> Void)?
     public let feedActions: TVVideoFeedActions?
     public let drama: Drama
@@ -11,6 +14,7 @@ public struct TVPlayerTopInfoBar: View {
     public init(
         title: String,
         episodeText: String,
+        episodeNumber: Int = 1,
         onSocial: (() -> Void)?,
         feedActions: TVVideoFeedActions?,
         drama: Drama,
@@ -18,6 +22,7 @@ public struct TVPlayerTopInfoBar: View {
     ) {
         self.title = title
         self.episodeText = episodeText
+        self.episodeNumber = episodeNumber
         self.onSocial = onSocial
         self.feedActions = feedActions
         self.drama = drama
@@ -40,6 +45,21 @@ public struct TVPlayerTopInfoBar: View {
                 }
 
                 Spacer()
+                if accountModel.loggedIn {
+                    let isLiked = likeStore.isLiked(dramaId: drama.id, episode: episodeNumber)
+                    barButton(
+                        title: isLiked ? "已点赞" : "点赞",
+                        icon: isLiked ? "heart.fill" : "heart",
+                        target: .like
+                    ) {
+                        Task {
+                            await likeStore.toggleLike(drama: drama, episode: episodeNumber)
+                        }
+                    }
+                    .onMoveCommand { direction in
+                        if direction == .down { focusedControl = .playPause }
+                    }
+                }
                 if let onSocial {
                     barButton(title: "点赞与关注", icon: "heart", target: .social, action: onSocial)
                         .onMoveCommand { direction in
@@ -64,6 +84,18 @@ public struct TVPlayerTopInfoBar: View {
                     .disabled(!feedActions.canGoNext)
                     .opacity(feedActions.canGoNext ? 1 : 0.45)
                     barButton(title: feedActions.isFavorite ? "已收藏" : "收藏", icon: "bookmark", target: .favorite, action: feedActions.onFavorite)
+                    if accountModel.loggedIn {
+                        let isFeedLiked = likeStore.isLiked(dramaId: drama.id, episode: episodeNumber)
+                        barButton(
+                            title: isFeedLiked ? "已点赞" : "点赞",
+                            icon: isFeedLiked ? "heart.fill" : "heart",
+                            target: .like
+                        ) {
+                            Task {
+                                await likeStore.toggleLike(drama: drama, episode: episodeNumber)
+                            }
+                        }
+                    }
                     barButton(title: "剧集详情", icon: "info.circle", target: .detail) {
                         feedActions.onDetail(drama)
                     }

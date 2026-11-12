@@ -1231,47 +1231,47 @@ class _HomeScreenState extends State<HomeScreen> {
           (5, Icons.settings_outlined, Icons.settings_rounded, '设置'),
         ];
         final navIndex = destinations.indexWhere((item) => item.$1 == _tab);
-        final scaffold = Scaffold(
-          appBar: _tab == 0
-              ? HomeAppBarView(
-                  selectionMode: _selectionMode,
-                  selectedEmpty: _selectedDramas.isEmpty,
-                  tab: _tab,
-                  sourceGroups: _sourceGroups,
-                  group: _group,
-                  showRecommendations: _showRecommendations,
-                  searchVisible: _searchVisible,
-                  television: television,
-                  canDownload: widget.store.canDownload,
-                  supportsDownloads: widget.repository.supportsDownloads,
-                  supportsSourceManagement:
-                      widget.repository.supportsSourceManagement,
-                  sourcesEmpty: _hasNoSourcePlugins,
-                  loading: _loading || _loadingMore || _categoriesLoading,
-                  catalogSortLabel: widget.store.catalogView.sort.label,
-                  isSortedOrFiltered:
-                      widget.store.catalogView.sort != CatalogSort.source ||
-                      widget.store.catalogView.release.isNotEmpty,
-                  screenWidth: constraints.maxWidth,
-                  onClearSelection: () => setState(_selectedDramas.clear),
-                  onCancelSelection: _cancelSelection,
-                  onChangeGroup: _changeGroup,
-                  onChooseCatalogView: _chooseCatalogView,
-                  onOpenRankings: _openRankings,
-                  onStartSelection: () => setState(() => _selectionMode = true),
-                  onToggleSearch: _toggleSearch,
-                  onRefreshCatalog: _refreshCatalog,
-                  onMoreAction: _handleHomeMoreAction,
-                  onOpenSourceSwitcher: _openSourceSwitcher,
-                )
-              : null,
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: Theme.of(context).brightness == Brightness.dark
-                  ? AppGradients.darkAtmosphere
-                  : null,
-            ),
-            child: SafeArea(
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final scaffold = Container(
+          decoration: BoxDecoration(
+            gradient: isDark ? AppGradients.darkAtmosphere : null,
+          ),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: _tab == 0
+                ? HomeAppBarView(
+                    selectionMode: _selectionMode,
+                    selectedEmpty: _selectedDramas.isEmpty,
+                    tab: _tab,
+                    sourceGroups: _sourceGroups,
+                    group: _group,
+                    showRecommendations: _showRecommendations,
+                    searchVisible: _searchVisible,
+                    television: television,
+                    canDownload: widget.store.canDownload,
+                    supportsDownloads: widget.repository.supportsDownloads,
+                    supportsSourceManagement:
+                        widget.repository.supportsSourceManagement,
+                    sourcesEmpty: _hasNoSourcePlugins,
+                    loading: _loading || _loadingMore || _categoriesLoading,
+                    catalogSortLabel: widget.store.catalogView.sort.label,
+                    isSortedOrFiltered:
+                        widget.store.catalogView.sort != CatalogSort.source ||
+                        widget.store.catalogView.release.isNotEmpty,
+                    screenWidth: constraints.maxWidth,
+                    onClearSelection: () => setState(_selectedDramas.clear),
+                    onCancelSelection: _cancelSelection,
+                    onChangeGroup: _changeGroup,
+                    onChooseCatalogView: _chooseCatalogView,
+                    onOpenRankings: _openRankings,
+                    onStartSelection: () => setState(() => _selectionMode = true),
+                    onToggleSearch: _toggleSearch,
+                    onRefreshCatalog: _refreshCatalog,
+                    onMoreAction: _handleHomeMoreAction,
+                    onOpenSourceSwitcher: _openSourceSwitcher,
+                  )
+                : null,
+            body: SafeArea(
               top: false,
               child: Row(
                 children: [
@@ -1397,7 +1397,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-          ),
           bottomNavigationBar: desktop || television
               ? null
               : _selectionMode
@@ -1415,7 +1414,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                   ],
                 ),
-        );
+        ));
         if (!television && !_selectionMode) return scaffold;
         return PopScope(
           canPop:

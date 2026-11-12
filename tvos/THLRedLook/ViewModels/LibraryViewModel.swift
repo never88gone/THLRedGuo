@@ -7,25 +7,13 @@ public final class LibraryViewModel: ObservableObject {
     @Published public var selectedFollowFilter: FollowState = .none
     @Published public var searchQuery: String = ""
 
-    public enum LibraryTab: String, CaseIterable, Identifiable {
-        case history = "history"
-        case follows = "follows"
-
-        public var id: String { rawValue }
-        public var label: String {
-            switch self {
-            case .history: return "最近观看"
-            case .follows: return "我的收藏"
-            }
-        }
-    }
-
     @Published private(set) var accountLists: [LibraryTab: [WatchEntry]] = [:]
     @Published private(set) var accountErrors: [LibraryTab: String] = [:]
     @Published private(set) var loadingTabs: Set<LibraryTab> = []
     private var accountRevision: UInt64?
 
     func loadAccount(_ tab: LibraryTab, refresh: Bool = false) async {
+        guard tab == .history || tab == .follows else { return }
         let revision = HongguoAccountVault.shared.snapshot.revision
         if revision != accountRevision {
             accountRevision = revision; accountLists = [:]; accountErrors = [:]; loadingTabs = []
@@ -50,6 +38,18 @@ public final class LibraryViewModel: ObservableObject {
     public init(store: LocalStore = .shared) {
         self.store = store
         store.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        UserLikeStore.shared.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        AnchorFollowStore.shared.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -79,6 +79,18 @@ public final class LibraryViewModel: ObservableObject {
         }
         guard !searchQuery.isEmpty else { return filtered }
         return filtered.filter { $0.title.localizedCaseInsensitiveContains(searchQuery) }
+    }
+
+    public var likedList: [Drama] {
+        let all = UserLikeStore.shared.likedDramas
+        guard !searchQuery.isEmpty else { return all }
+        return all.filter { $0.title.localizedCaseInsensitiveContains(searchQuery) }
+    }
+
+    public var followedAnchorsList: [Anchor] {
+        let all = AnchorFollowStore.shared.followedAnchors
+        guard !searchQuery.isEmpty else { return all }
+        return all.filter { $0.name.localizedCaseInsensitiveContains(searchQuery) }
     }
 
     public func clearHistory() {

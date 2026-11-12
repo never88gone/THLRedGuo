@@ -6,6 +6,7 @@ import '../../utils/screen/app_layout.dart';
 import '../../utils/theme/app_colors.dart';
 import 'login_page.dart';
 import 'account_pairing_page.dart';
+import '../anchor/anchor_detail_page.dart';
 export 'qr_login_page.dart';
 import '../../core/account/hongguo_account_session.dart';
 import '../../core/account/hongguo_account_service.dart';
@@ -47,6 +48,7 @@ class _AccountScreenState extends State<AccountScreen> {
   final errors = <bool, String>{};
   final loading = <bool>{};
   late bool history = widget.initialHistory;
+  int _accountTab = 0;
   int revision = -1;
   @override
   void initState() {
@@ -306,30 +308,50 @@ class _AccountScreenState extends State<AccountScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= 600;
-              final tabs = [
-                for (final value in [false, true])
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: TextButton.icon(
-                      key: ValueKey(value ? 'my-history' : 'my-follows'),
-                      onPressed: () => _select(value),
-                      style: TextButton.styleFrom(
-                        backgroundColor: history == value
-                            ? Theme.of(context).colorScheme.secondaryContainer
-                            : null,
-                      ),
-                      icon: Icon(value ? Icons.history : Icons.bookmark_border),
-                      label: Text(value ? '历史记录' : '追剧'),
-                    ),
-                  ),
-              ];
-              final content = account.loggedIn
-                  ? _cloudLibrary()
-                  : widget.localLibraryBuilder(history);
+              final tabs = account.loggedIn
+                  ? [
+                      _accountTabButton(0, '追剧', Icons.bookmark_border),
+                      _accountTabButton(1, '历史记录', Icons.history),
+                      _accountTabButton(2, '点赞视频', Icons.favorite_border),
+                      _accountTabButton(3, '关注主播', Icons.person_outline_rounded),
+                    ]
+                  : [
+                      for (final value in [false, true])
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: TextButton.icon(
+                            key: ValueKey(value ? 'my-history' : 'my-follows'),
+                            onPressed: () => _select(value),
+                            style: TextButton.styleFrom(
+                              backgroundColor: history == value
+                                  ? Theme.of(context).colorScheme.secondaryContainer
+                                  : null,
+                            ),
+                            icon: Icon(value ? Icons.history : Icons.bookmark_border),
+                            label: Text(value ? '历史记录' : '追剧'),
+                          ),
+                        ),
+                    ];
+              final Widget content;
+              if (!account.loggedIn) {
+                content = widget.localLibraryBuilder(history);
+              } else if (_accountTab == 0) {
+                content = _cloudLibrary(false);
+              } else if (_accountTab == 1) {
+                content = _cloudLibrary(true);
+              } else if (_accountTab == 2) {
+                content = _likedVideosView();
+              } else {
+                content = _followedAnchorsView();
+              }
+
               if (!wide) {
                 return Column(
                   children: [
-                    Row(children: tabs),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(children: tabs),
+                    ),
                     Expanded(child: content),
                   ],
                 );
@@ -354,40 +376,212 @@ class _AccountScreenState extends State<AccountScreen> {
       ],
     ),
   );
-  Widget _cloudLibrary() {
-    final entries = lists[history] ?? const <WatchEntry>[];
+
+  Widget _accountTabButton(int index, String label, IconData icon) {
+    final selected = _accountTab == index;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: TextButton.icon(
+        key: ValueKey('account-tab-$index'),
+        onPressed: () {
+          setState(() => _accountTab = index);
+          if (index == 0) _load(false);
+          if (index == 1) _load(true);
+        },
+        style: TextButton.styleFrom(
+          backgroundColor: selected
+              ? Theme.of(context).colorScheme.secondaryContainer
+              : null,
+          foregroundColor: selected ? AppColors.hongguoRed : null,
+        ),
+        icon: Icon(icon, size: 18),
+        label: Text(label),
+      ),
+    );
+  }
+
+  Widget _likedVideosView() {
+    final liked = widget.store.likedDramas;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '点赞的视频',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(
+                key: const Key('account-liked-refresh'),
+                tooltip: '刷新列表',
+                onPressed: () => setState(() {}),
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: liked.isEmpty
+              ? const Center(
+                  child: Text(
+                    '暂无点赞的短剧视频',
+                    key: Key('account-liked-state'),
+                  ),
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = (constraints.maxWidth / 170).floor().clamp(2, 8);
+                    final width = (constraints.maxWidth - 32 - (columns - 1) * 12) / columns;
+                    return GridView.builder(
+                      key: const ValueKey('account-liked-grid'),
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 12,
+                        mainAxisExtent: DramaTile.extentFor(context, width),
+                      ),
+                      itemCount: liked.length,
+                      itemBuilder: (_, index) {
+                        final drama = liked[index];
+                        return DramaTile(
+                          key: ValueKey('account-liked-${drama.id}'),
+                          drama: drama,
+                          repository: widget.repository,
+                          onTap: () => widget.onOpen(drama),
+                          subtitle: '已点赞',
+                        );
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _followedAnchorsView() {
+    final anchors = widget.store.followedAnchors;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '关注的主播',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(
+                key: const Key('account-anchors-refresh'),
+                tooltip: '刷新列表',
+                onPressed: () => setState(() {}),
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: anchors.isEmpty
+              ? const Center(
+                  child: Text(
+                    '暂无关注的主播',
+                    key: Key('account-anchors-state'),
+                  ),
+                )
+              : ListView.builder(
+                  key: const ValueKey('account-anchors-list'),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: anchors.length,
+                  itemBuilder: (context, index) {
+                    final anchor = anchors[index];
+                    return Card(
+                      key: ValueKey('anchor-card-${anchor.id}'),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: AppColors.hongguoRed.withValues(alpha: 0.15),
+                          child: Text(
+                            anchor.name.isNotEmpty ? anchor.name.substring(0, 1) : '主',
+                            style: const TextStyle(
+                              color: AppColors.hongguoRed,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        title: Text(anchor.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          anchor.bio.isNotEmpty ? anchor.bio : '粉丝数：${anchor.fansCount}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: OutlinedButton(
+                          onPressed: () {
+                            widget.store.toggleFollowAnchor(anchor);
+                            setState(() {});
+                          },
+                          child: const Text('已关注'),
+                        ),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => AnchorDetailPage(
+                                anchor: anchor,
+                                repository: widget.repository,
+                                store: widget.store,
+                                onOpenDrama: widget.onOpen,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _cloudLibrary(bool tabHistory) {
+    final entries = lists[tabHistory] ?? const <WatchEntry>[];
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              Expanded(child: Text('红果账号 · ${history ? '历史记录' : '追剧'}')),
+              Expanded(child: Text('红果账号 · ${tabHistory ? '历史记录' : '追剧'}')),
               IconButton(
                 key: const Key('account-library-refresh'),
                 tooltip: '刷新列表',
-                onPressed: loading.contains(history)
+                onPressed: loading.contains(tabHistory)
                     ? null
-                    : () => _load(history, refresh: true),
+                    : () => _load(tabHistory, refresh: true),
                 icon: const Icon(Icons.refresh),
               ),
             ],
           ),
         ),
-        if (loading.contains(history)) const LinearProgressIndicator(),
-        if (errors[history] != null)
+        if (loading.contains(tabHistory)) const LinearProgressIndicator(),
+        if (errors[tabHistory] != null)
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    errors[history]!,
+                    errors[tabHistory]!,
                     key: const Key('account-library-error'),
                   ),
                 ),
                 TextButton(
-                  onPressed: () => _load(history, refresh: true),
+                  onPressed: () => _load(tabHistory, refresh: true),
                   child: const Text('重试'),
                 ),
               ],
@@ -397,11 +591,11 @@ class _AccountScreenState extends State<AccountScreen> {
           child: entries.isEmpty
               ? Center(
                   child: Text(
-                    loading.contains(history)
+                    loading.contains(tabHistory)
                         ? '正在获取账号列表'
-                        : errors[history] != null
+                        : errors[tabHistory] != null
                         ? '暂时无法读取账号列表'
-                        : history
+                        : tabHistory
                         ? '暂无观看记录'
                         : '暂无追剧记录',
                     key: const Key('account-library-state'),
@@ -417,7 +611,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         (constraints.maxWidth - 32 - (columns - 1) * 12) /
                         columns;
                     return GridView.builder(
-                      key: ValueKey('account-library-$history'),
+                      key: ValueKey('account-library-$tabHistory'),
                       padding: const EdgeInsets.all(16),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
@@ -433,7 +627,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           drama: entry.drama,
                           repository: widget.repository,
                           onTap: () => widget.onOpen(entry.drama),
-                          subtitle: history
+                          subtitle: tabHistory
                               ? '第 ${entry.episode} 集 · ${formatPosition(entry.position)}'
                               : '账号追剧',
                         );

@@ -44,22 +44,22 @@ abstract final class AppColors {
   // ==========================================
   // 3. 深色主题环境色彩 (Dark Mode Surfaces)
   // ==========================================
-  /// 深色深邃背景（纯正影院级黑底）
-  static const Color darkBackground = Color(0xFF0D0E13);
+  /// 深色深邃背景（柔和高阶影院炭灰黑）
+  static const Color darkBackground = Color(0xFF141620);
   /// 深色主面板/导航底色
-  static const Color darkSurface = Color(0xFF15171F);
+  static const Color darkSurface = Color(0xFF1A1D28);
   /// 深色卡片/条目表面
-  static const Color darkCard = Color(0xFF1C1F2A);
+  static const Color darkCard = Color(0xFF202432);
   /// 深色悬浮/弹窗表面
-  static const Color darkSurfaceHigh = Color(0xFF242836);
+  static const Color darkSurfaceHigh = Color(0xFF282D3D);
   /// 深色抬升表面
-  static const Color darkSurfaceElevated = Color(0xFF242836);
+  static const Color darkSurfaceElevated = Color(0xFF282D3D);
   /// 深色高亮微卡片
-  static const Color darkSurfaceHighest = Color(0xFF2D3244);
+  static const Color darkSurfaceHighest = Color(0xFF32374B);
   /// 深色描边与分隔线
-  static const Color darkBorder = Color(0xFF262A38);
+  static const Color darkBorder = Color(0xFF2B3041);
   /// 深色弱化边框
-  static const Color darkBorderSubtle = Color(0xFF1E212E);
+  static const Color darkBorderSubtle = Color(0xFF222634);
 
   // ==========================================
   // 4. 浅色主题环境色彩 (Light Mode Surfaces)
@@ -234,14 +234,14 @@ abstract final class AppGradients {
     ],
   );
 
-  /// 深色影院级背景纵深氛围微渐变（顶部极暗红晕 -> 纯净影院黑）
+  /// 深色影院级背景纵深氛围微渐变（顶部极暗红晕 -> 柔和通透深空灰）
   static const LinearGradient darkAtmosphere = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color(0xFF161118),
-      Color(0xFF0D0E13),
-      Color(0xFF0A0B10),
+      Color(0xFF1E1B26),
+      Color(0xFF171A24),
+      Color(0xFF141620),
     ],
     stops: [0.0, 0.45, 1.0],
   );

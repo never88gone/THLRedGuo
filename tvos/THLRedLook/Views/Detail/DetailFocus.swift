@@ -3,6 +3,7 @@ import Foundation
 enum DetailFocus: Hashable {
     case play
     case favorite
+    case anchor
     case followState
     case download
     case season(Int)

@@ -1,4 +1,3 @@
-import '../../views/account/hongguo_social_dialog.dart';
 import 'dart:async';
 import '../../core/account/hongguo_account_session.dart';
 import 'dart:io';
@@ -22,6 +21,8 @@ import 'package:THLRedLook/core/player/pip_manager.dart';
 import 'package:THLRedLook/core/danmaku/danmaku_controller.dart';
 import 'package:THLRedLook/views/download/download_picker.dart';
 import 'package:THLRedLook/pages/downloads/downloads_page.dart';
+import 'package:THLRedLook/pages/anchor/anchor_detail_page.dart';
+import 'package:THLRedLook/core/account/hongguo_account_social.dart';
 import 'package:THLRedLook/core/store/follow_state.dart';
 import 'package:THLRedLook/core/series/hongguo_series.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
@@ -817,7 +818,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       'autoEnter': autoEnter,
       'width': width,
       'height': height,
-      if (sourceRect != null) ...sourceRect,
+      ...?sourceRect,
     };
     unawaited(
       AppDevice.channel
@@ -2530,55 +2531,92 @@ class _PlayerScreenState extends State<PlayerScreen>
     );
   }
 
-  Widget _feedControls() => AnimatedBuilder(
-    animation: widget.store,
-    builder: (context, _) => StreamBuilder<bool>(
-      stream: _player.stream.playing,
-      builder: (context, snapshot) => StreamBuilder<Duration>(
-        stream: _player.stream.position,
-        builder: (context, _) => FeedPlayerOverlay(
-          title: widget.detail.drama.title,
-          episodeText:
-              '第 ${widget.detail.episodes[_index].number} 集 · 共 ${widget.detail.episodes.length} 集',
-          description: widget.detail.drama.description,
-          playing: _player.state.playing,
-          enabled: !_loading && _error == null,
-          following: widget.store.following(widget.detail.drama.id) != null,
-          danmakuEnabled: _danmakuEnabled,
-          position: _player.state.position,
-          duration: _player.state.duration,
-          onTogglePlayback: _togglePlayback,
-          onSeek: (value) => unawaited(
-            _seekTo(
-              Duration(
-                milliseconds: (_player.state.duration.inMilliseconds * value)
-                    .round(),
+  Widget _feedControls() {
+    final anchor = Anchor(
+      id: widget.detail.drama.cleanSourceId,
+      name: widget.detail.drama.category.isNotEmpty
+          ? '${widget.detail.drama.category}精选'
+          : '官方主播',
+      avatar: widget.detail.drama.cover,
+      bio: widget.detail.drama.description.isNotEmpty
+          ? widget.detail.drama.description
+          : '优质短剧创作者',
+    );
+    return AnimatedBuilder(
+      animation: widget.store,
+      builder: (context, _) => StreamBuilder<bool>(
+        stream: _player.stream.playing,
+        builder: (context, snapshot) => StreamBuilder<Duration>(
+          stream: _player.stream.position,
+          builder: (context, _) => FeedPlayerOverlay(
+            title: widget.detail.drama.title,
+            episodeText:
+                '第 ${widget.detail.episodes[_index].number} 集 · 共 ${widget.detail.episodes.length} 集',
+            description: widget.detail.drama.description,
+            playing: _player.state.playing,
+            enabled: !_loading && _error == null,
+            following: widget.store.following(widget.detail.drama.id) != null,
+            danmakuEnabled: _danmakuEnabled,
+            position: _player.state.position,
+            duration: _player.state.duration,
+            isLiked: widget.store.isLiked(widget.detail.drama.id),
+            onLike: () {
+              widget.store.toggleLike(widget.detail.drama);
+              if (widget.store.usesAccountLibrary(widget.detail.drama.id)) {
+                final ep = widget.detail.episodes[_index].number;
+                final likeModel = HongguoAccountSocial.shared
+                    .snapshot(widget.detail.drama)
+                    ?.episode(ep);
+                if (likeModel != null) {
+                  HongguoAccountSocial.shared.like(
+                    widget.detail.drama,
+                    likeModel,
+                    !likeModel.liked,
+                  );
+                }
+              }
+            },
+            anchorName: anchor.name,
+            isAnchorFollowed: widget.store.isAnchorFollowed(anchor.id),
+            onToggleFollowAnchor: () {
+              widget.store.toggleFollowAnchor(anchor);
+            },
+            onOpenAnchorDetail: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AnchorDetailPage(
+                    anchor: anchor,
+                    repository: widget.repository,
+                    store: widget.store,
+                    initialDramas: [widget.detail.drama],
+                  ),
+                ),
+              );
+            },
+            onTogglePlayback: _togglePlayback,
+            onSeek: (value) => unawaited(
+              _seekTo(
+                Duration(
+                  milliseconds: (_player.state.duration.inMilliseconds * value)
+                      .round(),
+                ),
               ),
             ),
-          ),
-          onSocial: widget.store.usesAccountLibrary(widget.detail.drama.id)
-              ? () => unawaited(
-                  showHongguoSocialDialog(
-                    context,
-                    widget.detail.drama,
-                    widget.detail.episodes[_index].number,
-                  ),
-                )
-              : null,
-          onFavorite: () => unawaited(
-            saveUserChange(
-              context,
-              () => widget.store.toggleFavorite(widget.detail.drama),
+            onFavorite: () => unawaited(
+              saveUserChange(
+                context,
+                () => widget.store.toggleFavorite(widget.detail.drama),
+              ),
             ),
+            onEpisodes: () => unawaited(_openPanel(PlayerMenuSection.episodes)),
+            onDetail: widget.onOpenDetail ?? () {},
+            onDanmaku: () => unawaited(_toggleDanmaku()),
+            onSettings: () => unawaited(_openPanel(PlayerMenuSection.settings)),
           ),
-          onEpisodes: () => unawaited(_openPanel(PlayerMenuSection.episodes)),
-          onDetail: widget.onOpenDetail ?? () {},
-          onDanmaku: () => unawaited(_toggleDanmaku()),
-          onSettings: () => unawaited(_openPanel(PlayerMenuSection.settings)),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _videoPane(BuildContext context, {double topPadding = 0.0}) {
     return PlayerViewportView(

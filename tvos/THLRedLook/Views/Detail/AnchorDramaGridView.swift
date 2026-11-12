@@ -1,0 +1,52 @@
+import SwiftUI
+
+/// 主播作品短剧网格展示组件
+public struct AnchorDramaGridView: View {
+    public let dramas: [Drama]
+    public let onSelectDrama: (Drama) -> Void
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 28), count: 5)
+    @FocusState private var focusedCardId: String?
+
+    public init(dramas: [Drama], onSelectDrama: @escaping (Drama) -> Void) {
+        self.dramas = dramas
+        self.onSelectDrama = onSelectDrama
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("参演短剧作品")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(TVColors.textPrimary)
+                .padding(.horizontal, 60)
+
+            if dramas.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "film")
+                        .font(.system(size: 48))
+                        .foregroundColor(TVColors.textMuted)
+                    Text("暂无相关短剧作品")
+                        .font(.system(size: 22))
+                        .foregroundColor(TVColors.textSecondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 280)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVGrid(columns: columns, spacing: 36) {
+                        ForEach(dramas) { drama in
+                            DramaCardView(
+                                drama: drama,
+                                isFocused: focusedCardId == drama.id
+                            ) {
+                                onSelectDrama(drama)
+                            }
+                            .focused($focusedCardId, equals: drama.id)
+                            .accessibilityIdentifier("anchor.drama.\(drama.id)")
+                        }
+                    }
+                    .padding(.horizontal, 60)
+                    .padding(.bottom, 60)
+                }
+            }
+        }
+    }
+}

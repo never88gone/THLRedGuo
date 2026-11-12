@@ -22,20 +22,13 @@ class AppBottomNavigation extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xE612141C) : const Color(0xF2FFFFFF),
+        color: isDark ? const Color(0xD9141620) : const Color(0xE6FFFFFF),
         border: Border(
           top: BorderSide(
-            color: isDark ? const Color(0x2EFFFFFF) : colors.outlineVariant.withValues(alpha: 0.5),
-            width: 0.6,
+            color: isDark ? const Color(0x1AFFFFFF) : colors.outlineVariant.withValues(alpha: 0.3),
+            width: 0.5,
           ),
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 16,
-            offset: Offset(0, -4),
-          ),
-        ],
       ),
       child: SafeArea(
         top: false,

@@ -10,6 +10,7 @@ public struct DramaDetailActionBar: View {
     @Binding var resumePosition: Double
     @Binding var playingEpisodeIndex: Int?
     @Binding var showingDownloadSuccess: Bool
+    var onShowAnchor: (() -> Void)? = nil
     let scrollProxy: ScrollViewProxy
     let onFocus: (DetailFocus) -> Void
 
@@ -57,6 +58,26 @@ public struct DramaDetailActionBar: View {
                     .accessibilityLabel(viewModel.followState == .none ? "追剧" : "已追剧(已收藏)")
 
                     TVAccountSocialButton(drama: viewModel.drama, episode: viewModel.lastWatchEntry?.episode ?? selectedEpisodeNumber)
+
+                    TVButton(
+                        title: "主播",
+                        icon: "person.crop.circle",
+                        isExternalFocused: focusedTarget == .anchor,
+                        onDownCommand: {
+                            if viewModel.seasonItems.count > 1 {
+                                onFocus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0))
+                            } else if detail.episodeChunks.count > 1 {
+                                onFocus(.chunk(viewModel.selectedChunkIndex))
+                            } else if let first = detail.episodes.first {
+                                onFocus(.episode(first.number))
+                            }
+                        }
+                    ) {
+                        onShowAnchor?()
+                    }
+                    .focused($focusedTarget, equals: .anchor)
+                    .id("detail_anchor")
+                    .accessibilityIdentifier("detail.anchor")
 
                     if viewModel.followState != .none && !accountLibrary.loggedIn {
                         Menu {

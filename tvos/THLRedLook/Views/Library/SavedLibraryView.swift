@@ -4,6 +4,7 @@ public struct SavedLibraryView: View {
     @StateObject private var viewModel = LibraryViewModel()
     @ObservedObject private var account = HongguoAccountModel.shared
     @State private var selectedDrama: Drama?
+    @State private var selectedAnchor: Anchor?
     @State private var lastOpenedID: String?
     @State private var detailDismissedAt = Date.distantPast
     @State private var showingClearHistory = false
@@ -12,16 +13,7 @@ public struct SavedLibraryView: View {
     @State private var openedDebugLogin = false
     @State private var focusSequence = 0
 
-    public enum FocusTarget: Hashable {
-        case mainTab(LibraryViewModel.LibraryTab)
-        case followFilter(FollowState)
-        case clearHistory
-        case account
-        case refresh
-        case card(String)
-        case emptyAction
-    }
-    @FocusState private var focusedTarget: FocusTarget?
+    @FocusState private var focusedTarget: LibraryFocusTarget?
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 28), count: 5)
     public var focusCategoryTrigger: Int = 0
     public var onRequestFocusTopNav: (() -> Void)?
@@ -37,12 +29,23 @@ public struct SavedLibraryView: View {
         account.loggedIn ? HongguoAccountLibraryCache.shared.entries(history: viewModel.selectedTab == .history) : viewModel.historyList
     }
     private var dramas: [Drama] {
-        account.loggedIn || viewModel.selectedTab == .history ? entries.map(\.drama) : viewModel.followedList
+        if viewModel.selectedTab == .liked {
+            return viewModel.likedList
+        }
+        if viewModel.selectedTab == .anchors {
+            return []
+        }
+        return account.loggedIn || viewModel.selectedTab == .history ? entries.map(\.drama) : viewModel.followedList
     }
-    private var listHeader: FocusTarget {
+    private var listHeader: LibraryFocusTarget {
         !account.loggedIn && viewModel.selectedTab == .follows ? .followFilter(viewModel.selectedFollowFilter) : .mainTab(viewModel.selectedTab)
     }
-    private var firstCardTarget: FocusTarget { dramas.first.map { .card($0.id) } ?? .emptyAction }
+    private var firstCardTarget: LibraryFocusTarget {
+        if viewModel.selectedTab == .anchors {
+            return viewModel.followedAnchorsList.first.map { .anchorCard($0.id) } ?? .emptyAction
+        }
+        return dramas.first.map { .card($0.id) } ?? .emptyAction
+    }
 
     public var body: some View {
         ScrollViewReader { proxy in
@@ -116,7 +119,7 @@ public struct SavedLibraryView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         ForEach(LibraryViewModel.LibraryTab.allCases) { tab in
                             TVCapsuleButton(
-                                title: tab == .follows ? "追剧" : "历史记录",
+                                title: tab.label,
                                 isSelected: viewModel.selectedTab == tab,
                                 isFocused: focusedTarget == .mainTab(tab),
                                 isCompact: true,
@@ -185,14 +188,38 @@ public struct SavedLibraryView: View {
                             Text(error).foregroundStyle(.orange).font(.system(size: 24)).padding(.horizontal, 20).accessibilityIdentifier("library.error")
                         }
                         ScrollView {
-                            if dramas.isEmpty {
+                            if viewModel.selectedTab == .anchors {
+                                if viewModel.followedAnchorsList.isEmpty {
+                                    VStack(spacing: 24) {
+                                        Text("暂无关注的主播").font(.system(size: 29, weight: .medium))
+                                        TVButton(title: "去探索短剧", icon: "sparkles.tv",
+                                            isFocused: focusedTarget == .emptyAction, onUpCommand: { focus(.account, with: proxy) }) {
+                                            requestTopNavigation()
+                                        }.focused($focusedTarget, equals: .emptyAction).accessibilityIdentifier("library.emptyAction").id(LibraryFocusTarget.emptyAction)
+                                    }.frame(maxWidth: .infinity, minHeight: 300)
+                                } else {
+                                    LazyVGrid(columns: columns, spacing: 36) {
+                                        ForEach(viewModel.followedAnchorsList) { anchor in
+                                            Button(action: { selectedAnchor = anchor }) {
+                                                AnchorCardView(anchor: anchor, isFocused: focusedTarget == .anchorCard(anchor.id))
+                                            }
+                                            .buttonStyle(TVZeroHighlightButtonStyle())
+                                            .focused($focusedTarget, equals: .anchorCard(anchor.id))
+                                            .accessibilityIdentifier("library.anchor.\(anchor.id)")
+                                            .id(LibraryFocusTarget.anchorCard(anchor.id))
+                                        }
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 24)
+                                }
+                            } else if dramas.isEmpty {
                                 VStack(spacing: 24) {
                                     Text(emptyMessage).font(.system(size: 29, weight: .medium))
                                     TVButton(title: account.loggedIn ? "刷新列表" : "去探索短剧", icon: account.loggedIn ? "arrow.clockwise" : "sparkles.tv",
                                         isFocused: focusedTarget == .emptyAction, onUpCommand: { focus(.account, with: proxy) }) {
                                         if account.loggedIn { Task { await viewModel.loadAccount(viewModel.selectedTab, refresh: true) } }
                                         else { requestTopNavigation() }
-                                    }.focused($focusedTarget, equals: .emptyAction).accessibilityIdentifier("library.emptyAction").id(FocusTarget.emptyAction)
+                                    }.focused($focusedTarget, equals: .emptyAction).accessibilityIdentifier("library.emptyAction").id(LibraryFocusTarget.emptyAction)
                                 }.frame(maxWidth: .infinity, minHeight: 300)
                             } else {
                                 LazyVGrid(columns: columns, spacing: 36) {
@@ -205,14 +232,15 @@ public struct SavedLibraryView: View {
                                             lastOpenedID = drama.id; selectedDrama = drama
                                         }.focused($focusedTarget, equals: .card(drama.id))
                                         .accessibilityIdentifier("library.card.\(drama.id)")
-                                        .accessibilityValue(entry?.progressLabel ?? (account.loggedIn ? "账号追剧" : "本地收藏"))
-                                        .id(FocusTarget.card(drama.id))
+                                        .accessibilityValue(entry?.progressLabel ?? (viewModel.selectedTab == .liked ? "点赞视频" : (account.loggedIn ? "账号追剧" : "本地收藏")))
+                                        .id(LibraryFocusTarget.card(drama.id))
                                         .contextMenu {
                                             if !account.loggedIn {
                                                 Button(role: .destructive) {
                                                     if viewModel.selectedTab == .follows { viewModel.removeFollow(dramaId: drama.id) }
+                                                    else if viewModel.selectedTab == .liked { UserLikeStore.shared.removeLike(dramaId: drama.id) }
                                                     else { viewModel.removeHistory(dramaId: drama.id) }
-                                                } label: { Label(viewModel.selectedTab == .follows ? "取消追剧" : "删除观看记录", systemImage: "trash") }
+                                                } label: { Label(viewModel.selectedTab == .follows ? "取消追剧" : (viewModel.selectedTab == .liked ? "取消点赞" : "删除观看记录"), systemImage: "trash") }
                                             }
                                         }
                                     }
@@ -227,9 +255,12 @@ public struct SavedLibraryView: View {
             .defaultFocus($focusedTarget, .mainTab(viewModel.selectedTab))
             .fullScreenCover(item: $selectedDrama, onDismiss: {
                 detailDismissedAt = Date()
-                let target = lastOpenedID.flatMap { id in dramas.contains { $0.id == id } ? FocusTarget.card(id) : nil } ?? firstCardTarget
+                let target = lastOpenedID.flatMap { id in dramas.contains { $0.id == id } ? LibraryFocusTarget.card(id) : nil } ?? firstCardTarget
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { focus(target, with: proxy) }
             }) { drama in DramaDetailView(drama: drama) }
+            .fullScreenCover(item: $selectedAnchor) { anchor in
+                AnchorDetailView(anchor: anchor)
+            }
             .fullScreenCover(isPresented: $showingLogin, onDismiss: {
                 if !account.loggedIn || !account.verified { account.cancel() }
                 onRequestFocusContent?()
@@ -283,13 +314,15 @@ public struct SavedLibraryView: View {
                 #endif
             }
             .onExitCommand {
-                guard selectedDrama == nil, !showingClearHistory, !showingLogin, !showingAccountMenu, Date().timeIntervalSince(detailDismissedAt) > 0.5 else { return }
+                guard selectedDrama == nil, selectedAnchor == nil, !showingClearHistory, !showingLogin, !showingAccountMenu, Date().timeIntervalSince(detailDismissedAt) > 0.5 else { return }
                 requestTopNavigation()
             }
         }
     }
 
     private var emptyMessage: String {
+        if viewModel.selectedTab == .liked { return "暂无点赞视频" }
+        if viewModel.selectedTab == .anchors { return "暂无关注的主播" }
         if account.loggedIn {
             if viewModel.loadingTabs.contains(viewModel.selectedTab) { return "正在获取账号列表" }
             if viewModel.accountErrors[viewModel.selectedTab] != nil { return "暂时无法读取账号列表" }
@@ -304,7 +337,7 @@ public struct SavedLibraryView: View {
         }.frame(width: 48, height: 48).clipShape(Circle())
     }
     private func requestTopNavigation() { focusSequence += 1; focusedTarget = nil; onRequestFocusTopNav?() }
-    private func focus(_ target: FocusTarget, with proxy: ScrollViewProxy) {
+    private func focus(_ target: LibraryFocusTarget, with proxy: ScrollViewProxy) {
         focusSequence += 1; let sequence = focusSequence
         if case .card = target { proxy.scrollTo(target, anchor: .center) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {

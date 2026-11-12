@@ -29,6 +29,7 @@ public struct TVPlayerControlsOverlay: View {
             TVPlayerTopInfoBar(
                 title: viewModel.drama.title,
                 episodeText: "第 \(viewModel.currentEpisodeIndex) 集 · \(PlaybackPlan.qualityLabel(viewModel.selectedQuality))",
+                episodeNumber: viewModel.currentEpisodeIndex,
                 onSocial: onSocial,
                 feedActions: feedActions,
                 drama: viewModel.drama,

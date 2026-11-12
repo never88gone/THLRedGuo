@@ -598,3 +598,62 @@ List<Map<String, dynamic>> readJsonList(String? value) {
     return [];
   }
 }
+
+class Anchor {
+  const Anchor({
+    required this.id,
+    required this.name,
+    this.avatar = '',
+    this.bio = '优质短剧创作者',
+    this.fansCount = 12800,
+    this.dramasCount = 18,
+    this.isFollowed = false,
+  });
+
+  final String id;
+  final String name;
+  final String avatar;
+  final String bio;
+  final int fansCount;
+  final int dramasCount;
+  final bool isFollowed;
+
+  Anchor copyWith({
+    String? id,
+    String? name,
+    String? avatar,
+    String? bio,
+    int? fansCount,
+    int? dramasCount,
+    bool? isFollowed,
+  }) =>
+      Anchor(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        avatar: avatar ?? this.avatar,
+        bio: bio ?? this.bio,
+        fansCount: fansCount ?? this.fansCount,
+        dramasCount: dramasCount ?? this.dramasCount,
+        isFollowed: isFollowed ?? this.isFollowed,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'avatar': avatar,
+        'bio': bio,
+        'fansCount': fansCount,
+        'dramasCount': dramasCount,
+        'isFollowed': isFollowed,
+      };
+
+  factory Anchor.fromJson(Map<String, dynamic> json) => Anchor(
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? '官方主播',
+        avatar: json['avatar'] as String? ?? '',
+        bio: json['bio'] as String? ?? '优质短剧创作者',
+        fansCount: (json['fansCount'] as num?)?.toInt() ?? 12800,
+        dramasCount: (json['dramasCount'] as num?)?.toInt() ?? 18,
+        isFollowed: json['isFollowed'] as bool? ?? false,
+      );
+}

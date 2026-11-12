@@ -7,6 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		97B3ACA0C5BF46CF974732DA /* AnchorHeaderFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41316F24FACF4B569C568A61 /* AnchorHeaderFocus.swift */; };
+		B90A5E68380147CABD81AC11 /* LibraryFocusTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59D63C6082D24104ACD55492 /* LibraryFocusTarget.swift */; };
+		447AEBD78C1443B991EBD8EA /* LibraryTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B852A497FB748A79571DFB8 /* LibraryTab.swift */; };
+		AF019690B36D66C8575DAC1A /* PlayerControlsVisibilityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF019690B36D66C8575DAC1A /* PlayerControlsVisibilityCoordinator.swift */; };
+		A9684BA90B4E125C5E8CD443 /* PlayerSeekCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9684BA90B4E125C5E8CD443 /* PlayerSeekCoordinator.swift */; };
+		A8528D890B81EE8B32D009E8 /* UserLikeRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8528D890B81EE8B32D009E8 /* UserLikeRecord.swift */; };
+		AFB1255DD922889EDD67FE28 /* Anchor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFB1255DD922889EDD67FE28 /* Anchor.swift */; };
+		A5304A5B2F99E3B609C23BF7 /* UserLikeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5304A5B2F99E3B609C23BF7 /* UserLikeStore.swift */; };
+		AEF2BBDC9F7FDA31C36B1493 /* AnchorFollowStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF2BBDC9F7FDA31C36B1493 /* AnchorFollowStore.swift */; };
+		A598ABF7807B6B28BD5233CF /* AnchorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B598ABF7807B6B28BD5233CF /* AnchorService.swift */; };
+		AE7592CD6206C594BB3847A9 /* AnchorHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE7592CD6206C594BB3847A9 /* AnchorHeaderView.swift */; };
+		A4108558B7155764D9A378EE /* AnchorDramaGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4108558B7155764D9A378EE /* AnchorDramaGridView.swift */; };
+		A8AD2E9E6F24F2F9F08271DE /* AnchorDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8AD2E9E6F24F2F9F08271DE /* AnchorDetailView.swift */; };
+		AA51665D682FA367ADBB4124 /* AnchorCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA51665D682FA367ADBB4124 /* AnchorCardView.swift */; };
 		A90100012D00000100000001 /* DownloadJobStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90100012D00000100000001 /* DownloadJobStore.swift */; };
 		41C37EC749EC58A53B9BAD6B /* AVPlayerContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759A6D2A08A5A853ED0D0C8E /* AVPlayerContainerView.swift */; };
 		CA93C7032E714C4DBD595936 /* AboutCompactInfoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A23B44F66966D28BA1F1D63 /* AboutCompactInfoCard.swift */; };
@@ -266,6 +280,20 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		41316F24FACF4B569C568A61 /* AnchorHeaderFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorHeaderFocus.swift; sourceTree = "<group>"; };
+		59D63C6082D24104ACD55492 /* LibraryFocusTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFocusTarget.swift; sourceTree = "<group>"; };
+		9B852A497FB748A79571DFB8 /* LibraryTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTab.swift; sourceTree = "<group>"; };
+		BF019690B36D66C8575DAC1A /* PlayerControlsVisibilityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControlsVisibilityCoordinator.swift; sourceTree = "<group>"; };
+		B9684BA90B4E125C5E8CD443 /* PlayerSeekCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSeekCoordinator.swift; sourceTree = "<group>"; };
+		B8528D890B81EE8B32D009E8 /* UserLikeRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserLikeRecord.swift; sourceTree = "<group>"; };
+		BFB1255DD922889EDD67FE28 /* Anchor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Anchor.swift; sourceTree = "<group>"; };
+		B5304A5B2F99E3B609C23BF7 /* UserLikeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserLikeStore.swift; sourceTree = "<group>"; };
+		BEF2BBDC9F7FDA31C36B1493 /* AnchorFollowStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorFollowStore.swift; sourceTree = "<group>"; };
+		B598ABF7807B6B28BD5233CF /* AnchorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorService.swift; sourceTree = "<group>"; };
+		BE7592CD6206C594BB3847A9 /* AnchorHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorHeaderView.swift; sourceTree = "<group>"; };
+		B4108558B7155764D9A378EE /* AnchorDramaGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorDramaGridView.swift; sourceTree = "<group>"; };
+		B8AD2E9E6F24F2F9F08271DE /* AnchorDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorDetailView.swift; sourceTree = "<group>"; };
+		BA51665D682FA367ADBB4124 /* AnchorCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorCardView.swift; sourceTree = "<group>"; };
 		B90100012D00000100000001 /* DownloadJobStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadJobStore.swift; sourceTree = "<group>"; };
 		759A6D2A08A5A853ED0D0C8E /* AVPlayerContainerView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AVPlayerContainerView.swift; sourceTree = "<group>"; };
 		0A23B44F66966D28BA1F1D63 /* AboutCompactInfoCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AboutCompactInfoCard.swift; sourceTree = "<group>"; };
@@ -664,6 +692,8 @@
 		G10000022C00000100000001 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				BFB1255DD922889EDD67FE28 /* Anchor.swift */,
+				B8528D890B81EE8B32D009E8 /* UserLikeRecord.swift */,
 				052BF7B8B5280F620C4F141C /* TVPlannedDanmaku.swift */,
 				585AB964FD06F7D08AF569AD /* CatalogCategory.swift */,
 				B8241044E54BEE6BFCB33210 /* CatalogReleaseFilter.swift */,
@@ -715,6 +745,9 @@
 		G10000032C00000100000001 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				B598ABF7807B6B28BD5233CF /* AnchorService.swift */,
+				BEF2BBDC9F7FDA31C36B1493 /* AnchorFollowStore.swift */,
+				B5304A5B2F99E3B609C23BF7 /* UserLikeStore.swift */,
 				DDB346FEB0F4F97CB0833845 /* AccountPairCipher.swift */,
 				02197E4C7064D41F2E7A938B /* AccountPairHTTPClient.swift */,
 				2AA3D8AF4DC3C3E20FD063E6 /* AccountPairingServer.swift */,
@@ -781,6 +814,9 @@
 		G10000042C00000100000001 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				9B852A497FB748A79571DFB8 /* LibraryTab.swift */,
+				BF019690B36D66C8575DAC1A /* PlayerControlsVisibilityCoordinator.swift */,
+				B9684BA90B4E125C5E8CD443 /* PlayerSeekCoordinator.swift */,
 				38AC5607CC1E8EAE2308D7BC /* DownloadsViewModel.swift */,
 				226CC75A3CA54CC74DB58DFF /* JSSourceService.swift */,
 				A87540E8E3E35308FEDEC02C /* PlayerDanmakuManager.swift */,
@@ -828,6 +864,7 @@
 		G10000072C00000100000001 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				BA51665D682FA367ADBB4124 /* AnchorCardView.swift */,
 				BCA85A0CC0F81BEB27689A8E /* DramaCardLabel.swift */,
 				A872C0928C0F899246406A49 /* PosterArtworkView.swift */,
 				97FDBCF8989E948B177C08D6 /* TVButtonLabel.swift */,
@@ -875,6 +912,10 @@
 		G10000092C00000100000001 /* Detail */ = {
 			isa = PBXGroup;
 			children = (
+				41316F24FACF4B569C568A61 /* AnchorHeaderFocus.swift */,
+				B8AD2E9E6F24F2F9F08271DE /* AnchorDetailView.swift */,
+				B4108558B7155764D9A378EE /* AnchorDramaGridView.swift */,
+				BE7592CD6206C594BB3847A9 /* AnchorHeaderView.swift */,
 				BAC401E72D397BB513180D02 /* DetailFocus.swift */,
 				74C124CA8B00E4190DF4410E /* DramaDetailActionBar.swift */,
 				05341280A8B0E1103B360BB5 /* DramaDetailEpisodeGrid.swift */,
@@ -929,6 +970,7 @@
 		G10000132C00000100000001 /* Library */ = {
 			isa = PBXGroup;
 			children = (
+				59D63C6082D24104ACD55492 /* LibraryFocusTarget.swift */,
 				B10000302C00000100000001 /* SavedLibraryView.swift */,
 			);
 			path = Library;
@@ -1213,6 +1255,20 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				97B3ACA0C5BF46CF974732DA /* AnchorHeaderFocus.swift in Sources */,
+				B90A5E68380147CABD81AC11 /* LibraryFocusTarget.swift in Sources */,
+				447AEBD78C1443B991EBD8EA /* LibraryTab.swift in Sources */,
+				AF019690B36D66C8575DAC1A /* PlayerControlsVisibilityCoordinator.swift in Sources */,
+				A9684BA90B4E125C5E8CD443 /* PlayerSeekCoordinator.swift in Sources */,
+				A8528D890B81EE8B32D009E8 /* UserLikeRecord.swift in Sources */,
+				AFB1255DD922889EDD67FE28 /* Anchor.swift in Sources */,
+				A5304A5B2F99E3B609C23BF7 /* UserLikeStore.swift in Sources */,
+				AEF2BBDC9F7FDA31C36B1493 /* AnchorFollowStore.swift in Sources */,
+				A598ABF7807B6B28BD5233CF /* AnchorService.swift in Sources */,
+				AE7592CD6206C594BB3847A9 /* AnchorHeaderView.swift in Sources */,
+				A4108558B7155764D9A378EE /* AnchorDramaGridView.swift in Sources */,
+				A8AD2E9E6F24F2F9F08271DE /* AnchorDetailView.swift in Sources */,
+				AA51665D682FA367ADBB4124 /* AnchorCardView.swift in Sources */,
 				41C37EC749EC58A53B9BAD6B /* AVPlayerContainerView.swift in Sources */,
 				CA93C7032E714C4DBD595936 /* AboutCompactInfoCard.swift in Sources */,
 				0756A4B02161B912F4A95657 /* AboutDisclaimerCard.swift in Sources */,

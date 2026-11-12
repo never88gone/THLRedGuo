@@ -9,7 +9,7 @@ import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/download/download_collections.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
-import 'package:THLRedLook/pages/player/player_page.dart';
+import 'package:THLRedLook/pages/downloads/offline_player_page.dart';
 import 'package:THLRedLook/views/remote/remote_widgets.dart';
 import 'package:THLRedLook/pages/settings/settings_page.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
@@ -262,13 +262,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         MaterialPageRoute<void>(
           builder: (_) =>
               widget.playerBuilder?.call(detail, index, position) ??
-              PlayerScreen(
-                detail: detail,
+              OfflinePlayerPage(
+                drama: job.drama,
+                completedJobs: completed,
                 initialIndex: index,
-                initialPosition: position,
                 repository: widget.repository,
                 store: widget.store,
-                localOnly: true,
               ),
         ),
       );
@@ -758,21 +757,14 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.embedded)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 4, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                ...actions,
-              ],
-            ),
+          AppBar(
+            key: const ValueKey('downloads-embedded-appbar'),
+            title: Text(title),
+            actions: actions,
+            automaticallyImplyLeading: false,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
           ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -897,7 +889,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         if (_selecting) _batchBar(),
       ],
     );
-    if (widget.embedded) return body;
+    if (widget.embedded) {
+      return SafeArea(
+        top: true,
+        bottom: false,
+        child: body,
+      );
+    }
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): () =>
