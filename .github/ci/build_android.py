@@ -40,7 +40,18 @@ def main():
         if options.cn_mirrors:
             print('本次构建启用国内依赖镜像，保留官方 Maven 仓库备用。', flush=True)
         subprocess.run([flutter, 'pub', 'get'], cwd=root, env=env, check=True)
-        build_args = [flutter, 'build', 'apk', '--release', '--split-per-abi', '--no-pub', '--build-name=1.0.0', f'--build-number={beijing_build}', *variant.flutter_arguments]
+        build_args = [
+            flutter,
+            'build',
+            'apk',
+            '--release',
+            '--split-per-abi',
+            '--no-pub',
+            '--android-skip-build-dependency-validation',
+            '--build-name=1.0.0',
+            f'--build-number={beijing_build}',
+            *variant.flutter_arguments,
+        ]
         if options.abi:
             targets = {'arm64-v8a': 'android-arm64', 'armeabi-v7a': 'android-arm', 'x86_64': 'android-x64'}
             build_args += ['--target-platform', ','.join(targets[abi] for abi in options.abi)]
