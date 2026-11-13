@@ -48,6 +48,7 @@ public struct AnchorDramaGridView: View {
                         }
                     }
                     .padding(.horizontal, 60)
+                    .padding(.top, 28)
                     .padding(.bottom, 60)
                 }
             }
