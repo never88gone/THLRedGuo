@@ -5,7 +5,24 @@ struct TVCapsuleButtonLabel: View {
     let isSelected: Bool
     let externalFocused: Bool
     let isCompact: Bool
+    let isLarge: Bool
     let onFocused: (() -> Void)?
+
+    init(
+        title: String,
+        isSelected: Bool,
+        externalFocused: Bool,
+        isCompact: Bool,
+        isLarge: Bool = false,
+        onFocused: (() -> Void)?
+    ) {
+        self.title = title
+        self.isSelected = isSelected
+        self.externalFocused = externalFocused
+        self.isCompact = isCompact
+        self.isLarge = isLarge
+        self.onFocused = onFocused
+    }
 
     @Environment(\.isFocused) private var envIsFocused
 
@@ -13,15 +30,36 @@ struct TVCapsuleButtonLabel: View {
         externalFocused || envIsFocused
     }
 
+    private var fontSize: CGFloat {
+        if isLarge {
+            return isFocused ? 22 : 20
+        }
+        return isCompact ? (isFocused ? 16 : 14) : (isFocused ? 19 : 17)
+    }
+
+    private var horizontalPadding: CGFloat {
+        if isLarge {
+            return isFocused ? 32 : 28
+        }
+        return isCompact ? (isFocused ? 18 : 14) : (isFocused ? 28 : 24)
+    }
+
+    private var verticalPadding: CGFloat {
+        if isLarge {
+            return isFocused ? 15 : 13
+        }
+        return isCompact ? (isFocused ? 9 : 7) : (isFocused ? 13 : 11)
+    }
+
     var body: some View {
         Text(title)
             .font(.system(
-                size: isCompact ? (isFocused ? 16 : 14) : (isFocused ? 19 : 17),
+                size: fontSize,
                 weight: (isFocused || isSelected) ? .heavy : .medium
             ))
             .foregroundColor(textColor)
-            .padding(.horizontal, isCompact ? (isFocused ? 18 : 14) : (isFocused ? 28 : 24))
-            .padding(.vertical, isCompact ? (isFocused ? 9 : 7) : (isFocused ? 13 : 11))
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
             .background(backgroundView)
             .clipShape(Capsule())
             .overlay(
@@ -80,10 +118,10 @@ struct TVCapsuleButtonLabel: View {
 
     private var shadowRadius: CGFloat {
         if isFocused {
-            return 16.0
+            return isLarge ? 20.0 : 16.0
         }
         if isSelected {
-            return 8.0
+            return isLarge ? 10.0 : 8.0
         }
         return 0
     }

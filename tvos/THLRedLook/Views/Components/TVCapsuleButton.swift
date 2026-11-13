@@ -6,6 +6,7 @@ public struct TVCapsuleButton: View {
     public var isSelected: Bool = false
     public var isFocused: Bool = false
     public var isCompact: Bool = false
+    public var isLarge: Bool = false
     public var onFocused: (() -> Void)? = nil
     public var onUpCommand: (() -> Void)? = nil
     public var onDownCommand: (() -> Void)? = nil
@@ -18,6 +19,7 @@ public struct TVCapsuleButton: View {
         isSelected: Bool = false,
         isFocused: Bool = false,
         isCompact: Bool = false,
+        isLarge: Bool = false,
         isExternalFocused: Bool? = nil,
         onFocused: (() -> Void)? = nil,
         onUpCommand: (() -> Void)? = nil,
@@ -30,6 +32,7 @@ public struct TVCapsuleButton: View {
         self.isSelected = isSelected
         self.isFocused = isExternalFocused ?? isFocused
         self.isCompact = isCompact
+        self.isLarge = isLarge
         self.onFocused = onFocused
         self.onUpCommand = onUpCommand
         self.onDownCommand = onDownCommand
@@ -45,6 +48,7 @@ public struct TVCapsuleButton: View {
                 isSelected: isSelected,
                 externalFocused: isFocused,
                 isCompact: isCompact,
+                isLarge: isLarge,
                 onFocused: onFocused
             )
         }

@@ -68,13 +68,13 @@ public struct SavedLibraryView: View {
                 headerView(proxy: proxy)
 
                 HStack(alignment: .top, spacing: 32) {
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 20) {
                         ForEach(LibraryTab.allCases) { tab in
                             TVCapsuleButton(
                                 title: tab.label,
                                 isSelected: viewModel.selectedTab == tab,
                                 isFocused: focusedTarget == .mainTab(tab),
-                                isCompact: true,
+                                isLarge: true,
                                 onFocused: {
                                     if viewModel.selectedTab != tab {
                                         viewModel.selectedTab = tab
@@ -89,7 +89,7 @@ public struct SavedLibraryView: View {
                         }
                         Spacer()
                     }
-                    .frame(width: 140)
+                    .frame(width: 200)
                     .padding(.leading, 48)
                     .focusSection()
 
