@@ -28,7 +28,7 @@ public struct AnchorDetailView: View {
     }
 
     private var followEnabled: Bool {
-        guard let anchor else { return false }
+        guard account.loggedIn, let anchor else { return false }
         return allowsWrites && !loading && !writing && anchor.following != nil && (anchor.canFollow == true || anchor.following == true)
     }
 
@@ -109,7 +109,7 @@ public struct AnchorDetailView: View {
     }
 
     private func toggleFollow(_ current: Anchor) async {
-        guard !writing, let following = current.following else { return }
+        guard account.loggedIn, !writing, let following = current.following else { return }
         writing = true; error = nil
         let next = !following
         let updated = Anchor(
@@ -125,15 +125,12 @@ public struct AnchorDetailView: View {
             relativeType: current.relativeType
         )
         self.anchor = updated
-        _ = await AnchorFollowStore.shared.toggleFollow(anchor: updated)
         onFollowingChanged?()
 
-        if account.loggedIn {
-            do {
-                try await account.setProfileFollowing(current, follow: next)
-            } catch {
-                NSLog("🎬 [AnchorDetailView] 官方创作者关注协同: %@", error.localizedDescription)
-            }
+        do {
+            try await account.setProfileFollowing(current, follow: next)
+        } catch {
+            NSLog("🎬 [AnchorDetailView] 接口请求关注: %@", error.localizedDescription)
         }
         writing = false
     }

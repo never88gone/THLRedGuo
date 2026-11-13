@@ -2571,41 +2571,50 @@ class _PlayerScreenState extends State<PlayerScreen>
               danmakuEnabled: _danmakuEnabled,
               position: _player.state.position,
               duration: _player.state.duration,
-              isLiked: widget.store.isLiked(widget.detail.drama.id),
-              onLike: () {
-                widget.store.toggleLike(widget.detail.drama);
-                if (widget.store.usesAccountLibrary(widget.detail.drama.id)) {
-                  final ep = widget.detail.episodes[_index].number;
-                  final likeModel = HongguoAccountSocial.shared
+              isLiked: HongguoAccountSocial.shared
                       .snapshot(widget.detail.drama)
-                      ?.episode(ep);
-                  if (likeModel != null) {
-                    HongguoAccountSocial.shared.like(
-                      widget.detail.drama,
-                      likeModel,
-                      !likeModel.liked,
-                    );
-                  }
-                }
-              },
+                      ?.episode(widget.detail.episodes[_index].number)
+                      ?.liked ??
+                  false,
+              likeCount: HongguoAccountSocial.shared
+                      .snapshot(widget.detail.drama)
+                      ?.episode(widget.detail.episodes[_index].number)
+                      ?.count ??
+                  0,
+              onLike: HongguoAccountSession.shared.loggedIn
+                  ? () {
+                      final ep = widget.detail.episodes[_index].number;
+                      final likeModel = HongguoAccountSocial.shared
+                          .snapshot(widget.detail.drama)
+                          ?.episode(ep);
+                      if (likeModel != null) {
+                        HongguoAccountSocial.shared.like(
+                          widget.detail.drama,
+                          likeModel,
+                          !likeModel.liked,
+                        );
+                      }
+                    }
+                  : null,
               anchorName: anchor?.name ?? '',
               isAnchorFollowed: creator?.following == true,
               onToggleFollowAnchor:
-                  creator == null ||
-                      creator.following == null ||
-                      social.busy(widget.detail.drama) ||
-                      (!creator.canFollow && creator.following != true)
-                  ? null
-                  : () => unawaited(
-                      saveUserChange(
-                        context,
-                        () => social.follow(
-                          widget.detail.drama,
-                          creator,
-                          !creator.following!,
+                  !HongguoAccountSession.shared.loggedIn ||
+                          creator == null ||
+                          creator.following == null ||
+                          social.busy(widget.detail.drama) ||
+                          (!creator.canFollow && creator.following != true)
+                      ? null
+                      : () => unawaited(
+                          saveUserChange(
+                            context,
+                            () => social.follow(
+                              widget.detail.drama,
+                              creator,
+                              !creator.following!,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
               onOpenAnchorDetail: anchor == null
                   ? null
                   : () {

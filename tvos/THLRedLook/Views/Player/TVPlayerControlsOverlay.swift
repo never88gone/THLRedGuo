@@ -421,6 +421,9 @@ public struct TVPlayerControlsOverlay: View {
         }
         .onChange(of: focusedControl) { _, _ in viewModel.showControls() }
         .onAppear {
+            if HongguoAccountModel.shared.loggedIn {
+                Task { try? await HongguoAccountModel.shared.loadSocial(viewModel.drama) }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 if let restore = viewModel.restoreFocusTarget {
                     focusedControl = restore

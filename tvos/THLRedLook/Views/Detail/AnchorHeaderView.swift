@@ -27,7 +27,6 @@ public struct AnchorHeaderView: View {
 
     public var body: some View {
         HStack(alignment: .top, spacing: 40) {
-            // 主播头像
             avatarView
                 .frame(width: 140, height: 140)
                 .clipShape(Circle())
@@ -37,7 +36,6 @@ public struct AnchorHeaderView: View {
                 )
                 .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 6)
 
-            // 主播基本信息
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 24) {
                     Text(anchor.name)
@@ -45,35 +43,36 @@ public struct AnchorHeaderView: View {
                         .foregroundColor(TVColors.textPrimary)
                         .lineLimit(1)
 
-                    // 关注按钮
-                    Button(action: onToggleFollow) {
-                        HStack(spacing: 8) {
-                            Image(systemName: isFollowed ? "checkmark" : "plus")
-                                .font(.system(size: 18, weight: .bold))
-                            Text(isFollowed ? "已关注" : "关注")
-                                .font(.system(size: 18, weight: .bold))
+                    if HongguoAccountModel.shared.loggedIn {
+                        Button(action: onToggleFollow) {
+                            HStack(spacing: 8) {
+                                Image(systemName: isFollowed ? "checkmark" : "plus")
+                                    .font(.system(size: 18, weight: .bold))
+                                Text(isFollowed ? "已关注" : "关注")
+                                    .font(.system(size: 18, weight: .bold))
+                            }
+                            .padding(.horizontal, 28)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(
+                                        isFollowed
+                                            ? (focus.wrappedValue == .follow ? TVColors.surfaceFocused : TVColors.surfaceCard)
+                                            : (focus.wrappedValue == .follow ? TVColors.activeRedHighlight : TVColors.activeRed)
+                                    )
+                            )
+                            .foregroundColor(TVColors.textPrimary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.white.opacity(focus.wrappedValue == .follow ? 0.9 : 0.2), lineWidth: 2)
+                            )
                         }
-                        .padding(.horizontal, 28)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(
-                                    isFollowed
-                                        ? (focus.wrappedValue == .follow ? TVColors.surfaceFocused : TVColors.surfaceCard)
-                                        : (focus.wrappedValue == .follow ? TVColors.activeRedHighlight : TVColors.activeRed)
-                                )
-                        )
-                        .foregroundColor(TVColors.textPrimary)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.white.opacity(focus.wrappedValue == .follow ? 0.9 : 0.2), lineWidth: 2)
-                        )
+                        .buttonStyle(TVZeroHighlightButtonStyle())
+                        .focused(focus, equals: .follow)
+                        .accessibilityIdentifier("anchor.follow")
+                        .disabled(!followEnabled)
+                        .onMoveCommand { if $0 == .down { onDownCommand() } }
                     }
-                    .buttonStyle(TVZeroHighlightButtonStyle())
-                    .focused(focus, equals: .follow)
-                    .accessibilityIdentifier("anchor.follow")
-                    .disabled(!followEnabled)
-                    .onMoveCommand { if $0 == .down { onDownCommand() } }
                 }
 
                 HStack(spacing: 28) {

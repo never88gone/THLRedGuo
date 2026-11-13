@@ -23,23 +23,24 @@ class HongguoSocialButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([
-      HongguoAccountSocial.shared,
-      ?store,
-    ]),
+    animation: HongguoAccountSocial.shared,
     builder: (context, _) {
-      final isLiked = store?.isLiked(drama.id) ?? false;
       final model = HongguoAccountSocial.shared;
+      // 未登录状态下不显示点赞与关注按钮
+      if (!model.active) {
+        return const SizedBox.shrink();
+      }
+
       final data = model.snapshot(drama);
       final like = data?.episode(episode);
+      final isLiked = like?.liked == true;
       final creator = data?.creators.firstOrNull;
 
       final Anchor? anchor = creator != null
           ? Anchor(
               id: creator.id,
               name: creator.name,
-              isFollowed: (store?.isAnchorFollowed(creator.id) ?? false) ||
-                  creator.following == true,
+              isFollowed: creator.following == true,
               officialFollowing: creator.following,
               canFollow: creator.canFollow,
               relativeType: creator.relativeType,
@@ -51,7 +52,7 @@ class HongguoSocialButton extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 点赞短剧操作（直接操作，即时更新本地与云端）
+            // 点赞短剧操作（纯接口请求，无需本地记录）
             Row(
               children: [
                 FilledButton.tonalIcon(
@@ -69,12 +70,11 @@ class HongguoSocialButton extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: () {
-                    store?.toggleLike(drama);
-                    if (model.active && like != null) {
-                      model.like(drama, like, !isLiked);
-                    }
-                  },
+                  onPressed: like == null
+                      ? null
+                      : () {
+                          model.like(drama, like, !isLiked);
+                        },
                   icon: Icon(
                     isLiked ? Icons.favorite : Icons.favorite_border,
                     size: 18,
@@ -82,9 +82,11 @@ class HongguoSocialButton extends StatelessWidget {
                   ),
                   label: Text(
                     isLiked
-                        ? (like != null ? '已点赞 (${like.count})' : '已点赞')
-                        : (like != null && like.count > 0
-                            ? '点赞 (${like.count})'
+                        ? ((like?.count ?? 0) > 0
+                            ? '已点赞 (${like!.count})'
+                            : '已点赞')
+                        : ((like?.count ?? 0) > 0
+                            ? '点赞 (${like!.count})'
                             : '点赞'),
                   ),
                 ),

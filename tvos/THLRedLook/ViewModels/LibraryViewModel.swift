@@ -124,13 +124,7 @@ public final class LibraryViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        UserLikeStore.shared.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
-
-        AnchorFollowStore.shared.objectWillChange
+        HongguoAccountModel.shared.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
@@ -195,13 +189,15 @@ public final class LibraryViewModel: ObservableObject {
     }
 
     public var likedList: [Drama] {
-        let all = UserLikeStore.shared.likedDramas
+        guard officialAccount else { return [] }
+        let all = officialLikes.compactMap(\.drama)
         guard !searchQuery.isEmpty else { return all }
         return all.filter { $0.title.localizedCaseInsensitiveContains(searchQuery) }
     }
 
     public var followedAnchorsList: [Anchor] {
-        let all = officialAccount ? officialAnchors : AnchorFollowStore.shared.followedAnchors
+        guard officialAccount else { return [] }
+        let all = officialAnchors
         guard !searchQuery.isEmpty else { return all }
         return all.filter { $0.name.localizedCaseInsensitiveContains(searchQuery) }
     }

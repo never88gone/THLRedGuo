@@ -1,6 +1,6 @@
 import Foundation
 
-/// 主播与创作者数据服务
+/// 主播与创作者数据服务（纯接口驱动）
 @MainActor
 public final class AnchorService {
     public static let shared = AnchorService()
@@ -11,7 +11,7 @@ public final class AnchorService {
     public func fetchAnchors(for drama: Drama) async -> [Anchor] {
         if let rows = try? await HongguoAccountModel.shared.creators(for: drama), !rows.isEmpty {
             return rows.map {
-                let isFollowed = $0.following ?? AnchorFollowStore.shared.isFollowed(anchorId: $0.id)
+                let isFollowed = $0.following ?? false
                 return Anchor(
                     id: $0.id,
                     name: $0.name,
@@ -23,9 +23,7 @@ public final class AnchorService {
             }
         }
 
-        // 兜底与离线：从短剧信息推导默认主播
         let anchorId = "anchor_\(drama.cleanSourceId)"
-        let isFollowed = AnchorFollowStore.shared.isFollowed(anchorId: anchorId)
         let defaultAnchor = Anchor(
             id: anchorId,
             name: extractAnchorName(from: drama),
@@ -34,7 +32,7 @@ public final class AnchorService {
             followerCount: 26800,
             worksCount: 1,
             dramas: [drama],
-            following: isFollowed,
+            following: false,
             canFollow: true
         )
         return [defaultAnchor]
@@ -43,7 +41,7 @@ public final class AnchorService {
     /// 获取主播详情（含其参与的短剧列表）
     public func fetchAnchorDetail(anchorId: String, dramas: [Drama] = []) async throws -> Anchor {
         if let profile = try? await HongguoAccountModel.shared.creatorProfile(anchorId, dramas: dramas) {
-            let isFollowed = profile.following ?? AnchorFollowStore.shared.isFollowed(anchorId: profile.id)
+            let isFollowed = profile.following ?? false
             return Anchor(
                 id: profile.id,
                 name: profile.name,
@@ -58,14 +56,8 @@ public final class AnchorService {
             )
         }
 
-        // 离线/接口空缺兜底
-        if let existing = AnchorFollowStore.shared.followedAnchors.first(where: { $0.id == anchorId }) {
-            return existing
-        }
-
         let firstDrama = dramas.first
         let name = firstDrama.map { extractAnchorName(from: $0) } ?? "热播短剧主播"
-        let isFollowed = AnchorFollowStore.shared.isFollowed(anchorId: anchorId)
         return Anchor(
             id: anchorId,
             name: name,
@@ -74,7 +66,7 @@ public final class AnchorService {
             followerCount: 36800,
             worksCount: max(1, dramas.count),
             dramas: dramas,
-            following: isFollowed,
+            following: false,
             canFollow: true
         )
     }

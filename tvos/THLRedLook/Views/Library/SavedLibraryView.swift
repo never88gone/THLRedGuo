@@ -69,7 +69,8 @@ public struct SavedLibraryView: View {
 
                 HStack(alignment: .top, spacing: 32) {
                     VStack(alignment: .leading, spacing: 18) {
-                        ForEach(LibraryTab.allCases) { tab in
+                        let displayedTabs: [LibraryTab] = viewModel.officialAccount ? LibraryTab.allCases : [.history, .follows]
+                        ForEach(displayedTabs) { tab in
                             TVCapsuleButton(
                                 title: tab.label,
                                 isSelected: viewModel.selectedTab == tab,
@@ -145,10 +146,16 @@ public struct SavedLibraryView: View {
                                 if viewModel.followedAnchorsList.isEmpty {
                                     VStack(spacing: 24) {
                                         Text(emptyMessage).font(.system(size: 29, weight: .medium))
-                                        TVButton(title: viewModel.officialAccount ? "刷新列表" : "去探索短剧", icon: viewModel.officialAccount ? "arrow.clockwise" : "sparkles.tv",
+                                        TVButton(title: (!viewModel.officialAccount && viewModel.selectedTab == .anchors) ? "登录红果账号" : (viewModel.officialAccount ? "刷新列表" : "去探索短剧"),
+                                            icon: (!viewModel.officialAccount && viewModel.selectedTab == .anchors) ? "person.crop.circle.badge.plus" : (viewModel.officialAccount ? "arrow.clockwise" : "sparkles.tv"),
                                             isFocused: focusedTarget == .emptyAction, onUpCommand: { focus(.account, with: proxy) }) {
-                                            if viewModel.officialAccount { Task { await viewModel.loadAccount(.anchors, refresh: true) } }
-                                            else { requestTopNavigation() }
+                                            if !viewModel.officialAccount && viewModel.selectedTab == .anchors {
+                                                showingLogin = true
+                                            } else if viewModel.officialAccount {
+                                                Task { await viewModel.loadAccount(.anchors, refresh: true) }
+                                            } else {
+                                                requestTopNavigation()
+                                            }
                                         }.focused($focusedTarget, equals: .emptyAction).accessibilityIdentifier("library.emptyAction").id(LibraryFocusTarget.emptyAction)
                                     }.frame(maxWidth: .infinity, minHeight: 300)
                                 } else {
@@ -174,10 +181,16 @@ public struct SavedLibraryView: View {
                             } else if videoRows.isEmpty {
                                 VStack(spacing: 24) {
                                     Text(emptyMessage).font(.system(size: 29, weight: .medium))
-                                    TVButton(title: viewModel.officialAccount ? "刷新列表" : "去探索短剧", icon: viewModel.officialAccount ? "arrow.clockwise" : "sparkles.tv",
+                                    TVButton(title: (!viewModel.officialAccount && viewModel.selectedTab == .liked) ? "登录红果账号" : (viewModel.officialAccount ? "刷新列表" : "去探索短剧"),
+                                        icon: (!viewModel.officialAccount && viewModel.selectedTab == .liked) ? "person.crop.circle.badge.plus" : (viewModel.officialAccount ? "arrow.clockwise" : "sparkles.tv"),
                                         isFocused: focusedTarget == .emptyAction, onUpCommand: { focus(.account, with: proxy) }) {
-                                        if viewModel.officialAccount { Task { await viewModel.loadAccount(viewModel.selectedTab, refresh: true) } }
-                                        else { requestTopNavigation() }
+                                        if !viewModel.officialAccount && viewModel.selectedTab == .liked {
+                                            showingLogin = true
+                                        } else if viewModel.officialAccount {
+                                            Task { await viewModel.loadAccount(viewModel.selectedTab, refresh: true) }
+                                        } else {
+                                            requestTopNavigation()
+                                        }
                                     }.focused($focusedTarget, equals: .emptyAction).accessibilityIdentifier("library.emptyAction").id(LibraryFocusTarget.emptyAction)
                                 }.frame(maxWidth: .infinity, minHeight: 300)
                             } else {
@@ -200,9 +213,8 @@ public struct SavedLibraryView: View {
                                             if !viewModel.officialAccount {
                                                 Button(role: .destructive) {
                                                     if viewModel.selectedTab == .follows { viewModel.removeFollow(dramaId: drama.id) }
-                                                    else if viewModel.selectedTab == .liked { UserLikeStore.shared.removeLike(dramaId: drama.id) }
                                                     else { viewModel.removeHistory(dramaId: drama.id) }
-                                                } label: { Label(viewModel.selectedTab == .follows ? "取消追剧" : (viewModel.selectedTab == .liked ? "取消点赞" : "删除观看记录"), systemImage: "trash") }
+                                                } label: { Label(viewModel.selectedTab == .follows ? "取消追剧" : "删除观看记录", systemImage: "trash") }
                                             }
                                         }
                                     }
