@@ -35,21 +35,27 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
   bool loading = true, writing = false;
   int generation = 0;
   late int revision;
-  bool get following => profile?.officialFollowing == true;
+  bool get following => service.session.loggedIn
+      ? profile?.officialFollowing == true
+      : profile?.isFollowed == true;
   bool get canChangeFollowing =>
       profile != null &&
       !loading &&
       !writing &&
-      service.session.loggedIn &&
-      profile!.officialFollowing != null &&
-      (following || profile!.canFollow);
+      (!service.session.loggedIn ||
+          profile!.officialFollowing != null &&
+              (following || profile!.canFollow));
 
+  Anchor get localProfile => widget.anchor.copyWith(
+    isFollowed: widget.store.isAnchorFollowed(widget.anchor.id),
+    officialFollowing: widget.store.isAnchorFollowed(widget.anchor.id),
+  );
   @override
   void initState() {
     super.initState();
     revision = service.session.revision;
     service.session.addListener(_accountChanged);
-    profile = widget.anchor;
+    profile = service.session.loggedIn ? widget.anchor : localProfile;
     loading = false;
     _load();
   }
@@ -60,7 +66,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
     generation++;
     if (mounted) {
       setState(() {
-        profile = service.session.loggedIn ? null : widget.anchor;
+        profile = service.session.loggedIn ? null : localProfile;
         error = null;
         writing = false;
       });
@@ -97,6 +103,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
   Future<void> _follow() async {
     final current = profile;
     if (current == null || !canChangeFollowing) return;
+    final official = service.session.loggedIn;
     final nextFollowing = !following;
     final ticket = ++generation;
     setState(() {
@@ -108,9 +115,12 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
       );
     });
     try {
-      final value = await service.setProfileFollowing(current, nextFollowing);
+      final value = official
+          ? await service.setProfileFollowing(current, nextFollowing)
+          : profile!;
       if (!mounted || ticket != generation) return;
       setState(() => profile = value);
+      await widget.store.setAnchorFollowed(value, nextFollowing);
       if (mounted && ticket == generation) widget.onFollowingChanged?.call();
     } catch (issue) {
       if (mounted && ticket == generation) {
@@ -189,23 +199,21 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                   key: const ValueKey('anchor-works-count'),
                 ),
               ),
-            if (service.session.loggedIn) ...[
-              FilledButton.icon(
-                key: ValueKey(
-                  following ? 'anchor-followed-btn' : 'anchor-follow-btn',
-                ),
-                onPressed: canChangeFollowing ? _follow : null,
-                icon: Icon(following ? Icons.check : Icons.add),
-                label: Text(
-                  writing
-                      ? '正在确认'
-                      : following
-                      ? '已关注'
-                      : '关注',
-                ),
+            FilledButton.icon(
+              key: ValueKey(
+                following ? 'anchor-followed-btn' : 'anchor-follow-btn',
               ),
-              const SizedBox(height: 24),
-            ],
+              onPressed: canChangeFollowing ? _follow : null,
+              icon: Icon(following ? Icons.check : Icons.add),
+              label: Text(
+                writing
+                    ? '正在确认'
+                    : following
+                    ? '已关注'
+                    : '关注',
+              ),
+            ),
+            const SizedBox(height: 24),
             if (widget.initialDramas.isNotEmpty) ...[
               Text(
                 '短剧作品 (${widget.initialDramas.length})',

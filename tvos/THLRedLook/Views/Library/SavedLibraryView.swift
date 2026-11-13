@@ -69,8 +69,7 @@ public struct SavedLibraryView: View {
 
                 HStack(alignment: .top, spacing: 32) {
                     VStack(alignment: .leading, spacing: 18) {
-                        let displayedTabs: [LibraryTab] = viewModel.officialAccount ? LibraryTab.allCases : [.history, .follows]
-                        ForEach(displayedTabs) { tab in
+                        ForEach(LibraryTab.allCases) { tab in
                             TVCapsuleButton(
                                 title: tab.label,
                                 isSelected: viewModel.selectedTab == tab,

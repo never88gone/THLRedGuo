@@ -68,10 +68,15 @@ class _AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     account.addListener(_accountChanged);
+    widget.store.addListener(_storeChanged);
     if (widget.service == null && widget.session == null) {
       HongguoAccountLibrary.shared.addListener(_libraryChanged);
     }
     _accountChanged();
+  }
+
+  void _storeChanged() {
+    if (mounted) setState(() {});
   }
 
   void _libraryChanged() {
@@ -84,10 +89,6 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   void _accountChanged() {
-    if (!account.loggedIn && _accountTab >= 2) {
-      _accountTab = 0;
-      history = false;
-    }
     if (revision != account.revision) {
       revision = account.revision;
       lists.clear();
@@ -138,6 +139,7 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   void dispose() {
     account.removeListener(_accountChanged);
+    widget.store.removeListener(_storeChanged);
     liked.dispose();
     anchors.dispose();
     if (widget.service == null && widget.session == null) {
@@ -324,32 +326,26 @@ class _AccountScreenState extends State<AccountScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= 600;
-              final tabs = account.loggedIn
-                  ? [
-                      _accountTabButton(0, '追剧', Icons.bookmark_border),
-                      _accountTabButton(1, '历史记录', Icons.history),
-                      _accountTabButton(2, '点赞视频', Icons.favorite_border),
-                      _accountTabButton(
-                        3,
-                        '关注主播',
-                        Icons.person_outline_rounded,
-                      ),
-                    ]
-                  : [
-                      _accountTabButton(0, '追剧', Icons.bookmark_border),
-                      _accountTabButton(1, '历史记录', Icons.history),
-                    ];
-              final activeTab = account.loggedIn ? _accountTab : (_accountTab.clamp(0, 1));
+              final tabs = [
+                _accountTabButton(0, '追剧', Icons.bookmark_border),
+                _accountTabButton(1, '历史记录', Icons.history),
+                _accountTabButton(2, '点赞视频', Icons.favorite_border),
+                _accountTabButton(
+                  3,
+                  '关注主播',
+                  Icons.person_outline_rounded,
+                ),
+              ];
               final Widget content;
-              if (activeTab == 0) {
+              if (_accountTab == 0) {
                 content = account.loggedIn
                     ? _cloudLibrary(false)
                     : widget.localLibraryBuilder(false);
-              } else if (activeTab == 1) {
+              } else if (_accountTab == 1) {
                 content = account.loggedIn
                     ? _cloudLibrary(true)
                     : widget.localLibraryBuilder(true);
-              } else if (activeTab == 2) {
+              } else if (_accountTab == 2) {
                 content = _likedVideosView();
               } else {
                 content = _followedAnchorsView();
@@ -413,105 +409,135 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  Widget _likedVideosView() => HongguoCollectionView<HongguoLikedVideo>(
-    key: const ValueKey('official-liked'),
-    controller: liked,
-    name: 'liked',
-    title: '红果账号 · 点赞视频',
-    emptyMessage: '暂无点赞的视频',
-    sliver: (context, rows) => SliverPadding(
-      padding: const EdgeInsets.all(16),
-      sliver: SliverLayoutBuilder(
-        builder: (context, constraints) {
-          final columns = (constraints.crossAxisExtent / 170).floor().clamp(
-            2,
-            8,
-          );
-          final width =
-              (constraints.crossAxisExtent - (columns - 1) * 12) / columns;
-          return SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 12,
-              mainAxisExtent: DramaTile.extentFor(context, width),
-            ),
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final row = rows[index];
-              final drama = row.drama;
-              if (drama == null) {
-                return Card(
-                  child: Center(child: Text('${row.title}\n暂不支持打开此视频')),
-                );
-              }
-              return DramaTile(
-                key: ValueKey('account-liked-${row.key}'),
-                heroTag: 'account-liked-cover-${row.key}',
-                drama: drama,
-                repository: widget.repository,
-                subtitle: row.subtitle,
-                onTap: () => widget.onOpen(drama),
-              );
-            }, childCount: rows.length),
-          );
-        },
-      ),
-    ),
-  );
+  Widget _likedVideosView() {
+    final localLikedRows = widget.store.likedDramas.map((drama) {
+      return HongguoLikedVideo(
+        id: drama.id,
+        title: drama.title,
+        seriesId: drama.cleanSourceId.isNotEmpty
+            ? drama.cleanSourceId
+            : (drama.sourceId.isNotEmpty ? drama.sourceId : drama.id),
+        cover: drama.cover,
+        description: drama.description,
+        episodes: drama.episodes,
+        kind: 'series',
+      );
+    }).toList();
+    final localMap = {for (final d in widget.store.likedDramas) d.id: d};
 
-  Widget _followedAnchorsView() => HongguoCollectionView<Anchor>(
-    key: const ValueKey('official-anchors'),
-    controller: anchors,
-    name: 'anchors',
-    title: '红果账号 · 关注主播',
-    emptyMessage: '暂无关注的主播',
-    sliver: (context, rows) => SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      sliver: SliverList.builder(
-        itemCount: rows.length,
-        itemBuilder: (context, index) {
-          final anchor = rows[index];
-          return Card(
-            key: ValueKey('anchor-card-${anchor.id}'),
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-              title: Text(
-                anchor.name,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+    return HongguoCollectionView<HongguoLikedVideo>(
+      key: const ValueKey('official-liked'),
+      controller: liked,
+      name: 'liked',
+      title: '红果账号 · 点赞视频',
+      emptyMessage: '暂无点赞的视频',
+      localItems: localLikedRows,
+      itemKey: (row) => row.id,
+      sliver: (context, rows) => SliverPadding(
+        padding: const EdgeInsets.all(16),
+        sliver: SliverLayoutBuilder(
+          builder: (context, constraints) {
+            final columns = (constraints.crossAxisExtent / 170).floor().clamp(
+              2,
+              8,
+            );
+            final width =
+                (constraints.crossAxisExtent - (columns - 1) * 12) / columns;
+            return SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 12,
+                mainAxisExtent: DramaTile.extentFor(context, width),
               ),
-              subtitle: anchor.bio.isEmpty
-                  ? null
-                  : Text(
-                      anchor.bio,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () async {
-                var changed = false;
-                await Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AnchorDetailPage(
-                      anchor: anchor,
-                      repository: widget.repository,
-                      store: widget.store,
-                      onOpenDrama: widget.onOpen,
-                      onFollowingChanged: () => changed = true,
-                      service: service,
-                    ),
-                  ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final row = rows[index];
+                final drama =
+                    row.drama ??
+                    localMap[row.id] ??
+                    Drama(
+                      id: row.id,
+                      source: 'hongguo',
+                      sourceId: row.seriesId,
+                      title: row.title,
+                      cover: row.cover,
+                      description: row.description,
+                      episodes: row.episodes,
+                    );
+                return DramaTile(
+                  key: ValueKey('account-liked-${row.key}'),
+                  heroTag: 'account-liked-cover-${row.key}',
+                  drama: drama,
+                  repository: widget.repository,
+                  subtitle: row.subtitle,
+                  onTap: () => widget.onOpen(drama),
                 );
-                if (mounted && changed && account.loggedIn) {
-                  await anchors.load(refresh: true);
-                }
-              },
-            ),
-          );
-        },
+              }, childCount: rows.length),
+            );
+          },
+        ),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _followedAnchorsView() {
+    final localAnchors = widget.store.followedAnchors;
+    return HongguoCollectionView<Anchor>(
+      key: const ValueKey('official-anchors'),
+      controller: anchors,
+      name: 'anchors',
+      title: '红果账号 · 关注主播',
+      emptyMessage: '暂无关注的主播',
+      localItems: localAnchors,
+      itemKey: (anchor) => anchor.id,
+      sliver: (context, rows) => SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        sliver: SliverList.builder(
+          itemCount: rows.length,
+          itemBuilder: (context, index) {
+            final anchor = rows[index];
+            return Card(
+              key: ValueKey('anchor-card-${anchor.id}'),
+              margin: const EdgeInsets.only(bottom: 10),
+              child: ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(
+                  anchor.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: anchor.bio.isEmpty
+                    ? null
+                    : Text(
+                        anchor.bio,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  var changed = false;
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AnchorDetailPage(
+                        anchor: anchor,
+                        repository: widget.repository,
+                        store: widget.store,
+                        onOpenDrama: widget.onOpen,
+                        onFollowingChanged: () => changed = true,
+                        service: service,
+                      ),
+                    ),
+                  );
+                  if (mounted && changed && account.loggedIn) {
+                    await anchors.load(refresh: true);
+                  }
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 
   Widget _cloudLibrary(bool tabHistory) {
     final entries = lists[tabHistory] ?? const <WatchEntry>[];

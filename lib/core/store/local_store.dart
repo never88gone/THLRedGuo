@@ -44,7 +44,39 @@ class LocalStore extends ChangeNotifier {
   int get lanUrgentRevision => _lanUrgentRevision;
   final Map<String, WatchEntry> _history = {};
   final Map<String, Drama> _favorites = {};
+  final Map<String, Drama> _likedDramas = {};
+  final Map<String, Anchor> _followedAnchors = {};
+  bool isLiked(String dramaId) => _likedDramas.containsKey(dramaId);
+  List<Drama> get likedDramas => _likedDramas.values.toList();
+  bool isAnchorFollowed(String anchorId) => _followedAnchors.containsKey(anchorId);
+  List<Anchor> get followedAnchors => _followedAnchors.values.toList();
 
+  Future<void> toggleLike(Drama drama) async {
+    if (_likedDramas.containsKey(drama.id)) {
+      _likedDramas.remove(drama.id);
+    } else {
+      _likedDramas[drama.id] = drama;
+    }
+    notifyListeners();
+  }
+
+  Future<void> toggleFollowAnchor(Anchor anchor) async {
+    if (_followedAnchors.containsKey(anchor.id)) {
+      _followedAnchors.remove(anchor.id);
+    } else {
+      _followedAnchors[anchor.id] = anchor.copyWith(isFollowed: true);
+    }
+    notifyListeners();
+  }
+
+  Future<void> setAnchorFollowed(Anchor anchor, bool follow) async {
+    if (follow) {
+      _followedAnchors[anchor.id] = anchor.copyWith(isFollowed: true);
+    } else {
+      _followedAnchors.remove(anchor.id);
+    }
+    notifyListeners();
+  }
   final Map<String, FollowState> _followStates = {};
   final Map<String, int> _deletedFollows = {};
   final Map<String, int> _deletedHistory = {};

@@ -9,10 +9,14 @@ class HongguoCollectionView<T> extends StatefulWidget {
     required this.title,
     required this.emptyMessage,
     required this.sliver,
+    this.localItems = const [],
+    this.itemKey,
   });
   final HongguoCollectionController<T> controller;
   final String name, title, emptyMessage;
   final Widget Function(BuildContext, List<T>) sliver;
+  final List<T> localItems;
+  final Object Function(T)? itemKey;
 
   @override
   State<HongguoCollectionView<T>> createState() =>
@@ -21,6 +25,21 @@ class HongguoCollectionView<T> extends StatefulWidget {
 
 class _HongguoCollectionViewState<T> extends State<HongguoCollectionView<T>> {
   final scroll = ScrollController();
+
+  List<T> get _effectiveItems {
+    if (widget.localItems.isEmpty) return widget.controller.items;
+    final seen = <Object?>{};
+    final result = <T>[];
+    for (final item in widget.localItems) {
+      final key = widget.itemKey?.call(item) ?? item;
+      if (seen.add(key)) result.add(item);
+    }
+    for (final item in widget.controller.items) {
+      final key = widget.itemKey?.call(item) ?? item;
+      if (seen.add(key)) result.add(item);
+    }
+    return result;
+  }
 
   @override
   void initState() {
@@ -61,7 +80,7 @@ class _HongguoCollectionViewState<T> extends State<HongguoCollectionView<T>> {
   @override
   Widget build(BuildContext context) {
     final model = widget.controller;
-    final items = model.items;
+    final items = _effectiveItems;
     final waiting =
         model.session.loggedIn &&
         (model.loading || (!model.loaded && model.error == null));
