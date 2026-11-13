@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/account/hongguo_account_service.dart';
 import '../../core/account/hongguo_account_session.dart';
@@ -35,17 +34,28 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
   String? error;
   bool loading = true, writing = false;
   int generation = 0;
-  late int revision = service.session.revision;
+  late int revision;
+  bool get following => service.session.loggedIn
+      ? profile?.officialFollowing == true
+      : profile?.isFollowed == true;
+  bool get canChangeFollowing =>
+      profile != null &&
+      !loading &&
+      !writing &&
+      (!service.session.loggedIn ||
+          profile!.officialFollowing != null &&
+              (following || profile!.canFollow));
+
+  Anchor get localProfile => widget.anchor.copyWith(
+    isFollowed: widget.store.isAnchorFollowed(widget.anchor.id),
+    officialFollowing: widget.store.isAnchorFollowed(widget.anchor.id),
+  );
   @override
   void initState() {
     super.initState();
+    revision = service.session.revision;
     service.session.addListener(_accountChanged);
-    final isLocal = widget.store.isAnchorFollowed(widget.anchor.id);
-    profile = widget.anchor.copyWith(
-      isFollowed: isLocal,
-      officialFollowing: widget.anchor.officialFollowing ?? isLocal,
-      canFollow: widget.anchor.canFollow,
-    );
+    profile = service.session.loggedIn ? widget.anchor : localProfile;
     loading = false;
     _load();
   }
@@ -56,7 +66,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
     generation++;
     if (mounted) {
       setState(() {
-        profile = null;
+        profile = service.session.loggedIn ? null : localProfile;
         error = null;
         writing = false;
       });
@@ -92,46 +102,35 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
 
   Future<void> _follow() async {
     final current = profile;
-    if (current == null || writing) return;
-    final isFollowed = current.isFollowed || current.officialFollowing == true;
-    final nextFollowing = !isFollowed;
+    if (current == null || !canChangeFollowing) return;
+    final official = service.session.loggedIn;
+    final nextFollowing = !following;
     final ticket = ++generation;
     setState(() {
-      writing = false;
+      writing = true;
       error = null;
       profile = current.copyWith(
         isFollowed: nextFollowing,
         officialFollowing: nextFollowing,
       );
     });
-    unawaited(widget.store.setAnchorFollowed(current, nextFollowing));
-    widget.onFollowingChanged?.call();
-    if (service.session.loggedIn) {
-      setState(() => writing = true);
-      try {
-        final value = await service.setProfileFollowing(
-          current,
-          nextFollowing,
-        );
-        if (mounted && ticket == generation) {
-          setState(
-            () => profile = value.copyWith(
-              isFollowed: nextFollowing,
-              officialFollowing: nextFollowing,
-            ),
-          );
-        }
-      } catch (issue) {
-        if (mounted && ticket == generation) {
-          setState(
-            () => error = issue is HongguoAccountFailure
-                ? issue.message
-                : '官方账号关注同步失败',
-          );
-        }
-      } finally {
-        if (mounted && ticket == generation) setState(() => writing = false);
+    try {
+      final value = official
+          ? await service.setProfileFollowing(current, nextFollowing)
+          : profile!;
+      if (!mounted || ticket != generation) return;
+      setState(() => profile = value);
+      await widget.store.setAnchorFollowed(value, nextFollowing);
+      if (mounted && ticket == generation) widget.onFollowingChanged?.call();
+    } catch (issue) {
+      if (mounted && ticket == generation) {
+        setState(() {
+          profile = current;
+          error = issue is HongguoAccountFailure ? issue.message : '官方账号关注同步失败';
+        });
       }
+    } finally {
+      if (mounted && ticket == generation) setState(() => writing = false);
     }
   }
 
@@ -202,20 +201,14 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
               ),
             FilledButton.icon(
               key: ValueKey(
-                (value.isFollowed || value.officialFollowing == true)
-                    ? 'anchor-followed-btn'
-                    : 'anchor-follow-btn',
+                following ? 'anchor-followed-btn' : 'anchor-follow-btn',
               ),
-              onPressed: writing ? null : _follow,
-              icon: Icon(
-                (value.isFollowed || value.officialFollowing == true)
-                    ? Icons.check
-                    : Icons.add,
-              ),
+              onPressed: canChangeFollowing ? _follow : null,
+              icon: Icon(following ? Icons.check : Icons.add),
               label: Text(
                 writing
                     ? '正在确认'
-                    : (value.isFollowed || value.officialFollowing == true)
+                    : following
                     ? '已关注'
                     : '关注',
               ),
