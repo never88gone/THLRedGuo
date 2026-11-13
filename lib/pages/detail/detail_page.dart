@@ -1,4 +1,5 @@
 import '../../views/account/hongguo_social_dialog.dart';
+import '../../core/account/hongguo_account_social.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -77,6 +78,13 @@ class _DetailScreenState extends State<DetailScreen> {
     _profileEpoch = widget.store.profileEpoch;
     widget.store.addListener(_onStoreChanged);
     _seriesEntries = widget.initialSeriesEntries;
+    if (HongguoAccountSocial.shared.active) {
+      unawaited(
+        HongguoAccountSocial.shared
+            .load(widget.drama)
+            .catchError((Object _) {}),
+      );
+    }
     if (widget.initialDetail != null) {
       _detail = widget.initialDetail;
       _loading = false;
@@ -1299,6 +1307,8 @@ class _DetailScreenState extends State<DetailScreen> {
                   _followingControls(drama),
                   HongguoSocialButton(
                     drama: drama,
+                    repository: widget.repository,
+                    store: widget.store,
                     episode: widget.store.watched(drama.id)?.episode ?? 1,
                   ),
                 ],

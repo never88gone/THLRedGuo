@@ -158,6 +158,8 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
           _mobileFollowControl(drama),
           HongguoSocialButton(
             drama: drama,
+            repository: widget.repository,
+            store: widget.store,
             episode: widget.detail.episodes.isEmpty
                 ? 1
                 : widget

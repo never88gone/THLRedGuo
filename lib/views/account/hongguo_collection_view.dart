@@ -9,10 +9,15 @@ class HongguoCollectionView<T> extends StatefulWidget {
     required this.title,
     required this.emptyMessage,
     required this.sliver,
+    this.localItems = const [],
+    this.itemKey,
   });
   final HongguoCollectionController<T> controller;
   final String name, title, emptyMessage;
   final Widget Function(BuildContext, List<T>) sliver;
+  final List<T> localItems;
+  final Object Function(T)? itemKey;
+
   @override
   State<HongguoCollectionView<T>> createState() =>
       _HongguoCollectionViewState<T>();
@@ -20,6 +25,22 @@ class HongguoCollectionView<T> extends StatefulWidget {
 
 class _HongguoCollectionViewState<T> extends State<HongguoCollectionView<T>> {
   final scroll = ScrollController();
+
+  List<T> get _effectiveItems {
+    if (widget.localItems.isEmpty) return widget.controller.items;
+    final seen = <Object?>{};
+    final result = <T>[];
+    for (final item in widget.localItems) {
+      final key = widget.itemKey?.call(item) ?? item;
+      if (seen.add(key)) result.add(item);
+    }
+    for (final item in widget.controller.items) {
+      final key = widget.itemKey?.call(item) ?? item;
+      if (seen.add(key)) result.add(item);
+    }
+    return result;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,7 +80,10 @@ class _HongguoCollectionViewState<T> extends State<HongguoCollectionView<T>> {
   @override
   Widget build(BuildContext context) {
     final model = widget.controller;
-    final waiting = model.loading || (!model.loaded && model.error == null);
+    final items = _effectiveItems;
+    final waiting =
+        model.session.loggedIn &&
+        (model.loading || (!model.loaded && model.error == null));
     return Column(
       children: [
         Padding(
@@ -83,7 +107,7 @@ class _HongguoCollectionViewState<T> extends State<HongguoCollectionView<T>> {
             ],
           ),
         ),
-        if (waiting)
+        if (waiting && items.isEmpty)
           LinearProgressIndicator(
             key: ValueKey('account-${widget.name}-loading'),
           ),
@@ -95,8 +119,8 @@ class _HongguoCollectionViewState<T> extends State<HongguoCollectionView<T>> {
               controller: scroll,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                if (model.items.isNotEmpty) widget.sliver(context, model.items),
-                if (model.items.isEmpty)
+                if (items.isNotEmpty) widget.sliver(context, items),
+                if (items.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: Center(

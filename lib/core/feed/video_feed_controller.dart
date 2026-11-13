@@ -38,10 +38,6 @@ class VideoFeedController extends ChangeNotifier {
   void setActive(bool value) {
     if (_disposed || active == value) return;
     active = value;
-    if (!active) {
-      detail = null;
-      loadingDetail = false;
-    }
     _selection++;
     _selectionTimer?.cancel();
     notifyListeners();
@@ -49,6 +45,10 @@ class VideoFeedController extends ChangeNotifier {
       if (items.isEmpty && !loading) {
         unawaited(refresh());
       } else {
+        if (current != null && detail?.drama.id == current!.drama.id) {
+          // 当前详情与短剧完全匹配，直接恢复播放无需重载
+          return;
+        }
         unawaited(prepare());
       }
     }
@@ -180,15 +180,21 @@ class VideoFeedController extends ChangeNotifier {
     if (_disposed || value < 0 || value >= items.length) return;
     index = value;
     _selection++;
-    detail = null;
-    detailError = null;
-    loadingDetail = true;
     _selectionTimer?.cancel();
-    notifyListeners();
-    _selectionTimer = Timer(
-      const Duration(milliseconds: 160),
-      () => unawaited(prepare()),
-    );
+    final target = items[index];
+    final cached = _details[target.drama.id];
+    if (cached != null) {
+      detail = cached;
+      detailError = null;
+      loadingDetail = false;
+      notifyListeners();
+      _preloadNext();
+    } else {
+      loadingDetail = true;
+      detailError = null;
+      notifyListeners();
+      unawaited(prepare());
+    }
     if (index >= items.length - 2) {
       if (hasMore) {
         unawaited(loadMore());
@@ -248,22 +254,34 @@ class VideoFeedController extends ChangeNotifier {
     if (_preparing || _disposed || !active || !allowed || current == null) {
       return;
     }
+    final target = current!;
+    if (detail != null && detail!.drama.id == target.drama.id && !loadingDetail) {
+      return;
+    }
+    final cached = _details[target.drama.id];
+    if (cached != null) {
+      detail = cached;
+      detailError = null;
+      loadingDetail = false;
+      notifyListeners();
+      _preloadNext();
+      return;
+    }
     _preparing = true;
     try {
       while (!_disposed && active && allowed && current != null) {
         final ticket = _selection;
-        final target = current!;
+        final currentTarget = current!;
         final epoch = store.profileEpoch;
         loadingDetail = true;
-        detail = null;
         detailError = null;
         notifyListeners();
         await playback.idle;
         if (_disposed || !active || ticket != _selection) continue;
         try {
           final loaded =
-              _details[target.drama.id] ??
-              await repository.detail(target.drama);
+              _details[currentTarget.drama.id] ??
+              await repository.detail(currentTarget.drama);
           if (_disposed ||
               !active ||
               ticket != _selection ||
@@ -273,14 +291,15 @@ class VideoFeedController extends ChangeNotifier {
           if (loaded.episodes.isEmpty) {
             throw AppFailure('这部短剧暂未返回可播放集数，请重试或上滑换一部');
           }
-          _details[target.drama.id] = loaded;
-          while (_details.length > 3) {
+          _details[currentTarget.drama.id] = loaded;
+          while (_details.length > 6) {
             _details.remove(_details.keys.first);
           }
           detail = loaded;
           loadingDetail = false;
           notifyListeners();
-          unawaited(store.markFeedSeen(target.drama.id));
+          unawaited(store.markFeedSeen(currentTarget.drama.id));
+          _preloadNext();
           break;
         } catch (failure) {
           if (_disposed || !active || ticket != _selection) continue;
@@ -292,6 +311,23 @@ class VideoFeedController extends ChangeNotifier {
       }
     } finally {
       _preparing = false;
+    }
+  }
+
+  void _preloadNext() {
+    final nextIndex = index + 1;
+    if (nextIndex < items.length) {
+      final nextDrama = items[nextIndex].drama;
+      if (!_details.containsKey(nextDrama.id)) {
+        unawaited(() async {
+          try {
+            final loaded = await repository.detail(nextDrama);
+            if (!_disposed && loaded.episodes.isNotEmpty) {
+              _details[nextDrama.id] = loaded;
+            }
+          } catch (_) {}
+        }());
+      }
     }
   }
 
