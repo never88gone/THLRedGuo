@@ -205,7 +205,7 @@ public struct SavedLibraryView: View {
                                             lastOpenedID = row.id; selectedDrama = drama
                                         }.focused($focusedTarget, equals: .card(row.id))
                                         .accessibilityIdentifier("library.card.\(row.id)")
-                                        .accessibilityValue(row.subtitle ?? entry?.progressLabel ?? (viewModel.selectedTab == .liked ? "点赞视频" : (viewModel.officialAccount ? "账号追剧" : "本地收藏")))
+                                        .accessibilityValue(row.subtitle ?? entry?.progressLabel ?? (viewModel.selectedTab == .liked ? "点赞视频" : (viewModel.officialAccount ? "点赞剧集" : "本地收藏")))
                                         .id(LibraryFocusTarget.card(row.id))
                                         .onAppear { Task { await viewModel.loadMoreIfNeeded(viewModel.selectedTab, index: index, count: videoRows.count) } }
                                         .contextMenu {
@@ -334,7 +334,7 @@ public struct SavedLibraryView: View {
         }
         if viewModel.selectedTab == .liked { return "暂无点赞视频" }
         if viewModel.selectedTab == .anchors { return "暂无关注的主播" }
-        return viewModel.selectedTab == .history ? "暂无观看记录" : "暂无追剧记录"
+        return viewModel.selectedTab == .history ? "暂无观看记录" : "暂无点赞剧集"
     }
     private var avatar: some View {
         Group {

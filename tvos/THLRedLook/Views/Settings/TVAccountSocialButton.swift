@@ -1,11 +1,9 @@
 import SwiftUI
 
-// MARK: - 账号社交互动按钮（点赞与创作者）
+// MARK: - 账号社交互动按钮（已废弃：点赞与关注职责已正交分离，剧集/视频为点赞，主播为关注）
 public struct TVAccountSocialButton: View {
-    @ObservedObject private var account = HongguoAccountModel.shared
     let drama: Drama
     var episode = 1
-    @State private var showing = false
 
     public init(drama: Drama, episode: Int = 1) {
         self.drama = drama
@@ -13,22 +11,6 @@ public struct TVAccountSocialButton: View {
     }
 
     public var body: some View {
-        if account.loggedIn && drama.source == "hongguo" {
-            Button {
-                showing = true
-            } label: {
-                Label("点赞与关注", systemImage: "heart")
-            }
-            .accessibilityIdentifier("account.social.open")
-            .sheet(isPresented: $showing) {
-                TVAccountSocialSheet(drama: drama, episode: episode)
-            }
-        }
+        EmptyView()
     }
-}
-
-#Preview("TVAccountSocialButton") {
-    TVAccountSocialButton(drama: Drama(id: "test", title: "测试短剧"))
-        .padding(50)
-        .background(TVColors.background)
 }

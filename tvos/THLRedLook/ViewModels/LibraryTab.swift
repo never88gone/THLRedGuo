@@ -10,7 +10,7 @@ public enum LibraryTab: String, CaseIterable, Identifiable {
     public var label: String {
         switch self {
         case .history: return "最近观看"
-        case .follows: return "我的收藏"
+        case .follows: return "点赞剧集"
         case .liked: return "点赞视频"
         case .anchors: return "关注主播"
         }

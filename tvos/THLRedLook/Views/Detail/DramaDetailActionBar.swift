@@ -45,19 +45,20 @@ public struct DramaDetailActionBar: View {
                     .id("detail_play")
                     .accessibilityIdentifier("detail.play")
 
-                    TVButton(
-                        title: viewModel.followState == .none ? "追剧" : "已追剧",
-                        icon: viewModel.followState == .none ? "bookmark" : "bookmark.fill",
-                        isExternalFocused: focusedTarget == .favorite
-                    ) {
-                        viewModel.toggleFavorite()
+                    if accountLibrary.loggedIn {
+                        let isLiked = viewModel.followState != .none
+                        TVButton(
+                            title: isLiked ? "已点赞" : "点赞",
+                            icon: isLiked ? "heart.fill" : "heart",
+                            isExternalFocused: focusedTarget == .favorite
+                        ) {
+                            viewModel.toggleFavorite()
+                        }
+                        .focused($focusedTarget, equals: .favorite)
+                        .id("detail_favorite")
+                        .accessibilityIdentifier("detail.favorite")
+                        .accessibilityLabel(isLiked ? "已点赞" : "点赞")
                     }
-                    .focused($focusedTarget, equals: .favorite)
-                    .id("detail_favorite")
-                    .accessibilityIdentifier("detail.favorite")
-                    .accessibilityLabel(viewModel.followState == .none ? "追剧" : "已追剧(已收藏)")
-
-                    TVAccountSocialButton(drama: viewModel.drama, episode: viewModel.lastWatchEntry?.episode ?? selectedEpisodeNumber)
 
                     TVButton(
                         title: "主播",
@@ -78,25 +79,6 @@ public struct DramaDetailActionBar: View {
                     .focused($focusedTarget, equals: .anchor)
                     .id("detail_anchor")
                     .accessibilityIdentifier("detail.anchor")
-
-                    if viewModel.followState != .none && !accountLibrary.loggedIn {
-                        Menu {
-                            ForEach([FollowState.wishlist, .watching, .watched, .updated]) { state in
-                                Button(state.label) { viewModel.setFollowState(state) }
-                            }
-                            Divider()
-                            Button(role: .destructive) {
-                                viewModel.setFollowState(.none)
-                            } label: {
-                                Label("取消追剧", systemImage: "bookmark.slash")
-                            }
-                        } label: {
-                            Label(viewModel.followState.label, systemImage: "list.bullet")
-                        }
-                        .focused($focusedTarget, equals: .followState)
-                        .id("detail_follow_state")
-                        .accessibilityIdentifier("detail.followState")
-                    }
 
                     TVButton(
                         title: "缓存全剧",
