@@ -228,8 +228,8 @@ export class CencDecryptor {
     const keystream = new Uint8Array(16);
 
     for (let r = 0; r < regions.length; r++) {
-      if (r > 0 && r % 1000 === 0) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      if (r > 0 && r % 50 === 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 1));
       }
       const reg = regions[r];
       let w0 = read32(reg.iv, 0);

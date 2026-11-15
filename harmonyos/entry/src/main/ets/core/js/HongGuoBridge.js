@@ -5,6 +5,22 @@ import hilog from '@ohos.hilog';
 const TAG = 'HongGuoBridge';
 const DOMAIN = 0x0000;
 
+function formatError(e) {
+  if (!e) return 'Unknown error';
+  var msg = (e.name ? e.name + ': ' : '') + (e.message || '') + (e.code ? ' [' + e.code + ']' : '');
+  if (e.stack) msg += ' | stack: ' + e.stack;
+  return msg;
+}
+
+function resetSession() {
+  try {
+    delete globalThis.__hongguoCachedDevice;
+    if (spider && typeof spider.resetGuestSession === 'function') {
+      spider.resetGuestSession();
+    }
+  } catch (_) {}
+}
+
 let isReady = false;
 
 export function bridgeInit() {
@@ -19,7 +35,7 @@ export function bridgeInit() {
       return true;
     }
   } catch (err) {
-    hilog.error(DOMAIN, TAG, 'bridgeInit error: %{public}s', JSON.stringify(err));
+    hilog.error(DOMAIN, TAG, 'bridgeInit error: %{public}s', formatError(err));
   }
   return false;
 }
@@ -36,8 +52,14 @@ export async function bridgeHome(filter) {
   try {
     return await spider.home(!!filter);
   } catch (e) {
-    hilog.error(DOMAIN, TAG, 'bridgeHome error: %{public}s', JSON.stringify(e));
-    return { class: [], filters: {} };
+    hilog.warn(DOMAIN, TAG, 'bridgeHome failed, retrying after reset: %{public}s', formatError(e));
+    resetSession();
+    try {
+      return await spider.home(!!filter);
+    } catch (retryErr) {
+      hilog.error(DOMAIN, TAG, 'bridgeHome retry error: %{public}s', formatError(retryErr));
+      return { class: [], filters: {} };
+    }
   }
 }
 
@@ -46,8 +68,14 @@ export async function bridgeCategory(tid, page, filter, extend) {
   try {
     return await spider.category(tid, page, !!filter, extend || {});
   } catch (e) {
-    hilog.error(DOMAIN, TAG, 'bridgeCategory error: %{public}s', JSON.stringify(e));
-    return { list: [], page: page || 1, pagecount: 1 };
+    hilog.warn(DOMAIN, TAG, 'bridgeCategory failed for %{public}s, retrying after reset: %{public}s', tid, formatError(e));
+    resetSession();
+    try {
+      return await spider.category(tid, page, !!filter, extend || {});
+    } catch (retryErr) {
+      hilog.error(DOMAIN, TAG, 'bridgeCategory retry error: %{public}s', formatError(retryErr));
+      return { list: [], page: page || 1, pagecount: 1 };
+    }
   }
 }
 
@@ -59,8 +87,17 @@ export async function bridgeSearch(word, quick, page) {
     }
     return { list: [], page: page || 1, pagecount: 1 };
   } catch (e) {
-    hilog.error(DOMAIN, TAG, 'bridgeSearch error: %{public}s', JSON.stringify(e));
-    return { list: [], page: page || 1, pagecount: 1 };
+    hilog.warn(DOMAIN, TAG, 'bridgeSearch failed for %{public}s, retrying after reset: %{public}s', word, formatError(e));
+    resetSession();
+    try {
+      if (typeof spider.search === 'function') {
+        return await spider.search(word, !!quick, page || 1);
+      }
+      return { list: [], page: page || 1, pagecount: 1 };
+    } catch (retryErr) {
+      hilog.error(DOMAIN, TAG, 'bridgeSearch retry error: %{public}s', formatError(retryErr));
+      return { list: [], page: page || 1, pagecount: 1 };
+    }
   }
 }
 
@@ -69,8 +106,14 @@ export async function bridgeDetail(id) {
   try {
     return await spider.detail(String(id));
   } catch (e) {
-    hilog.error(DOMAIN, TAG, 'bridgeDetail error: %{public}s', JSON.stringify(e));
-    return null;
+    hilog.warn(DOMAIN, TAG, 'bridgeDetail failed for %{public}s, retrying after reset: %{public}s', String(id), formatError(e));
+    resetSession();
+    try {
+      return await spider.detail(String(id));
+    } catch (retryErr) {
+      hilog.error(DOMAIN, TAG, 'bridgeDetail retry error: %{public}s', formatError(retryErr));
+      return null;
+    }
   }
 }
 
@@ -83,7 +126,7 @@ export async function bridgePlay(flag, id, flags) {
     }
     return res;
   } catch (e) {
-    hilog.error(DOMAIN, TAG, 'bridgePlay error: %{public}s', JSON.stringify(e));
+    hilog.error(DOMAIN, TAG, 'bridgePlay error: %{public}s', formatError(e));
     return { url: '', parse: 0, header: {} };
   }
 }
@@ -96,7 +139,7 @@ export async function bridgeFeed(page, session) {
     }
     return { list: [], hasMore: false };
   } catch (e) {
-    hilog.error(DOMAIN, TAG, 'bridgeFeed error: %{public}s', JSON.stringify(e));
+    hilog.error(DOMAIN, TAG, 'bridgeFeed error: %{public}s', formatError(e));
     return { list: [], hasMore: false };
   }
 }
@@ -110,7 +153,7 @@ export async function bridgeRankingBoards() {
     }
     return [];
   } catch (e) {
-    hilog.error(DOMAIN, TAG, 'bridgeRankingBoards error: %{public}s', JSON.stringify(e));
+    hilog.error(DOMAIN, TAG, 'bridgeRankingBoards error: %{public}s', formatError(e));
     return [];
   }
 }
@@ -123,7 +166,7 @@ export async function bridgeRankings(board, page) {
     }
     return { list: [], page: page || 1 };
   } catch (e) {
-    hilog.error(DOMAIN, TAG, 'bridgeRankings error: %{public}s', JSON.stringify(e));
+    hilog.error(DOMAIN, TAG, 'bridgeRankings error: %{public}s', formatError(e));
     return { list: [], page: page || 1 };
   }
 }
