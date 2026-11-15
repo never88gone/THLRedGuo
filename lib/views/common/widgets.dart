@@ -12,6 +12,7 @@ import 'package:THLRedLook/views/remote/remote_widgets.dart';
 import 'package:THLRedLook/views/drama/drama_cover_view.dart';
 
 export 'package:THLRedLook/views/drama/drama_cover_view.dart';
+export 'mouse_horizontal_scroll.dart';
 
 Future<void> saveUserChange(
   BuildContext context,

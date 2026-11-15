@@ -2818,12 +2818,22 @@ spider.accountParse = function (action, text) {
     const paging = { hasMore: data.has_more, nextOffset, total: integer(data.total) };
     const list = (key, countKey) => {
       if (Array.isArray(data[key])) return data[key];
-      if (Object.prototype.hasOwnProperty.call(data,key) && data[key] === null && data.has_more === false && integer(data[countKey]) === 0) return [];
+      if ((data[key] == null || !Object.prototype.hasOwnProperty.call(data, key)) && (data.has_more === false || integer(data[countKey]) === 0 || !data[countKey])) return [];
       throw new Error('账号列表格式已变化');
     };
     if (action === 'followingCreators') {
       const seen = new Set();
-      const creators = list('relation_user_list','total').map(row => creator(row && row.user_info, row && row.user_relation_type)).filter(row => !seen.has(row.id) && seen.add(row.id));
+      const rawList = list('relation_user_list','total');
+      const creators = [];
+      for (const raw of rawList) {
+        try {
+          const item = creator(raw && (raw.user_info || raw), raw && raw.user_relation_type);
+          if (item && item.id && !seen.has(item.id)) {
+            seen.add(item.id);
+            creators.push(item);
+          }
+        } catch (_) {}
+      }
       return { creators, ...paging, followingDouyinNextOffset: integer(data.following_douyin_user_next_offset) };
     }
     const items = [], seen = new Set();

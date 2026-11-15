@@ -211,6 +211,10 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     if (account.loggedIn) {
       final avatar =
           !const bool.fromEnvironment('DISABLE_REMOTE_IMAGES') &&
@@ -223,9 +227,12 @@ class _AccountScreenState extends State<AccountScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0x14FFFFFF),
+            color: isDark ? const Color(0x14FFFFFF) : scheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0x1AFFFFFF), width: 0.8),
+            border: Border.all(
+              color: isDark ? const Color(0x1AFFFFFF) : scheme.outlineVariant,
+              width: 0.8,
+            ),
           ),
           child: Row(
             children: [
@@ -239,10 +246,14 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
                 child: CircleAvatar(
                   radius: 22,
-                  backgroundColor: const Color(0x1FFFFFFF),
+                  backgroundColor: isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHigh,
                   foregroundImage: avatar,
                   onForegroundImageError: avatar == null ? null : (_, _) {},
-                  child: const Icon(Icons.person, size: 24, color: Colors.white70),
+                  child: Icon(
+                    Icons.person,
+                    size: 24,
+                    color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -255,10 +266,10 @@ class _AccountScreenState extends State<AccountScreen> {
                       displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: scheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -297,7 +308,10 @@ class _AccountScreenState extends State<AccountScreen> {
               PopupMenuButton<String>(
                 key: const Key('hongguo-account-more-menu'),
                 tooltip: '更多',
-                icon: const Icon(Icons.more_horiz_rounded, color: Colors.white70),
+                icon: Icon(
+                  Icons.more_horiz_rounded,
+                  color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                ),
                 onSelected: (action) {
                   if (action == 'scan') {
                     Navigator.of(context).push(
@@ -380,9 +394,12 @@ class _AccountScreenState extends State<AccountScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: const Color(0x14FFFFFF),
+                color: isDark ? const Color(0x14FFFFFF) : scheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0x1AFFFFFF), width: 0.8),
+                border: Border.all(
+                  color: isDark ? const Color(0x1AFFFFFF) : scheme.outlineVariant,
+                  width: 0.8,
+                ),
               ),
               child: Row(
                 children: [
@@ -391,17 +408,20 @@ class _AccountScreenState extends State<AccountScreen> {
                     height: 48,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0x1FFFFFFF),
-                      border: Border.all(color: const Color(0x26FFFFFF), width: 1),
+                      color: isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHigh,
+                      border: Border.all(
+                        color: isDark ? const Color(0x26FFFFFF) : scheme.outlineVariant,
+                        width: 1,
+                      ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.person_outline_rounded,
                       size: 26,
-                      color: Colors.white70,
+                      color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -410,20 +430,23 @@ class _AccountScreenState extends State<AccountScreen> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            color: scheme.onSurface,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           '登录同步多端追剧与观看记录',
-                          style: TextStyle(fontSize: 12, color: Colors.white54),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
-                    color: Colors.white38,
+                    color: isDark ? Colors.white38 : scheme.outline,
                     size: 20,
                   ),
                 ],
@@ -437,6 +460,10 @@ class _AccountScreenState extends State<AccountScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final isLogged = account.loggedIn;
     if (!isLogged && _accountTab >= 2) {
       _accountTab = 0;
@@ -480,10 +507,10 @@ class _AccountScreenState extends State<AccountScreen> {
                         margin: const EdgeInsets.fromLTRB(16, 4, 16, 10),
                         padding: const EdgeInsets.all(3.5),
                         decoration: BoxDecoration(
-                          color: const Color(0x0FFFFFFF),
+                          color: isDark ? const Color(0x0FFFFFFF) : scheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(22),
                           border: Border.all(
-                            color: const Color(0x14FFFFFF),
+                            color: isDark ? const Color(0x14FFFFFF) : scheme.outlineVariant,
                             width: 0.8,
                           ),
                         ),
@@ -503,6 +530,8 @@ class _AccountScreenState extends State<AccountScreen> {
                                   });
                                   if (index == 0) _load(false);
                                   if (index == 1) _load(true);
+                                  if (index == 2) liked.load();
+                                  if (index == 3) anchors.load();
                                 },
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 200),
@@ -512,16 +541,16 @@ class _AccountScreenState extends State<AccountScreen> {
                                   decoration: BoxDecoration(
                                     color: selected
                                         ? AppColors.hongguoRed.withValues(
-                                            alpha: 0.20,
+                                            alpha: isDark ? 0.20 : 0.12,
                                           )
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(19),
                                     border: Border.all(
                                       color: selected
                                           ? AppColors.hongguoRed.withValues(
-                                              alpha: 0.55,
+                                              alpha: isDark ? 0.55 : 0.40,
                                             )
-                                          : Colors.transparent,
+                                        : Colors.transparent,
                                       width: 0.8,
                                     ),
                                   ),
@@ -535,8 +564,10 @@ class _AccountScreenState extends State<AccountScreen> {
                                           ? FontWeight.bold
                                           : FontWeight.normal,
                                       color: selected
-                                          ? Colors.white
-                                          : const Color(0x99FFFFFF),
+                                          ? (isDark ? Colors.white : AppColors.hongguoRed)
+                                          : (isDark
+                                              ? const Color(0x99FFFFFF)
+                                              : scheme.onSurfaceVariant),
                                     ),
                                   ),
                                 ),
@@ -575,6 +606,8 @@ class _AccountScreenState extends State<AccountScreen> {
                                 });
                                 if (index == 0) _load(false);
                                 if (index == 1) _load(true);
+                                if (index == 2) liked.load();
+                                if (index == 3) anchors.load();
                               },
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
@@ -585,14 +618,14 @@ class _AccountScreenState extends State<AccountScreen> {
                                 decoration: BoxDecoration(
                                   color: selected
                                       ? AppColors.hongguoRed.withValues(
-                                          alpha: 0.18,
+                                          alpha: isDark ? 0.18 : 0.12,
                                         )
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: selected
                                         ? AppColors.hongguoRed.withValues(
-                                            alpha: 0.45,
+                                            alpha: isDark ? 0.45 : 0.40,
                                           )
                                         : Colors.transparent,
                                     width: 0.8,
@@ -621,8 +654,10 @@ class _AccountScreenState extends State<AccountScreen> {
                                             ? FontWeight.bold
                                             : FontWeight.normal,
                                         color: selected
-                                            ? Colors.white
-                                            : const Color(0x8AFFFFFF),
+                                            ? (isDark ? Colors.white : AppColors.hongguoRed)
+                                            : (isDark
+                                                ? const Color(0x8AFFFFFF)
+                                                : scheme.onSurfaceVariant),
                                       ),
                                     ),
                                   ],
@@ -709,78 +744,91 @@ class _AccountScreenState extends State<AccountScreen> {
       emptyMessage: '暂无关注的主播',
       localItems: const [],
       itemKey: (anchor) => anchor.id,
-      sliver: (context, rows) => SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        sliver: SliverList.builder(
-          itemCount: rows.length,
-          itemBuilder: (context, index) {
-            final anchor = rows[index];
-            return Card(
-              key: ValueKey('anchor-card-${anchor.id}'),
-              margin: const EdgeInsets.only(bottom: 10),
-              color: const Color(0x14FFFFFF),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0x1AFFFFFF), width: 0.8),
-              ),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.hongguoRed.withValues(alpha: 0.15),
-                  child: const Icon(
-                    Icons.person_outline_rounded,
-                    color: AppColors.hongguoRed,
+      sliver: (context, rows) {
+        final theme = Theme.of(context);
+        final scheme = theme.colorScheme;
+        final isDark = theme.brightness == Brightness.dark;
+
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          sliver: SliverList.builder(
+            itemCount: rows.length,
+            itemBuilder: (context, index) {
+              final anchor = rows[index];
+              return Card(
+                key: ValueKey('anchor-card-${anchor.id}'),
+                margin: const EdgeInsets.only(bottom: 10),
+                color: isDark ? const Color(0x14FFFFFF) : scheme.surfaceContainerHighest,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: isDark ? const Color(0x1AFFFFFF) : scheme.outlineVariant,
+                    width: 0.8,
                   ),
                 ),
-                title: Text(
-                  anchor.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.hongguoRed.withValues(alpha: 0.15),
+                    child: const Icon(
+                      Icons.person_outline_rounded,
+                      color: AppColors.hongguoRed,
+                    ),
                   ),
-                ),
-                subtitle: anchor.bio.isEmpty
-                    ? null
-                    : Text(
-                        anchor.bio,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 13,
+                  title: Text(
+                    anchor.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                  subtitle: anchor.bio.isEmpty
+                      ? null
+                      : Text(
+                          anchor.bio,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
+                        ),
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: isDark ? Colors.white38 : scheme.outline,
+                  ),
+                  onTap: () async {
+                    var changed = false;
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => AnchorDetailPage(
+                          anchor: anchor,
+                          repository: widget.repository,
+                          store: widget.store,
+                          onOpenDrama: widget.onOpen,
+                          onFollowingChanged: () => changed = true,
+                          service: service,
                         ),
                       ),
-                trailing: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.white38,
+                    );
+                    if (mounted && changed && account.loggedIn) {
+                      await anchors.load(refresh: true);
+                    }
+                  },
                 ),
-                onTap: () async {
-                  var changed = false;
-                  await Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AnchorDetailPage(
-                        anchor: anchor,
-                        repository: widget.repository,
-                        store: widget.store,
-                        onOpenDrama: widget.onOpen,
-                        onFollowingChanged: () => changed = true,
-                        service: service,
-                      ),
-                    ),
-                  );
-                  if (mounted && changed && account.loggedIn) {
-                    await anchors.load(refresh: true);
-                  }
-                },
-              ),
-            );
-          },
-        ),
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
   Widget _cloudLibrary(bool tabHistory) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final entries = lists[tabHistory] ?? const <WatchEntry>[];
     return Column(
       children: [
@@ -791,9 +839,9 @@ class _AccountScreenState extends State<AccountScreen> {
               Expanded(
                 child: Text(
                   '红果账号 · ${tabHistory ? '历史记录' : '追剧'}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Colors.white54,
+                    color: scheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -804,7 +852,11 @@ class _AccountScreenState extends State<AccountScreen> {
                 onPressed: loading.contains(tabHistory)
                     ? null
                     : () => _load(tabHistory, refresh: true),
-                icon: const Icon(Icons.refresh, size: 20, color: Colors.white70),
+                icon: Icon(
+                  Icons.refresh,
+                  size: 20,
+                  color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

@@ -183,6 +183,10 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
           if (value != null) ...[
             Builder(
               builder: (context) {
+                final theme = Theme.of(context);
+                final scheme = theme.colorScheme;
+                final isDark = theme.brightness == Brightness.dark;
+
                 final avatarUri = Uri.tryParse(value.avatar);
                 final hasAvatar =
                     !const bool.fromEnvironment('DISABLE_REMOTE_IMAGES') &&
@@ -193,10 +197,10 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                 return Container(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                   decoration: BoxDecoration(
-                    color: const Color(0x14FFFFFF),
+                    color: isDark ? const Color(0x14FFFFFF) : scheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: const Color(0x1AFFFFFF),
+                      color: isDark ? const Color(0x1AFFFFFF) : scheme.outlineVariant,
                       width: 0.8,
                     ),
                   ),
@@ -213,15 +217,15 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                         ),
                         child: CircleAvatar(
                           radius: 28,
-                          backgroundColor: const Color(0x1FFFFFFF),
+                          backgroundColor: isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHigh,
                           foregroundImage: avatarImage,
                           onForegroundImageError: avatarImage == null
                               ? null
                               : (_, _) {},
-                          child: const Icon(
+                          child: Icon(
                             Icons.person_outline_rounded,
                             size: 30,
-                            color: Colors.white70,
+                            color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -229,10 +233,10 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                       Text(
                         value.name,
                         key: const ValueKey('anchor-name'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: scheme.onSurface,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -243,7 +247,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                           vertical: 2.5,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0x0FFFFFFF),
+                          color: isDark ? const Color(0x0FFFFFFF) : scheme.surfaceContainer,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
@@ -253,26 +257,28 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                               Text(
                                 '作品 ${value.dramasCount}',
                                 key: const ValueKey('anchor-works-count'),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                  color: scheme.onSurface,
                                 ),
                               ),
                             if (value.fansCount != null && value.fansCount! > 0) ...[
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 6),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
                                 child: Text(
                                   '·',
-                                  style: TextStyle(color: Colors.white38),
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white38 : scheme.outline,
+                                  ),
                                 ),
                               ),
                               Text(
                                 '粉丝 ${value.fansCount}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.white70,
+                                  color: scheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -283,9 +289,9 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                       Text(
                         value.bio.isEmpty ? '暂无简介' : value.bio,
                         key: const ValueKey('anchor-bio'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12.5,
-                          color: Colors.white60,
+                          color: scheme.onSurfaceVariant,
                           height: 1.35,
                         ),
                         textAlign: TextAlign.center,

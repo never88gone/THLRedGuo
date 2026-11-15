@@ -61,6 +61,9 @@ class _DetailScreenState extends State<DetailScreen> {
   bool _episodesExpanded = false;
   final _episodeAnchor = GlobalKey();
   final _detailScroll = ScrollController();
+  final _seriesScroll = ScrollController();
+  final _currentSeasonKey = GlobalKey();
+  bool _didEnsureCurrentSeasonVisible = false;
   bool _initialActionHandled = false;
   late final int _profileEpoch;
   List<HongguoSeriesEntry>? _seriesEntries;
@@ -105,6 +108,7 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   void dispose() {
     _detailScroll.dispose();
+    _seriesScroll.dispose();
     widget.store.removeListener(_onStoreChanged);
     _generation++;
     super.dispose();
@@ -1394,6 +1398,20 @@ class _DetailScreenState extends State<DetailScreen> {
 
     final notices = widget.store.following(drama.id)?.seriesSeasons ?? const {};
 
+    if (!_didEnsureCurrentSeasonVisible && entries.isNotEmpty) {
+      _didEnsureCurrentSeasonVisible = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _currentSeasonKey.currentContext;
+        if (mounted && ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            alignment: 0.3,
+            duration: const Duration(milliseconds: 240),
+          );
+        }
+      });
+    }
+
     return AnimatedSize(
       duration: const Duration(milliseconds: 240),
       curve: Curves.easeOutCubic,
@@ -1456,22 +1474,26 @@ class _DetailScreenState extends State<DetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final entry in entries) ...[
-                          Builder(
-                            builder: (context) {
-                              final isCurrent = entry.drama.id == drama.id;
-                              final watched = widget.store.watched(
-                                entry.drama.id,
-                              );
-                              final isNew =
-                                  notices[entry.drama.id]?.read == false;
+                  MouseHorizontalScroll(
+                    controller: _seriesScroll,
+                    child: SingleChildScrollView(
+                      controller: _seriesScroll,
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final entry in entries) ...[
+                            Builder(
+                              builder: (context) {
+                                final isCurrent = entry.drama.id == drama.id;
+                                final watched = widget.store.watched(
+                                  entry.drama.id,
+                                );
+                                final isNew =
+                                    notices[entry.drama.id]?.read == false;
 
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
+                                return Padding(
+                                  key: isCurrent ? _currentSeasonKey : null,
+                                  padding: const EdgeInsets.only(right: 8),
                                 child: InkWell(
                                   key: ValueKey('series-${entry.drama.id}'),
                                   onTap: isCurrent || !entry.playable
@@ -1610,6 +1632,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       ],
                     ),
                   ),
+                ),
                 ],
               ),
             ),

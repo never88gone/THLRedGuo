@@ -962,8 +962,6 @@ class HongguoAccountService {
     );
   }
 
-  (int, String)? _collectionIdentity;
-
   Future<Anchor> creatorProfile(String userId) async {
     if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
     final revision = session.revision;
@@ -988,17 +986,10 @@ class HongguoAccountService {
   }) async {
     if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
     final revision = session.revision;
-    var identity = _collectionIdentity;
-    if (identity == null || identity.$1 != revision) {
-      final self = await creatorProfile(session.id);
-      _check(revision);
-      identity = (revision, self.id);
-      _collectionIdentity = identity;
-    }
     final result = await _call(
       'followingCreators',
       {
-        'userId': identity.$2,
+        'userId': session.id,
         'offset': offset,
         'count': count,
         'followingDouyinOffset': douyinOffset,
@@ -1007,8 +998,9 @@ class HongguoAccountService {
       revision,
     );
     _check(revision);
+    final creatorsList = (result['creators'] as List?) ?? const [];
     return HongguoCollectionPage(
-      (result['creators'] as List)
+      creatorsList
           .map((r) => Anchor.fromOfficial(Map<String, dynamic>.from(r as Map)))
           .toList(),
       hasMore: result['hasMore'] == true,

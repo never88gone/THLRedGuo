@@ -7,6 +7,7 @@ import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/views/remote/remote_widgets.dart';
+import 'package:THLRedLook/views/common/mouse_horizontal_scroll.dart';
 
 const episodePageSize = 50;
 
@@ -344,45 +345,47 @@ class _EpisodeBrowserState extends State<EpisodeBrowser> {
     final selectedPage = (target ~/ episodePageSize).clamp(0, pageCount - 1);
     return SizedBox(
       height: 34,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(4, 2, 4, 3),
-        scrollDirection: Axis.horizontal,
-        itemCount: pageCount,
-        separatorBuilder: (_, _) => const SizedBox(width: 6),
-        itemBuilder: (context, page) {
-          final start = page * episodePageSize;
-          final end = min(start + episodePageSize, widget.episodes.length) - 1;
-          final selected = page == selectedPage;
-          return OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 28),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              foregroundColor: selected ? colors.onPrimary : colors.onSurface,
-              backgroundColor: selected ? colors.primary : AppColors.transparent,
-              side: BorderSide(
-                color: selected ? colors.primary : colors.outlineVariant.withValues(alpha: 0.4),
-                width: 0.8,
+      child: MouseHorizontalScroll(
+        child: ListView.separated(
+          padding: const EdgeInsets.fromLTRB(4, 2, 4, 3),
+          scrollDirection: Axis.horizontal,
+          itemCount: pageCount,
+          separatorBuilder: (_, _) => const SizedBox(width: 6),
+          itemBuilder: (context, page) {
+            final start = page * episodePageSize;
+            final end = min(start + episodePageSize, widget.episodes.length) - 1;
+            final selected = page == selectedPage;
+            return OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 28),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                foregroundColor: selected ? colors.onPrimary : colors.onSurface,
+                backgroundColor: selected ? colors.primary : AppColors.transparent,
+                side: BorderSide(
+                  color: selected ? colors.primary : colors.outlineVariant.withValues(alpha: 0.4),
+                  width: 0.8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+              onPressed: () {
+                setState(() {
+                  _located = widget.episodes[start].number;
+                });
+              },
+              child: Text(
+                '${widget.episodes[start].number}–${widget.episodes[end].number}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? colors.onPrimary : colors.onSurface,
+                ),
               ),
-            ),
-            onPressed: () {
-              setState(() {
-                _located = widget.episodes[start].number;
-              });
-            },
-            child: Text(
-              '${widget.episodes[start].number}–${widget.episodes[end].number}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? colors.onPrimary : colors.onSurface,
-              ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

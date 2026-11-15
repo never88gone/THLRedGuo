@@ -6,6 +6,7 @@ import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/views/remote/remote_widgets.dart';
+import 'package:THLRedLook/views/common/mouse_horizontal_scroll.dart';
 
 class CatalogFilters extends StatefulWidget {
   const CatalogFilters({
@@ -33,6 +34,13 @@ class CatalogFilters extends StatefulWidget {
 
 class _CatalogFiltersState extends State<CatalogFilters> {
   final _anchors = <String, GlobalKey>{};
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant CatalogFilters oldWidget) {
@@ -61,12 +69,15 @@ class _CatalogFiltersState extends State<CatalogFilters> {
       child: Row(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              key: const ValueKey('catalog-categories'),
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
+            child: MouseHorizontalScroll(
+              controller: _scrollController,
+              child: SingleChildScrollView(
+                key: const ValueKey('catalog-categories'),
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
                   if (widget.leading != null) widget.leading!,
                   for (final entry in widget.categories)
                     Padding(
@@ -115,6 +126,7 @@ class _CatalogFiltersState extends State<CatalogFilters> {
               ),
             ),
           ),
+        ),
           if (widget.error != null)
             IconButton(
               tooltip: widget.error,
