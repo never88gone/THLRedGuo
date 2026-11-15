@@ -99,33 +99,15 @@ export struct SettingsPage {
   }
 
   showSourceSwitcher(): void {
-    promptAction.showDialog({
-      title: '切换数据源',
-      message: '当前正在使用：官方免费短剧 (hongguo.js)\n\n本项目严格遵守开源合规红线，仅内置官方规范数据源，所有解析与直链调度均在设备端独立运行。',
-      buttons: [
-        { text: '我知道了', color: AppColors.hongguoRed }
-      ]
-    });
+    router.pushUrl({ url: 'pages/settings/SourceSwitcherPage' });
   }
 
   showJsManagement(): void {
-    promptAction.showDialog({
-      title: 'JS 数据源插件管理',
-      message: 'CatPawOpen JS 运行时沙箱状态：\n\n✅ 沙箱初始化：已就绪\n✅ 运行架构：纯端侧执行，无需中转服务\n✅ 站源文件：hongguo.js (v1.1.0-dev.22)\n✅ 签名状态：官方有效凭证已装载',
-      buttons: [
-        { text: '确定', color: AppColors.hongguoRed }
-      ]
-    });
+    router.pushUrl({ url: 'pages/settings/JsSourcesPage' });
   }
 
   runDiagnostics(): void {
-    promptAction.showDialog({
-      title: '网络与数据源诊断',
-      message: '正在检测官方数据源连接...\n\n✅ 官方 API 网络连通正常 (200 OK)\n✅ DNS 解析与 TLS 证书链正常\n✅ CatPawOpen JS 运行时正常\n✅ 站源脚本 (hongguo.js) 签名有效\n✅ CENC MP4 解密器与 AVPlayer 解码正常',
-      buttons: [
-        { text: '完成', color: AppColors.hongguoRed }
-      ]
-    });
+    router.pushUrl({ url: 'pages/settings/SourceDiagnosticsPage' });
   }
 
   clearAppCache(): void {
@@ -134,28 +116,11 @@ export struct SettingsPage {
   }
 
   showBackupDialog(): void {
-    promptAction.showDialog({
-      title: '备份与恢复',
-      message: '支持导出本地完整的追剧清单、观看历史记录与偏好设置配置。\n\n如需迁移数据，可将配置备份至本地设备存储。',
-      buttons: [
-        { text: '导出备份', color: AppColors.hongguoRed },
-        { text: '取消', color: AppColors.textSecondary }
-      ]
-    }, (err, data) => {
-      if (!err && data.index === 0) {
-        promptAction.showToast({ message: '备份数据已成功导出至应用沙箱目录' });
-      }
-    });
+    router.pushUrl({ url: 'pages/settings/BackupSettingsPage' });
   }
 
   showPrivacyLockDialog(): void {
-    promptAction.showDialog({
-      title: '手势密码与隐私保护',
-      message: '开启手势隐私锁后，进入私密短剧库或修改关键设置需要验证手势图形，保护您的个人观影隐私。',
-      buttons: [
-        { text: '确定', color: AppColors.hongguoRed }
-      ]
-    });
+    router.pushUrl({ url: 'pages/privacy/PrivacySettingsPage' });
   }
 
   clearHistoryData(): void {
@@ -204,23 +169,11 @@ export struct SettingsPage {
   }
 
   showReleaseNotesDialog(): void {
-    promptAction.showDialog({
-      title: '更新内容',
-      message: '【v1.0.0 最新版本特性】\n\n1. 采用鸿蒙原生 ArkTS / Stage 模型重构；\n2. 支持端侧 CENC 视频流硬解密与 1080P 高清流畅播放；\n3. 全面适配沉浸式推荐短剧流与无缝上滑切集；\n4. 支持真实红果官方二维码扫码登录与状态轮询；\n5. 对齐 Flutter / iOS 多端一致界面交互与视觉规范。',
-      buttons: [
-        { text: '确定', color: AppColors.hongguoRed }
-      ]
-    });
+    router.pushUrl({ url: 'pages/about/ReleaseNotesPage' });
   }
 
   showAppIntroDialog(): void {
-    promptAction.showDialog({
-      title: '应用说明',
-      message: '糖葫芦Haw 是一款纯粹独立的多端短剧应用。\n\n全端独立运行，请求、解析、播放与缓存均在设备本地完成，不依赖任何第三方远程自建代理服务。',
-      buttons: [
-        { text: '确定', color: AppColors.hongguoRed }
-      ]
-    });
+    router.pushUrl({ url: 'pages/about/AppIntroPage' });
   }
 
   showContactDialog(): void {
@@ -228,23 +181,11 @@ export struct SettingsPage {
   }
 
   showThirdPartyDialog(): void {
-    promptAction.showDialog({
-      title: '第三方开源组件',
-      message: '本项目采用以下优秀开源组件：\n\n• OpenHarmony / HarmonyOS NEXT SDK\n• CatPawOpen Spider Core Specification\n• Material Design Icons (Apache-2.0)\n• AES-128-CTR Decryption Engine',
-      buttons: [
-        { text: '确定', color: AppColors.hongguoRed }
-      ]
-    });
+    router.pushUrl({ url: 'pages/about/ThirdPartyPage' });
   }
 
   showDiaryDialog(): void {
-    promptAction.showDialog({
-      title: '播放诊断日记',
-      message: '【最近播放追踪轨迹】\n\n[INFO] 站源适配层: hongguo.js 调度正常\n[INFO] 播放器内核: HarmonyOS AVPlayer\n[INFO] 视频解密: CENC AES-128-CTR 逐帧解密\n[INFO] 渲染组件: XComponent (Surface)\n[INFO] 状态流转: initialized -> prepared -> playing',
-      buttons: [
-        { text: '关闭', color: AppColors.hongguoRed }
-      ]
-    });
+    router.pushUrl({ url: 'pages/about/PlaybackDiaryPage' });
   }
 
   showAboutDialog(): void {

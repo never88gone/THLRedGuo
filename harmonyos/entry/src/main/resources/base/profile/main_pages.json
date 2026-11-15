@@ -12,6 +12,15 @@
     "pages/downloads/DownloadsPage",
     "pages/settings/SettingsPage",
     "pages/about/ContactPage",
-    "pages/about/AboutPage"
+    "pages/about/AboutPage",
+    "pages/about/ReleaseNotesPage",
+    "pages/about/AppIntroPage",
+    "pages/about/ThirdPartyPage",
+    "pages/about/PlaybackDiaryPage",
+    "pages/settings/SourceDiagnosticsPage",
+    "pages/settings/JsSourcesPage",
+    "pages/settings/BackupSettingsPage",
+    "pages/settings/SourceSwitcherPage",
+    "pages/privacy/PrivacySettingsPage"
   ]
 }
