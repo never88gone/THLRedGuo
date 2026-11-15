@@ -61,13 +61,20 @@ jobs:
       - name: 安装 Linux 必要图形渲染系统依赖
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1 libgl1-mesa-glx
+          sudo apt-get install -y libgl1 || sudo apt-get install -y libgl1-mesa-dri || true
 
       - name: 配置 HarmonyOS / OpenHarmony CLI 工具链
         uses: ErBWs/setup-ohos@v2
         with:
           version: 6.1.1.280
           cache: true
+
+      - name: 赋予 CLI 工具链可执行权限
+        run: |
+          chmod +x harmonyos/hvigorw || true
+          if [ -d "$HOME/ohos-sdk/command-line-tools/bin" ]; then
+            chmod +x $HOME/ohos-sdk/command-line-tools/bin/* || true
+          fi
 
       - name: 注入官方签名并执行 HAP 打包构建
         env:

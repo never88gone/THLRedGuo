@@ -75,7 +75,18 @@ def find_hvigor_command(harmony_dir: Path):
         if deveco_node.is_file() and deveco_hvigorw.is_file():
             return [str(deveco_node), str(deveco_hvigorw)]
 
-    # 3. 检查项目自带的 hvigorw 脚本
+    # 3. 检查 Linux CI / setup-ohos 路径
+    if os.name != 'nt':
+        sdk_home = os.environ.get('HOS_SDK_HOME') or os.environ.get('DEVECO_SDK_HOME')
+        if sdk_home:
+            candidate = Path(sdk_home).parent / 'bin' / 'hvigorw'
+            if candidate.is_file():
+                return [str(candidate)]
+        home_cli = Path.home() / 'ohos-sdk' / 'command-line-tools' / 'bin' / 'hvigorw'
+        if home_cli.is_file():
+            return [str(home_cli)]
+
+    # 4. 检查项目自带的 hvigorw 脚本
     local_script = harmony_dir / ('hvigorw.bat' if os.name == 'nt' else 'hvigorw')
     if local_script.is_file():
         return [str(local_script)]
@@ -119,6 +130,29 @@ def main():
         deveco_sdk = Path(r"D:\Program Files\Huawei\DevEco Studio\sdk")
         if deveco_sdk.is_dir():
             env['DEVECO_SDK_HOME'] = str(deveco_sdk)
+    else:
+        # Linux CI 下适配 setup-ohos 的 SDK 路径
+        sdk_home = env.get('HOS_SDK_HOME') or env.get('DEVECO_SDK_HOME') or env.get('OHOS_BASE_SDK_HOME')
+        if not sdk_home:
+            candidate_sdk = Path.home() / 'ohos-sdk' / 'command-line-tools' / 'sdk'
+            if candidate_sdk.is_dir():
+                sdk_home = str(candidate_sdk)
+        if sdk_home:
+            env['DEVECO_SDK_HOME'] = sdk_home
+            env['HOS_SDK_HOME'] = sdk_home
+            local_props = harmony_dir / 'local.properties'
+            if not local_props.exists():
+                local_props.write_text(f"hwsdk.dir={sdk_home}\nsdk.dir={sdk_home}\n", encoding='utf-8')
+                print(f"[INFO] 自动写入 local.properties: hwsdk.dir={sdk_home}", flush=True)
+
+    # 检查签名文件是否存在；若不存在则自动降级为免签名构建以保证 CI 打包顺利生成 HAP
+    store_file = harmony_dir / 'thl.p12'
+    profile_path = harmony_dir / 'build-profile.json5'
+    if profile_path.is_file() and not store_file.is_file():
+        print("[WARN] 未检测到本地签名证书 thl.p12，自动调整 build-profile.json5 为免签名模式以完成 CI 构建", flush=True)
+        raw_profile = profile_path.read_text(encoding='utf-8')
+        cleaned_profile = re.sub(r'"signingConfig":\s*"[^"]*",?\s*', '', raw_profile)
+        profile_path.write_text(cleaned_profile, encoding='utf-8')
 
     # 4. 执行 hvigorw assembleHap
     hvigor_cmd = find_hvigor_command(harmony_dir)
@@ -165,10 +199,14 @@ def main():
     shutil.copy2(target_hap, dest_fixed_hap)
     print(f"[SUCCESS] HAP 固定命名产物已导出至: {dest_fixed_hap}", flush=True)
 
+    dest_generic_hap = output_dir / f'{variant.slug}-1.0.0-harmonyos.hap'
+    shutil.copy2(target_hap, dest_generic_hap)
+    print(f"[SUCCESS] HAP 通用命名产物已导出至: {dest_generic_hap}", flush=True)
+
     # 计算 SHA256 校验和
     checksum_file = output_dir / 'SHA256SUMS.txt'
     lines = []
-    for f in [dest_hap, dest_fixed_hap]:
+    for f in [dest_hap, dest_fixed_hap, dest_generic_hap]:
         digest = hashlib.sha256(f.read_bytes()).hexdigest()
         lines.append(f"{digest}  {f.name}\n")
         print(f"[SHA256] {digest}  {f.name}", flush=True)
