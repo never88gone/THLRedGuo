@@ -32,6 +32,10 @@ class HongguoSocialButton extends StatelessWidget {
       ?store,
     ]),
     builder: (context, _) {
+      final theme = Theme.of(context);
+      final scheme = theme.colorScheme;
+      final isDark = theme.brightness == Brightness.dark;
+
       final model = HongguoAccountSocial.shared;
       if (!model.active) {
         return const SizedBox.shrink();
@@ -68,12 +72,16 @@ class HongguoSocialButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: isLiked
                   ? AppColors.hongguoRed.withValues(alpha: 0.16)
-                  : const Color(0x14FFFFFF),
+                  : (isDark
+                      ? const Color(0x14FFFFFF)
+                      : scheme.surfaceContainerHighest.withValues(alpha: 0.8)),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isLiked
                     ? AppColors.hongguoRed.withValues(alpha: 0.5)
-                    : const Color(0x26FFFFFF),
+                    : (isDark
+                        ? const Color(0x26FFFFFF)
+                        : scheme.outlineVariant.withValues(alpha: 0.5)),
                 width: 0.8,
               ),
             ),
@@ -83,7 +91,9 @@ class HongguoSocialButton extends StatelessWidget {
                 Icon(
                   isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                   size: 14,
-                  color: isLiked ? AppColors.hongguoRed : Colors.white70,
+                  color: isLiked
+                      ? AppColors.hongguoRed
+                      : (isDark ? Colors.white70 : scheme.onSurfaceVariant),
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -95,7 +105,9 @@ class HongguoSocialButton extends StatelessWidget {
                           ? '点赞 ${like.count}'
                           : '点赞'),
                   style: TextStyle(
-                    color: isLiked ? AppColors.hongguoRed : Colors.white,
+                    color: isLiked
+                        ? AppColors.hongguoRed
+                        : (isDark ? Colors.white : scheme.onSurface),
                     fontSize: 11.5,
                     fontWeight: isLiked ? FontWeight.w700 : FontWeight.w600,
                   ),
@@ -141,9 +153,16 @@ class HongguoSocialButton extends StatelessWidget {
               height: 26,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0x14FFFFFF),
+                color: isDark
+                    ? const Color(0x14FFFFFF)
+                    : scheme.surfaceContainerHighest.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(13),
-                border: Border.all(color: const Color(0x1AFFFFFF), width: 0.6),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0x1AFFFFFF)
+                      : scheme.outlineVariant.withValues(alpha: 0.5),
+                  width: 0.6,
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -164,17 +183,17 @@ class HongguoSocialButton extends StatelessWidget {
                   const SizedBox(width: 5),
                   Text(
                     '主播 · ${anchor.name}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 11,
-                      color: Colors.white,
+                      color: isDark ? Colors.white : scheme.onSurface,
                     ),
                   ),
                   const SizedBox(width: 2),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
                     size: 14,
-                    color: Colors.white54,
+                    color: isDark ? Colors.white54 : scheme.onSurfaceVariant,
                   ),
                 ],
               ),

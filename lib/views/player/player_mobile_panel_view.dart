@@ -171,7 +171,14 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
                       .number,
           ),
           const SizedBox(height: 12),
-          Text(body, style: const TextStyle(height: 1.5, fontSize: 13)),
+          Text(
+            body,
+            style: TextStyle(
+              height: 1.5,
+              fontSize: 13,
+              color: colors.onSurface.withValues(alpha: 0.90),
+            ),
+          ),
         ],
       ),
     );
@@ -179,6 +186,9 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
 
   Widget _mobileFollowControl(Drama drama) {
     final state = widget.store.following(drama.id);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final fgColor = state == null ? colors.onSurface : colors.onSecondaryContainer;
     return PopupMenuButton<String>(
       key: const ValueKey('player-follow-status'),
       tooltip: '追剧与观看状态',
@@ -220,8 +230,8 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: state == null
-              ? Theme.of(context).colorScheme.surfaceContainerHighest
-              : Theme.of(context).colorScheme.secondaryContainer,
+              ? colors.surfaceContainerHighest
+              : colors.secondaryContainer,
           borderRadius: BorderRadius.circular(18),
         ),
         child: Row(
@@ -232,11 +242,19 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
                   ? Icons.bookmark_add_outlined
                   : Icons.bookmark_rounded,
               size: 18,
+              color: fgColor,
             ),
             const SizedBox(width: 6),
-            Text(state?.label ?? '加入追剧'),
+            Text(
+              state?.label ?? '加入追剧',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: fgColor,
+              ),
+            ),
             const SizedBox(width: 2),
-            const Icon(Icons.expand_more_rounded, size: 16),
+            Icon(Icons.expand_more_rounded, size: 16, color: fgColor),
           ],
         ),
       ),

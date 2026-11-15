@@ -223,14 +223,14 @@ class _AccountScreenState extends State<AccountScreen> {
           : null;
       final displayName = account.nickname.isNotEmpty ? account.nickname : '用户';
       return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0x14FFFFFF) : scheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(14),
+            color: isDark ? AppColors.darkCard : scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isDark ? const Color(0x1AFFFFFF) : scheme.outlineVariant,
+              color: isDark ? AppColors.darkBorder : scheme.outlineVariant,
               width: 0.8,
             ),
           ),
@@ -245,18 +245,18 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ),
                 child: CircleAvatar(
-                  radius: 22,
+                  radius: 18,
                   backgroundColor: isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHigh,
                   foregroundImage: avatar,
                   onForegroundImageError: avatar == null ? null : (_, _) {},
                   child: Icon(
                     Icons.person,
-                    size: 24,
+                    size: 20,
                     color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,14 +267,14 @@ class _AccountScreenState extends State<AccountScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: scheme.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
                         color: AppColors.hongguoRed.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
@@ -283,18 +283,18 @@ class _AccountScreenState extends State<AccountScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            width: 5,
-                            height: 5,
+                            width: 4.5,
+                            height: 4.5,
                             decoration: const BoxDecoration(
                               shape: BoxShape.circle,
                               color: Color(0xFF4CAF50),
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 3.5),
                           const Text(
                             '红果账号已同步',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 10.5,
                               color: AppColors.hongguoRed,
                               fontWeight: FontWeight.w500,
                             ),
@@ -387,25 +387,25 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           InkWell(
             onTap: _login,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0x14FFFFFF) : scheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14),
+                color: isDark ? AppColors.darkCard : scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isDark ? const Color(0x1AFFFFFF) : scheme.outlineVariant,
+                  color: isDark ? AppColors.darkBorder : scheme.outlineVariant,
                   width: 0.8,
                 ),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHigh,
@@ -416,11 +416,11 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                     child: Icon(
                       Icons.person_outline_rounded,
-                      size: 26,
+                      size: 20,
                       color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,16 +428,16 @@ class _AccountScreenState extends State<AccountScreen> {
                         Text(
                           '点击登录红果账号',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 14.5,
                             fontWeight: FontWeight.w600,
                             color: scheme.onSurface,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           '登录同步多端追剧与观看记录',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
@@ -447,7 +447,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   Icon(
                     Icons.chevron_right_rounded,
                     color: isDark ? Colors.white38 : scheme.outline,
-                    size: 20,
+                    size: 18,
                   ),
                 ],
               ),
@@ -504,11 +504,11 @@ class _AccountScreenState extends State<AccountScreen> {
                   return Column(
                     children: [
                       Container(
-                        margin: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                        padding: const EdgeInsets.all(3.5),
+                        margin: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+                        padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
                           color: isDark ? const Color(0x0FFFFFFF) : scheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isDark ? const Color(0x14FFFFFF) : scheme.outlineVariant,
                             width: 0.8,
@@ -536,7 +536,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 200),
                                   padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
+                                    vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
                                     color: selected
@@ -559,7 +559,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                     label,
                                     maxLines: 1,
                                     style: TextStyle(
-                                      fontSize: selected ? 13.5 : 13,
+                                      fontSize: selected ? 12.5 : 12,
                                       fontWeight: selected
                                           ? FontWeight.bold
                                           : FontWeight.normal,
@@ -757,27 +757,33 @@ class _AccountScreenState extends State<AccountScreen> {
               final anchor = rows[index];
               return Card(
                 key: ValueKey('anchor-card-${anchor.id}'),
-                margin: const EdgeInsets.only(bottom: 10),
-                color: isDark ? const Color(0x14FFFFFF) : scheme.surfaceContainerHighest,
+                margin: const EdgeInsets.only(bottom: 6),
+                color: isDark ? AppColors.darkCard : scheme.surfaceContainerHighest,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                   side: BorderSide(
-                    color: isDark ? const Color(0x1AFFFFFF) : scheme.outlineVariant,
+                    color: isDark ? AppColors.darkBorder : scheme.outlineVariant,
                     width: 0.8,
                   ),
                 ),
                 child: ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                  minLeadingWidth: 32,
                   leading: CircleAvatar(
+                    radius: 16,
                     backgroundColor: AppColors.hongguoRed.withValues(alpha: 0.15),
                     child: const Icon(
                       Icons.person_outline_rounded,
                       color: AppColors.hongguoRed,
+                      size: 18,
                     ),
                   ),
                   title: Text(
                     anchor.name,
                     style: TextStyle(
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: scheme.onSurface,
                     ),
@@ -790,11 +796,12 @@ class _AccountScreenState extends State<AccountScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: scheme.onSurfaceVariant,
-                            fontSize: 13,
+                            fontSize: 12,
                           ),
                         ),
                   trailing: Icon(
                     Icons.chevron_right_rounded,
+                    size: 18,
                     color: isDark ? Colors.white38 : scheme.outline,
                   ),
                   onTap: () async {

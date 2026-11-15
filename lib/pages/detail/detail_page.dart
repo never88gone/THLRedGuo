@@ -1100,7 +1100,9 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _overview(Drama drama) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final metaInfo = [
       if (drama.releaseStatus.isNotEmpty && drama.releaseStatus != 'unknown')
         drama.releaseLabel,
@@ -1288,10 +1290,14 @@ class _DetailScreenState extends State<DetailScreen> {
                           vertical: 2.5,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.blackWithAlpha(0.40),
+                          color: isDark
+                              ? AppColors.darkSurfaceElevated
+                              : colors.surfaceContainerHighest.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: AppColors.whiteWithAlpha(0.12),
+                            color: isDark
+                                ? AppColors.darkBorder
+                                : colors.outlineVariant.withValues(alpha: 0.4),
                             width: 0.6,
                           ),
                         ),
@@ -1300,7 +1306,9 @@ class _DetailScreenState extends State<DetailScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: colors.onSurface,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : colors.onSurfaceVariant,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1388,6 +1396,10 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _seriesSelector(Drama drama) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final localEntries = hongguoSeriesEntries(
       drama,
       widget.store.seriesDramasFor(drama),
@@ -1421,9 +1433,16 @@ class _DetailScreenState extends State<DetailScreen> {
               margin: const EdgeInsets.fromLTRB(16, 6, 16, 10),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.darkSurfaceHighest,
+                color: isDark
+                    ? AppColors.darkSurfaceHigh
+                    : colors.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.whiteWithAlpha(0.08)),
+                border: Border.all(
+                  color: isDark
+                      ? AppColors.darkBorder
+                      : colors.outlineVariant.withValues(alpha: 0.35),
+                  width: 0.8,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1436,12 +1455,12 @@ class _DetailScreenState extends State<DetailScreen> {
                         color: AppColors.hongguoRed,
                       ),
                       const SizedBox(width: 6),
-                      const Text(
+                      Text(
                         '系列多季',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? AppColors.textPrimaryDark : colors.onSurface,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1464,11 +1483,11 @@ class _DetailScreenState extends State<DetailScreen> {
                         ),
                       ),
                       const Spacer(),
-                      const Text(
+                      Text(
                         '快速切季',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textTertiary,
+                          color: isDark ? AppColors.textTertiaryDark : colors.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -1512,7 +1531,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                           : null,
                                       color: isCurrent
                                           ? null
-                                          : AppColors.darkSurfaceElevated,
+                                          : (isDark
+                                              ? AppColors.darkSurfaceElevated
+                                              : colors.surface),
                                       borderRadius: BorderRadius.circular(14),
                                       boxShadow: isCurrent
                                           ? AppShadows.pillGlow
@@ -1524,9 +1545,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   ? AppColors.hongguoRedWithAlpha(
                                                       0.6,
                                                     )
-                                                  : AppColors.whiteWithAlpha(
-                                                      0.12,
-                                                    )),
+                                                  : (isDark
+                                                      ? AppColors.darkBorder
+                                                      : colors.outlineVariant.withValues(alpha: 0.45))),
                                         width: isCurrent ? 1.2 : 0.8,
                                       ),
                                     ),
@@ -1540,10 +1561,14 @@ class _DetailScreenState extends State<DetailScreen> {
                                           children: [
                                             Text(
                                               entry.label,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.bold,
-                                                color: AppColors.textPrimary,
+                                                color: isCurrent
+                                                    ? AppColors.white
+                                                    : (isDark
+                                                        ? AppColors.textPrimaryDark
+                                                        : colors.onSurface),
                                               ),
                                             ),
                                             if (isCurrent) ...[
@@ -1567,8 +1592,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   style: TextStyle(
                                                     fontSize: 9,
                                                     fontWeight: FontWeight.bold,
-                                                    color:
-                                                        AppColors.textPrimary,
+                                                    color: AppColors.white,
                                                   ),
                                                 ),
                                               ),
@@ -1590,8 +1614,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   style: TextStyle(
                                                     fontSize: 9,
                                                     fontWeight: FontWeight.bold,
-                                                    color:
-                                                        AppColors.textPrimary,
+                                                    color: AppColors.white,
                                                   ),
                                                 ),
                                               ),
@@ -1617,7 +1640,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   ? AppColors.whiteWithAlpha(
                                                       0.85,
                                                     )
-                                                  : AppColors.textTertiary,
+                                                  : (isDark
+                                                      ? AppColors.textTertiaryDark
+                                                      : colors.onSurfaceVariant),
                                             ),
                                           ),
                                         ),

@@ -145,6 +145,9 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final value = profile;
     return Scaffold(
       appBar: AppBar(
@@ -309,10 +312,10 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                           onPressed: canChangeFollowing ? _follow : null,
                           style: FilledButton.styleFrom(
                             backgroundColor: following
-                                ? const Color(0x1FFFFFFF)
+                                ? (isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHighest)
                                 : AppColors.hongguoRed,
                             foregroundColor: following
-                                ? Colors.white70
+                                ? (isDark ? Colors.white70 : scheme.onSurfaceVariant)
                                 : Colors.white,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 22,
@@ -361,10 +364,10 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                   const SizedBox(width: 8),
                   Text(
                     '短剧作品 (${widget.initialDramas.length})',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: scheme.onSurface,
                     ),
                   ),
                 ],
@@ -375,7 +378,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Material(
                     key: ValueKey('anchor-drama-${drama.id}'),
-                    color: const Color(0x14FFFFFF),
+                    color: isDark ? AppColors.darkCard : scheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(12),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
@@ -421,10 +424,10 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                                         .title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      color: scheme.onSurface,
                                     ),
                                   ),
                                   const SizedBox(height: 3),
@@ -432,9 +435,9 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                                     drama.displayCategory.isNotEmpty
                                         ? '${drama.displayCategory} · 共 ${drama.episodes} 集'
                                         : '共 ${drama.episodes} 集',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.white54,
+                                      color: scheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
@@ -453,7 +456,11 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                   ),
                 ),
             ] else
-              const Text('暂无可展示的关联短剧', key: ValueKey('anchor-no-works')),
+              Text(
+                '暂无可展示的关联短剧',
+                key: const ValueKey('anchor-no-works'),
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
           ],
         ],
       ),
