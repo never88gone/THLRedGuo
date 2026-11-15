@@ -1,5 +1,6 @@
 import router from '@ohos.router';
-import { AppColors, AppDimensions } from '../../common/AppTheme';
+import { AppColors } from '../../common/AppColors';
+import { AppDimensions } from '../../common/AppDimensions';
 import { RankingBoard, RankingItem, RankingPageResult } from '../../models/Ranking';
 import { CoreEngine } from '../../core/engine/CoreEngine';
 
@@ -85,9 +86,9 @@ export struct RankingsPage {
   }
 
   getRankColor(rank: number): ResourceColor {
-    if (rank === 1) return '#FF2442'; // 榜首使用红果红
-    if (rank === 2) return '#FFA000'; // 榜眼使用琥珀金
-    if (rank === 3) return '#FFC107'; // 探花使用暖黄色
+    if (rank === 1) return AppColors.rankGold;
+    if (rank === 2) return AppColors.rankSilver;
+    if (rank === 3) return AppColors.rankBronze;
     return AppColors.textSecondaryDark;
   }
 
@@ -112,7 +113,7 @@ export struct RankingsPage {
             .height(22)
             .fillColor(AppColors.textPrimary)
         }
-        .backgroundColor(Color.Transparent)
+        .backgroundColor(AppColors.transparent)
         .width(40)
         .height(40)
         .onClick(() => {
@@ -132,7 +133,7 @@ export struct RankingsPage {
             .height(20)
             .fillColor(AppColors.textPrimary)
         }
-        .backgroundColor(Color.Transparent)
+        .backgroundColor(AppColors.transparent)
         .width(40)
         .height(40)
         .onClick(() => {
@@ -151,7 +152,7 @@ export struct RankingsPage {
               Button(board.title)
                 .fontSize(13)
                 .fontWeight(this.selectedBoardIndex === index ? FontWeight.Bold : FontWeight.Normal)
-                .fontColor(this.selectedBoardIndex === index ? Color.White : AppColors.textSecondary)
+                .fontColor(this.selectedBoardIndex === index ? AppColors.white : AppColors.textSecondary)
                 .backgroundColor(this.selectedBoardIndex === index ? AppColors.hongguoRed : AppColors.bgCard)
                 .height(32)
                 .padding({ left: 16, right: 16 })
@@ -256,7 +257,7 @@ export struct RankingsPage {
                 Button('追剧')
                   .fontSize(11)
                   .fontColor(AppColors.hongguoRed)
-                  .backgroundColor('rgba(255, 36, 66, 0.12)')
+                  .backgroundColor(AppColors.redAlpha12)
                   .borderRadius(14)
                   .height(28)
                   .padding({ left: 12, right: 12 })

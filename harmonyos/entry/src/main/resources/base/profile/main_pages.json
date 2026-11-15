@@ -10,6 +10,8 @@
     "pages/account/AccountPage",
     "pages/account/LoginPage",
     "pages/downloads/DownloadsPage",
-    "pages/settings/SettingsPage"
+    "pages/settings/SettingsPage",
+    "pages/about/ContactPage",
+    "pages/about/AboutPage"
   ]
 }

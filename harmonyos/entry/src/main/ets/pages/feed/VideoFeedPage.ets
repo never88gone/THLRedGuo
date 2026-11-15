@@ -1,8 +1,8 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 import hilog from '@ohos.hilog';
-import { AppColors, AppDimensions } from '../../common/AppTheme';
-import { DramaItem, DramaDetail, EpisodeInfo } from '../../models/Drama';
+import { AppColors } from '../../common/AppColors';
+import { DramaItem, DramaDetail } from '../../models/Drama';
 import { PlaybackState } from '../../models/Episode';
 import { PlayerController } from '../../core/player/PlayerController';
 import { CoreEngine } from '../../core/engine/CoreEngine';
@@ -17,6 +17,8 @@ export struct VideoFeedPage {
   @State feedItems: DramaItem[] = [];
   @State currentIndex: number = 0;
   @State isLoading: boolean = true;
+  @State isLoadingMore: boolean = false;
+  @State hasMore: boolean = true;
   @State isBuffering: boolean = false;
   @State isPlaying: boolean = false;
   @State videoRatio: number = 9 / 16;
@@ -24,12 +26,14 @@ export struct VideoFeedPage {
   @State durationMs: number = 0;
   @State favoritedMap: Record<string, boolean> = {};
   @State showPauseIcon: boolean = false;
+  @State danmakuEnabled: boolean = true;
 
   private swiperController: SwiperController = new SwiperController();
   private playerController: PlayerController = new PlayerController();
   private xComponentController: XComponentController = new XComponentController();
   private surfaceId: string = '';
   private currentPlayingDramaId: string = '';
+  private feedPage: number = 1;
 
   aboutToAppear(): void {
     this.initPlayer();
@@ -50,10 +54,15 @@ export struct VideoFeedPage {
         this.videoRatio = state.aspectRatio;
       }
     });
+
+    this.playerController.setOnCompleted(() => {
+      this.playNextVideo();
+    });
   }
 
   async loadFeed(): Promise<void> {
     this.isLoading = true;
+    this.feedPage = 1;
     try {
       this.feedItems = await CoreEngine.getInstance().getFeedDramas(1);
       for (const item of this.feedItems) {
@@ -69,6 +78,51 @@ export struct VideoFeedPage {
     }
   }
 
+  async loadMoreFeed(): Promise<void> {
+    if (this.isLoadingMore || !this.hasMore) return;
+    this.isLoadingMore = true;
+    try {
+      this.feedPage += 1;
+      const newItems = await CoreEngine.getInstance().getFeedDramas(this.feedPage);
+      if (newItems && newItems.length > 0) {
+        for (const item of newItems) {
+          const fav = await LocalStore.getInstance().isFavorite(item.id);
+          this.favoritedMap[item.id] = fav;
+        }
+        this.feedItems.push(...newItems);
+        if (this.currentIndex + 1 < this.feedItems.length) {
+          this.swiperController.showNext();
+        }
+      } else {
+        this.hasMore = false;
+        if (this.feedItems.length > 0) {
+          this.currentIndex = 0;
+          this.swiperController.changeIndex(0, true);
+        }
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'loadMoreFeed error: %{public}s', JSON.stringify(e));
+    } finally {
+      this.isLoadingMore = false;
+    }
+  }
+
+  playNextVideo(): void {
+    hilog.info(DOMAIN, TAG, 'Video playback completed in feed. currentIndex: %{public}d, total: %{public}d', this.currentIndex, this.feedItems.length);
+    const nextIndex = this.currentIndex + 1;
+    if (nextIndex < this.feedItems.length) {
+      this.swiperController.showNext();
+      setTimeout(() => {
+        if (this.currentIndex !== nextIndex) {
+          this.currentIndex = nextIndex;
+          this.playItemAtIndex(nextIndex);
+        }
+      }, 350);
+    } else {
+      this.loadMoreFeed();
+    }
+  }
+
   async playItemAtIndex(index: number): Promise<void> {
     if (index < 0 || index >= this.feedItems.length) return;
     const drama = this.feedItems[index];
@@ -78,6 +132,8 @@ export struct VideoFeedPage {
     this.currentPlayingDramaId = drama.id;
     this.isBuffering = true;
     this.showPauseIcon = false;
+    this.progressMs = 0;
+    this.durationMs = 0;
 
     try {
       hilog.info(DOMAIN, TAG, 'Auto playing feed drama: %{public}s (%{public}s)', drama.title, drama.id);
@@ -100,6 +156,9 @@ export struct VideoFeedPage {
   onSwiperChange(index: number): void {
     this.currentIndex = index;
     this.playItemAtIndex(index);
+    if (index >= this.feedItems.length - 2 && !this.isLoadingMore && this.hasMore) {
+      this.loadMoreFeed();
+    }
   }
 
   togglePlayPause(): void {
@@ -146,18 +205,15 @@ export struct VideoFeedPage {
         }
         .justifyContent(FlexAlign.Center)
       } else {
-        // 核心：全屏原生垂直滑动 Swiper，直接播放视频
         Swiper(this.swiperController) {
           ForEach(this.feedItems, (drama: DramaItem, index: number) => {
             Stack({ alignContent: Alignment.Center }) {
-              // 黑色底衬，防拉伸居中容器
               Column()
                 .width('100%')
                 .height('100%')
-                .backgroundColor(Color.Black)
+                .backgroundColor(AppColors.black)
 
               if (this.currentIndex === index) {
-                // 当前活动项：真实 XComponent 视频渲染组件（防拉伸，保持比例居中）
                 Stack({ alignContent: Alignment.Center }) {
                   XComponent({
                     id: 'feedPlayerSurface',
@@ -172,7 +228,7 @@ export struct VideoFeedPage {
                     })
                     .aspectRatio(this.videoRatio > 0 ? this.videoRatio : 9 / 16)
                     .width('100%')
-                    .backgroundColor(Color.Black)
+                    .backgroundColor(AppColors.black)
                 }
                 .width('100%')
                 .height('100%')
@@ -180,7 +236,6 @@ export struct VideoFeedPage {
                   this.togglePlayPause();
                 })
               } else {
-                // 非活动项：显示原比例封面占位
                 Stack({ alignContent: Alignment.Center }) {
                   Image(drama.coverUrl)
                     .aspectRatio(9 / 16)
@@ -191,7 +246,6 @@ export struct VideoFeedPage {
                 .height('100%')
               }
 
-              // 缓冲加载状态指示
               if (this.currentIndex === index && this.isBuffering) {
                 LoadingProgress()
                   .width(44)
@@ -199,12 +253,11 @@ export struct VideoFeedPage {
                   .color(AppColors.hongguoRed)
               }
 
-              // 暂停居中大图标
               if (this.currentIndex === index && this.showPauseIcon) {
                 Button('▶')
                   .fontSize(32)
-                  .fontColor(Color.White)
-                  .backgroundColor('rgba(0,0,0,0.5)')
+                  .fontColor(AppColors.white)
+                  .backgroundColor(AppColors.maskDark50)
                   .width(64)
                   .height(64)
                   .borderRadius(32)
@@ -213,107 +266,163 @@ export struct VideoFeedPage {
                   })
               }
 
-              // 顶部精选推荐与上滑换剧提示
-              Column() {
-                Row() {
-                  Text('推荐')
-                    .fontSize(18)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Color.White)
+              Stack({ alignContent: Alignment.Bottom }) {
+                Column()
+                  .width('100%')
+                  .height(320)
+                  .linearGradient({
+                    direction: GradientDirection.Bottom,
+                    colors: [[AppColors.transparent, 0.0], [AppColors.maskDark80, 1.0]]
+                  })
+                  .hitTestBehavior(HitTestMode.None)
+
+                Column() {
+                  Row() {
+                    Text('推荐')
+                      .fontSize(20)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(AppColors.white)
+
+                    Blank()
+
+                    Text('上滑换剧')
+                      .fontSize(12)
+                      .fontColor(AppColors.whiteAlpha70)
+                  }
+                  .width('100%')
+                  .padding({ left: 16, right: 16, top: 38, bottom: 8 })
 
                   Blank()
 
-                  Text('上滑换剧')
-                    .fontSize(12)
-                    .fontColor('rgba(255,255,255,0.7)')
-                }
-                .width('100%')
-                .padding({ left: 16, right: 16, top: 38, bottom: 8 })
+                  Row() {
+                    Column({ space: 8 }) {
+                      Text(drama.title)
+                        .fontSize(20)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor(AppColors.white)
+                        .maxLines(2)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-                Blank()
-
-                // 底部剧名、选集与查看全集覆盖层 (对齐 Flutter 推荐流)
-                Row() {
-                  Column({ space: 6 }) {
-                    Text(drama.title)
-                      .fontSize(17)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(Color.White)
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-                    Text(drama.remarks ? `第 1 集 · ${drama.remarks}` : '第 1 集')
-                      .fontSize(13)
-                      .fontColor('rgba(255,255,255,0.85)')
-
-                    Button('查看全集 >')
-                      .fontSize(12)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(Color.White)
-                      .backgroundColor('rgba(255, 255, 255, 0.22)')
-                      .borderRadius(14)
-                      .height(28)
-                      .padding({ left: 12, right: 12 })
-                      .margin({ top: 4 })
+                      Row({ space: 6 }) {
+                        Image($r('app.media.ic_play_circle_outline'))
+                          .width(18)
+                          .height(18)
+                          .fillColor(AppColors.white)
+                        Text(drama.remarks ? `第 1 集 · ${drama.remarks}` : '第 1 集')
+                          .fontSize(14)
+                          .fontColor(AppColors.white)
+                          .maxLines(1)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      }
+                      .padding({ top: 2, bottom: 2 })
                       .onClick(() => {
                         this.openDramaDetail(drama);
                       })
-                  }
-                  .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Start)
 
-                  // 右侧追剧浮动大图标
-                  Column({ space: 16 }) {
-                    Column({ space: 4 }) {
-                      Button(this.favoritedMap[drama.id] ? '❤️' : '🤍')
-                        .fontSize(22)
-                        .backgroundColor('rgba(0,0,0,0.45)')
-                        .width(46)
-                        .height(46)
-                        .borderRadius(23)
-                        .onClick(() => {
-                          this.toggleFavorite(drama);
-                        })
-
-                      Text(this.favoritedMap[drama.id] ? '已追' : '追剧')
-                        .fontSize(11)
-                        .fontColor(Color.White)
+                      if (drama.intro && drama.intro.length > 0) {
+                        Text(drama.intro)
+                          .fontSize(13)
+                          .fontColor(AppColors.whiteAlpha70)
+                          .maxLines(2)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                          .lineHeight(18)
+                      }
                     }
+                    .layoutWeight(1)
+                    .alignItems(HorizontalAlign.Start)
 
-                    Column({ space: 4 }) {
-                      Button('📑')
-                        .fontSize(20)
-                        .backgroundColor('rgba(0,0,0,0.45)')
-                        .width(46)
-                        .height(46)
-                        .borderRadius(23)
-                        .onClick(() => {
-                          this.openDramaDetail(drama);
-                        })
+                    Column({ space: 12 }) {
+                      Button({ type: ButtonType.Circle }) {
+                        Image(this.favoritedMap[drama.id] ? $r('app.media.ic_favorite') : $r('app.media.ic_favorite_border'))
+                          .width(26)
+                          .height(26)
+                          .fillColor(this.favoritedMap[drama.id] ? AppColors.hongguoRed : AppColors.white)
+                      }
+                      .width(48)
+                      .height(48)
+                      .backgroundColor(AppColors.feedActionBg)
+                      .onClick(() => {
+                        this.toggleFavorite(drama);
+                      })
 
-                      Text('全集')
-                        .fontSize(11)
-                        .fontColor(Color.White)
+                      Button({ type: ButtonType.Circle }) {
+                        Image($r('app.media.ic_episodes'))
+                          .width(26)
+                          .height(26)
+                          .fillColor(AppColors.white)
+                      }
+                      .width(48)
+                      .height(48)
+                      .backgroundColor(AppColors.feedActionBg)
+                      .onClick(() => {
+                        this.openDramaDetail(drama);
+                      })
+
+                      Button({ type: ButtonType.Circle }) {
+                        Image($r('app.media.ic_subtitles'))
+                          .width(26)
+                          .height(26)
+                          .fillColor(this.danmakuEnabled ? AppColors.hongguoRed : AppColors.white)
+                      }
+                      .width(48)
+                      .height(48)
+                      .backgroundColor(AppColors.feedActionBg)
+                      .onClick(() => {
+                        this.danmakuEnabled = !this.danmakuEnabled;
+                        promptAction.showToast({
+                          message: this.danmakuEnabled ? '弹幕已开启' : '弹幕已关闭'
+                        });
+                      })
+
+                      Button({ type: ButtonType.Circle }) {
+                        Image($r('app.media.ic_info_outline'))
+                          .width(26)
+                          .height(26)
+                          .fillColor(AppColors.white)
+                      }
+                      .width(48)
+                      .height(48)
+                      .backgroundColor(AppColors.feedActionBg)
+                      .onClick(() => {
+                        this.openDramaDetail(drama);
+                      })
+
+                      Button({ type: ButtonType.Circle }) {
+                        Image($r('app.media.ic_tune'))
+                          .width(26)
+                          .height(26)
+                          .fillColor(AppColors.white)
+                      }
+                      .width(48)
+                      .height(48)
+                      .backgroundColor(AppColors.feedActionBg)
+                      .onClick(() => {
+                        promptAction.showToast({
+                          message: '当前采用高清智能硬件解码'
+                        });
+                      })
                     }
+                    .alignItems(HorizontalAlign.Center)
+                    .padding({ left: 12 })
                   }
-                  .alignItems(HorizontalAlign.Center)
-                  .padding({ left: 12 })
+                  .alignItems(VerticalAlign.Bottom)
+                  .width('100%')
+                  .padding({ left: 16, right: 16, bottom: 12 })
+
+                  if (this.durationMs > 0) {
+                    Progress({
+                      value: this.progressMs,
+                      total: this.durationMs,
+                      type: ProgressType.Linear
+                    })
+                      .color(AppColors.hongguoRed)
+                      .backgroundColor(AppColors.whiteAlpha20)
+                      .width('100%')
+                      .height(2)
+                  }
                 }
                 .width('100%')
-                .padding({ left: 16, right: 16, bottom: 20 })
-
-                // 底部纤细播放进度条
-                if (this.durationMs > 0) {
-                  Progress({
-                    value: this.progressMs,
-                    total: this.durationMs,
-                    type: ProgressType.Linear
-                  })
-                    .color(AppColors.hongguoRed)
-                    .backgroundColor('rgba(255,255,255,0.2)')
-                    .width('100%')
-                    .height(2)
-                }
+                .height('100%')
               }
               .width('100%')
               .height('100%')
@@ -335,6 +444,6 @@ export struct VideoFeedPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(Color.Black)
+    .backgroundColor(AppColors.black)
   }
 }

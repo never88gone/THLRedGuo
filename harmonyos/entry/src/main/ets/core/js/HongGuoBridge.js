@@ -11,11 +11,6 @@ export function bridgeInit() {
   if (isReady) return true;
   try {
     if (spider) {
-      // 允许使用 hongguo.js 内置的 Gorgon/Ladon/Argus 算法进行直连签名
-      globalThis.__hongguoLocalSign = function() {
-        return null;
-      };
-
       if (typeof spider.init === 'function') {
         spider.init();
       }

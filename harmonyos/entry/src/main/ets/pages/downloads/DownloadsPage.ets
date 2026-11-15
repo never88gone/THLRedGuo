@@ -1,6 +1,7 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
-import { AppColors, AppDimensions } from '../../common/AppTheme';
+import { AppColors } from '../../common/AppColors';
+import { AppDimensions } from '../../common/AppDimensions';
 import { DownloadTask, DownloadStatus } from '../../models/Download';
 import { DownloadManager } from '../../core/download/DownloadManager';
 
@@ -45,19 +46,6 @@ export struct DownloadsPage {
     promptAction.showToast({ message: '已删除下载任务' });
   }
 
-  // 快捷添加模拟下载任务用于快速体验与验证
-  createDemoTask(): void {
-    DownloadManager.getInstance().enqueue(
-      'demo_drama_1',
-      '战神归来：无双战神',
-      'https://p3-novel.byteimg.com/origin/novel-static/demo.jpg',
-      1,
-      '第 1 集',
-      'https://example.com/demo.mp4'
-    );
-    promptAction.showToast({ message: '已创建离线缓存任务' });
-  }
-
   build() {
     Column() {
       // 顶部导航栏
@@ -68,7 +56,7 @@ export struct DownloadsPage {
             .height(22)
             .fillColor(AppColors.textPrimary)
         }
-        .backgroundColor(Color.Transparent)
+        .backgroundColor(AppColors.transparent)
         .width(40)
         .height(40)
         .onClick(() => {
@@ -84,13 +72,10 @@ export struct DownloadsPage {
 
         Blank()
 
-        Button('+ 模拟添加')
-          .fontSize(12)
-          .fontColor(AppColors.hongguoGold)
-          .backgroundColor(Color.Transparent)
-          .onClick(() => {
-            this.createDemoTask();
-          })
+        // 右侧空白占位，保持标题居中对齐
+        Row()
+          .width(40)
+          .height(40)
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 38, bottom: 8 })
@@ -117,7 +102,7 @@ export struct DownloadsPage {
           .fontSize(13)
           .fontWeight(this.selectedTab === 0 ? FontWeight.Bold : FontWeight.Normal)
           .fontColor(this.selectedTab === 0 ? AppColors.hongguoRed : AppColors.textSecondary)
-          .backgroundColor(Color.Transparent)
+          .backgroundColor(AppColors.transparent)
           .onClick(() => {
             this.selectedTab = 0;
           })
@@ -127,7 +112,7 @@ export struct DownloadsPage {
           .fontSize(13)
           .fontWeight(this.selectedTab === 2 ? FontWeight.Bold : FontWeight.Normal)
           .fontColor(this.selectedTab === 2 ? AppColors.hongguoRed : AppColors.textSecondary)
-          .backgroundColor(Color.Transparent)
+          .backgroundColor(AppColors.transparent)
           .onClick(() => {
             this.selectedTab = 2;
           })
@@ -137,7 +122,7 @@ export struct DownloadsPage {
           .fontSize(13)
           .fontWeight(this.selectedTab === 1 ? FontWeight.Bold : FontWeight.Normal)
           .fontColor(this.selectedTab === 1 ? AppColors.hongguoRed : AppColors.textSecondary)
-          .backgroundColor(Color.Transparent)
+          .backgroundColor(AppColors.transparent)
           .onClick(() => {
             this.selectedTab = 1;
           })
@@ -187,7 +172,7 @@ export struct DownloadsPage {
                   // 进度条
                   Progress({ value: task.progress, total: 100, type: ProgressType.Linear })
                     .color(AppColors.hongguoRed)
-                    .backgroundColor('rgba(255, 255, 255, 0.15)')
+                    .backgroundColor(AppColors.whiteAlpha15)
                     .width('100%')
                     .height(4)
 
@@ -226,7 +211,7 @@ export struct DownloadsPage {
                   Button('删除')
                     .fontSize(11)
                     .fontColor(AppColors.textMuted)
-                    .backgroundColor(Color.Transparent)
+                    .backgroundColor(AppColors.transparent)
                     .height(26)
                     .onClick(() => {
                       this.deleteTask(task);

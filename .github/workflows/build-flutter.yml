@@ -541,6 +541,10 @@ jobs:
             printf -- '- [THLRedLook-1.0.0-tvos-signed.ipa](%s/THLRedLook-1.0.0-tvos-signed.ipa)（已签名 tvOS 原生大屏安装包）\n' "$base_url"
             printf -- '- [THLRedLook-1.0.0-tvos-unsigned.ipa](%s/THLRedLook-1.0.0-tvos-unsigned.ipa)（tvOS 未签名自签包）\n' "$base_url"
 
+            # 保持 HarmonyOS NEXT 链接说明
+            printf '\n%s\n' "#### 🔴 HarmonyOS NEXT (华为纯血鸿蒙原生)"
+            printf -- '- [THLRedLook-1.0.0-harmonyos-signed.hap](%s/THLRedLook-1.0.0-harmonyos-signed.hap)（HarmonyOS NEXT 原生已签名 HAP 安装包）\n' "$base_url"
+
             printf '\n%s\n' "---"
             printf '%s\n' "### 🔒 安全校验与哈希"
             printf '本次发布产物的完整性哈希已记录于 [SHA256SUMS.txt](%s/SHA256SUMS.txt)。\n' "$base_url"

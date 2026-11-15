@@ -1,4 +1,4 @@
-import { AppColors } from '../common/AppTheme';
+import { AppColors } from '../common/AppColors';
 import { HomePage } from './home/HomePage';
 import { VideoFeedPage } from './feed/VideoFeedPage';
 import { AccountPage } from './account/AccountPage';
@@ -12,9 +12,9 @@ struct Index {
   private controller: TabsController = new TabsController();
 
   @Builder
-  TabBuilder(title: string, index: number, iconRes: Resource) {
+  TabBuilder(title: string, index: number, defaultIcon: Resource, activeIcon: Resource) {
     Column({ space: 3 }) {
-      Image(iconRes)
+      Image(this.currentIndex === index ? activeIcon : defaultIcon)
         .width(this.currentIndex === index ? 24 : 22)
         .height(this.currentIndex === index ? 24 : 22)
         .fillColor(this.currentIndex === index ? AppColors.hongguoRed : AppColors.textSecondaryDark)
@@ -36,27 +36,27 @@ struct Index {
         TabContent() {
           HomePage()
         }
-        .tabBar(this.TabBuilder('发现', 0, $r('app.media.nav_explore')))
+        .tabBar(this.TabBuilder('发现', 0, $r('app.media.nav_explore'), $r('app.media.nav_explore_active')))
 
         TabContent() {
           VideoFeedPage()
         }
-        .tabBar(this.TabBuilder('推荐', 1, $r('app.media.nav_recommend')))
+        .tabBar(this.TabBuilder('推荐', 1, $r('app.media.nav_recommend'), $r('app.media.nav_recommend_active')))
 
         TabContent() {
           AccountPage()
         }
-        .tabBar(this.TabBuilder('我的', 2, $r('app.media.nav_account')))
+        .tabBar(this.TabBuilder('我的', 2, $r('app.media.nav_account'), $r('app.media.nav_account')))
 
         TabContent() {
           DownloadsPage()
         }
-        .tabBar(this.TabBuilder('下载', 3, $r('app.media.nav_download')))
+        .tabBar(this.TabBuilder('下载', 3, $r('app.media.nav_download'), $r('app.media.nav_download_active')))
 
         TabContent() {
           SettingsPage()
         }
-        .tabBar(this.TabBuilder('设置', 4, $r('app.media.nav_settings')))
+        .tabBar(this.TabBuilder('设置', 4, $r('app.media.nav_settings'), $r('app.media.nav_settings')))
       }
       .barHeight(66)
       .barBackgroundColor(AppColors.bottomNavBg)

@@ -1,6 +1,7 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
-import { AppColors, AppDimensions } from '../../common/AppTheme';
+import { AppColors } from '../../common/AppColors';
+import { AppDimensions } from '../../common/AppDimensions';
 import { DramaItem } from '../../models/Drama';
 import { UserProfile } from '../../models/Account';
 import { WatchHistoryItem, LocalStore } from '../../core/store/LocalStore';
@@ -126,7 +127,7 @@ export struct AccountPage {
               Text('登录')
                 .fontSize(14)
                 .fontWeight(FontWeight.Bold)
-                .fontColor(Color.White)
+                .fontColor(AppColors.white)
             }
             .padding({ left: 16, right: 16, top: 6, bottom: 6 })
           }
@@ -168,12 +169,12 @@ export struct AccountPage {
             Text('追剧')
               .fontSize(13)
               .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
-              .fontColor(this.currentTab === 0 ? Color.White : AppColors.textSecondary)
+              .fontColor(this.currentTab === 0 ? AppColors.white : AppColors.textSecondary)
           }
           .padding({ left: 14, right: 14, top: 6, bottom: 6 })
         }
-        .backgroundColor(this.currentTab === 0 ? AppColors.bgElevated : Color.Transparent)
-        .border({ width: 0.8, color: this.currentTab === 0 ? AppColors.hongguoRed : 'rgba(255,255,255,0.1)' })
+        .backgroundColor(this.currentTab === 0 ? AppColors.bgElevated : AppColors.transparent)
+        .border({ width: 0.8, color: this.currentTab === 0 ? AppColors.hongguoRed : AppColors.whiteAlpha10 })
         .height(36)
         .onClick(() => {
           this.currentTab = 0;
@@ -186,12 +187,12 @@ export struct AccountPage {
             Text('历史记录')
               .fontSize(13)
               .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
-              .fontColor(this.currentTab === 1 ? Color.White : AppColors.textSecondary)
+              .fontColor(this.currentTab === 1 ? AppColors.white : AppColors.textSecondary)
           }
           .padding({ left: 14, right: 14, top: 6, bottom: 6 })
         }
-        .backgroundColor(this.currentTab === 1 ? AppColors.bgElevated : Color.Transparent)
-        .border({ width: 0.8, color: this.currentTab === 1 ? AppColors.hongguoRed : 'rgba(255,255,255,0.1)' })
+        .backgroundColor(this.currentTab === 1 ? AppColors.bgElevated : AppColors.transparent)
+        .border({ width: 0.8, color: this.currentTab === 1 ? AppColors.hongguoRed : AppColors.whiteAlpha10 })
         .height(36)
         .onClick(() => {
           this.currentTab = 1;
@@ -203,7 +204,7 @@ export struct AccountPage {
           Button('清空历史')
             .fontSize(12)
             .fontColor(AppColors.textSecondaryDark)
-            .backgroundColor(Color.Transparent)
+            .backgroundColor(AppColors.transparent)
             .onClick(() => {
               this.clearAllHistory();
             })
@@ -259,7 +260,7 @@ export struct AccountPage {
                     Row({ space: 8 }) {
                       Button('继续播放')
                         .fontSize(11)
-                        .fontColor(Color.White)
+                        .fontColor(AppColors.white)
                         .backgroundColor(AppColors.hongguoRed)
                         .height(26)
                         .borderRadius(13)
@@ -344,7 +345,7 @@ export struct AccountPage {
                     Row({ space: 8 }) {
                       Button('续播')
                         .fontSize(11)
-                        .fontColor(Color.White)
+                        .fontColor(AppColors.white)
                         .backgroundColor(AppColors.hongguoRed)
                         .height(26)
                         .borderRadius(13)

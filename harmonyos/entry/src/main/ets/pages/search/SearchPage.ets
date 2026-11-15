@@ -1,5 +1,6 @@
 import router from '@ohos.router';
-import { AppColors, AppDimensions } from '../../common/AppTheme';
+import { AppColors } from '../../common/AppColors';
+import { AppDimensions } from '../../common/AppDimensions';
 import { DramaItem } from '../../models/Drama';
 import { CoreEngine } from '../../core/engine/CoreEngine';
 import { LocalStore } from '../../core/store/LocalStore';
@@ -71,7 +72,7 @@ export struct SearchPage {
             .height(22)
             .fillColor(AppColors.textPrimary)
         }
-        .backgroundColor(Color.Transparent)
+        .backgroundColor(AppColors.transparent)
         .width(40)
         .height(40)
         .onClick(() => {
@@ -101,7 +102,7 @@ export struct SearchPage {
             Button('✕')
               .fontSize(12)
               .fontColor(AppColors.textSecondary)
-              .backgroundColor(Color.Transparent)
+              .backgroundColor(AppColors.transparent)
               .width(28)
               .height(28)
               .onClick(() => {
@@ -174,7 +175,7 @@ export struct SearchPage {
                       Text(drama.remarks)
                         .fontSize(10)
                         .fontColor(AppColors.textPrimary)
-                        .backgroundColor('rgba(0, 0, 0, 0.65)')
+                        .backgroundColor(AppColors.maskDark65)
                         .padding({ left: 4, right: 4, top: 2, bottom: 2 })
                         .borderRadius(4)
                         .margin(6)
@@ -219,7 +220,7 @@ export struct SearchPage {
                   Button('清空')
                     .fontSize(12)
                     .fontColor(AppColors.textMuted)
-                    .backgroundColor(Color.Transparent)
+                    .backgroundColor(AppColors.transparent)
                     .onClick(() => {
                       this.clearRecent();
                     })

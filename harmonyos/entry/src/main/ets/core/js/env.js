@@ -98,8 +98,9 @@ globalThis.fetch = function(url, options) {
       method: httpMethod,
       header: headers,
       extraData: body,
-      readTimeout: options.timeoutMs || 25000,
-      connectTimeout: 12000
+      expectDataType: http.HttpDataType.STRING,
+      readTimeout: Math.max(options.timeoutMs || 25000, 10000),
+      connectTimeout: 10000
     }, function(err, data) {
       if (err) {
         try { req.destroy(); } catch (_) {}
@@ -145,19 +146,29 @@ globalThis.fetch = function(url, options) {
       var resultStr = '';
       if (typeof data.result === 'string') {
         resultStr = data.result;
-      } else if (data.result instanceof ArrayBuffer) {
-        var u8 = new Uint8Array(data.result);
-        var s = '';
-        for (var i = 0; i < u8.length; i++) {
-          s += String.fromCharCode(u8[i]);
-        }
-        try {
-          resultStr = decodeURIComponent(escape(s));
-        } catch (_) {
-          resultStr = s;
+      } else if (typeof data.result === 'object' && data.result !== null) {
+        if (data.result instanceof ArrayBuffer) {
+          var u8 = new Uint8Array(data.result);
+          var s = '';
+          for (var i = 0; i < u8.length; i++) {
+            s += String.fromCharCode(u8[i]);
+          }
+          try {
+            resultStr = decodeURIComponent(escape(s));
+          } catch (_) {
+            resultStr = s;
+          }
+        } else {
+          try {
+            resultStr = JSON.stringify(data.result);
+          } catch (_) {
+            resultStr = '';
+          }
         }
       }
       try { req.destroy(); } catch (_) {}
+
+      hilog.info(0x0000, 'HongGuoFetch', 'Fetch %{public}s %{public}s -> status %{public}d, bodyLen=%{public}d', method, url.slice(0, 80), respCode, resultStr.length);
 
       var responseObj = {
         status: respCode,
@@ -171,6 +182,7 @@ globalThis.fetch = function(url, options) {
             }
             return '';
           },
+          'content-type': respHeaders['content-type'] || respHeaders['Content-Type'] || (httpMethod === http.RequestMethod.HEAD ? 'video/mp4' : ''),
           ...respHeaders
         },
         body: resultStr,
@@ -179,6 +191,9 @@ globalThis.fetch = function(url, options) {
         },
         json: function() {
           try {
+            if (typeof data.result === 'object' && data.result !== null && !(data.result instanceof ArrayBuffer)) {
+              return Promise.resolve(data.result);
+            }
             return Promise.resolve(JSON.parse(resultStr));
           } catch (parseErr) {
             return Promise.reject(parseErr);

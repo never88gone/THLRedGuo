@@ -1,0 +1,126 @@
+name: Build HarmonyOS App (HAP)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+    tags:
+      - 'v*'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches:
+      - main
+      - master
+      - dev
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: harmonyos-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TZ: 'Asia/Shanghai'
+
+jobs:
+  harmonyos:
+    name: HarmonyOS NEXT 原生 HAP 自动化打包
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 配置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 配置 Node.js 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: 配置 Java JDK 环境
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 安装 Linux 必要图形渲染系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libgl1-mesa-glx
+
+      - name: 配置 HarmonyOS / OpenHarmony CLI 工具链
+        uses: ErBWs/setup-ohos@v2
+        with:
+          version: 6.1.1.280
+          cache: true
+
+      - name: 注入官方签名并执行 HAP 打包构建
+        env:
+          HONGGUO_SIGNING_CONFIG: ${{ secrets.HONGGUO_SIGNING_CONFIG }}
+        run: |
+          python .github/ci/build_harmonyos.py
+
+      - name: 上传 HarmonyOS HAP 安装包构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmonyos-hap-output
+          path: dist/harmonyos/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release-harmonyos:
+    name: HarmonyOS HAP 产物自动发布至 GitHub Release
+    needs: harmonyos
+    if: always() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref_type == 'tag') && needs.harmonyos.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: harmonyos-hap-output
+          path: release
+      - name: 自动上传 HarmonyOS 安装包至 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${{ github.ref_name }}"
+            base_version="${tag#v}"
+          else
+            version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
+            base_version="${version%%+*}"
+            tag="v${base_version}"
+          fi
+
+          echo "准备上传 HarmonyOS HAP 产物至 Release: $tag"
+          ls -la release/
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "更新已有 Release: $tag 资产"
+            gh release upload "$tag" release/* --clobber
+          else
+            echo "创建新 Release: $tag (Target: ${{ github.sha }})"
+            gh release create "$tag" release/* \
+              --title "糖葫芦Haw v${base_version}" \
+              --notes "## 糖葫芦Haw (THLRedLook) v${base_version} 鸿蒙原生 (HarmonyOS NEXT) 版本发布" \
+              --target "${{ github.sha }}"
+          fi

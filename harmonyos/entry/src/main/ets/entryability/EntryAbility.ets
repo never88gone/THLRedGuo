@@ -6,6 +6,7 @@ import Want from '@ohos.app.ability.Want';
 import AbilityConstant from '@ohos.app.ability.AbilityConstant';
 import { LocalStore } from '../core/store/LocalStore';
 import { CatPawJsRuntime } from '../core/js/CatPawJsRuntime';
+import { AppColors } from '../common/AppColors';
 
 const TAG = 'EntryAbility';
 const DOMAIN = 0x0000;
@@ -33,8 +34,8 @@ export default class EntryAbility extends UIAbility {
       }
       try {
         windowClass.setWindowSystemBarProperties({
-          statusBarColor: '#00000000',
-          navigationBarColor: '#00000000'
+          statusBarColor: AppColors.transparent,
+          navigationBarColor: AppColors.transparent
         });
       } catch (e) {
         hilog.warn(DOMAIN, TAG, 'setWindowSystemBarProperties error: %{public}s', JSON.stringify(e));

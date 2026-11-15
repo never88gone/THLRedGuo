@@ -22,3 +22,16 @@ export interface AccountSession {
   installId: string;
   expireTime: number;
 }
+
+export interface QrDataPayload {
+  token?: string;
+  qrcode_index_url?: string;
+  qrcode?: string;
+  status?: string;
+  expire_time?: number;
+}
+
+export interface QrApiResponse {
+  data?: QrDataPayload;
+  message?: string;
+}

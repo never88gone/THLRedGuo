@@ -1,4 +1,9 @@
-import { UserProfile, QRLoginState } from '../../models/Account';
+import http from '@ohos.net.http';
+import hilog from '@ohos.hilog';
+import { UserProfile, QRLoginState, QrApiResponse } from '../../models/Account';
+
+const TAG = 'AccountService';
+const DOMAIN = 0x0000;
 
 /**
  * 账号与认证服务
@@ -35,10 +40,45 @@ export class AccountService {
    * 生成扫码登录二维码
    */
   public async requestQrCode(): Promise<QRLoginState> {
-    const mockToken = 'qr_' + Date.now();
+    const url = 'https://reading.snssdk.com/passport/web/get_qrcode/?aid=513755&passport_jssdk_version=3.4.10&passport_jssdk_type=normal&account_sdk_source=web&is_from_ttaccountsdk=1&language=zh&next=https%3A%2F%2Freading.snssdk.com%2F';
+    const httpRequest = http.createHttp();
+    try {
+      const response = await httpRequest.request(url, {
+        method: http.RequestMethod.GET,
+        header: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://reading.snssdk.com/',
+          'Origin': 'https://reading.snssdk.com',
+          'Accept': 'application/json, text/javascript'
+        },
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 8000,
+        readTimeout: 8000
+      });
+
+      if (response && response.responseCode === 200 && response.result) {
+        const raw: string = typeof response.result === 'string' ? response.result : JSON.stringify(response.result);
+        const json: QrApiResponse = JSON.parse(raw) as QrApiResponse;
+        if (json && json.data && json.data.token) {
+          const qrUrl: string = (json.data.qrcode_index_url as string) || (json.data.qrcode as string) || ('https://hongguoduanju.com/login/qrcode?token=' + json.data.token);
+          hilog.info(DOMAIN, TAG, 'requestQrCode success, token: %{public}s', json.data.token);
+          return {
+            token: json.data.token as string,
+            qrCodeUrl: qrUrl,
+            status: 'pending'
+          };
+        }
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'requestQrCode error: %{public}s', JSON.stringify(e));
+    } finally {
+      httpRequest.destroy();
+    }
+
+    const fallbackToken = 'qr_' + Date.now();
     return {
-      token: mockToken,
-      qrCodeUrl: 'https://hongguoduanju.com/login/qrcode?token=' + mockToken,
+      token: fallbackToken,
+      qrCodeUrl: 'https://hongguoduanju.com/login/qrcode?token=' + fallbackToken,
       status: 'pending'
     };
   }
@@ -47,22 +87,53 @@ export class AccountService {
    * 轮询扫码状态
    */
   public async checkQrStatus(token: string): Promise<'pending' | 'scanned' | 'confirmed' | 'expired'> {
-    return 'pending';
-  }
+    if (!token || token.startsWith('qr_')) {
+      return 'pending';
+    }
+    const url = 'https://reading.snssdk.com/passport/web/check_qrconnect/?aid=513755&passport_jssdk_version=3.4.10&passport_jssdk_type=normal&account_sdk_source=web&is_from_ttaccountsdk=1&language=zh&next=https%3A%2F%2Freading.snssdk.com%2F&token=' + encodeURIComponent(token);
+    const httpRequest = http.createHttp();
+    try {
+      const response = await httpRequest.request(url, {
+        method: http.RequestMethod.GET,
+        header: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://reading.snssdk.com/',
+          'Origin': 'https://reading.snssdk.com',
+          'Accept': 'application/json, text/javascript'
+        },
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 5000,
+        readTimeout: 5000
+      });
 
-  /**
-   * 模拟确认扫码登录（供本地开发与测试）
-   */
-  public async mockConfirmQr(token: string): Promise<boolean> {
-    this.currentUser = {
-      userId: 'qr_user_' + Math.floor(Math.random() * 8999 + 1000),
-      nickname: '红果VIP会员',
-      avatarUrl: '',
-      isLoggedIn: true,
-      vipStatus: 'VIP有效',
-      phoneMasked: '138****8888'
-    };
-    return true;
+      if (response && response.responseCode === 200 && response.result) {
+        const raw: string = typeof response.result === 'string' ? response.result : JSON.stringify(response.result);
+        const json: QrApiResponse = JSON.parse(raw) as QrApiResponse;
+        if (json && json.data) {
+          const st = String(json.data.status || '');
+          if (st === 'confirmed' || st === '3') {
+            this.currentUser = {
+              userId: 'hg_' + token.slice(0, 8),
+              nickname: '红果剧友',
+              avatarUrl: '',
+              isLoggedIn: true
+            };
+            return 'confirmed';
+          }
+          if (st === 'scanned' || st === '2') {
+            return 'scanned';
+          }
+          if (st === 'expired' || st === '5') {
+            return 'expired';
+          }
+        }
+      }
+    } catch (e) {
+      hilog.warn(DOMAIN, TAG, 'checkQrStatus error: %{public}s', JSON.stringify(e));
+    } finally {
+      httpRequest.destroy();
+    }
+    return 'pending';
   }
 
   /**

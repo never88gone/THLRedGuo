@@ -1,11 +1,14 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
 import hilog from '@ohos.hilog';
-import { AppColors, AppDimensions } from '../../common/AppTheme';
+import { AppColors } from '../../common/AppColors';
 import { DramaItem } from '../../models/Drama';
 import { CategoryItem } from '../../models/Category';
 import { CoreEngine } from '../../core/engine/CoreEngine';
 import { LocalStore } from '../../core/store/LocalStore';
+import { HomeAppBarView } from './components/HomeAppBarView';
+import { HomeSearchBarView } from './components/HomeSearchBarView';
+import { HomeDramaCardView } from './components/HomeDramaCardView';
 
 const TAG = 'HomePage';
 const DOMAIN = 0x0000;
@@ -186,185 +189,39 @@ export struct HomePage {
 
   build() {
     Column() {
-      // 1. 顶部 Header (对齐 Flutter HomeAppBarView)
-      Row() {
-        // 左侧：数据源切换胶囊 (官方红果 + 下拉箭头)
-        Row({ space: 6 }) {
-          Image($r('app.media.ic_movie_filter'))
-            .width(18)
-            .height(18)
-
-          Text('官方红果')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bolder)
-            .fontColor(AppColors.textPrimary)
-
-          Image($r('app.media.ic_expand_more'))
-            .width(18)
-            .height(18)
-            .fillColor(AppColors.textSecondary)
-        }
-        .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-        .backgroundColor(AppColors.darkSurfaceHighest70)
-        .borderRadius(12)
-        .onClick(() => {
-          promptAction.showToast({ message: '当前数据源：官方红果（独立直连）' });
-        })
-
-        Blank()
-
-        // 右侧操作按钮：榜单与搜索
-        Row({ space: 8 }) {
-          // 榜单按钮
-          Button({ type: ButtonType.Circle }) {
-            Image($r('app.media.ic_rankings'))
-              .width(20)
-              .height(20)
-              .fillColor(AppColors.textPrimary)
+      // 1. 顶部 Header
+      HomeAppBarView({
+        isSearchVisible: this.isSearchVisible,
+        onToggleSearch: () => {
+          this.isSearchVisible = !this.isSearchVisible;
+          if (!this.isSearchVisible && this.searchActiveKeyword) {
+            this.searchQuery = '';
+            this.searchActiveKeyword = '';
+            this.page = 1;
+            this.hasMore = true;
+            this.loadDramas(1, false);
           }
-          .backgroundColor(Color.Transparent)
-          .width(36)
-          .height(36)
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/rankings/RankingsPage' });
-          })
-
-          // 搜索按钮 (折叠/展开搜索栏)
-          Button({ type: ButtonType.Circle }) {
-            Image($r('app.media.ic_search'))
-              .width(20)
-              .height(20)
-              .fillColor(this.isSearchVisible ? AppColors.hongguoRed : AppColors.textPrimary)
-          }
-          .backgroundColor(this.isSearchVisible ? 'rgba(255, 36, 66, 0.15)' : Color.Transparent)
-          .width(36)
-          .height(36)
-          .onClick(() => {
-            this.isSearchVisible = !this.isSearchVisible;
-            if (!this.isSearchVisible && this.searchActiveKeyword) {
-              this.searchQuery = '';
-              this.searchActiveKeyword = '';
-              this.page = 1;
-              this.hasMore = true;
-              this.loadDramas(1, false);
-            }
-          })
         }
-      }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: 38, bottom: 10 })
-      .backgroundColor(AppColors.bgDark)
+      })
 
-      // 2. 折叠式搜索视图 (对齐 Flutter HomeSearchBarView & SearchInput)
+      // 2. 折叠式搜索视图
       if (this.isSearchVisible) {
-        Column({ space: 8 }) {
-          // 搜索输入框
-          Row({ space: 8 }) {
-            Image($r('app.media.ic_search'))
-              .width(18)
-              .height(18)
-              .fillColor(AppColors.textSecondary)
-              .margin({ left: 12 })
-
-            TextInput({ placeholder: '搜索短剧名称、主角或题材...', text: this.searchQuery })
-              .layoutWeight(1)
-              .fontSize(14)
-              .fontColor(AppColors.textPrimary)
-              .placeholderColor(AppColors.textSecondary)
-              .backgroundColor(Color.Transparent)
-              .onChange((val: string) => {
-                this.searchQuery = val;
-              })
-              .onSubmit(() => {
-                this.performSearch(this.searchQuery);
-              })
-
-            if (this.searchQuery.length > 0) {
-              Button({ type: ButtonType.Circle }) {
-                Image($r('app.media.ic_close'))
-                  .width(16)
-                  .height(16)
-                  .fillColor(AppColors.textSecondary)
-              }
-              .backgroundColor(Color.Transparent)
-              .width(32)
-              .height(32)
-              .onClick(() => {
-                this.searchQuery = '';
-              })
-            }
-
-            Button({ type: ButtonType.Circle }) {
-              Image($r('app.media.ic_arrow_forward'))
-                .width(18)
-                .height(18)
-                .fillColor(AppColors.textPrimary)
-            }
-            .backgroundColor(AppColors.hongguoRed)
-            .width(32)
-            .height(32)
-            .margin({ right: 6 })
-            .onClick(() => {
-              this.performSearch(this.searchQuery);
-            })
+        HomeSearchBarView({
+          searchQuery: this.searchQuery,
+          recentSearches: this.recentSearches,
+          onSearchChange: (val: string) => {
+            this.searchQuery = val;
+          },
+          onSearchSubmit: (val: string) => {
+            this.performSearch(val);
+          },
+          onClearQuery: () => {
+            this.searchQuery = '';
+          },
+          onClearRecent: () => {
+            this.clearRecentSearches();
           }
-          .width('100%')
-          .height(44)
-          .backgroundColor(AppColors.bgCard)
-          .borderRadius(22)
-          .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.12)' })
-
-          // 最近搜索词 ActionChips
-          if (this.searchQuery.trim().length === 0 && this.recentSearches.length > 0) {
-            Row() {
-              Scroll() {
-                Row({ space: 8 }) {
-                  ForEach(this.recentSearches, (word: string) => {
-                    Row({ space: 4 }) {
-                      Image($r('app.media.ic_history'))
-                        .width(13)
-                        .height(13)
-                        .fillColor(AppColors.textSecondary)
-                      Text(word)
-                        .fontSize(12)
-                        .fontColor(AppColors.textPrimary)
-                    }
-                    .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                    .backgroundColor(AppColors.bgCard)
-                    .borderRadius(14)
-                    .border({ width: 0.6, color: 'rgba(255, 255, 255, 0.08)' })
-                    .onClick(() => {
-                      this.searchQuery = word;
-                      this.performSearch(word);
-                    })
-                  })
-                }
-                .padding({ left: 4, right: 8 })
-              }
-              .scrollable(ScrollDirection.Horizontal)
-              .scrollBar(BarState.Off)
-              .layoutWeight(1)
-
-              // 清空搜索历史图标
-              Button({ type: ButtonType.Circle }) {
-                Image($r('app.media.ic_delete'))
-                  .width(16)
-                  .height(16)
-                  .fillColor(AppColors.textSecondary)
-              }
-              .backgroundColor(Color.Transparent)
-              .width(32)
-              .height(32)
-              .onClick(() => {
-                this.clearRecentSearches();
-              })
-            }
-            .width('100%')
-            .padding({ top: 4, bottom: 4 })
-          }
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 8 })
+        })
       }
 
       // 3. 分类滚动胶囊栏或当前搜索结果提示
@@ -380,7 +237,7 @@ export struct HomePage {
           Button('清除搜索')
             .fontSize(12)
             .fontColor(AppColors.hongguoRed)
-            .backgroundColor(Color.Transparent)
+            .backgroundColor(AppColors.transparent)
             .onClick(() => {
               this.searchQuery = '';
               this.searchActiveKeyword = '';
@@ -399,7 +256,7 @@ export struct HomePage {
               Button(item.typeName)
                 .fontSize(13)
                 .fontWeight(this.selectedCategoryIndex === index ? FontWeight.Bold : FontWeight.Normal)
-                .fontColor(this.selectedCategoryIndex === index ? Color.White : AppColors.textSecondary)
+                .fontColor(this.selectedCategoryIndex === index ? AppColors.white : AppColors.textSecondary)
                 .backgroundColor(this.selectedCategoryIndex === index ? AppColors.hongguoRed : AppColors.bgCard)
                 .height(32)
                 .padding({ left: 14, right: 14 })
@@ -451,7 +308,12 @@ export struct HomePage {
         Grid() {
           ForEach(this.dramas, (item: DramaItem) => {
             GridItem() {
-              this.DramaCard(item)
+              HomeDramaCardView({
+                drama: item,
+                onDramaClick: (d: DramaItem) => {
+                  this.openDramaDetail(d);
+                }
+              })
             }
           })
 
@@ -503,52 +365,5 @@ export struct HomePage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.bgDark)
-  }
-
-  @Builder
-  DramaCard(drama: DramaItem) {
-    Column() {
-      Stack({ alignContent: Alignment.BottomEnd }) {
-        Image(drama.coverUrl)
-          .width('100%')
-          .height(180)
-          .borderRadius(AppDimensions.radiusMd)
-          .objectFit(ImageFit.Cover)
-          .backgroundColor(AppColors.bgCardHover)
-
-        if (drama.remarks) {
-          Text(drama.remarks)
-            .fontSize(10)
-            .fontColor(Color.White)
-            .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-            .backgroundColor('rgba(0, 0, 0, 0.65)')
-            .borderRadius({ topLeft: 4, bottomRight: AppDimensions.radiusMd })
-        }
-      }
-      .width('100%')
-      .height(180)
-
-      Text(drama.title)
-        .fontSize(13)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(AppColors.textPrimary)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .margin({ top: 6, bottom: 2 })
-        .width('100%')
-
-      if (drama.intro) {
-        Text(drama.intro)
-          .fontSize(11)
-          .fontColor(AppColors.textSecondary)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
-      }
-    }
-    .width('100%')
-    .onClick(() => {
-      this.openDramaDetail(drama);
-    })
   }
 }

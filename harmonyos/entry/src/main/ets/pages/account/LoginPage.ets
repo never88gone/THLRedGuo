@@ -1,6 +1,7 @@
 import router from '@ohos.router';
 import promptAction from '@ohos.promptAction';
-import { AppColors, AppDimensions } from '../../common/AppTheme';
+import { AppColors } from '../../common/AppColors';
+import { AppDimensions } from '../../common/AppDimensions';
 import { QRLoginState } from '../../models/Account';
 import { AccountService } from '../../core/account/AccountService';
 
@@ -10,6 +11,7 @@ export struct LoginPage {
   @State selectedTab: number = 0; // 0: 扫码登录, 1: 手机号登录
   @State qrState: QRLoginState | null = null;
   @State isLoadingQr: boolean = false;
+  private pollTimer: number = -1;
 
   @State phoneNumber: string = '';
   @State smsCode: string = '';
@@ -21,28 +23,52 @@ export struct LoginPage {
   }
 
   aboutToDisappear(): void {
+    this.stopPolling();
     if (this.timer !== -1) {
       clearInterval(this.timer);
     }
   }
 
+  stopPolling(): void {
+    if (this.pollTimer !== -1) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = -1;
+    }
+  }
+
+  startPolling(): void {
+    this.stopPolling();
+    this.pollTimer = setInterval(async () => {
+      if (this.qrState && this.qrState.token && this.qrState.status !== 'expired') {
+        const status = await AccountService.getInstance().checkQrStatus(this.qrState.token);
+        if (status === 'confirmed') {
+          this.stopPolling();
+          promptAction.showToast({ message: '登录成功！' });
+          router.back();
+        } else if (status === 'expired') {
+          this.stopPolling();
+          if (this.qrState) {
+            this.qrState = {
+              token: this.qrState.token,
+              qrCodeUrl: this.qrState.qrCodeUrl,
+              status: 'expired'
+            };
+          }
+        }
+      }
+    }, 2000);
+  }
+
   async refreshQrCode(): Promise<void> {
+    this.stopPolling();
     this.isLoadingQr = true;
     try {
       this.qrState = await AccountService.getInstance().requestQrCode();
+      this.startPolling();
     } catch (e) {
       promptAction.showToast({ message: '获取二维码失败' });
     }
     this.isLoadingQr = false;
-  }
-
-  async confirmMockQr(): Promise<void> {
-    if (!this.qrState) return;
-    const ok = await AccountService.getInstance().mockConfirmQr(this.qrState.token);
-    if (ok) {
-      promptAction.showToast({ message: '登录成功' });
-      router.back();
-    }
   }
 
   sendSmsCode(): void {
@@ -100,7 +126,7 @@ export struct LoginPage {
             .height(22)
             .fillColor(AppColors.textPrimary)
         }
-        .backgroundColor(Color.Transparent)
+        .backgroundColor(AppColors.transparent)
         .width(40)
         .height(40)
         .onClick(() => {
@@ -129,7 +155,7 @@ export struct LoginPage {
           .fontSize(14)
           .fontWeight(this.selectedTab === 0 ? FontWeight.Bold : FontWeight.Normal)
           .fontColor(this.selectedTab === 0 ? AppColors.hongguoRed : AppColors.textSecondary)
-          .backgroundColor(Color.Transparent)
+          .backgroundColor(AppColors.transparent)
           .onClick(() => {
             this.selectedTab = 0;
           })
@@ -139,7 +165,7 @@ export struct LoginPage {
           .fontSize(14)
           .fontWeight(this.selectedTab === 1 ? FontWeight.Bold : FontWeight.Normal)
           .fontColor(this.selectedTab === 1 ? AppColors.hongguoRed : AppColors.textSecondary)
-          .backgroundColor(Color.Transparent)
+          .backgroundColor(AppColors.transparent)
           .onClick(() => {
             this.selectedTab = 1;
           })
@@ -164,20 +190,53 @@ export struct LoginPage {
                 .width(48)
                 .height(48)
                 .color(AppColors.hongguoRed)
-            } else {
-              // 模拟二维码图块展示
+            } else if (this.qrState && this.qrState.qrCodeUrl) {
               Stack({ alignContent: Alignment.Center }) {
-                Column()
+                QRCode(this.qrState.qrCodeUrl)
                   .width(180)
                   .height(180)
-                  .backgroundColor(Color.White)
+                  .color(AppColors.black)
+                  .backgroundColor(AppColors.white)
+                  .padding(8)
                   .borderRadius(AppDimensions.radiusMd)
 
-                Text('📱\n[二维码]')
-                  .fontSize(20)
-                  .textAlign(TextAlign.Center)
-                  .fontColor(Color.Black)
+                if (this.qrState.status === 'expired') {
+                  Column({ space: 8 }) {
+                    Text('二维码已过期')
+                      .fontSize(14)
+                      .fontColor(AppColors.white)
+                    Button('点击刷新')
+                      .fontSize(12)
+                      .fontColor(AppColors.white)
+                      .backgroundColor(AppColors.hongguoRed)
+                      .height(30)
+                      .onClick(() => {
+                        this.refreshQrCode();
+                      })
+                  }
+                  .width(180)
+                  .height(180)
+                  .backgroundColor(AppColors.maskDark80)
+                  .borderRadius(AppDimensions.radiusMd)
+                  .justifyContent(FlexAlign.Center)
+                }
               }
+            } else {
+              Column({ space: 8 }) {
+                Text('二维码加载失败')
+                  .fontSize(14)
+                  .fontColor(AppColors.textSecondary)
+                Button('点击重试')
+                  .fontSize(12)
+                  .fontColor(AppColors.hongguoRed)
+                  .backgroundColor(AppColors.transparent)
+                  .onClick(() => {
+                    this.refreshQrCode();
+                  })
+              }
+              .width(180)
+              .height(180)
+              .justifyContent(FlexAlign.Center)
             }
           }
           .width(210)
@@ -186,7 +245,7 @@ export struct LoginPage {
           .borderRadius(AppDimensions.radiusLg)
           .justifyContent(FlexAlign.Center)
 
-          Row({ space: 12 }) {
+          Row() {
             Button('刷新二维码')
               .fontSize(12)
               .fontColor(AppColors.textSecondary)
@@ -195,16 +254,6 @@ export struct LoginPage {
               .borderRadius(17)
               .onClick(() => {
                 this.refreshQrCode();
-              })
-
-            Button('模拟扫码成功')
-              .fontSize(12)
-              .fontColor(Color.White)
-              .backgroundColor(AppColors.hongguoRed)
-              .height(34)
-              .borderRadius(17)
-              .onClick(() => {
-                this.confirmMockQr();
               })
           }
         }
@@ -226,7 +275,7 @@ export struct LoginPage {
               .placeholderColor(AppColors.textMuted)
               .fontSize(14)
               .fontColor(AppColors.textPrimary)
-              .backgroundColor(Color.Transparent)
+              .backgroundColor(AppColors.transparent)
               .type(InputType.PhoneNumber)
               .layoutWeight(1)
               .onChange((v: string) => {
@@ -244,7 +293,7 @@ export struct LoginPage {
               .placeholderColor(AppColors.textMuted)
               .fontSize(14)
               .fontColor(AppColors.textPrimary)
-              .backgroundColor(Color.Transparent)
+              .backgroundColor(AppColors.transparent)
               .type(InputType.Number)
               .layoutWeight(1)
               .padding({ left: 12 })
@@ -255,7 +304,7 @@ export struct LoginPage {
             Button(this.countdown > 0 ? `${this.countdown}s后重发` : '获取验证码')
               .fontSize(12)
               .fontColor(this.countdown > 0 ? AppColors.textMuted : AppColors.hongguoRed)
-              .backgroundColor(Color.Transparent)
+              .backgroundColor(AppColors.transparent)
               .enabled(this.countdown <= 0)
               .onClick(() => {
                 this.sendSmsCode();

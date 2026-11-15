@@ -1,6 +1,7 @@
 import router from '@ohos.router';
 import hilog from '@ohos.hilog';
-import { AppColors, AppDimensions } from '../../common/AppTheme';
+import { AppColors } from '../../common/AppColors';
+import { AppDimensions } from '../../common/AppDimensions';
 import { DramaDetail, EpisodeInfo } from '../../models/Drama';
 import { CoreEngine } from '../../core/engine/CoreEngine';
 import { LocalStore } from '../../core/store/LocalStore';
@@ -70,7 +71,7 @@ struct DramaDetailPage {
             .height(22)
             .fillColor(AppColors.textPrimary)
         }
-        .backgroundColor(Color.Transparent)
+        .backgroundColor(AppColors.transparent)
         .width(40)
         .height(40)
         .onClick(() => {
