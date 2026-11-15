@@ -193,7 +193,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
     _startHideControlsTimer();
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF1E212B),
+      backgroundColor: AppColors.darkSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
