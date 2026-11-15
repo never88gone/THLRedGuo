@@ -477,13 +477,14 @@ class _AccountScreenState extends State<AccountScreen> {
                   return Column(
                     children: [
                       Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: const BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: Color(0x14FFFFFF),
-                              width: 0.8,
-                            ),
+                        margin: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                        padding: const EdgeInsets.all(3.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0x0FFFFFFF),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: const Color(0x14FFFFFF),
+                            width: 0.8,
                           ),
                         ),
                         child: Row(
@@ -494,6 +495,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             return Expanded(
                               child: InkWell(
                                 key: ValueKey('account-tab-$index'),
+                                borderRadius: BorderRadius.circular(19),
                                 onTap: () {
                                   setState(() {
                                     _accountTab = index;
@@ -502,42 +504,40 @@ class _AccountScreenState extends State<AccountScreen> {
                                   if (index == 0) _load(false);
                                   if (index == 1) _load(true);
                                 },
-                                child: Padding(
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
                                   padding: const EdgeInsets.symmetric(
-                                    vertical: 10,
+                                    vertical: 8,
                                   ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        label,
-                                        style: TextStyle(
-                                          fontSize: selected ? 15 : 14,
-                                          fontWeight: selected
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
-                                          color: selected
-                                              ? Colors.white
-                                              : const Color(0x8AFFFFFF),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds: 200,
-                                        ),
-                                        height: 3,
-                                        width: selected ? 22 : 0,
-                                        decoration: BoxDecoration(
-                                          color: selected
-                                              ? AppColors.hongguoRed
-                                              : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(
-                                            1.5,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.hongguoRed.withValues(
+                                            alpha: 0.20,
+                                          )
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(19),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.hongguoRed.withValues(
+                                              alpha: 0.55,
+                                            )
+                                          : Colors.transparent,
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    label,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontSize: selected ? 13.5 : 13,
+                                      fontWeight: selected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: selected
+                                          ? Colors.white
+                                          : const Color(0x99FFFFFF),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -567,7 +567,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             ),
                             child: InkWell(
                               key: ValueKey('account-tab-$index'),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                               onTap: () {
                                 setState(() {
                                   _accountTab = index;
@@ -576,16 +576,27 @@ class _AccountScreenState extends State<AccountScreen> {
                                 if (index == 0) _load(false);
                                 if (index == 1) _load(true);
                               },
-                              child: Container(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 14,
                                   vertical: 10,
                                 ),
                                 decoration: BoxDecoration(
                                   color: selected
-                                      ? const Color(0x1FFFFFFF)
+                                      ? AppColors.hongguoRed.withValues(
+                                          alpha: 0.18,
+                                        )
                                       : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: selected
+                                        ? AppColors.hongguoRed.withValues(
+                                            alpha: 0.45,
+                                          )
+                                        : Colors.transparent,
+                                    width: 0.8,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [

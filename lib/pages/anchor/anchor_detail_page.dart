@@ -181,141 +181,164 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
               ),
             ),
           if (value != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-              decoration: BoxDecoration(
-                color: const Color(0x14FFFFFF),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0x1AFFFFFF), width: 0.8),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.hongguoRed.withValues(alpha: 0.45),
-                        width: 2,
-                      ),
-                    ),
-                    child: const CircleAvatar(
-                      radius: 34,
-                      backgroundColor: Color(0x1FFFFFFF),
-                      child: Icon(
-                        Icons.person_outline_rounded,
-                        size: 38,
-                        color: Colors.white70,
-                      ),
+            Builder(
+              builder: (context) {
+                final avatarUri = Uri.tryParse(value.avatar);
+                final hasAvatar =
+                    !const bool.fromEnvironment('DISABLE_REMOTE_IMAGES') &&
+                    avatarUri != null &&
+                    (avatarUri.scheme == 'https' || avatarUri.scheme == 'http');
+                final avatarImage = hasAvatar ? NetworkImage(value.avatar) : null;
+
+                return Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0x14FFFFFF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0x1AFFFFFF),
+                      width: 0.8,
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Text(
-                    value.name,
-                    key: const ValueKey('anchor-name'),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0x0FFFFFFF),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (value.dramasCount != null)
-                          Text(
-                            '作品 ${value.dramasCount}',
-                            key: const ValueKey('anchor-works-count'),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(2.5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.hongguoRed.withValues(alpha: 0.45),
+                            width: 1.5,
                           ),
-                        if (value.fansCount != null && value.fansCount! > 0) ...[
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(
-                              '·',
-                              style: TextStyle(color: Colors.white38),
-                            ),
-                          ),
-                          Text(
-                            '粉丝 ${value.fansCount}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    value.bio.isEmpty ? '暂无简介' : value.bio,
-                    key: const ValueKey('anchor-bio'),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.white60,
-                      height: 1.4,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (service.session.loggedIn) ...[
-                    const SizedBox(height: 18),
-                    FilledButton.icon(
-                      key: ValueKey(
-                        following ? 'anchor-followed-btn' : 'anchor-follow-btn',
-                      ),
-                      onPressed: canChangeFollowing ? _follow : null,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: following
-                            ? const Color(0x1FFFFFFF)
-                            : AppColors.hongguoRed,
-                        foregroundColor: following
-                            ? Colors.white70
-                            : Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 10,
                         ),
-                        shape: const StadiumBorder(),
-                        elevation: 0,
+                        child: CircleAvatar(
+                          radius: 28,
+                          backgroundColor: const Color(0x1FFFFFFF),
+                          foregroundImage: avatarImage,
+                          onForegroundImageError: avatarImage == null
+                              ? null
+                              : (_, _) {},
+                          child: const Icon(
+                            Icons.person_outline_rounded,
+                            size: 30,
+                            color: Colors.white70,
+                          ),
+                        ),
                       ),
-                      icon: Icon(
-                        following ? Icons.check_rounded : Icons.add_rounded,
-                        size: 18,
-                      ),
-                      label: Text(
-                        writing
-                            ? '正在确认'
-                            : following
-                            ? '已关注'
-                            : '关注',
+                      const SizedBox(height: 8),
+                      Text(
+                        value.name,
+                        key: const ValueKey('anchor-name'),
                         style: const TextStyle(
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 2.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0x0FFFFFFF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (value.dramasCount != null)
+                              Text(
+                                '作品 ${value.dramasCount}',
+                                key: const ValueKey('anchor-works-count'),
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            if (value.fansCount != null && value.fansCount! > 0) ...[
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 6),
+                                child: Text(
+                                  '·',
+                                  style: TextStyle(color: Colors.white38),
+                                ),
+                              ),
+                              Text(
+                                '粉丝 ${value.fansCount}',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
+                      const SizedBox(height: 6),
+                      Text(
+                        value.bio.isEmpty ? '暂无简介' : value.bio,
+                        key: const ValueKey('anchor-bio'),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Colors.white60,
+                          height: 1.35,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (service.session.loggedIn) ...[
+                        const SizedBox(height: 10),
+                        FilledButton.icon(
+                          key: ValueKey(
+                            following
+                                ? 'anchor-followed-btn'
+                                : 'anchor-follow-btn',
+                          ),
+                          onPressed: canChangeFollowing ? _follow : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: following
+                                ? const Color(0x1FFFFFFF)
+                                : AppColors.hongguoRed,
+                            foregroundColor: following
+                                ? Colors.white70
+                                : Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: 6,
+                            ),
+                            minimumSize: const Size(0, 32),
+                            shape: const StadiumBorder(),
+                            elevation: 0,
+                          ),
+                          icon: Icon(
+                            following
+                                ? Icons.check_rounded
+                                : Icons.add_rounded,
+                            size: 16,
+                          ),
+                          label: Text(
+                            writing
+                                ? '正在确认'
+                                : following
+                                ? '已关注'
+                                : '关注',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 24),
             if (widget.initialDramas.isNotEmpty) ...[

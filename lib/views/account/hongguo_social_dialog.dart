@@ -108,6 +108,15 @@ class HongguoSocialButton extends StatelessWidget {
 
       Widget? anchorEntry;
       if (anchor != null) {
+        final anchorAvatarUri = Uri.tryParse(anchor.avatar);
+        final hasAnchorAvatar =
+            !const bool.fromEnvironment('DISABLE_REMOTE_IMAGES') &&
+            anchorAvatarUri != null &&
+            (anchorAvatarUri.scheme == 'https' ||
+                anchorAvatarUri.scheme == 'http');
+        final anchorAvatarImage =
+            hasAnchorAvatar ? NetworkImage(anchor.avatar) : null;
+
         anchorEntry = Material(
           color: Colors.transparent,
           child: InkWell(
@@ -142,6 +151,10 @@ class HongguoSocialButton extends StatelessWidget {
                   CircleAvatar(
                     radius: 8,
                     backgroundColor: AppColors.hongguoRed.withValues(alpha: 0.2),
+                    foregroundImage: anchorAvatarImage,
+                    onForegroundImageError: anchorAvatarImage == null
+                        ? null
+                        : (_, _) {},
                     child: const Icon(
                       Icons.person,
                       size: 11,
