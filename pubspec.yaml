@@ -1,5 +1,6 @@
 name: THLRedLook
-description: 独立运行的多端短剧应�?publish_to: none
+description: 独立运行的多端短剧应用
+publish_to: none
 version: 1.0.0+263190831
 
 environment:

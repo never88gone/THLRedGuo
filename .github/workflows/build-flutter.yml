@@ -122,7 +122,8 @@ jobs:
             echo "== $(basename "$apk")"
             output=$("$apksigner" verify --print-certs "$apk" 2>&1 || true)
             printf '%s\n' "$output"
-            if ! printf '%s' "$output" | tr -d ':' | tr '[:upper:]' '[:lower:]' | grep -q "$expected"; then
+            clean_output=$(printf '%s' "$output" | tr -d ':' | tr '[:upper:]' '[:lower:]')
+            if [[ "$clean_output" != *"$expected"* ]]; then
               echo "签名证书与发布证书不一致，已终止。" >&2
               exit 1
             fi
