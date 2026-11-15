@@ -1166,7 +1166,17 @@ class _DetailScreenState extends State<DetailScreen> {
                       fontSize: 19,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: HongguoSocialButton(
+                      drama: drama,
+                      repository: widget.repository,
+                      store: widget.store,
+                      episode: widget.store.watched(drama.id)?.episode ?? 1,
+                      anchorOnly: true,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
@@ -1305,12 +1315,6 @@ class _DetailScreenState extends State<DetailScreen> {
                     ),
                   const SizedBox(height: 8),
                   _followingControls(drama),
-                  HongguoSocialButton(
-                    drama: drama,
-                    repository: widget.repository,
-                    store: widget.store,
-                    episode: widget.store.watched(drama.id)?.episode ?? 1,
-                  ),
                 ],
               ),
             ),
@@ -1991,6 +1995,13 @@ class _DetailScreenState extends State<DetailScreen> {
               () => widget.store.markUpdatesRead(drama.id),
             ),
           ),
+        HongguoSocialButton(
+          drama: drama,
+          repository: widget.repository,
+          store: widget.store,
+          episode: widget.store.watched(drama.id)?.episode ?? 1,
+          likeOnly: true,
+        ),
       ],
     );
   }

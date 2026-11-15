@@ -4,6 +4,7 @@ import '../../core/account/hongguo_account_session.dart';
 import '../../core/bridge/core_bridge.dart';
 import '../../core/store/local_store.dart';
 import '../../models/catalog/models.dart';
+import '../../utils/theme/app_colors.dart';
 import '../detail/detail_page.dart';
 
 class AnchorDetailPage extends StatefulWidget {
@@ -148,6 +149,8 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(value?.name ?? '主播详情'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           IconButton(
             key: const ValueKey('anchor-refresh'),
@@ -159,7 +162,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
       ),
       body: ListView(
         key: const ValueKey('anchor-detail'),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
           if (loading)
             const LinearProgressIndicator(key: ValueKey('anchor-loading')),
@@ -178,62 +181,244 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
               ),
             ),
           if (value != null) ...[
-            const CircleAvatar(radius: 36, child: Icon(Icons.person, size: 40)),
-            const SizedBox(height: 16),
-            Text(
-              value.name,
-              key: const ValueKey('anchor-name'),
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              value.bio.isEmpty ? '暂无简介' : value.bio,
-              key: const ValueKey('anchor-bio'),
-            ),
-            if (value.dramasCount != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  '作品 ${value.dramasCount}',
-                  key: const ValueKey('anchor-works-count'),
-                ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+              decoration: BoxDecoration(
+                color: const Color(0x14FFFFFF),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0x1AFFFFFF), width: 0.8),
               ),
-            FilledButton.icon(
-              key: ValueKey(
-                following ? 'anchor-followed-btn' : 'anchor-follow-btn',
-              ),
-              onPressed: canChangeFollowing ? _follow : null,
-              icon: Icon(following ? Icons.check : Icons.add),
-              label: Text(
-                writing
-                    ? '正在确认'
-                    : following
-                    ? '已关注'
-                    : '关注',
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.hongguoRed.withValues(alpha: 0.45),
+                        width: 2,
+                      ),
+                    ),
+                    child: const CircleAvatar(
+                      radius: 34,
+                      backgroundColor: Color(0x1FFFFFFF),
+                      child: Icon(
+                        Icons.person_outline_rounded,
+                        size: 38,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    value.name,
+                    key: const ValueKey('anchor-name'),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0x0FFFFFFF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (value.dramasCount != null)
+                          Text(
+                            '作品 ${value.dramasCount}',
+                            key: const ValueKey('anchor-works-count'),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        if (value.fansCount != null && value.fansCount! > 0) ...[
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(
+                              '·',
+                              style: TextStyle(color: Colors.white38),
+                            ),
+                          ),
+                          Text(
+                            '粉丝 ${value.fansCount}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    value.bio.isEmpty ? '暂无简介' : value.bio,
+                    key: const ValueKey('anchor-bio'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.white60,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (service.session.loggedIn) ...[
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      key: ValueKey(
+                        following ? 'anchor-followed-btn' : 'anchor-follow-btn',
+                      ),
+                      onPressed: canChangeFollowing ? _follow : null,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: following
+                            ? const Color(0x1FFFFFFF)
+                            : AppColors.hongguoRed,
+                        foregroundColor: following
+                            ? Colors.white70
+                            : Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                          vertical: 10,
+                        ),
+                        shape: const StadiumBorder(),
+                        elevation: 0,
+                      ),
+                      icon: Icon(
+                        following ? Icons.check_rounded : Icons.add_rounded,
+                        size: 18,
+                      ),
+                      label: Text(
+                        writing
+                            ? '正在确认'
+                            : following
+                            ? '已关注'
+                            : '关注',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             const SizedBox(height: 24),
             if (widget.initialDramas.isNotEmpty) ...[
-              Text(
-                '短剧作品 (${widget.initialDramas.length})',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              for (final drama in widget.initialDramas)
-                ListTile(
-                  key: ValueKey('anchor-drama-${drama.id}'),
-                  title: Text(
-                    widget.repository.catalogUpdates.current(drama).title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+              Row(
+                children: [
+                  Container(
+                    width: 3.5,
+                    height: 15,
+                    decoration: BoxDecoration(
+                      color: AppColors.hongguoRed,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => DetailScreen(
-                        drama: drama,
-                        repository: widget.repository,
-                        store: widget.store,
+                  const SizedBox(width: 8),
+                  Text(
+                    '短剧作品 (${widget.initialDramas.length})',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              for (final drama in widget.initialDramas)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Material(
+                    key: ValueKey('anchor-drama-${drama.id}'),
+                    color: const Color(0x14FFFFFF),
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => DetailScreen(
+                            drama: drama,
+                            repository: widget.repository,
+                            store: widget.store,
+                          ),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: AppColors.hongguoRed.withValues(
+                                  alpha: 0.15,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.movie_outlined,
+                                color: AppColors.hongguoRed,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.repository.catalogUpdates
+                                        .current(drama)
+                                        .title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    drama.displayCategory.isNotEmpty
+                                        ? '${drama.displayCategory} · 共 ${drama.episodes} 集'
+                                        : '共 ${drama.episodes} 集',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.play_circle_outline_rounded,
+                              color: AppColors.hongguoRed,
+                              size: 22,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

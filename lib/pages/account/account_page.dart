@@ -219,97 +219,215 @@ class _AccountScreenState extends State<AccountScreen> {
           : null;
       final displayName = account.nickname.isNotEmpty ? account.nickname : '用户';
       return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              foregroundImage: avatar,
-              onForegroundImageError: avatar == null ? null : (_, _) {},
-              child: const Icon(Icons.person, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0x14FFFFFF),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0x1AFFFFFF), width: 0.8),
+          ),
+          child: Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.hongguoRed.withValues(alpha: 0.5),
+                    width: 1.5,
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 22,
+                  backgroundColor: const Color(0x1FFFFFFF),
+                  foregroundImage: avatar,
+                  onForegroundImageError: avatar == null ? null : (_, _) {},
+                  child: const Icon(Icons.person, size: 24, color: Colors.white70),
+                ),
               ),
-            ),
-            PopupMenuButton<String>(
-              key: const Key('hongguo-account-more-menu'),
-              tooltip: '更多',
-              icon: const Icon(Icons.more_horiz_rounded),
-              onSelected: (action) {
-                if (action == 'scan') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const AccountPairingScanScreen(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
-                  );
-                } else if (action == 'logout') {
-                  _logout();
-                }
-              },
-              itemBuilder: (_) => [
-                if ((Platform.isIOS || Platform.isAndroid) &&
-                    !AppLayout.isTelevision(context))
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.hongguoRed.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF4CAF50),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            '红果账号已同步',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.hongguoRed,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                key: const Key('hongguo-account-more-menu'),
+                tooltip: '更多',
+                icon: const Icon(Icons.more_horiz_rounded, color: Colors.white70),
+                onSelected: (action) {
+                  if (action == 'scan') {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AccountPairingScanScreen(),
+                      ),
+                    );
+                  } else if (action == 'logout') {
+                    _logout();
+                  }
+                },
+                itemBuilder: (_) => [
+                  if ((Platform.isIOS || Platform.isAndroid) &&
+                      !AppLayout.isTelevision(context))
+                    const PopupMenuItem(
+                      value: 'scan',
+                      child: Row(
+                        children: [
+                          Icon(Icons.qr_code_scanner_rounded, size: 20),
+                          SizedBox(width: 12),
+                          Text('扫码配对'),
+                        ],
+                      ),
+                    ),
                   const PopupMenuItem(
-                    value: 'scan',
+                    value: 'logout',
                     child: Row(
                       children: [
-                        Icon(Icons.qr_code_scanner_rounded, size: 20),
+                        Icon(Icons.logout_rounded, size: 20),
                         SizedBox(width: 12),
-                        Text('扫码'),
+                        Text('退出登录'),
                       ],
                     ),
                   ),
-                const PopupMenuItem(
-                  value: 'logout',
-                  child: Row(
-                    children: [
-                      Icon(Icons.logout_rounded, size: 20),
-                      SizedBox(width: 12),
-                      Text('退出登录'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '我的',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              Text(
+                '我的',
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              FilledButton.icon(
+                key: const Key('hongguo-account-login'),
+                onPressed: _login,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.hongguoRed,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  minimumSize: const Size(0, 36),
+                  shape: const StadiumBorder(),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.login_rounded, size: 18),
+                label: const Text(
+                  '登录',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ],
           ),
-          const Spacer(),
-          FilledButton.icon(
-            key: const Key('hongguo-account-login'),
-            onPressed: _login,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.hongguoRed,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              minimumSize: const Size(0, 36),
-              shape: const StadiumBorder(),
-              elevation: 0,
-            ),
-            icon: const Icon(Icons.login_rounded, size: 18),
-            label: const Text(
-              '登录',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: _login,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0x14FFFFFF),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0x1AFFFFFF), width: 0.8),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0x1FFFFFFF),
+                      border: Border.all(color: const Color(0x26FFFFFF), width: 1),
+                    ),
+                    child: const Icon(
+                      Icons.person_outline_rounded,
+                      size: 26,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '点击登录红果账号',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          '登录同步多端追剧与观看记录',
+                          style: TextStyle(fontSize: 12, color: Colors.white54),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white38,
+                    size: 20,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -318,120 +436,212 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    child: Column(
-      children: [
-        _buildHeader(context),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 600;
-              final tabs = [
-                _accountTabButton(0, '追剧', Icons.bookmark_border),
-                _accountTabButton(1, '历史记录', Icons.history),
-                _accountTabButton(2, '点赞视频', Icons.favorite_border),
-                _accountTabButton(
-                  3,
-                  '关注主播',
-                  Icons.person_outline_rounded,
-                ),
-              ];
-              final Widget content;
-              if (_accountTab == 0) {
-                content = account.loggedIn
-                    ? _cloudLibrary(false)
-                    : widget.localLibraryBuilder(false);
-              } else if (_accountTab == 1) {
-                content = account.loggedIn
-                    ? _cloudLibrary(true)
-                    : widget.localLibraryBuilder(true);
-              } else if (_accountTab == 2) {
-                content = _likedVideosView();
-              } else {
-                content = _followedAnchorsView();
-              }
+  Widget build(BuildContext context) {
+    final isLogged = account.loggedIn;
+    if (!isLogged && _accountTab >= 2) {
+      _accountTab = 0;
+    }
+    final tabDefs = <(int, String)>[
+      (0, '追剧'),
+      (1, '历史记录'),
+      if (isLogged) ...[
+        (2, '点赞视频'),
+        (3, '关注主播'),
+      ],
+    ];
 
-              if (!wide) {
-                return Column(
+    return SafeArea(
+      child: Column(
+        children: [
+          _buildHeader(context),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 600;
+                final Widget content;
+                if (_accountTab == 0) {
+                  content = account.loggedIn
+                      ? _cloudLibrary(false)
+                      : widget.localLibraryBuilder(false);
+                } else if (_accountTab == 1) {
+                  content = account.loggedIn
+                      ? _cloudLibrary(true)
+                      : widget.localLibraryBuilder(true);
+                } else if (_accountTab == 2) {
+                  content = _likedVideosView();
+                } else {
+                  content = _followedAnchorsView();
+                }
+
+                if (!wide) {
+                  return Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Color(0x14FFFFFF),
+                              width: 0.8,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: tabDefs.map((tab) {
+                            final index = tab.$1;
+                            final label = tab.$2;
+                            final selected = _accountTab == index;
+                            return Expanded(
+                              child: InkWell(
+                                key: ValueKey('account-tab-$index'),
+                                onTap: () {
+                                  setState(() {
+                                    _accountTab = index;
+                                    if (index < 2) history = index == 1;
+                                  });
+                                  if (index == 0) _load(false);
+                                  if (index == 1) _load(true);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        label,
+                                        style: TextStyle(
+                                          fontSize: selected ? 15 : 14,
+                                          fontWeight: selected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          color: selected
+                                              ? Colors.white
+                                              : const Color(0x8AFFFFFF),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 200,
+                                        ),
+                                        height: 3,
+                                        width: selected ? 22 : 0,
+                                        decoration: BoxDecoration(
+                                          color: selected
+                                              ? AppColors.hongguoRed
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(
+                                            1.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      Expanded(child: content),
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(children: tabs),
+                    SizedBox(
+                      width: 180,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: tabDefs.map((tab) {
+                          final index = tab.$1;
+                          final label = tab.$2;
+                          final selected = _accountTab == index;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            child: InkWell(
+                              key: ValueKey('account-tab-$index'),
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () {
+                                setState(() {
+                                  _accountTab = index;
+                                  if (index < 2) history = index == 1;
+                                });
+                                if (index == 0) _load(false);
+                                if (index == 1) _load(true);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? const Color(0x1FFFFFFF)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 3,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        color: selected
+                                            ? AppColors.hongguoRed
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(
+                                          1.5,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      label,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: selected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                        color: selected
+                                            ? Colors.white
+                                            : const Color(0x8AFFFFFF),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
+                    const VerticalDivider(width: 1),
                     Expanded(child: content),
                   ],
                 );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 180,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: tabs,
-                    ),
-                  ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: content),
-                ],
-              );
-            },
+              },
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _accountTabButton(int index, String label, IconData icon) {
-    final selected = _accountTab == index;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      child: TextButton.icon(
-        key: ValueKey('account-tab-$index'),
-        onPressed: () {
-          setState(() {
-            _accountTab = index;
-            if (index < 2) history = index == 1;
-          });
-          if (index == 0) _load(false);
-          if (index == 1) _load(true);
-        },
-        style: TextButton.styleFrom(
-          backgroundColor: selected
-              ? Theme.of(context).colorScheme.secondaryContainer
-              : null,
-          foregroundColor: selected ? AppColors.hongguoRed : null,
-        ),
-        icon: Icon(icon, size: 18),
-        label: Text(label),
+        ],
       ),
     );
   }
 
   Widget _likedVideosView() {
-    final localLikedRows = widget.store.likedDramas.map((drama) {
-      return HongguoLikedVideo(
-        id: drama.id,
-        title: drama.title,
-        seriesId: drama.cleanSourceId.isNotEmpty
-            ? drama.cleanSourceId
-            : (drama.sourceId.isNotEmpty ? drama.sourceId : drama.id),
-        cover: drama.cover,
-        description: drama.description,
-        episodes: drama.episodes,
-        kind: 'series',
-      );
-    }).toList();
-    final localMap = {for (final d in widget.store.likedDramas) d.id: d};
-
     return HongguoCollectionView<HongguoLikedVideo>(
       key: const ValueKey('official-liked'),
       controller: liked,
       name: 'liked',
       title: '红果账号 · 点赞视频',
       emptyMessage: '暂无点赞的视频',
-      localItems: localLikedRows,
+      localItems: const [],
       itemKey: (row) => row.id,
       sliver: (context, rows) => SliverPadding(
         padding: const EdgeInsets.all(16),
@@ -454,7 +664,6 @@ class _AccountScreenState extends State<AccountScreen> {
                 final row = rows[index];
                 final drama =
                     row.drama ??
-                    localMap[row.id] ??
                     Drama(
                       id: row.id,
                       source: 'hongguo',
@@ -481,14 +690,13 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _followedAnchorsView() {
-    final localAnchors = widget.store.followedAnchors;
     return HongguoCollectionView<Anchor>(
       key: const ValueKey('official-anchors'),
       controller: anchors,
       name: 'anchors',
       title: '红果账号 · 关注主播',
       emptyMessage: '暂无关注的主播',
-      localItems: localAnchors,
+      localItems: const [],
       itemKey: (anchor) => anchor.id,
       sliver: (context, rows) => SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -499,11 +707,26 @@ class _AccountScreenState extends State<AccountScreen> {
             return Card(
               key: ValueKey('anchor-card-${anchor.id}'),
               margin: const EdgeInsets.only(bottom: 10),
+              color: const Color(0x14FFFFFF),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Color(0x1AFFFFFF), width: 0.8),
+              ),
               child: ListTile(
-                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.hongguoRed.withValues(alpha: 0.15),
+                  child: const Icon(
+                    Icons.person_outline_rounded,
+                    color: AppColors.hongguoRed,
+                  ),
+                ),
                 title: Text(
                   anchor.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
                 subtitle: anchor.bio.isEmpty
                     ? null
@@ -511,8 +734,15 @@ class _AccountScreenState extends State<AccountScreen> {
                         anchor.bio,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 13,
+                        ),
                       ),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white38,
+                ),
                 onTap: () async {
                   var changed = false;
                   await Navigator.of(context).push(
@@ -544,17 +774,26 @@ class _AccountScreenState extends State<AccountScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
             children: [
-              Expanded(child: Text('红果账号 · ${tabHistory ? '历史记录' : '追剧'}')),
+              Expanded(
+                child: Text(
+                  '红果账号 · ${tabHistory ? '历史记录' : '追剧'}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.white54,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
               IconButton(
                 key: const Key('account-library-refresh'),
                 tooltip: '刷新列表',
                 onPressed: loading.contains(tabHistory)
                     ? null
                     : () => _load(tabHistory, refresh: true),
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh, size: 20, color: Colors.white70),
               ),
             ],
           ),

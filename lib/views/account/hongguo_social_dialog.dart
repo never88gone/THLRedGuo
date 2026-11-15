@@ -14,12 +14,16 @@ class HongguoSocialButton extends StatelessWidget {
     this.store,
     this.episode = 1,
     this.onOpenDrama,
+    this.likeOnly = false,
+    this.anchorOnly = false,
   });
   final Drama drama;
   final AppRepository? repository;
   final LocalStore? store;
   final int episode;
   final ValueChanged<Drama>? onOpenDrama;
+  final bool likeOnly;
+  final bool anchorOnly;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -28,125 +32,160 @@ class HongguoSocialButton extends StatelessWidget {
       ?store,
     ]),
     builder: (context, _) {
-      final isLiked = store?.isLiked(drama.id) ?? false;
       final model = HongguoAccountSocial.shared;
+      if (!model.active) {
+        return const SizedBox.shrink();
+      }
       final data = model.snapshot(drama);
       final like = data?.episode(episode);
+      final isLiked = like?.liked ?? false;
       final creator = data?.creators.firstOrNull;
 
       final Anchor? anchor = creator != null
           ? Anchor(
               id: creator.id,
               name: creator.name,
-              isFollowed: (store?.isAnchorFollowed(creator.id) ?? false) ||
-                  creator.following == true,
+              isFollowed: creator.following == true,
               officialFollowing: creator.following,
               canFollow: creator.canFollow,
               relativeType: creator.relativeType,
             )
           : null;
 
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 点赞短剧操作（直接操作，即时更新本地与云端）
-            Row(
+      final likeBtn = Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const ValueKey('account-social-like-btn'),
+          onTap: () {
+            if (like != null) {
+              model.like(drama, like, !isLiked);
+            }
+          },
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            height: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: isLiked
+                  ? AppColors.hongguoRed.withValues(alpha: 0.16)
+                  : const Color(0x14FFFFFF),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isLiked
+                    ? AppColors.hongguoRed.withValues(alpha: 0.5)
+                    : const Color(0x26FFFFFF),
+                width: 0.8,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                FilledButton.tonalIcon(
-                  key: const ValueKey('account-social-like-btn'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: isLiked
-                        ? AppColors.hongguoRed.withValues(alpha: 0.15)
-                        : null,
-                    foregroundColor: isLiked ? AppColors.hongguoRed : null,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () {
-                    store?.toggleLike(drama);
-                    if (model.active && like != null) {
-                      model.like(drama, like, !isLiked);
-                    }
-                  },
-                  icon: Icon(
-                    isLiked ? Icons.favorite : Icons.favorite_border,
-                    size: 18,
-                    color: isLiked ? AppColors.hongguoRed : null,
-                  ),
-                  label: Text(
-                    isLiked
-                        ? (like != null ? '已点赞 (${like.count})' : '已点赞')
-                        : (like != null && like.count > 0
-                            ? '点赞 (${like.count})'
-                            : '点赞'),
+                Icon(
+                  isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                  size: 14,
+                  color: isLiked ? AppColors.hongguoRed : Colors.white70,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isLiked
+                      ? (like != null && like.count > 0
+                          ? '已赞 ${like.count}'
+                          : '已赞')
+                      : (like != null && like.count > 0
+                          ? '点赞 ${like.count}'
+                          : '点赞'),
+                  style: TextStyle(
+                    color: isLiked ? AppColors.hongguoRed : Colors.white,
+                    fontSize: 11.5,
+                    fontWeight: isLiked ? FontWeight.w700 : FontWeight.w600,
                   ),
                 ),
               ],
             ),
-            // 主播入口卡片（点击跳转主播详情页面，并在主播详情页面中进行关注）
-            if (anchor != null) ...[
-              const SizedBox(height: 10),
-              Material(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  key: const ValueKey('detail-anchor-entry'),
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () {
-                    if (repository != null && store != null) {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => AnchorDetailPage(
-                            anchor: anchor,
-                            repository: repository!,
-                            store: store!,
-                            initialDramas: [drama],
-                            onOpenDrama: onOpenDrama,
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircleAvatar(
-                          radius: 14,
-                          child: Icon(Icons.person, size: 16),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '主播 · ${anchor.name}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(
-                          Icons.chevron_right,
-                          size: 16,
-                          color: Colors.white70,
-                        ),
-                      ],
+          ),
+        ),
+      );
+
+      Widget? anchorEntry;
+      if (anchor != null) {
+        anchorEntry = Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: const ValueKey('detail-anchor-entry'),
+            borderRadius: BorderRadius.circular(13),
+            onTap: () {
+              if (repository != null && store != null) {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => AnchorDetailPage(
+                      anchor: anchor,
+                      repository: repository!,
+                      store: store!,
+                      initialDramas: [drama],
+                      onOpenDrama: onOpenDrama,
                     ),
                   ),
-                ),
+                );
+              }
+            },
+            child: Container(
+              height: 26,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0x14FFFFFF),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: const Color(0x1AFFFFFF), width: 0.6),
               ),
-            ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 8,
+                    backgroundColor: AppColors.hongguoRed.withValues(alpha: 0.2),
+                    child: const Icon(
+                      Icons.person,
+                      size: 11,
+                      color: AppColors.hongguoRed,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '主播 · ${anchor.name}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 14,
+                    color: Colors.white54,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      if (likeOnly) {
+        return likeBtn;
+      }
+      if (anchorOnly) {
+        return anchorEntry ?? const SizedBox.shrink();
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            likeBtn,
+            ?anchorEntry,
           ],
         ),
       );
