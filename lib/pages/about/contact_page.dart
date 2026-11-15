@@ -190,12 +190,13 @@ class ContactPage extends StatelessWidget {
 
             final infoCard = _buildCompactInfoCard(context);
 
-            return Center(
+            return Align(
+              alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 680),
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
                   child: isWide
                       ? Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
