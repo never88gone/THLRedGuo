@@ -158,7 +158,7 @@ class ContactPage extends StatelessWidget {
                 icon: Icons.mail_outline_rounded,
                 title: '官方支持与反馈邮箱',
                 value: emailAddress,
-                hint: '商务合作、使用咨询、版权与技术反馈',
+                hint: '使用咨询、版权与技术反馈',
                 primaryBtnKey: 'btn-open-email',
                 primaryBtnText: '发送',
                 primaryBtnIcon: Icons.email_rounded,
@@ -580,7 +580,7 @@ class ContactPage extends StatelessWidget {
             _buildCompactInfoRow(
               context,
               icon: Icons.verified_user_outlined,
-              title: '开源社区与合作',
+              title: '开源社区与共建',
               detail: '遵循开源规范透明维护，技术探讨与反馈欢迎通过邮件与 GitHub 交流。',
             ),
           ],
