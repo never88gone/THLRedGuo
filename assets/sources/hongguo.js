@@ -1149,9 +1149,17 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     const count=integer(payload.count===undefined?20:payload.count);
     if(count<1||count>50)throw new Error("账号列表分页大小无效");
     Object.assign(params,{count,offset:integer(payload.offset===undefined?0:payload.offset)});
-    if(action==="followingCreators")Object.assign(params,{relative_user_id:identity(payload.userId),relative_type:2,user_relation_type:2,only_relation_type:false});
-    else Object.assign(params,{object_type_list:"6,15,10",action_type:3});
-    if(action==="followingCreators"&&payload.followingDouyinOffset!==undefined)params.following_douyin_user_offset=integer(payload.followingDouyinOffset);
+    if(action==="followingCreators") {
+      const relType = payload.relativeType !== undefined && payload.relativeType !== null ? integer(payload.relativeType) : 2;
+      const onlyRel = payload.onlyRelationType !== undefined ? Boolean(payload.onlyRelationType) : false;
+      Object.assign(params, {
+        relative_user_id: identity(payload.userId),
+        relative_type: relType,
+        user_relation_type: 2,
+        only_relation_type: onlyRel
+      });
+      if(payload.followingDouyinOffset!==undefined)params.following_douyin_user_offset=integer(payload.followingDouyinOffset);
+    } else Object.assign(params,{object_type_list:"6,15,10",action_type:3});
   }
   if(action==="creatorProfile")params.user_id=identity(payload.userId);
   if(action==="likeUpdate") {
@@ -2802,14 +2810,24 @@ spider.accountParse = function (action, text) {
     const creator = (row, relationType) => {
       if (!row || typeof row !== 'object') throw new Error('主播资料格式已变化');
       const base = row.base_info || row, relation = row.user_relation || {};
-      const id = identity(row.user_id) || identity(base.user_id);
+      const id = identity(row.user_id) || identity(base.user_id) || identity(row.author_id) || identity(base.author_id) || identity(row.celebrity_id) || identity(base.celebrity_id);
       if (!id) throw new Error('主播编号无效');
-      const state = Number(relationType === undefined ? relation.relation_type : relationType);
-      return { id, businessId: identity(base.biz_user_id), name: plain(base.user_name).slice(0,80),
-        avatar: cleanCoverUrl(plain(base.user_avatar)), description: plain(base.description),
-        following: [1,2,3,4].includes(state) ? state === 2 || state === 4 : null,
-        canFollow: relation.can_follow === true && base.is_cancelled !== true,
-        worksCount: integer(row.user_stat && row.user_stat.celebrity_work_cnt) };
+      const rawState = relationType !== undefined && relationType !== null ? relationType : (relation.relation_type !== undefined ? relation.relation_type : (row.relation_type !== undefined ? row.relation_type : base.relation_type));
+      const state = rawState !== undefined && rawState !== null ? Number(rawState) : null;
+      const canFollowVal = row.can_follow !== undefined ? row.can_follow : (base.can_follow !== undefined ? base.can_follow : relation.can_follow);
+      const worksCount = integer(row.user_stat && row.user_stat.celebrity_work_cnt) ?? integer(row.author_book_num) ?? integer(row.creation_num) ?? integer(base.author_book_num);
+      const relType = integer(row.relative_type) ?? integer(base.relative_type) ?? ((row.is_author || row.author_type || base.is_author) ? 3 : 2);
+      return {
+        id,
+        businessId: identity(base.biz_user_id),
+        name: plain(base.user_name || base.author_name || base.celebrity_name || base.name).slice(0, 80),
+        avatar: cleanCoverUrl(plain(base.user_avatar || base.author_avatar || base.avatar)),
+        description: plain(base.description || base.author_desc || base.desc),
+        following: state !== null && [1, 2, 3, 4].includes(state) ? (state === 2 || state === 4) : null,
+        canFollow: canFollowVal === true && base.is_cancelled !== true,
+        worksCount,
+        relativeType: relType
+      };
     };
     if (action === 'creatorProfile') return { creator: creator(data.ugc_user) };
     if (typeof data.has_more !== 'boolean') throw new Error('账号列表分页格式已变化');
@@ -2818,16 +2836,18 @@ spider.accountParse = function (action, text) {
     const paging = { hasMore: data.has_more, nextOffset, total: integer(data.total) };
     const list = (key, countKey) => {
       if (Array.isArray(data[key])) return data[key];
-      if ((data[key] == null || !Object.prototype.hasOwnProperty.call(data, key)) && (data.has_more === false || integer(data[countKey]) === 0 || !data[countKey])) return [];
+      const countVal = integer(data[countKey]);
+      if ((data[key] == null || !Object.prototype.hasOwnProperty.call(data, key)) && data.has_more === false && (countVal === 0 || countVal === null)) return [];
       throw new Error('账号列表格式已变化');
     };
     if (action === 'followingCreators') {
       const seen = new Set();
-      const rawList = list('relation_user_list','total');
+      const rawList = list('relation_user_list', 'total');
       const creators = [];
       for (const raw of rawList) {
         try {
-          const item = creator(raw && (raw.user_info || raw), raw && raw.user_relation_type);
+          const userObj = raw && (raw.user_info ? { ...raw.user_info, relative_type: raw.relative_type ?? raw.user_info.relative_type } : raw);
+          const item = creator(userObj, raw && raw.user_relation_type);
           if (item && item.id && !seen.has(item.id)) {
             seen.add(item.id);
             creators.push(item);
