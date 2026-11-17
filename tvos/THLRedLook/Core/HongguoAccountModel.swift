@@ -115,20 +115,27 @@ final class HongguoAccountModel: ObservableObject {
     func verify(force: Bool = false) async {
         guard loggedIn, !busy, force || !verified else { return }
         let owner = attempt
+        let revision = vault.snapshot.revision
         busy = true
         defer { busy = false }
         do {
             let (profile, _, _) = try await transportService.call("profile", owner: owner, attempt: attempt, existing: true, account: account, cookies: [])
             try transportService.check(owner: owner, attempt: attempt)
-            guard profile["id"] as? String == account?.id else { throw HongguoAccountError.invalid }
+            guard let resolvedId = profile["id"] as? String, !resolvedId.isEmpty else { throw HongguoAccountError.invalid }
             if let current = account {
-                account = HongguoAccountRecord(
-                    id: current.id,
-                    nickname: profile["nickname"] as? String ?? current.nickname,
+                let resolvedName = (profile["nickname"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? current.nickname
+                let resolvedAvatar = (profile["avatar"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? current.avatar
+                let updated = HongguoAccountRecord(
+                    id: resolvedId,
+                    nickname: resolvedName,
                     cookies: current.cookies,
                     device: current.device,
-                    avatar: profile["avatar"] as? String ?? current.avatar
+                    avatar: resolvedAvatar
                 )
+                if updated.id != current.id || updated.nickname != current.nickname || updated.avatar != current.avatar {
+                    try? vault.save(updated, expectedRevision: revision)
+                }
+                account = updated
             }
             verified = true
         } catch {
@@ -349,41 +356,20 @@ final class HongguoAccountModel: ObservableObject {
             collectionIdentity = (revision, targetId)
         }
         let userId = collectionIdentity?.id ?? account?.id ?? ""
-        let firstResult = try await readCollection("followingCreators", payload: [
+        let result = try await readCollection("followingCreators", payload: [
             "userId": userId,
             "offset": String(offset),
-            "count": "20",
-            "followingDouyinOffset": String(douyinOffset),
-            "relativeType": "2"
+            "count": "20"
         ])
-        guard let firstRows = firstResult["creators"] as? [[String: Any]], let firstMore = firstResult["hasMore"] as? Bool else {
+        guard let rows = result["creators"] as? [[String: Any]], let more = result["hasMore"] as? Bool else {
             throw HongguoAccountError.interactionInvalid
         }
-        if !firstRows.isEmpty || offset > 0 || firstMore {
-            return HongguoCollectionPage(items: firstRows.compactMap { Anchor(official: $0) }, hasMore: firstMore,
-                nextOffset: firstResult["nextOffset"] as? Int, douyinOffset: firstResult["followingDouyinNextOffset"] as? Int ?? 0)
-        }
-        if let fallbackResult = try? await readCollection("followingCreators", payload: [
-            "userId": userId,
-            "offset": "0",
-            "count": "20",
-            "followingDouyinOffset": String(douyinOffset),
-            "relativeType": "3"
-        ]), let fallbackRows = fallbackResult["creators"] as? [[String: Any]], let fallbackMore = fallbackResult["hasMore"] as? Bool, (!fallbackRows.isEmpty || fallbackMore) {
-            return HongguoCollectionPage(items: fallbackRows.compactMap { Anchor(official: $0) }, hasMore: fallbackMore,
-                nextOffset: fallbackResult["nextOffset"] as? Int, douyinOffset: fallbackResult["followingDouyinNextOffset"] as? Int ?? 0)
-        }
-        if let broadResult = try? await readCollection("followingCreators", payload: [
-            "userId": userId,
-            "offset": "0",
-            "count": "20",
-            "followingDouyinOffset": String(douyinOffset),
-            "relativeType": "0"
-        ]), let broadRows = broadResult["creators"] as? [[String: Any]], let broadMore = broadResult["hasMore"] as? Bool {
-            return HongguoCollectionPage(items: broadRows.compactMap { Anchor(official: $0) }, hasMore: broadMore,
-                nextOffset: broadResult["nextOffset"] as? Int, douyinOffset: broadResult["followingDouyinNextOffset"] as? Int ?? 0)
-        }
-        return HongguoCollectionPage(items: [], hasMore: false, nextOffset: nil, douyinOffset: 0)
+        return HongguoCollectionPage(
+            items: rows.compactMap { Anchor(official: $0) },
+            hasMore: more,
+            nextOffset: result["nextOffset"] as? Int,
+            douyinOffset: result["followingDouyinNextOffset"] as? Int ?? 0
+        )
     }
 
     func likedVideos(offset: Int = 0) async throws -> HongguoCollectionPage<HongguoLikedVideo> {

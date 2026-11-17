@@ -117,8 +117,7 @@ final class HongguoAccountTransport: @unchecked Sendable {
         try check(owner: owner, attempt: attempt)
         let started = ProcessInfo.processInfo.systemUptime
         let web = url.scheme == "https" && url.host == "hongguoduanju.com" && url.port == nil
-        let isWebOrPassport = (web || HongguoCookie.isValidDomain(url.host ?? ""))
-        guard isWebOrPassport || HongguoAccountVault.businessURL(url) else { throw HongguoAccountError.invalid }
+        guard web || HongguoAccountVault.businessURL(url) else { throw HongguoAccountError.invalid }
         guard ["GET", "POST"].contains(method) else { throw HongguoAccountError.invalid }
         var request = URLRequest(url: url)
         request.timeoutInterval = 12
@@ -134,13 +133,13 @@ final class HongguoAccountTransport: @unchecked Sendable {
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
         let active = candidateCookies?.values ?? (existing ? account?.cookies ?? [] : cookies)
         let vault = HongguoAccountVault.shared
-        if isWebOrPassport {
+        if web {
             let host = (url.host ?? "").lowercased()
             let matched = active.filter { cookie in
                 guard cookie.valid else { return false }
                 let cd = cookie.domain.lowercased()
                 let cleanDomain = cd.hasPrefix(".") ? String(cd.dropFirst()) : cd
-                let domainMatch = cleanDomain == host || host.hasSuffix("." + cleanDomain) || (cleanDomain == "hongguoduanju.com" && host.hasSuffix("snssdk.com"))
+                let domainMatch = cleanDomain == host || host.hasSuffix("." + cleanDomain)
                 let pathMatch = url.path == cookie.path || url.path.hasPrefix(cookie.path.hasSuffix("/") ? cookie.path : cookie.path + "/")
                 return domainMatch && pathMatch
             }
@@ -152,7 +151,10 @@ final class HongguoAccountTransport: @unchecked Sendable {
             }
         } else {
             let record = HongguoAccountRecord(id: "", nickname: "", cookies: active)
-            request.setValue(vault.header(for: url, record: record), forHTTPHeaderField: "Cookie")
+            let cookieHeader = vault.header(for: url, record: record)
+            if !cookieHeader.isEmpty {
+                request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
+            }
         }
         let session = transport ?? URLSession(configuration: .ephemeral, delegate: HongguoLoginRedirectDelegate(), delegateQueue: nil)
         let (data, raw) = try await session.data(for: request)
@@ -186,7 +188,7 @@ final class HongguoAccountTransport: @unchecked Sendable {
             ))
         }
         var returnedCookies: [HongguoCookie]?
-        if isWebOrPassport && !existing {
+        if web && !existing {
             let fields = response.allHeaderFields.reduce(into: [String: String]()) { result, pair in
                 result[String(describing: pair.key)] = String(describing: pair.value)
             }
@@ -200,7 +202,7 @@ final class HongguoAccountTransport: @unchecked Sendable {
             }
             if let candidateCookies { candidateCookies.values = updated } else { returnedCookies = updated }
         }
-        if [301, 302, 303, 307, 308].contains(response.statusCode), let next = response.value(forHTTPHeaderField: "Location"), isWebOrPassport {
+        if [301, 302, 303, 307, 308].contains(response.statusCode), let next = response.value(forHTTPHeaderField: "Location"), web {
             return ("redirect:" + next, returnedCookies)
         }
         guard response.statusCode == 200 else { throw HongguoAccountError.server(response.statusCode) }

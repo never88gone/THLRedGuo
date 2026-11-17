@@ -207,6 +207,13 @@ void main() {
       '{"code":0,"data":{"biz_user_id":7688558312157088793,"user_name":"合成账号"}}',
     );
     expect(account['id'], '7688558312157088793');
+    final encodedProfile = runtime.accountParse(
+      'profile',
+      '{"code":0,"data":{"user_id":"MS4wLjABAAAA_synthetic_encoded","biz_user_id":"","req_id":7688558312157099999,"user_name":"合成编码账号","avatar_url":"http://p3-reading-sign.fqnovelpic.com/synthetic-avatar.heic"}}',
+    );
+    expect(encodedProfile['id'], '7688558312157099999');
+    expect(encodedProfile['nickname'], '合成编码账号');
+    expect(encodedProfile['avatar'], 'https://p3-reading-sign.fqnovelpic.com/synthetic-avatar.heic');
     expect(
       () => runtime.accountParse('profile', '{"code":1,"data":{}}'),
       throwsA(isA<HongguoAccountFailure>()),

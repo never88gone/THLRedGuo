@@ -1002,103 +1002,30 @@ class HongguoAccountService {
   }) async {
     if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
     final revision = session.revision;
+    final payload = <String, dynamic>{
+      'userId': session.id,
+      'offset': offset,
+      'count': count,
+    };
     if (relativeType != null) {
-      final result = await _call(
-        'followingCreators',
-        {
-          'userId': session.id,
-          'offset': offset,
-          'count': count,
-          'followingDouyinOffset': douyinOffset,
-          'relativeType': relativeType,
-        },
-        null,
-        revision,
-      );
-      _check(revision);
-      final creatorsList = (result['creators'] as List?) ?? const [];
-      return HongguoCollectionPage(
-        creatorsList
-            .map((r) => Anchor.fromOfficial(Map<String, dynamic>.from(r as Map)))
-            .toList(),
-        hasMore: result['hasMore'] == true,
-        nextOffset: (result['nextOffset'] as num?)?.toInt(),
-        followingDouyinOffset:
-            (result['followingDouyinNextOffset'] as num?)?.toInt() ?? 0,
-      );
+      payload['relativeType'] = relativeType;
     }
-    final firstResult = await _call(
+    final result = await _call(
       'followingCreators',
-      {
-        'userId': session.id,
-        'offset': offset,
-        'count': count,
-        'followingDouyinOffset': douyinOffset,
-        'relativeType': 2,
-      },
+      payload,
       null,
       revision,
     );
     _check(revision);
-    final firstList = (firstResult['creators'] as List?) ?? const [];
-    if (firstList.isNotEmpty || offset > 0 || firstResult['hasMore'] == true) {
-      return HongguoCollectionPage(
-        firstList
-            .map((r) => Anchor.fromOfficial(Map<String, dynamic>.from(r as Map)))
-            .toList(),
-        hasMore: firstResult['hasMore'] == true,
-        nextOffset: (firstResult['nextOffset'] as num?)?.toInt(),
-        followingDouyinOffset:
-            (firstResult['followingDouyinNextOffset'] as num?)?.toInt() ?? 0,
-      );
-    }
-    final fallbackResult = await _call(
-      'followingCreators',
-      {
-        'userId': session.id,
-        'offset': 0,
-        'count': count,
-        'followingDouyinOffset': douyinOffset,
-        'relativeType': 3,
-      },
-      null,
-      revision,
-    );
-    _check(revision);
-    final fallbackList = (fallbackResult['creators'] as List?) ?? const [];
-    if (fallbackList.isNotEmpty || fallbackResult['hasMore'] == true) {
-      return HongguoCollectionPage(
-        fallbackList
-            .map((r) => Anchor.fromOfficial(Map<String, dynamic>.from(r as Map)))
-            .toList(),
-        hasMore: fallbackResult['hasMore'] == true,
-        nextOffset: (fallbackResult['nextOffset'] as num?)?.toInt(),
-        followingDouyinOffset:
-            (fallbackResult['followingDouyinNextOffset'] as num?)?.toInt() ?? 0,
-      );
-    }
-    final broadResult = await _call(
-      'followingCreators',
-      {
-        'userId': session.id,
-        'offset': 0,
-        'count': count,
-        'followingDouyinOffset': douyinOffset,
-        'relativeType': 0,
-      },
-      null,
-      revision,
-    );
-    _check(revision);
-    final broadList = (broadResult['creators'] as List?) ?? const [];
+    final creatorsList = (result['creators'] as List?) ?? const [];
     return HongguoCollectionPage(
-      broadList
+      creatorsList
           .map((r) => Anchor.fromOfficial(Map<String, dynamic>.from(r as Map)))
           .toList(),
-      hasMore: broadResult['hasMore'] == true,
-      nextOffset: (broadResult['nextOffset'] as num?)?.toInt(),
+      hasMore: result['hasMore'] == true,
+      nextOffset: (result['nextOffset'] as num?)?.toInt(),
       followingDouyinOffset:
-          (broadResult['followingDouyinNextOffset'] as num?)?.toInt() ?? 0,
+          (result['followingDouyinNextOffset'] as num?)?.toInt() ?? 0,
     );
   }
 

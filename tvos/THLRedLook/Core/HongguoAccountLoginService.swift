@@ -37,6 +37,23 @@ final class HongguoAccountLoginService {
         phoneCodeSent = false
     }
 
+    private static func resolveNickname(profile: [String: Any], webProfile: [String: Any]?) -> String {
+        if let name = profile["user_name"] as? String, !name.isEmpty { return name }
+        if let name = profile["nickname"] as? String, !name.isEmpty { return name }
+        if let name = webProfile?["user_name"] as? String, !name.isEmpty { return name }
+        if let name = webProfile?["nickname"] as? String, !name.isEmpty { return name }
+        return "红果用户"
+    }
+
+    private static func resolveProfileId(profile: [String: Any], webProfile: [String: Any]?, cookies: [HongguoCookie]) -> String {
+        if let id = profile["id"] as? String, !id.isEmpty { return id }
+        if let id = profile["user_id"] as? String, !id.isEmpty { return id }
+        if let id = profile["biz_user_id"] as? String, !id.isEmpty { return id }
+        if let id = webProfile?["id"] as? String, !id.isEmpty { return id }
+        if let id = cookies.first(where: { ["uid_tt", "uid_tt_ss"].contains($0.name) && !$0.value.isEmpty })?.value { return id }
+        return ""
+    }
+
     func begin(
         attempt: Int,
         onUpdate: @escaping (String?, Int, Bool, String) -> Void,
@@ -133,11 +150,12 @@ final class HongguoAccountLoginService {
                             let profile = profileCall?.result ?? webProfile ?? [:]
                             let dev = profileCall?.profileDevice ?? profileDevice
                             try transportService.check(owner: owner, attempt: attempt)
-                            let profileId = (profile["id"] as? String) ?? (profile["biz_user_id"] as? String) ?? (profile["user_id"] as? String) ?? (webProfile?["id"] as? String) ?? cookies.first(where: { ["uid_tt", "uid_tt_ss"].contains($0.name) && !$0.value.isEmpty })?.value ?? ""
+                            let profileId = Self.resolveProfileId(profile: profile, webProfile: webProfile, cookies: cookies)
                             guard !profileId.isEmpty else { throw HongguoAccountError.invalid }
+                            let resolvedNickname = Self.resolveNickname(profile: profile, webProfile: webProfile)
                             let record = HongguoAccountRecord(
                                 id: profileId,
-                                nickname: profile["nickname"] as? String ?? profile["user_name"] as? String ?? webProfile?["nickname"] as? String ?? "红果用户",
+                                nickname: resolvedNickname,
                                 cookies: cookies,
                                 device: dev,
                                 avatar: profile["avatar"] as? String ?? profile["avatar_url"] as? String ?? webProfile?["avatar"] as? String
@@ -237,11 +255,12 @@ final class HongguoAccountLoginService {
             let profile = profileCall?.result ?? webProfile ?? [:]
             let dev = profileCall?.profileDevice ?? profileDevice
             try transportService.check(owner: owner, attempt: attempt)
-            let profileId = (profile["id"] as? String) ?? (profile["biz_user_id"] as? String) ?? (profile["user_id"] as? String) ?? (webProfile?["id"] as? String) ?? cookies.first(where: { ["uid_tt", "uid_tt_ss"].contains($0.name) && !$0.value.isEmpty })?.value ?? ""
+            let profileId = Self.resolveProfileId(profile: profile, webProfile: webProfile, cookies: cookies)
             guard !profileId.isEmpty else { throw HongguoAccountError.invalid }
+            let resolvedNickname = Self.resolveNickname(profile: profile, webProfile: webProfile)
             let record = HongguoAccountRecord(
                 id: profileId,
-                nickname: profile["nickname"] as? String ?? profile["user_name"] as? String ?? webProfile?["nickname"] as? String ?? "红果用户",
+                nickname: resolvedNickname,
                 cookies: cookies,
                 device: dev,
                 avatar: profile["avatar"] as? String ?? profile["avatar_url"] as? String ?? webProfile?["avatar"] as? String
