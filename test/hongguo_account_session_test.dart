@@ -423,4 +423,13 @@ void main() {
     expect(mediaAccountAttached, isNotEmpty);
     expect(mediaAccountAttached, everyElement(isFalse));
   });
+  test('Cookies 合并支持 snssdk 域与 sid 凭据会话判定', () {
+    final cookies = HongguoAccountCookies();
+    cookies.merge(Uri.parse('https://reading.snssdk.com/passport/'), [
+      'sid_tt=synthetic_sid_value; Domain=.snssdk.com; Path=/',
+      'passport_auth_status=1; Domain=.snssdk.com; Path=/',
+    ]);
+    expect(cookies.hasSession, true);
+    expect(cookies.businessHeader, contains('sid_tt=synthetic_sid_value'));
+  });
 }

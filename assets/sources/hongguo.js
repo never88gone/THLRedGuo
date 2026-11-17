@@ -1154,10 +1154,10 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
       const onlyRel = payload.onlyRelationType !== undefined ? Boolean(payload.onlyRelationType) : false;
       Object.assign(params, {
         relative_user_id: identity(payload.userId),
-        relative_type: relType,
         user_relation_type: 2,
         only_relation_type: onlyRel
       });
+      if(relType > 0) params.relative_type = relType;
       if(payload.followingDouyinOffset!==undefined)params.following_douyin_user_offset=integer(payload.followingDouyinOffset);
     } else Object.assign(params,{object_type_list:"6,15,10",action_type:3});
   }
@@ -2791,7 +2791,7 @@ spider.accountParse = function (action, text) {
   if (!response || typeof response !== 'object') throw new Error('账号接口返回无效数据');
   const data = response.data;
   if (action === 'profile') {
-    const id = String(data && data.biz_user_id || '');
+    const id = String(data && (data.biz_user_id || data.user_id || data.id) || '');
     if (Number(response.code) !== 0) throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
     if (!/^\d{1,30}$/.test(id)) throw new Error('账号资料验证失败，请重新扫码');
     return { id, nickname: String(data.user_name || '红果用户').slice(0, 80),
@@ -2830,24 +2830,29 @@ spider.accountParse = function (action, text) {
       };
     };
     if (action === 'creatorProfile') return { creator: creator(data.ugc_user) };
-    if (typeof data.has_more !== 'boolean') throw new Error('账号列表分页格式已变化');
-    const nextOffset = integer(data.next_offset);
-    if (data.has_more && nextOffset === null) throw new Error('账号列表缺少下一页游标');
-    const paging = { hasMore: data.has_more, nextOffset, total: integer(data.total) };
+    const hasMore = typeof data.has_more === 'boolean' ? data.has_more : (data.common_list_info && typeof data.common_list_info.has_more === 'boolean' ? data.common_list_info.has_more : null);
+    if (hasMore === null) throw new Error('账号列表分页格式已变化');
+    const nextOffset = integer(data.next_offset) ?? integer(data.common_list_info && data.common_list_info.cursor);
+    if (hasMore && nextOffset === null) throw new Error('账号列表缺少下一页游标');
+    const paging = { hasMore, nextOffset, total: integer(data.total) };
     const list = (key, countKey) => {
       if (Array.isArray(data[key])) return data[key];
       const countVal = integer(data[countKey]);
-      if ((data[key] == null || !Object.prototype.hasOwnProperty.call(data, key)) && data.has_more === false && (countVal === 0 || countVal === null)) return [];
+      if ((data[key] == null || !Object.prototype.hasOwnProperty.call(data, key)) && hasMore === false && (countVal === 0 || countVal === null)) return [];
       throw new Error('账号列表格式已变化');
     };
     if (action === 'followingCreators') {
       const seen = new Set();
-      const rawList = list('relation_user_list', 'total');
+      const rawList = Array.isArray(data.relation_user_list) ? data.relation_user_list :
+                     (Array.isArray(data.ugc_user_list) ? data.ugc_user_list :
+                     (Array.isArray(data.user_list) ? data.user_list :
+                     (Array.isArray(data.author_list) ? data.author_list :
+                     (Array.isArray(data.relationUserList) ? data.relationUserList : list('relation_user_list', 'total')))));
       const creators = [];
       for (const raw of rawList) {
         try {
           const userObj = raw && (raw.user_info ? { ...raw.user_info, relative_type: raw.relative_type ?? raw.user_info.relative_type } : raw);
-          const item = creator(userObj, raw && raw.user_relation_type);
+          const item = creator(userObj, raw && (raw.user_relation_type !== undefined ? raw.user_relation_type : raw.relation_type));
           if (item && item.id && !seen.has(item.id)) {
             seen.add(item.id);
             creators.push(item);

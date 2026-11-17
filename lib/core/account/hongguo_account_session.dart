@@ -27,15 +27,26 @@ class HongguoAccountCookies {
     'passport_auth_status',
     'passport_auth_status_ss',
   };
+  static bool _isValidDomain(String domain, String host) {
+    final d = domain.replaceFirst(RegExp(r'^\.'), '').toLowerCase();
+    final h = host.toLowerCase();
+    return d == h ||
+        h.endsWith('.$d') ||
+        d == 'hongguoduanju.com' ||
+        d.endsWith('.hongguoduanju.com') ||
+        d == 'snssdk.com' ||
+        d.endsWith('.snssdk.com');
+  }
+
   void merge(Uri uri, List<String> headers) {
-    if (uri.scheme != 'https' || uri.host != 'hongguoduanju.com') return;
+    if (uri.scheme != 'https') return;
     for (final header in headers) {
       try {
         final cookie = Cookie.fromSetCookieValue(header);
         final domain = (cookie.domain ?? uri.host)
             .replaceFirst(RegExp(r'^\.'), '')
             .toLowerCase();
-        if (domain != uri.host) continue;
+        if (!_isValidDomain(domain, uri.host)) continue;
         final path = cookie.path ?? '/';
         _values.removeWhere(
           (v) =>
@@ -62,19 +73,31 @@ class HongguoAccountCookies {
     (v) =>
         v['name'] is String &&
         v['value'] is String &&
-        v['domain'] == 'hongguoduanju.com' &&
         (v['expires'] == null ||
             (v['expires'] as num) > DateTime.now().millisecondsSinceEpoch),
   );
-  bool get hasSession =>
-      valid.any((v) => {'sessionid', 'sessionid_ss'}.contains(v['name']));
-  String websiteHeader(Uri uri) =>
-      uri.scheme == 'https' && uri.host == 'hongguoduanju.com'
-      ? valid
-            .where((v) => _pathMatches(uri.path, v['path'] as String? ?? '/'))
-            .map((v) => '${v['name']}=${v['value']}')
-            .join('; ')
-      : '';
+  bool get hasSession => valid.any(
+    (v) =>
+        {
+          'sessionid',
+          'sessionid_ss',
+          'sid_tt',
+          'sid_guard',
+          'passport_auth_status',
+        }.contains(v['name']),
+  );
+  String websiteHeader(Uri uri) {
+    if (uri.scheme != 'https') return '';
+    final h = uri.host.toLowerCase();
+    return valid
+        .where((v) {
+          final d = (v['domain'] as String? ?? '').toLowerCase();
+          final domainMatch = d == h || h.endsWith('.$d') || h == 'hongguoduanju.com';
+          return domainMatch && _pathMatches(uri.path, v['path'] as String? ?? '/');
+        })
+        .map((v) => '${v['name']}=${v['value']}')
+        .join('; ');
+  }
   static bool _pathMatches(String path, String scope) =>
       path == scope || path.startsWith(scope.endsWith('/') ? scope : '$scope/');
   String get businessHeader => valid

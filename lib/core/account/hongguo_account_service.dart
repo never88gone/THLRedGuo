@@ -26,7 +26,8 @@ class HongguoQrLogin {
   final int _revision;
   bool cancelled = false;
   bool finalCheckDone = false;
-  bool get confirmed => _cookies.hasSession;
+  bool statusConfirmed = false;
+  bool get confirmed => statusConfirmed || _cookies.hasSession;
 }
 
 class HongguoPhoneLogin {
@@ -385,12 +386,6 @@ class HongguoAccountService {
   Future<bool> poll(HongguoQrLogin login, {bool finalCheck = false}) async {
     if (_polling || login.cancelled) return false;
     _check(login._revision);
-    if (!login.confirmed && !login.expiresAt.isAfter(DateTime.now())) {
-      if (!finalCheck || login.finalCheckDone) {
-        throw const HongguoAccountFailure('二维码已过期，请刷新', 'QR_EXPIRED');
-      }
-      login.finalCheckDone = true;
-    }
     _polling = true;
     try {
       final data = login._cookies.hasSession
@@ -410,6 +405,9 @@ class HongguoAccountService {
       if (status == 'cancelled') {
         throw const HongguoAccountFailure('手机已取消登录，请刷新二维码', 'CANCELLED');
       }
+      if (status == 'confirmed' || status == '3') {
+        login.statusConfirmed = true;
+      }
       var redirect = status == 'confirmed' || status == '3'
           ? data['redirect'] as String
           : '';
@@ -417,7 +415,8 @@ class HongguoAccountService {
       for (var step = 0; redirect.isNotEmpty && step < 5; step++) {
         final uri = Uri.parse('https://hongguoduanju.com/').resolve(redirect);
         if (uri.scheme != 'https' ||
-            uri.host != 'hongguoduanju.com' ||
+            (!uri.host.endsWith('hongguoduanju.com') &&
+                !uri.host.endsWith('snssdk.com')) ||
             uri.hasPort) {
           throw const HongguoAccountFailure('登录确认地址未通过校验');
         }
@@ -429,8 +428,18 @@ class HongguoAccountService {
         redirect = response.redirect?.toString() ?? '';
       }
       if (redirect.isNotEmpty) throw const HongguoAccountFailure('登录确认跳转次数过多');
-      if (!login._cookies.hasSession) return false;
-      await _call('webInfo', {}, login._cookies, login._revision);
+      if (!login._cookies.hasSession) {
+        if (!login.confirmed &&
+            !login.expiresAt.isAfter(
+              DateTime.now().subtract(const Duration(seconds: 30)),
+            )) {
+          throw const HongguoAccountFailure('二维码已过期，请刷新', 'QR_EXPIRED');
+        }
+        return false;
+      }
+      try {
+        await _call('webInfo', {}, login._cookies, login._revision);
+      } catch (_) {}
       final profile = await _call(
         'profile',
         {},
@@ -1051,14 +1060,39 @@ class HongguoAccountService {
     );
     _check(revision);
     final fallbackList = (fallbackResult['creators'] as List?) ?? const [];
+    if (fallbackList.isNotEmpty || fallbackResult['hasMore'] == true) {
+      return HongguoCollectionPage(
+        fallbackList
+            .map((r) => Anchor.fromOfficial(Map<String, dynamic>.from(r as Map)))
+            .toList(),
+        hasMore: fallbackResult['hasMore'] == true,
+        nextOffset: (fallbackResult['nextOffset'] as num?)?.toInt(),
+        followingDouyinOffset:
+            (fallbackResult['followingDouyinNextOffset'] as num?)?.toInt() ?? 0,
+      );
+    }
+    final broadResult = await _call(
+      'followingCreators',
+      {
+        'userId': session.id,
+        'offset': 0,
+        'count': count,
+        'followingDouyinOffset': douyinOffset,
+        'relativeType': 0,
+      },
+      null,
+      revision,
+    );
+    _check(revision);
+    final broadList = (broadResult['creators'] as List?) ?? const [];
     return HongguoCollectionPage(
-      fallbackList
+      broadList
           .map((r) => Anchor.fromOfficial(Map<String, dynamic>.from(r as Map)))
           .toList(),
-      hasMore: fallbackResult['hasMore'] == true,
-      nextOffset: (fallbackResult['nextOffset'] as num?)?.toInt(),
+      hasMore: broadResult['hasMore'] == true,
+      nextOffset: (broadResult['nextOffset'] as num?)?.toInt(),
       followingDouyinOffset:
-          (fallbackResult['followingDouyinNextOffset'] as num?)?.toInt() ?? 0,
+          (broadResult['followingDouyinNextOffset'] as num?)?.toInt() ?? 0,
     );
   }
 

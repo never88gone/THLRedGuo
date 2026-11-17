@@ -94,7 +94,7 @@ class _HongguoQrLoginScreenState extends State<HongguoQrLoginScreen>
         Navigator.of(context).pop(true);
         return;
       }
-      if (remaining <= 0 && !current.confirmed) {
+      if (seconds < -30 && !current.confirmed) {
         timer?.cancel();
         current.cancelled = true;
         setState(() => error = '二维码已过期，请刷新');
