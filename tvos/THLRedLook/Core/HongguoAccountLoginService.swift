@@ -121,21 +121,26 @@ final class HongguoAccountLoginService {
                         let sessionReady = HongguoAccountRecord(id: "", nickname: "", cookies: cookies).hasSession
                         if sessionReady {
                             onUpdate(nil, 0, true, "手机已确认，正在校验红果账号")
-                            if let webCall = try? await transportService.call("webInfo", owner: owner, attempt: attempt, account: nil, cookies: cookies),
-                               let webCookies = webCall.updatedCookies {
-                                self.cookies = webCookies
+                            var webProfile: [String: Any]?
+                            if let webCall = try? await transportService.call("webInfo", owner: owner, attempt: attempt, account: nil, cookies: cookies) {
+                                if let webCookies = webCall.updatedCookies {
+                                    self.cookies = webCookies
+                                }
+                                webProfile = webCall.result
                             }
-                            let (profile, dev, profCookies) = try await transportService.call("profile", owner: owner, attempt: attempt, account: nil, cookies: cookies)
-                            if let profCookies { self.cookies = profCookies }
+                            let profileCall = try? await transportService.call("profile", owner: owner, attempt: attempt, account: nil, cookies: cookies)
+                            if let profCookies = profileCall?.updatedCookies { self.cookies = profCookies }
+                            let profile = profileCall?.result ?? webProfile ?? [:]
+                            let dev = profileCall?.profileDevice ?? profileDevice
                             try transportService.check(owner: owner, attempt: attempt)
-                            let profileId = (profile["id"] as? String) ?? (profile["biz_user_id"] as? String) ?? (profile["user_id"] as? String) ?? cookies.first(where: { ["uid_tt", "uid_tt_ss"].contains($0.name) && !$0.value.isEmpty })?.value ?? ""
+                            let profileId = (profile["id"] as? String) ?? (profile["biz_user_id"] as? String) ?? (profile["user_id"] as? String) ?? (webProfile?["id"] as? String) ?? cookies.first(where: { ["uid_tt", "uid_tt_ss"].contains($0.name) && !$0.value.isEmpty })?.value ?? ""
                             guard !profileId.isEmpty else { throw HongguoAccountError.invalid }
                             let record = HongguoAccountRecord(
                                 id: profileId,
-                                nickname: profile["nickname"] as? String ?? profile["user_name"] as? String ?? "红果用户",
+                                nickname: profile["nickname"] as? String ?? profile["user_name"] as? String ?? webProfile?["nickname"] as? String ?? "红果用户",
                                 cookies: cookies,
-                                device: dev ?? profileDevice,
-                                avatar: profile["avatar"] as? String ?? profile["avatar_url"] as? String
+                                device: dev,
+                                avatar: profile["avatar"] as? String ?? profile["avatar_url"] as? String ?? webProfile?["avatar"] as? String
                             )
                             try vault.save(record, expectedRevision: revision)
                             releaseLoginResources()
@@ -222,19 +227,24 @@ final class HongguoAccountLoginService {
             if let smsCookies { cookies = smsCookies }
             try transportService.check(owner: owner, attempt: attempt)
             guard HongguoAccountRecord(id: "", nickname: "", cookies: cookies).hasSession else { throw HongguoAccountError.invalid }
-            let (_, _, webCookies) = try await transportService.call("webInfo", owner: owner, attempt: attempt, account: nil, cookies: cookies)
-            if let webCookies { cookies = webCookies }
-            let (profile, dev, profCookies) = try await transportService.call("profile", owner: owner, attempt: attempt, account: nil, cookies: cookies)
-            if let profCookies { cookies = profCookies }
+            var webProfile: [String: Any]?
+            if let webCall = try? await transportService.call("webInfo", owner: owner, attempt: attempt, account: nil, cookies: cookies) {
+                if let webCookies = webCall.updatedCookies { cookies = webCookies }
+                webProfile = webCall.result
+            }
+            let profileCall = try? await transportService.call("profile", owner: owner, attempt: attempt, account: nil, cookies: cookies)
+            if let profCookies = profileCall?.updatedCookies { cookies = profCookies }
+            let profile = profileCall?.result ?? webProfile ?? [:]
+            let dev = profileCall?.profileDevice ?? profileDevice
             try transportService.check(owner: owner, attempt: attempt)
-            let profileId = (profile["id"] as? String) ?? (profile["biz_user_id"] as? String) ?? (profile["user_id"] as? String) ?? ""
+            let profileId = (profile["id"] as? String) ?? (profile["biz_user_id"] as? String) ?? (profile["user_id"] as? String) ?? (webProfile?["id"] as? String) ?? cookies.first(where: { ["uid_tt", "uid_tt_ss"].contains($0.name) && !$0.value.isEmpty })?.value ?? ""
             guard !profileId.isEmpty else { throw HongguoAccountError.invalid }
             let record = HongguoAccountRecord(
                 id: profileId,
-                nickname: profile["nickname"] as? String ?? profile["user_name"] as? String ?? "红果用户",
+                nickname: profile["nickname"] as? String ?? profile["user_name"] as? String ?? webProfile?["nickname"] as? String ?? "红果用户",
                 cookies: cookies,
-                device: dev ?? profileDevice,
-                avatar: profile["avatar"] as? String ?? profile["avatar_url"] as? String
+                device: dev,
+                avatar: profile["avatar"] as? String ?? profile["avatar_url"] as? String ?? webProfile?["avatar"] as? String
             )
             try vault.save(record, expectedRevision: revision)
             releaseLoginResources()

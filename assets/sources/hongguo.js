@@ -2791,11 +2791,27 @@ spider.accountParse = function (action, text) {
   if (!response || typeof response !== 'object') throw new Error('账号接口返回无效数据');
   const data = response.data;
   if (action === 'profile') {
-    const id = String(data && (data.biz_user_id || data.user_id || data.id) || '');
-    if (Number(response.code) !== 0) throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    const user = (data && (data.user_info || data.base_info || data.user_data || data.user || data.profile)) || data || {};
+    const id = String(user.biz_user_id || user.user_id || user.id || user.uid || (data && (data.biz_user_id || data.user_id || data.id || data.uid)) || '');
+    const code = Number(response.code ?? response.status_code ?? response.err_no ?? 0);
+    if (code !== 0) throw new Error('ACCOUNT_BUSINESS_' + code);
     if (!/^\d{1,30}$/.test(id)) throw new Error('账号资料验证失败，请重新扫码');
-    return { id, nickname: String(data.user_name || '红果用户').slice(0, 80),
-      avatar: typeof data.avatar_url === 'string' && /^https:\/\//.test(data.avatar_url) ? data.avatar_url : '' };
+    return {
+      id,
+      nickname: String(user.user_name || user.nickname || user.name || data.user_name || data.nickname || '红果用户').slice(0, 80),
+      avatar: typeof (user.avatar_url || user.avatar || data.avatar_url) === 'string' && /^https:\/\//.test(user.avatar_url || user.avatar || data.avatar_url) ? (user.avatar_url || user.avatar || data.avatar_url) : ''
+    };
+  }
+  if (action === 'webInfo') {
+    if (response.message !== 'success' || !data) throw new Error('官方登录请求失败');
+    const user = (data && (data.user_info || data.base_info || data.user_data || data.user)) || data || {};
+    const id = String(user.user_id_str || user.user_id || user.biz_user_id || user.id || '');
+    return {
+      id: /^\d{1,30}$/.test(id) ? id : '',
+      nickname: String(user.name || user.user_name || user.screen_name || '红果用户').slice(0, 80),
+      avatar: typeof (user.avatar_url || user.avatar) === 'string' && /^https:\/\//.test(user.avatar_url || user.avatar) ? (user.avatar_url || user.avatar) : '',
+      valid: true
+    };
   }
   if (['favoriteUpdate', 'progressUpdate', 'likeUpdate', 'creatorFollow'].includes(action)) {
     if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));

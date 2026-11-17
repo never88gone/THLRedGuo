@@ -90,6 +90,7 @@ final class HongguoAccountTransport: @unchecked Sendable {
         do {
             result = try await NativeBridge.shared.accountParse(action, body: body)
         } catch {
+            NSLog("[Account] parse failed for action=%@ error=%@ bodyPreview=%@", action, String(describing: error), String(body.prefix(300)))
             trace(phase: action, error: error, existing: existing, account: account, cookies: cookies)
             throw error
         }
