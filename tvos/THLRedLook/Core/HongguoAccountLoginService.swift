@@ -88,8 +88,8 @@ final class HongguoAccountLoginService {
                     tick += 1
                     guard tick % 2 == 0 else { continue }
                     do {
-                        let hasSession = HongguoAccountRecord(id: "", nickname: "", cookies: cookies).hasSession
-                        let pollCall = hasSession ? nil : try await transportService.call(
+                        let initialSession = HongguoAccountRecord(id: "", nickname: "", cookies: cookies).hasSession
+                        let pollCall = initialSession ? nil : try await transportService.call(
                             "poll",
                             payload: ["token": token],
                             owner: owner,
@@ -113,18 +113,22 @@ final class HongguoAccountLoginService {
                             isConfirmed = true
                             onUpdate(value, remaining, true, "手机已确认，正在校验红果账号")
                             if let redirect = state["redirect"] as? String, !redirect.isEmpty {
-                                let redirectCookies = try await transportService.finishRedirect(redirect, owner: owner, attempt: attempt, account: nil, cookies: cookies)
-                                self.cookies = redirectCookies
+                                if let redirectCookies = try? await transportService.finishRedirect(redirect, owner: owner, attempt: attempt, account: nil, cookies: cookies) {
+                                    self.cookies = redirectCookies
+                                }
                             }
                         }
-                        if HongguoAccountRecord(id: "", nickname: "", cookies: cookies).hasSession || isConfirmed {
+                        let sessionReady = HongguoAccountRecord(id: "", nickname: "", cookies: cookies).hasSession
+                        if sessionReady {
                             onUpdate(nil, 0, true, "手机已确认，正在校验红果账号")
-                            let (_, _, webCookies) = try await transportService.call("webInfo", owner: owner, attempt: attempt, account: nil, cookies: cookies)
-                            if let webCookies { self.cookies = webCookies }
+                            if let webCall = try? await transportService.call("webInfo", owner: owner, attempt: attempt, account: nil, cookies: cookies),
+                               let webCookies = webCall.updatedCookies {
+                                self.cookies = webCookies
+                            }
                             let (profile, dev, profCookies) = try await transportService.call("profile", owner: owner, attempt: attempt, account: nil, cookies: cookies)
                             if let profCookies { self.cookies = profCookies }
                             try transportService.check(owner: owner, attempt: attempt)
-                            let profileId = (profile["id"] as? String) ?? (profile["biz_user_id"] as? String) ?? (profile["user_id"] as? String) ?? ""
+                            let profileId = (profile["id"] as? String) ?? (profile["biz_user_id"] as? String) ?? (profile["user_id"] as? String) ?? cookies.first(where: { ["uid_tt", "uid_tt_ss"].contains($0.name) && !$0.value.isEmpty })?.value ?? ""
                             guard !profileId.isEmpty else { throw HongguoAccountError.invalid }
                             let record = HongguoAccountRecord(
                                 id: profileId,
@@ -140,6 +144,8 @@ final class HongguoAccountLoginService {
                             cookies = []
                             onSuccess(record)
                             return
+                        } else if isConfirmed {
+                            onUpdate(value, remaining, true, "手机已确认，正在同步登录会话...")
                         }
                         failures = 0
                     } catch {
@@ -149,8 +155,10 @@ final class HongguoAccountLoginService {
                         failures += 1
                         if !isConfirmed {
                             onUpdate(value, remaining, false, "登录查询暂时失败，正在重试")
+                        } else {
+                            onUpdate(value, remaining, true, "正在校验红果账号，请稍候...")
                         }
-                        if failures >= 3 && !isConfirmed { throw error }
+                        if failures >= 8 { throw error }
                     }
                 }
                 if isConfirmed {

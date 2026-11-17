@@ -203,7 +203,7 @@ final class HongguoAccountTransport: @unchecked Sendable {
             return ("redirect:" + next, returnedCookies)
         }
         guard response.statusCode == 200 else { throw HongguoAccountError.server(response.statusCode) }
-        guard !data.isEmpty, let body = String(data: data, encoding: .utf8) else { throw HongguoAccountError.invalid }
+        let body = String(data: data, encoding: .utf8) ?? ""
         return (body, returnedCookies)
     }
 
@@ -222,13 +222,15 @@ final class HongguoAccountTransport: @unchecked Sendable {
                   let host = url.host,
                   HongguoCookie.isValidDomain(host),
                   url.port == nil else {
-                throw HongguoAccountError.invalid
+                return currentCookies
             }
-            let (body, newCookies) = try await request(url, headers: [:], owner: owner, attempt: attempt, account: account, cookies: currentCookies)
+            guard let (body, newCookies) = try? await request(url, headers: [:], owner: owner, attempt: attempt, account: account, cookies: currentCookies) else {
+                return currentCookies
+            }
             if let newCookies { currentCookies = newCookies }
             if !body.hasPrefix("redirect:") { return currentCookies }
             next = String(body.dropFirst(9))
         }
-        throw HongguoAccountError.invalid
+        return currentCookies
     }
 }
