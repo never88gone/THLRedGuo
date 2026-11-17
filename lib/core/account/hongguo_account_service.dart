@@ -386,6 +386,12 @@ class HongguoAccountService {
   Future<bool> poll(HongguoQrLogin login, {bool finalCheck = false}) async {
     if (_polling || login.cancelled) return false;
     _check(login._revision);
+    if (!login.confirmed && !login.expiresAt.isAfter(DateTime.now())) {
+      if (!finalCheck || login.finalCheckDone) {
+        throw const HongguoAccountFailure('二维码已过期，请刷新', 'QR_EXPIRED');
+      }
+      login.finalCheckDone = true;
+    }
     _polling = true;
     try {
       final data = login._cookies.hasSession

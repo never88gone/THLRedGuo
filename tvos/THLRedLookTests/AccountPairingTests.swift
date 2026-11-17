@@ -213,6 +213,21 @@ final class AccountPairingTests: XCTestCase {
         XCTAssertTrue(HongguoAccountVault.shared.snapshot.record?.id == original.record?.id)
         XCTAssertEqual(HongguoAccountVault.shared.snapshot.revision, original.revision)
     }
+
+    func testHongguoCookieValidationAndMultiDomainSession() {
+        let dotDomainCookie = HongguoCookie(name: "sid_tt", value: "test-sid", domain: ".snssdk.com", path: "/", expires: Date().addingTimeInterval(3600))
+        XCTAssertTrue(dotDomainCookie.valid)
+        let record = HongguoAccountRecord(id: "123", nickname: "test", cookies: [dotDomainCookie])
+        XCTAssertTrue(record.hasSession)
+
+        let passportStatusCookie = HongguoCookie(name: "passport_auth_status", value: "1", domain: "hongguoduanju.com", path: "/", expires: nil)
+        XCTAssertTrue(passportStatusCookie.valid)
+        let statusRecord = HongguoAccountRecord(id: "123", nickname: "test", cookies: [passportStatusCookie])
+        XCTAssertTrue(statusRecord.hasSession)
+
+        let untrustedCookie = HongguoCookie(name: "sessionid", value: "evil", domain: "untrusted.com", path: "/", expires: nil)
+        XCTAssertFalse(untrustedCookie.valid)
+    }
 }
 
 private final class WritebackBlockedProtocol: URLProtocol {
