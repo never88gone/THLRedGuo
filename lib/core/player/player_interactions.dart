@@ -9,7 +9,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 
-enum SwipeAction { none, brightness, episode, seek }
+enum SwipeAction { none, brightness, episode, seek, volume }
 
 class GestureHudState {
   const GestureHudState({
@@ -35,7 +35,11 @@ class PlayerInteractions extends ChangeNotifier {
     required this.onFullscreen,
     required this.onEpisode,
     this.onSeek,
+    this.onVolumeChanged,
   }) {
+    if (player.state.volume > 0) {
+      _unmutedVolume = player.state.volume;
+    }
     _playing = player.stream.playing.listen((playing) {
       if (!playing) cancel();
     });
@@ -54,9 +58,12 @@ class PlayerInteractions extends ChangeNotifier {
   final VoidCallback onFullscreen;
   final String Function(int direction) onEpisode;
   final Future<void> Function(Duration)? onSeek;
+  ValueChanged<double>? onVolumeChanged;
   late final StreamSubscription<bool> _playing;
   Timer? _holdTimer;
   Timer? _hintTimer;
+  DateTime _lastScrollTime = DateTime(2000);
+  double _accumulatedScrollDy = 0.0;
   Future<void> _rates = Future<void>.value();
   final Set<int> _pointers = {};
   int? _pointer;
@@ -351,7 +358,9 @@ class PlayerInteractions extends ChangeNotifier {
     final volume = (player.state.volume + delta).clamp(0.0, 100.0);
     unawaited(player.setVolume(volume));
     if (volume > 0) _unmutedVolume = volume;
-    hint(volume == 0 ? '已静音' : '音量 ${volume.round()}%');
+    onVolumeChanged?.call(volume);
+    _showHud(SwipeAction.volume, volume / 100.0);
+    _scheduleDismissHud();
   }
 
   void toggleMute() {
@@ -360,7 +369,34 @@ class PlayerInteractions extends ChangeNotifier {
     if (current > 0) _unmutedVolume = current;
     final target = current > 0 ? 0.0 : _unmutedVolume;
     unawaited(player.setVolume(target));
-    hint(target == 0 ? '已静音' : '音量 ${target.round()}%');
+    onVolumeChanged?.call(target);
+    _showHud(SwipeAction.volume, target / 100.0);
+    _scheduleDismissHud();
+  }
+
+  void setVolumeDirect(double volume) {
+    if (!available()) return;
+    final v = volume.clamp(0.0, 100.0);
+    unawaited(player.setVolume(v));
+    if (v > 0) _unmutedVolume = v;
+    onVolumeChanged?.call(v);
+    _showHud(SwipeAction.volume, v / 100.0);
+    _scheduleDismissHud();
+  }
+
+  void handleScrollVolume(double dy) {
+    if (!available()) return;
+    _accumulatedScrollDy += dy;
+    final now = DateTime.now();
+    if (now.difference(_lastScrollTime).inMilliseconds < 40) {
+      return;
+    }
+    if (_accumulatedScrollDy.abs() >= 8.0) {
+      final step = _accumulatedScrollDy < 0 ? 5.0 : -5.0;
+      changeVolume(step);
+      _accumulatedScrollDy = 0.0;
+      _lastScrollTime = now;
+    }
   }
 
   KeyEventResult key(KeyEvent event) {

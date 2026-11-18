@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/core/player/player_interactions.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
@@ -225,6 +227,11 @@ class _PlayerControlsState extends State<PlayerControls> {
               Listener(
                 key: const ValueKey('player-gesture-surface'),
                 behavior: HitTestBehavior.opaque,
+                onPointerSignal: (event) {
+                  if (event is PointerScrollEvent && AppLayout.isDesktop(context)) {
+                    widget.interactions.handleScrollVolume(event.scrollDelta.dy);
+                  }
+                },
                 onPointerDown: (event) {
                   widget.onFocusSurface();
                   widget.interactions.pointerDown(
@@ -347,6 +354,19 @@ class _PlayerControlsState extends State<PlayerControls> {
                         position: position,
                         buffered: buffered,
                         seekValue: _seekValue,
+                        volume: state.volume,
+                        onVolumeChange: widget.enabled
+                            ? (val) {
+                                widget.interactions.setVolumeDirect(val);
+                                _show();
+                              }
+                            : null,
+                        onToggleMute: widget.enabled
+                            ? () {
+                                widget.interactions.toggleMute();
+                                _show();
+                              }
+                            : null,
                         onSpeed: () => _panel(widget.onSpeed),
                         onQuality: () => _panel(widget.onQuality),
                         onFullscreen: widget.onFullscreen,
@@ -408,6 +428,8 @@ class _GestureHudOverlay extends StatelessWidget {
                   ? _buildSeekCard(hud)
                   : hud.type == SwipeAction.brightness
                   ? _buildBrightnessCard(hud)
+                  : hud.type == SwipeAction.volume
+                  ? _buildVolumeCard(hud)
                   : const SizedBox.shrink(),
             ),
           ),
@@ -537,6 +559,67 @@ class _GestureHudOverlay extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '$percent%',
+            style: const TextStyle(
+              color: AppColors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 90,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: hud.value.clamp(0.0, 1.0),
+                minHeight: 3.5,
+                backgroundColor: AppColors.playerGestureHudTrack,
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVolumeCard(GestureHudState hud) {
+    final percent = (hud.value * 100).round().clamp(0, 100);
+    final IconData icon;
+    if (percent == 0) {
+      icon = Icons.volume_off_rounded;
+    } else if (percent < 30) {
+      icon = Icons.volume_mute_rounded;
+    } else if (percent < 70) {
+      icon = Icons.volume_down_rounded;
+    } else {
+      icon = Icons.volume_up_rounded;
+    }
+
+    return Container(
+      key: const ValueKey('volume-hud-card'),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.playerGestureHudBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.playerGestureHudBorder, width: 0.5),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.playerGestureHudShadow,
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.white, size: 26),
+          const SizedBox(height: 6),
+          Text(
+            percent == 0 ? '静音' : '$percent%',
             style: const TextStyle(
               color: AppColors.white,
               fontSize: 14,

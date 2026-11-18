@@ -123,6 +123,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   Timer? _errorTimer;
   Timer? _pictureInPictureExitTimer;
   Timer? _diagnosticsTimer;
+  Timer? _volumeSaveTimer;
   Future<void> _operations = Future<void>.value();
   late int _index;
   late final int _profileEpoch;
@@ -195,6 +196,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     danmakuStyle: _danmakuStyle,
     preload: _preloadEnabled,
     enhancement: _enhancement.preferences,
+    volume: _player.state.volume,
   );
   String get _qualityLabel {
     if (_plan?.offline == true) return '本地原画';
@@ -251,6 +253,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (_player is LunaExoPlayer) {
       _player.setDecoderMode(preferences.decoderMode);
     }
+    unawaited(_player.setVolume(preferences.volume));
     _video = widget.videoBuilder == null && _player is! LunaExoPlayer
         ? VideoController(
             _player,
@@ -281,6 +284,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           _foreground &&
           !_panelOpen,
       baseSpeed: () => _speed,
+      onVolumeChanged: _onVolumeChanged,
       onTogglePlayback: _togglePlayback,
       onSeek: _seekTo,
       onFullscreen: _rotate,
@@ -1401,6 +1405,19 @@ class _PlayerScreenState extends State<PlayerScreen>
     );
   }
 
+  void _onVolumeChanged(double volume) {
+    _volumeSaveTimer?.cancel();
+    _volumeSaveTimer = Timer(const Duration(milliseconds: 350), () {
+      if (_closed || !mounted) return;
+      final current = widget.store.playbackPreferences;
+      if ((current.volume - volume).abs() > 0.5) {
+        unawaited(
+          widget.store.setPlaybackPreferences(current.copyWith(volume: volume)),
+        );
+      }
+    });
+  }
+
   void _togglePlayback() {
     if (_closed || _loading || _error != null) return;
     _handoffOwned = false;
@@ -2314,6 +2331,14 @@ class _PlayerScreenState extends State<PlayerScreen>
     _errorTimer?.cancel();
     _pictureInPictureExitTimer?.cancel();
     _diagnosticsTimer?.cancel();
+    _volumeSaveTimer?.cancel();
+    final latestVolume = _player.state.volume;
+    final pref = widget.store.playbackPreferences;
+    if ((pref.volume - latestVolume).abs() > 0.5) {
+      unawaited(
+        widget.store.setPlaybackPreferences(pref.copyWith(volume: latestVolume)),
+      );
+    }
     if (_pictureInPictureHandlerInstalled) {
       PipManager.instance.notifyPlayerDisposed();
     }

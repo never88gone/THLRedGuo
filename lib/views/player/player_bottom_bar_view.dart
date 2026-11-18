@@ -1,9 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 
-/// 播放器底部控制层（进度条、清晰度、倍速、画中画、全屏）
+/// 播放器底部控制层（进度条、清晰度、倍速、音量、画中画、全屏）
 class PlayerBottomBarView extends StatelessWidget {
   const PlayerBottomBarView({
     super.key,
@@ -23,6 +25,10 @@ class PlayerBottomBarView extends StatelessWidget {
     required this.onSeekStart,
     required this.onSeekChange,
     required this.onSeekEnd,
+    this.volume = 100.0,
+    this.onVolumeChange,
+    this.onToggleMute,
+    this.showVolumeControl,
     this.onEpisodes,
     this.onPush,
     this.onPictureInPicture,
@@ -40,6 +46,10 @@ class PlayerBottomBarView extends StatelessWidget {
   final double position;
   final double buffered;
   final double? seekValue;
+  final double volume;
+  final ValueChanged<double>? onVolumeChange;
+  final VoidCallback? onToggleMute;
+  final bool? showVolumeControl;
   final VoidCallback onSpeed;
   final VoidCallback onQuality;
   final VoidCallback onFullscreen;
@@ -116,12 +126,102 @@ class PlayerBottomBarView extends StatelessWidget {
     );
   }
 
-  Widget _clusteredToolRow(List<Widget> tools) {
+  Widget _desktopVolumeControl(BuildContext context) {
+    final isMuted = volume <= 0;
+    final IconData volumeIcon;
+    if (isMuted) {
+      volumeIcon = Icons.volume_off_rounded;
+    } else if (volume < 30) {
+      volumeIcon = Icons.volume_mute_rounded;
+    } else if (volume < 70) {
+      volumeIcon = Icons.volume_down_rounded;
+    } else {
+      volumeIcon = Icons.volume_up_rounded;
+    }
+
+    final isEnabled = enabled && (onVolumeChange != null || onToggleMute != null);
+
+    return Listener(
+      onPointerSignal: (event) {
+        if (event is PointerScrollEvent && isEnabled && onVolumeChange != null) {
+          final delta = event.scrollDelta.dy < 0 ? 5.0 : -5.0;
+          onVolumeChange!((volume + delta).clamp(0.0, 100.0));
+        }
+      },
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: const Color(0x40000000),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0x26FFFFFF), width: 0.8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Tooltip(
+              message: isMuted ? '取消静音 (M)' : '静音 (M)',
+              child: Semantics(
+                button: true,
+                enabled: isEnabled,
+                label: isMuted ? '取消静音' : '静音',
+                child: GestureDetector(
+                  key: const ValueKey('player-volume-button'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: enabled ? onToggleMute : null,
+                  child: SizedBox(
+                    width: 32,
+                    height: 36,
+                    child: Center(
+                      child: Icon(
+                        volumeIcon,
+                        size: 20,
+                        color: AppColors.whiteWithAlpha(isEnabled ? 0.92 : 0.36),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 76,
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 3,
+                  activeTrackColor: AppColors.hongguoRed,
+                  inactiveTrackColor: AppColors.playerProgressInactive,
+                  thumbColor: AppColors.white,
+                  overlayColor: AppColors.hongguoRedWithAlpha(0.2),
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                ),
+                child: Slider(
+                  key: const ValueKey('player-volume-slider'),
+                  value: volume.clamp(0.0, 100.0),
+                  min: 0.0,
+                  max: 100.0,
+                  semanticFormatterCallback: (val) => '音量 ${val.round()}%',
+                  onChanged: enabled ? onVolumeChange : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _clusteredToolRow(List<Widget> tools, {bool desktop = false}) {
     if (tools.isEmpty) return const SizedBox.shrink();
-    if (tools.length <= 5) {
+    if (desktop || tools.length <= 5) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
-        children: [Row(mainAxisSize: MainAxisSize.min, children: tools)],
+        children: [
+          for (int i = 0; i < tools.length; i++) ...[
+            if (i > 0) const SizedBox(width: 4),
+            tools[i],
+          ],
+        ],
       );
     }
     final leftCount = tools.length ~/ 2;
@@ -198,6 +298,7 @@ class PlayerBottomBarView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = constraints.maxWidth;
+    final isDesktop = showVolumeControl ?? AppLayout.isDesktop(context);
     final showSpeedQuality = swipeEnabled || width >= 540;
 
     final tools = [
@@ -219,6 +320,7 @@ class PlayerBottomBarView extends StatelessWidget {
           child: Text(qualityLabel),
         ),
       ],
+      if (isDesktop) _desktopVolumeControl(context),
       if (onPictureInPicture != null)
         _toolButton(
           context: context,
@@ -274,7 +376,7 @@ class PlayerBottomBarView extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
-              child: _clusteredToolRow(tools),
+              child: _clusteredToolRow(tools, desktop: isDesktop),
             ),
             _progressRow(context),
           ],

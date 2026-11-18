@@ -141,6 +141,12 @@ class AppLayout extends InheritedWidget {
   static bool isPad(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppLayout>()?.pad ??
       AppDevice.isPadDevice;
+  static bool isDesktop([BuildContext? context]) {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux;
+  }
   static String versionOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppLayout>()?.version ??
       appVersion;
