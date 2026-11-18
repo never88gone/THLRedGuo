@@ -994,6 +994,8 @@ class HongguoAccountService {
     return Anchor.fromOfficial(row);
   }
 
+  ({int revision, String id})? _collectionIdentity;
+
   Future<HongguoCollectionPage<Anchor>> followingCreators({
     int offset = 0,
     int count = 20,
@@ -1002,8 +1004,18 @@ class HongguoAccountService {
   }) async {
     if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
     final revision = session.revision;
+    if (_collectionIdentity?.revision != revision) {
+      var targetId = session.id;
+      try {
+        final profile = await creatorProfile(targetId);
+        if (profile.id.isNotEmpty) targetId = profile.id;
+      } catch (_) {}
+      _check(revision);
+      _collectionIdentity = (revision: revision, id: targetId);
+    }
+    final userId = _collectionIdentity?.id ?? session.id;
     final payload = <String, dynamic>{
-      'userId': session.id,
+      'userId': userId,
       'offset': offset,
       'count': count,
     };

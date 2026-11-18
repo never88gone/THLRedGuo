@@ -2859,7 +2859,7 @@ spider.accountParse = function (action, text) {
         id,
         businessId: identity(base.biz_user_id),
         name: plain(base.user_name || base.author_name || base.celebrity_name || base.name).slice(0, 80),
-        avatar: cleanCoverUrl(plain(base.user_avatar || base.author_avatar || base.avatar)),
+        avatar: cleanCoverUrl(plain(base.user_avatar || base.expand_user_avatar || base.author_avatar || base.avatar)).replace(/^http:\/\//, 'https://'),
         description: plain(base.description || base.author_desc || base.desc),
         following: state !== null && [1, 2, 3, 4].includes(state) ? (state === 2 || state === 4) : null,
         canFollow: canFollowVal === true && base.is_cancelled !== true,

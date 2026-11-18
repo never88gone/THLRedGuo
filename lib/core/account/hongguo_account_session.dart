@@ -244,11 +244,34 @@ class HongguoAccountSession extends ChangeNotifier {
   }
 
   void confirm(Map<String, dynamic> account, int expectedRevision) {
-    if (expectedRevision != revision || account['id']?.toString() != id) return;
+    if (expectedRevision != revision) return;
+    final resolvedId = account['id']?.toString() ?? '';
+    if (!RegExp(r'^\d{1,30}$').hasMatch(resolvedId)) return;
+    final nextNickname = account['nickname']?.toString().trim();
+    final nextAvatar = account['avatar']?.toString().trim();
+    final changed = resolvedId != id ||
+        (nextNickname != null && nextNickname.isNotEmpty && nextNickname != nickname) ||
+        (nextAvatar != null && nextAvatar.isNotEmpty && nextAvatar != avatar);
+    id = resolvedId;
+    if (nextNickname != null && nextNickname.isNotEmpty) nickname = nextNickname;
+    if (nextAvatar != null && nextAvatar.isNotEmpty) avatar = nextAvatar;
     verified = true;
     error = null;
-    nickname = account['nickname']?.toString() ?? nickname;
-    avatar = account['avatar']?.toString() ?? avatar;
+    if (changed && _cookies != null) {
+      final key = _key;
+      final value = jsonEncode({
+        'cookies': _cookies!.toJson(),
+        'device': deviceSession,
+        'id': id,
+        'nickname': nickname,
+        'avatar': avatar,
+      });
+      final write = _writes.then((_) async {
+        if (expectedRevision != revision) return;
+        await _storage.write(key: key, value: value);
+      });
+      _writes = write.catchError((Object _) {});
+    }
     notifyListeners();
   }
 
