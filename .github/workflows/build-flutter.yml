@@ -178,10 +178,14 @@ jobs:
   ios:
     name: iOS 平台自动化打包
     if: inputs.target_platform == null || inputs.target_platform == 'all' || inputs.target_platform == 'ios'
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: 检查 Xcode 与 iOS SDK 版本
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos || true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -294,10 +298,14 @@ jobs:
   macos:
     name: macOS 平台自动化打包
     if: inputs.target_platform == null || inputs.target_platform == 'all' || inputs.target_platform == 'macos'
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: 检查 Xcode 与 macOS SDK 版本
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i macosx || true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

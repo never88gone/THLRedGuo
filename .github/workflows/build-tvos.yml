@@ -38,12 +38,16 @@ env:
 jobs:
   tvos:
     name: Apple tvOS 大屏原生自动化打包
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: 检查 Xcode 与 tvOS SDK 版本
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i appletvos || true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
