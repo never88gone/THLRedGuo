@@ -690,21 +690,13 @@ class _AccountScreenState extends State<AccountScreen> {
       localItems: const [],
       itemKey: (row) => row.id,
       sliver: (context, rows) => SliverPadding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
         sliver: SliverLayoutBuilder(
           builder: (context, constraints) {
-            final columns = (constraints.crossAxisExtent / 170).floor().clamp(
-              2,
-              8,
-            );
-            final width =
-                (constraints.crossAxisExtent - (columns - 1) * 12) / columns;
             return SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 12,
-                mainAxisExtent: DramaTile.extentFor(context, width),
+              gridDelegate: compactDramaGridDelegate(
+                context,
+                constraints.crossAxisExtent,
               ),
               delegate: SliverChildBuilderDelegate((context, index) {
                 final row = rows[index];
@@ -725,6 +717,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   drama: drama,
                   repository: widget.repository,
                   subtitle: row.subtitle,
+                  compact: true,
                   onTap: () => widget.onOpen(drama),
                 );
               }, childCount: rows.length),
@@ -840,14 +833,14 @@ class _AccountScreenState extends State<AccountScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.fromLTRB(16, 2, 8, 2),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   '红果账号 · ${tabHistory ? '历史记录' : '追剧'}',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     color: scheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
@@ -856,12 +849,15 @@ class _AccountScreenState extends State<AccountScreen> {
               IconButton(
                 key: const Key('account-library-refresh'),
                 tooltip: '刷新列表',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                padding: EdgeInsets.zero,
                 onPressed: loading.contains(tabHistory)
                     ? null
                     : () => _load(tabHistory, refresh: true),
                 icon: Icon(
                   Icons.refresh,
-                  size: 20,
+                  size: 18,
                   color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
                 ),
               ),
@@ -903,21 +899,20 @@ class _AccountScreenState extends State<AccountScreen> {
                 )
               : LayoutBuilder(
                   builder: (context, constraints) {
-                    final columns = (constraints.maxWidth / 170).floor().clamp(
-                      2,
-                      8,
-                    );
-                    final width =
-                        (constraints.maxWidth - 32 - (columns - 1) * 12) /
-                        columns;
+                    final horizontalPadding = constraints.maxWidth < 600
+                        ? 12.0
+                        : 16.0;
                     return GridView.builder(
                       key: ValueKey('account-library-$tabHistory'),
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 12,
-                        mainAxisExtent: DramaTile.extentFor(context, width),
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        4,
+                        horizontalPadding,
+                        16,
+                      ),
+                      gridDelegate: compactDramaGridDelegate(
+                        context,
+                        constraints.maxWidth - 2 * horizontalPadding,
                       ),
                       itemCount: entries.length,
                       itemBuilder: (_, index) {
@@ -926,6 +921,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           key: ValueKey('account-card-${entry.drama.id}'),
                           drama: entry.drama,
                           repository: widget.repository,
+                          compact: true,
                           onTap: () => widget.onOpen(entry.drama),
                           subtitle: tabHistory
                               ? '第 ${entry.episode} 集 · ${formatPosition(entry.position)}'

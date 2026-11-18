@@ -84,25 +84,39 @@ class _HongguoCollectionViewState<T> extends State<HongguoCollectionView<T>> {
     final waiting =
         model.session.loggedIn &&
         (model.loading || (!model.loaded && model.error == null));
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(16, 2, 8, 2),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   widget.title,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
               IconButton(
                 key: ValueKey('account-${widget.name}-refresh'),
                 tooltip: '刷新列表',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                padding: EdgeInsets.zero,
                 onPressed: model.loading
                     ? null
                     : () => model.load(refresh: true),
-                icon: const Icon(Icons.refresh),
+                icon: Icon(
+                  Icons.refresh,
+                  size: 18,
+                  color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

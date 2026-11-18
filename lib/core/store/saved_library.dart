@@ -140,7 +140,12 @@ class _SavedLibraryState extends State<SavedLibrary> {
         : () => widget.onDownload!(drama),
   );
 
-  Widget _tile(Drama drama, {FocusNode? focusNode, VoidCallback? onFocus}) {
+  Widget _tile(
+    Drama drama, {
+    FocusNode? focusNode,
+    VoidCallback? onFocus,
+    bool compact = false,
+  }) {
     final watched = widget.store.watched(drama.id);
     final state = widget.store.following(drama.id);
     final badge = state == null
@@ -152,6 +157,7 @@ class _SavedLibraryState extends State<SavedLibrary> {
       repository: widget.repository,
       focusNode: focusNode,
       onFocus: onFocus,
+      compact: compact,
       onTap: () => widget.onOpen(drama),
       onMore: () => _actions(drama),
       actions: DramaActionButton(
@@ -385,7 +391,7 @@ class _SavedLibraryState extends State<SavedLibrary> {
               ],
             );
           }
-          final padding = constraints.maxWidth < 600 ? 16.0 : 24.0;
+          final padding = constraints.maxWidth < 600 ? 12.0 : 16.0;
           return CustomScrollView(
             key: PageStorageKey(
               'saved-${widget.history}-$_filter-${_search.text}',
@@ -396,14 +402,14 @@ class _SavedLibraryState extends State<SavedLibrary> {
                 SliverFillRemaining(hasScrollBody: false, child: empty)
               else
                 SliverPadding(
-                  padding: EdgeInsets.fromLTRB(padding, 0, padding, 20),
+                  padding: EdgeInsets.fromLTRB(padding, 0, padding, 16),
                   sliver: SliverGrid(
-                    gridDelegate: dramaGridDelegate(
+                    gridDelegate: compactDramaGridDelegate(
                       context,
                       constraints.maxWidth - 2 * padding,
                     ),
                     delegate: SliverChildBuilderDelegate(
-                      (_, index) => _tile(items[index]),
+                      (_, index) => _tile(items[index], compact: true),
                       childCount: items.length,
                     ),
                   ),
