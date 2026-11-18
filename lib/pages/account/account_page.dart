@@ -29,6 +29,7 @@ class AccountScreen extends StatefulWidget {
     this.initialHistory = true,
     this.service,
     this.session,
+    this.library,
   });
   final AppRepository repository;
   final LocalStore store;
@@ -38,6 +39,7 @@ class AccountScreen extends StatefulWidget {
   final bool initialHistory;
   final HongguoAccountService? service;
   final HongguoAccountSession? session;
+  final HongguoAccountLibrary? library;
   @override
   State<AccountScreen> createState() => _AccountScreenState();
 }
@@ -47,6 +49,11 @@ class _AccountScreenState extends State<AccountScreen> {
       widget.session ?? HongguoAccountSession.shared;
   late final HongguoAccountService service =
       widget.service ?? HongguoAccountService(session: account);
+  HongguoAccountLibrary? get _sharedLibrary =>
+      widget.library ??
+      (widget.service == null && widget.session == null
+          ? HongguoAccountLibrary.shared
+          : null);
   late final liked = HongguoCollectionController<HongguoLikedVideo>(
     session: account,
     request: (offset, _) => service.likedVideos(offset: offset),
@@ -69,9 +76,7 @@ class _AccountScreenState extends State<AccountScreen> {
     super.initState();
     account.addListener(_accountChanged);
     widget.store.addListener(_storeChanged);
-    if (widget.service == null && widget.session == null) {
-      HongguoAccountLibrary.shared.addListener(_libraryChanged);
-    }
+    _sharedLibrary?.addListener(_libraryChanged);
     _accountChanged();
   }
 
@@ -80,10 +85,15 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   void _libraryChanged() {
-    if (!mounted || !account.loggedIn) return;
+    final shared = _sharedLibrary;
+    if (!mounted || !account.loggedIn || shared == null) return;
     setState(() {
       for (final tab in [true, false]) {
-        lists[tab] = HongguoAccountLibrary.shared.entries(tab);
+        if (shared.isLoaded(tab)) {
+          lists[tab] = shared.entries(tab);
+        } else {
+          lists.remove(tab);
+        }
       }
     });
   }
@@ -119,9 +129,10 @@ class _AccountScreenState extends State<AccountScreen> {
       errors.remove(tab);
     });
     try {
-      final entries = widget.service != null || widget.session != null
-          ? await service.library(history: tab)
-          : await HongguoAccountLibrary.shared.load(tab, refresh: refresh);
+      final shared = _sharedLibrary;
+      final entries = shared != null
+          ? await shared.load(tab, refresh: refresh)
+          : await service.library(history: tab);
       if (!mounted || owner != account.revision) return;
       setState(() => lists[tab] = entries);
     } catch (_) {
@@ -142,9 +153,7 @@ class _AccountScreenState extends State<AccountScreen> {
     widget.store.removeListener(_storeChanged);
     liked.dispose();
     anchors.dispose();
-    if (widget.service == null && widget.session == null) {
-      HongguoAccountLibrary.shared.removeListener(_libraryChanged);
-    }
+    _sharedLibrary?.removeListener(_libraryChanged);
     if (widget.service == null) {
       service.dispose();
     }

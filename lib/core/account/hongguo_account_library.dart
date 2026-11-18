@@ -25,6 +25,7 @@ class HongguoAccountLibrary extends ChangeNotifier {
   final _pendingReports = <String, Future<void>>{};
   Future<void> _writes = Future.value();
   bool get active => service.session.loggedIn;
+  bool isLoaded(bool history) => _loaded.contains(history);
   static String id(String value) =>
       value.startsWith('hongguo:') ? value.substring('hongguo:'.length) : value;
   bool handles(String value) =>
