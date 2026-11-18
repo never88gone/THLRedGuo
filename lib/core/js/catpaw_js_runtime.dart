@@ -296,6 +296,7 @@ class CatPawJsRuntime {
         'likeUpdate',
         'creatorFollow',
         'followingCreators',
+        'creatorWorks',
         'likedVideos',
         'creatorProfile',
       }.contains(action)) {

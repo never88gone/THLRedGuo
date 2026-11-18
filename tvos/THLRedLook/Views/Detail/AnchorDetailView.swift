@@ -18,6 +18,11 @@ public struct AnchorDetailView: View {
     @FocusState private var actionFocus: AnchorHeaderFocus?
     @State private var lastDramaID: String?
     @State private var loadedRevision: UInt64?
+    @State private var worksCursor = ""
+    @State private var worksHasMore = false
+    @State private var worksLoadingMore = false
+    @State private var worksSource = 1506
+    @State private var worksTab = 23
 
     public init(anchor: Anchor, relatedDrama: Drama? = nil) {
         initialAnchor = anchor; self.relatedDrama = relatedDrama; profileRequest = nil; allowsWrites = true; onFollowingChanged = nil
@@ -63,12 +68,21 @@ public struct AnchorDetailView: View {
                         }
                 }
                 if let anchor {
-                    AnchorDramaGridView(dramas: anchor.dramas, focus: $actionFocus, onSelectDrama: {
-                        lastDramaID = $0.id; selectedDrama = $0
-                    }, onUpCommand: {
-                        if error != nil { actionFocus = .retry }
-                        else if followEnabled { actionFocus = .follow }
-                    })
+                    AnchorDramaGridView(
+                        dramas: anchor.dramas,
+                        focus: $actionFocus,
+                        loadingMore: worksLoadingMore,
+                        onSelectDrama: {
+                            lastDramaID = $0.id; selectedDrama = $0
+                        },
+                        onUpCommand: {
+                            if error != nil { actionFocus = .retry }
+                            else if followEnabled { actionFocus = .follow }
+                        },
+                        onReachEnd: {
+                            Task { await loadMoreWorks() }
+                        }
+                    )
                 }
                 Spacer(minLength: 0)
             }
@@ -88,17 +102,51 @@ public struct AnchorDetailView: View {
         }
     }
 
+    private static func mergeDramas(_ primary: [Drama], _ extra: [Drama]) -> [Drama] {
+        var result: [Drama] = []
+        var seen = Set<String>()
+        for drama in primary + extra {
+            if seen.insert(drama.id).inserted {
+                result.append(drama)
+            }
+        }
+        return result
+    }
+
     private func load() async {
         generation += 1; let ticket = generation
         let revision = HongguoAccountVault.shared.snapshot.revision
         loading = true; error = nil
+        worksCursor = ""; worksHasMore = false; worksLoadingMore = false
         do {
             let dramas = relatedDrama.map { [$0] } ?? initialAnchor.dramas
             let result: Anchor
             if let profileRequest { result = try await profileRequest(initialAnchor.id) }
             else { result = try await AnchorService.shared.fetchAnchorDetail(anchorId: initialAnchor.id, dramas: dramas) }
             guard ticket == generation, revision == HongguoAccountVault.shared.snapshot.revision else { return }
-            anchor = result
+            var mergedDramas = Self.mergeDramas(result.dramas, dramas)
+            if allowsWrites && account.loggedIn {
+                if let page = try? await account.creatorWorks(result.id) {
+                    guard ticket == generation, revision == HongguoAccountVault.shared.snapshot.revision else { return }
+                    mergedDramas = Self.mergeDramas(page.items, mergedDramas)
+                    worksHasMore = page.hasMore
+                    worksCursor = page.nextCursor
+                    worksSource = page.commentSource
+                    worksTab = page.tabType
+                }
+            }
+            anchor = Anchor(
+                id: result.id,
+                name: result.name,
+                avatar: result.avatar,
+                intro: result.intro,
+                followerCount: result.followerCount,
+                worksCount: result.worksCount ?? (mergedDramas.isEmpty ? nil : mergedDramas.count),
+                dramas: mergedDramas,
+                following: result.following,
+                canFollow: result.canFollow,
+                relativeType: result.relativeType
+            )
             loadedRevision = revision
         } catch {
             guard ticket == generation, revision == HongguoAccountVault.shared.snapshot.revision else { return }
@@ -106,6 +154,34 @@ public struct AnchorDetailView: View {
             actionFocus = .retry
         }
         if ticket == generation { loading = false }
+    }
+
+    private func loadMoreWorks() async {
+        guard allowsWrites, account.loggedIn, worksHasMore, !worksLoadingMore, !worksCursor.isEmpty,
+              let current = anchor else { return }
+        let ticket = generation
+        let revision = HongguoAccountVault.shared.snapshot.revision
+        let cursor = worksCursor
+        worksLoadingMore = true
+        defer { if ticket == generation { worksLoadingMore = false } }
+        if let page = try? await account.creatorWorks(current.id, cursor: cursor, commentSource: worksSource, tabType: worksTab) {
+            guard ticket == generation, revision == HongguoAccountVault.shared.snapshot.revision else { return }
+            let merged = Self.mergeDramas(current.dramas, page.items)
+            worksHasMore = page.hasMore && !page.nextCursor.isEmpty && page.nextCursor != cursor
+            worksCursor = page.nextCursor
+            anchor = Anchor(
+                id: current.id,
+                name: current.name,
+                avatar: current.avatar,
+                intro: current.intro,
+                followerCount: current.followerCount,
+                worksCount: current.worksCount ?? (merged.isEmpty ? nil : merged.count),
+                dramas: merged,
+                following: current.following,
+                canFollow: current.canFollow,
+                relativeType: current.relativeType
+            )
+        }
     }
 
     private func toggleFollow(_ current: Anchor) async {

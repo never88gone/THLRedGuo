@@ -345,6 +345,52 @@ final class HongguoAccountModel: ObservableObject {
         return anchor
     }
 
+    func creatorWorks(
+        _ id: String,
+        cursor: String = "",
+        count: Int = 20,
+        commentSource: Int = 1506,
+        tabType: Int = 23
+    ) async throws -> (items: [Drama], hasMore: Bool, nextCursor: String, commentSource: Int, tabType: Int) {
+        func fetch(source: Int, tab: Int) async throws -> (items: [Drama], hasMore: Bool, nextCursor: String) {
+            let result = try await readCollection("creatorWorks", payload: [
+                "userId": id,
+                "cursor": cursor,
+                "count": String(count),
+                "commentSource": String(source),
+                "tabType": String(tab)
+            ])
+            guard let rows = result["items"] as? [[String: Any]] else {
+                throw HongguoAccountError.interactionInvalid
+            }
+            let dramas: [Drama] = rows.compactMap { row in
+                guard let sid = row["id"] as? String, !sid.isEmpty,
+                      let title = row["title"] as? String, !title.isEmpty else { return nil }
+                return Drama(
+                    id: "hongguo:\(sid)",
+                    source: "hongguo",
+                    sourceId: sid,
+                    title: title,
+                    description: row["description"] as? String ?? "",
+                    cover: row["cover"] as? String ?? "",
+                    episodes: (row["episodes"] as? NSNumber)?.intValue ?? 0,
+                    tags: row["tags"] as? [String] ?? []
+                )
+            }
+            let hasMore = result["hasMore"] as? Bool ?? false
+            let nextCursor = result["nextCursor"] as? String ?? ""
+            return (dramas, hasMore, nextCursor)
+        }
+        let primary = try await fetch(source: commentSource, tab: tabType)
+        if !primary.items.isEmpty || !cursor.isEmpty || (commentSource == 1504 && tabType == 1) {
+            return (primary.items, primary.hasMore, primary.nextCursor, commentSource, tabType)
+        }
+        if let fallback = try? await fetch(source: 1504, tab: 1), !fallback.items.isEmpty {
+            return (fallback.items, fallback.hasMore, fallback.nextCursor, 1504, 1)
+        }
+        return (primary.items, primary.hasMore, primary.nextCursor, commentSource, tabType)
+    }
+
     func followingCreators(offset: Int = 0, douyinOffset: Int = 0) async throws -> HongguoCollectionPage<Anchor> {
         let revision = vault.snapshot.revision
         if collectionIdentity?.revision != revision {

@@ -7,12 +7,23 @@ public struct AnchorDramaGridView: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 28), count: 5)
     private let focus: FocusState<AnchorHeaderFocus?>.Binding
     private let onUpCommand: () -> Void
+    private let onReachEnd: (() -> Void)?
+    private let loadingMore: Bool
 
-    public init(dramas: [Drama], focus: FocusState<AnchorHeaderFocus?>.Binding, onSelectDrama: @escaping (Drama) -> Void, onUpCommand: @escaping () -> Void) {
+    public init(
+        dramas: [Drama],
+        focus: FocusState<AnchorHeaderFocus?>.Binding,
+        loadingMore: Bool = false,
+        onSelectDrama: @escaping (Drama) -> Void,
+        onUpCommand: @escaping () -> Void,
+        onReachEnd: (() -> Void)? = nil
+    ) {
         self.dramas = dramas
+        self.loadingMore = loadingMore
         self.onSelectDrama = onSelectDrama
         self.focus = focus
         self.onUpCommand = onUpCommand
+        self.onReachEnd = onReachEnd
     }
 
     public var body: some View {
@@ -35,21 +46,30 @@ public struct AnchorDramaGridView: View {
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVGrid(columns: columns, spacing: 36) {
-                        ForEach(dramas) { drama in
+                        ForEach(Array(dramas.enumerated()), id: \.element.id) { index, drama in
                             DramaCardView(
                                 drama: drama,
                                 isFocused: focus.wrappedValue == .drama(drama.id),
-                                onUpCommand: dramas.prefix(columns.count).contains(where: { $0.id == drama.id }) ? onUpCommand : nil
+                                onUpCommand: index < columns.count ? onUpCommand : nil
                             ) {
                                 onSelectDrama(drama)
                             }
                             .focused(focus, equals: .drama(drama.id))
                             .accessibilityIdentifier("anchor.drama.\(drama.id)")
+                            .onAppear {
+                                if index >= max(0, dramas.count - 5) {
+                                    onReachEnd?()
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, 60)
                     .padding(.top, 28)
-                    .padding(.bottom, 60)
+                    .padding(.bottom, loadingMore ? 16 : 60)
+                    if loadingMore {
+                        ProgressView("正在加载更多作品")
+                            .padding(.bottom, 48)
+                    }
                 }
             }
         }

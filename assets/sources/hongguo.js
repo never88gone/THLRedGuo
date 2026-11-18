@@ -1118,7 +1118,7 @@ function ln(model, videoId, downloadQuality) {
   const r = model, e = videoId, t = downloadQuality, n = entries;
 let i,o=[],a=new Set;for(let c of n)try{let s=c.item.spade_a||c.item.encrypt_info?.spade_a,u=s?no(s):null;for(let f of[c.item.main_url,c.item.backup_url,c.item.backup_url_1,c.item.backup_url_2,c.item.backup_url_3,...Array.isArray(c.item.backup_url_list)?c.item.backup_url_list:[]])if(!(typeof f!="string"||!f))try{let h=r.key_seed?io(f,S.from(r.key_seed,"base64")):/^https:\/\//i.test(cn(f))?cn(f):S.from(f,"base64").toString("utf8"),d=lt(h,["qznovelvod.com","fqnovelvod.com","douyinvod.com"]),x=u?u.toString("hex"):null,y=`${d}:${x||""}`;if(a.has(y))continue;a.add(y),o.push({url:d,contentKey:x,codec:c.codec==="bytevc1"?"hevc":c.codec||"auto",source:"app",vid:e,expiresAt:appModelExpiry(r),userAgent:dt,referer:"https://novelquickapp.com/",mediaBytes:Math.max(0,Number(c.item.size||c.item.video_meta?.size||0)),quality:c.quality,width:c.width,height:c.height})}catch(h){i=h}}catch(s){i=s}if(o.length)return o;throw i?.code==="SECURITY_BLOCKED"?i:Object.assign(new Error("\u672C\u96C6\u7247\u6E90\u5730\u5740\u6216\u5BC6\u94A5\u65E0\u6CD5\u89E3\u6790"),{code:"INVALID_RESPONSE"})}
 var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code:"73932",update_version_code:"73932",pv_player:"73932"},Ae;function ao(){let r=K.randomBytes(16);r[6]=r[6]&15|64,r[8]=r[8]&63|128;let e=r.toString("hex");return[e.slice(0,8),e.slice(8,12),e.slice(12,16),e.slice(16,20),e.slice(20)].join("-")}async function Ot(r=1/0){if(globalThis.__hongguoCachedDevice&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.iid))&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.device_id))){globalThis.__hongguoCachedDevice={...globalThis.__hongguoCachedDevice,...he,iid:fe(globalThis.__hongguoCachedDevice.iid),device_id:fe(globalThis.__hongguoCachedDevice.device_id),cdid:fe(globalThis.__hongguoCachedDevice.cdid)||ao()};return globalThis.__hongguoCachedDevice;}return Ae||(Ae=(async()=>{let e=ao(),t={aid:8662,app_name:"novelread",package:"com.phoenix.read",app_version:he.version_name,version_code:73932,update_version_code:73932,manifest_version_code:73932,sdk_version:"6.18.0",device_platform:"android",os:"Android",os_version:he.os_version,os_api:Number(he.os_api),device_model:he.device_type,device_brand:he.device_brand,device_manufacturer:"Xiaomi",density_dpi:Number(he.dpi),display_density:"mdpi",resolution:he.resolution.replace("*","x"),language:"zh",timezone:8,access:"wifi",channel:he.channel,cdid:e,openudid:K.randomBytes(8).toString("hex")},n=await Pe("https://log.snssdk.com/service/2/device_register/?aid=8662&app_name=novelread",{method:"POST",headers:{"Content-Type":"application/json; charset=utf-8","User-Agent":dt},data:JSON.stringify({magic_tag:"ss_app_log",header:t,_gen_time:Date.now()})},Math.min(Date.now()+12e3,r)),i=fe(n.install_id_str),o=fe(n.device_id_str);if(!/^\d{10,24}$/.test(i)||!/^\d{10,24}$/.test(o))throw Object.assign(new Error("\u65E0\u6CD5\u521D\u59CB\u5316\u5B98\u65B9\u4F1A\u8BDD"),{code:"GUEST_REGISTRATION_FAILED"});let dev={...he,iid:i,device_id:o,cdid:e};globalThis.__hongguoCachedDevice=dev;if(typeof __native_save_device==="function"){try{__native_save_device(JSON.stringify(dev));}catch(_){}}return dev;})().catch(e=>{throw Ae=null,e})),Ae}async function co(r,e={},t=!1){t&&!globalThis.__hongguoAccountActive&&(Ae=null,delete globalThis.__hongguoCachedDevice);let deadline=Math.min(Date.now()+12e3,e.deadline||1/0),n=await Ot(deadline),i={query:r,count:0,offset:e.offset||0,tab_type:e.fallbackToGeneral?11:29,tab_name:e.fallbackToGeneral?"":"feed",search_source:1,use_correct:!1,use_lynx:!1,user_is_login:globalThis.__hongguoAccountActive?1:0,bookshelf_search_plan:4,bookstore_tab:16,is_first_enter_search:!e.offset};e.passback&&(i.passback=e.passback),e.searchId&&(i.search_id=e.searchId);let o=Ht(null,"https://reading.snssdk.com/reading/bookapi/search/tab/v",i,n),a=await Pe(o.url,{headers:{...o.headers,lc:"101"}},deadline);if(Number(a.code)!==0||!Array.isArray(a.search_tabs))throw Object.assign(new Error("\u5B98\u65B9\u641C\u7D22\u672A\u8FD4\u56DE\u6709\u6548\u7ED3\u679C"),{code:"SEARCH_REJECTED",category:"business_reject"});return a}async function so({seriesId:r,videoId:e,startMs:t=0,durationMs:n,cursor:i=""}){if(!/^\d{10,30}$/.test(String(r))||!/^\d{10,30}$/.test(String(e)))throw new Error("\u5F39\u5E55\u5206\u96C6\u7F16\u53F7\u65E0\u6548");let o={comment_source:601,server_channel:1e3,group_id:String(e),group_type:30,comment_type:20,sort:1,business_param:{book_id:String(r),start_offset_time:t,playlet_item_duration:n},count:90,cursor:String(i),aid:8662,compliance_status:0},a=await Ot(),c=Ht(JSON.stringify(o),"https://reading.snssdk.com/novel/commentapi/comment/list/"+e+"/v1/",{},a);return Pe(c.url,{method:"POST",headers:{...c.headers,lc:"101"},data:c.body},Date.now()+5e3)}mn.exports={buildAccountRequest:async function(action="profile",payload={}) {
-  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v"};
+  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",creatorWorks:"/novel/commentapi/user/profile/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v"};
   if(!Object.prototype.hasOwnProperty.call(routes,action))throw new Error("不支持的账号操作");
   const identity=value=>{const id=String(value||"");if(!/^[1-9]\d{0,29}$/.test(id))throw new Error("账号剧集编号无效");return id;};
   const integer=value=>{const n=Number(value);if(!Number.isSafeInteger(n)||n<0)throw new Error("账号进度参数无效");return n;};
@@ -1153,6 +1153,16 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     const cursor=payload.cursor!==undefined&&payload.cursor!==null&&String(payload.cursor)!==""?String(payload.cursor):(offset>0?String(offset):"");
     body={aid:integer(he.aid),comment_source:1507,count,cursor,target_user_id:uid};
   }
+  if(action==="creatorWorks") {
+    const count=integer(payload.count===undefined?20:payload.count);
+    if(count<1||count>50)throw new Error("账号列表分页大小无效");
+    const offset=integer(payload.offset===undefined?0:payload.offset);
+    const uid=identity(payload.userId);
+    const cursor=payload.cursor!==undefined&&payload.cursor!==null&&String(payload.cursor)!==""?String(payload.cursor):(offset>0?String(offset):"");
+    const commentSource=payload.commentSource!==undefined&&payload.commentSource!==null&&String(payload.commentSource)!==""?integer(payload.commentSource):1506;
+    const tabType=payload.tabType!==undefined&&payload.tabType!==null&&String(payload.tabType)!==""?integer(payload.tabType):23;
+    body={aid:integer(he.aid),comment_source:commentSource,tab_type:tabType,count,cursor,target_user_id:uid};
+  }
   if(action==="likedVideos") {
     const count=integer(payload.count===undefined?20:payload.count);
     if(count<1||count>50)throw new Error("账号列表分页大小无效");
@@ -1175,8 +1185,8 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     dev={...he,iid:String(bound.iid),device_id:String(bound.device_id),cdid:bound.cdid};
   } else dev=await Ot();
   const wireBody=body===null?null:action==="progressGet"?'{"book_ids":{"2":['+identity(payload.id)+']}}':JSON.stringify(body);
-  const origin=["followingCreators","likedVideos","creatorProfile"].includes(action)?"https://reading.snssdk.com":"https://api5-normal-sinfonlinea.fqnovel.com";
-  const path=action==="followingCreators"?routes[action]+identity(payload.userId)+"/v1/":routes[action];
+  const origin=["followingCreators","creatorWorks","likedVideos","creatorProfile"].includes(action)?"https://reading.snssdk.com":"https://api5-normal-sinfonlinea.fqnovel.com";
+  const path=(action==="followingCreators"||action==="creatorWorks")?routes[action]+identity(payload.userId)+"/v1/":routes[action];
   const signed=Ht(wireBody,origin+path,params,dev);
   return {url:signed.url,method:body===null?"GET":"POST",headers:signed.headers,...(body===null?{}:{body:wireBody})};
 },resetGuestSession:function(){Ae=null;appVideoModels.clear();delete globalThis.__hongguoCachedDevice;},fetchAppDetailRaw:async function(id){const dev=await Ot();const signed=Ht(JSON.stringify({series_id:String(id)}),"https://reading.snssdk.com/novel/player/video_detail/v1/",{},dev);const result=await Pe(signed.url,{method:"POST",headers:{...signed.headers,lc:"101"},data:signed.body},Date.now()+12000);if(Number(result.code||0)!==0)throw Object.assign(new Error("官方详情接口暂不可用，请重试"),{code:"DETAIL_REJECTED"});return result.data?.video_data},fetchAppPlayUrl:oo,fetchAppSearchRaw:co,fetchAppDanmakuRaw:so,fetchAppDiscoveryRaw:async function(path,params){if(!["/reading/bookapi/search/cue/v","/reading/bookapi/search/suggest/v","/reading/bookapi/plan/v","/reading/bookapi/bookmall/tab/v","/reading/bookapi/bookmall/cell/change/v"].includes(path))throw Object.assign(new Error("不支持的官方接口"),{code:"SECURITY_BLOCKED"});const device=await Ot();const signed=Ht(null,"https://reading.snssdk.com"+path,params,device);const result=await Pe(signed.url,{headers:{...signed.headers,lc:"101"}},Date.now()+12000);if(!result||String(result.code??result.status_code)!=="0")throw Object.assign(new Error("官方发现接口暂不可用，请重试"),{code:"DISCOVERY_REJECTED"});return result}}});var wn=z((Do,vn)=>{var{fetchAppSearchRaw:bn}=pt();function fo(r){let e=[],t=new Set;let tabs=Array.isArray(r)?r:(r?[r]:[]);for(let m of tabs){for(let n of m.data||[]){let i=Array.isArray(n.video_data)?n.video_data:[];for(let o of i){let a=o.video_detail||{},c=String(a.series_id_str||o.series_id||a.series_id||"");if(!/^\d{10,30}$/.test(c)||t.has(c))continue;let s=String(a.series_title||o.title||"").trim();if(!s)continue;t.add(c);let u=Number(a.episode_cnt||o.episode_cnt||0);e.push({vod_id:c,vod_name:s,vod_pic:cleanCoverUrl(String(a.series_cover||o.cover||"")),vod_remarks:u>0?"全"+u+"集":"",vod_content:String(a.series_intro||""),vod_total:u,content_type:Number(a.content_type||o.content_type||0)})}}}return e}function pickTab(response, general) {
@@ -2748,7 +2758,7 @@ spider.danmaku = function (id, startMs, durationMs) {
 
 spider.accountRequest = async function (action, payload) {
   payload = payload || {};
-  if (['profile', 'favorites', 'history', 'libraryDetails', 'libraryDetail', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow', 'followingCreators', 'likedVideos', 'creatorProfile'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
+  if (['profile', 'favorites', 'history', 'libraryDetails', 'libraryDetail', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow', 'followingCreators', 'creatorWorks', 'likedVideos', 'creatorProfile'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
   const paths = { qr: '/passport/web/get_qrcode/', poll: '/passport/web/check_qrconnect/', webInfo: '/passport/account/info/v2/', phoneCode: '/passport/web/send_code/', phoneSms: '/passport/web/sms_login_only/' };
   if (!Object.prototype.hasOwnProperty.call(paths, action)) throw new Error('不支持的账号操作');
   const params = { aid: '513755', passport_jssdk_version: '3.4.10', passport_jssdk_type: 'normal',
@@ -2838,6 +2848,60 @@ spider.accountParse = function (action, text) {
   if (['favoriteUpdate', 'progressUpdate', 'likeUpdate', 'creatorFollow'].includes(action)) {
     if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
     return { valid: true };
+  }
+  if (action === 'creatorWorks') {
+    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('账号列表返回无效数据');
+    const identity = value => /^[1-9]\d{0,29}$/.test(String(value || '')) ? String(value) : '';
+    const integer = value => value !== null && value !== undefined && value !== '' && Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? Number(value) : null;
+    const plain = value => typeof value === 'string' ? value.trim() : '';
+    const rawList = Array.isArray(data.data_list) ? data.data_list : [];
+    const items = [];
+    const seen = new Set();
+    const pushVideo = v => {
+      if (!v || typeof v !== 'object') return;
+      const detail = v.video_detail_info || v.video_detail || v.series_info || v;
+      const id = identity(detail.series_id_str || detail.series_id || v.series_id_str || v.series_id || detail.book_id || v.book_id);
+      if (!id || seen.has(id)) return;
+      const title = plain(detail.series_title || detail.title || v.series_title || v.title || detail.book_name || v.book_name);
+      if (!title) return;
+      seen.add(id);
+      const rawCover = plain(detail.series_cover || detail.cover || v.series_cover || v.cover || detail.thumb_url || v.thumb_url);
+      const cover = cleanCoverUrl(rawCover).replace(/^http:\/\//, 'https://');
+      const description = plain(detail.series_intro || detail.intro || v.series_intro || v.intro || detail.abstract || detail.video_desc || v.video_desc);
+      const episodes = integer(detail.episode_cnt || v.episode_cnt || detail.serial_count || v.serial_count) ?? 0;
+      const subList = Array.isArray(detail.sub_title_list) ? detail.sub_title_list : (Array.isArray(v.sub_title_list) ? v.sub_title_list : []);
+      const tags = subList.map(t => plain(t && t.text)).filter(Boolean).slice(0, 6);
+      items.push({ id, title: title.slice(0, 120), cover, description: description.slice(0, 500), episodes, tags });
+    };
+    for (const row of rawList) {
+      if (!row || typeof row !== 'object') continue;
+      const containers = [
+        row.video && row.video.expand,
+        row.post && row.post.expand,
+        row.expand,
+        row
+      ];
+      for (const container of containers) {
+        if (!container || typeof container !== 'object') continue;
+        if (Array.isArray(container.videos)) {
+          for (const v of container.videos) pushVideo(v);
+        }
+        if (Array.isArray(container.video_data)) {
+          for (const v of container.video_data) pushVideo(v);
+        }
+        if (container.video_detail || container.series_info || container.series_id || container.series_id_str) {
+          pushVideo(container);
+        }
+      }
+    }
+    const common = data.common_list_info && typeof data.common_list_info === 'object' ? data.common_list_info : {};
+    const hasMore = Boolean(common.has_more === true || data.has_more === true);
+    const rawCursorVal = common.cursor !== undefined && common.cursor !== null ? common.cursor : data.next_offset;
+    const nextCursor = rawCursorVal !== undefined && rawCursorVal !== null ? String(rawCursorVal).trim() : '';
+    const nextOffset = integer(nextCursor);
+    const tabs = Array.isArray(data.tabs) ? data.tabs.map(t => integer(t && t.tab_type)).filter(v => v !== null) : [];
+    return { items, hasMore, nextCursor, nextOffset, tabs };
   }
   if (['followingCreators', 'likedVideos', 'creatorProfile'].includes(action)) {
     if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));

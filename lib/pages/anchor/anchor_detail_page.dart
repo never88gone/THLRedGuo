@@ -34,8 +34,23 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
   Anchor? profile;
   String? error;
   bool loading = true, writing = false;
+  List<Drama> works = const [];
+  bool worksLoadingMore = false;
+  bool worksHasMore = false;
+  String worksCursor = '';
+  int worksSource = 1506;
+  int worksTab = 23;
   int generation = 0;
   late int revision;
+
+  List<Drama> get displayDramas {
+    final seen = <String>{};
+    final list = <Drama>[];
+    for (final d in [...works, ...widget.initialDramas]) {
+      if (seen.add(d.id)) list.add(d);
+    }
+    return list;
+  }
   bool get following => service.session.loggedIn
       ? profile?.officialFollowing == true
       : profile?.isFollowed == true;
@@ -68,6 +83,10 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
     if (mounted) {
       setState(() {
         profile = service.session.loggedIn ? null : localProfile;
+        works = const [];
+        worksHasMore = false;
+        worksCursor = '';
+        worksLoadingMore = false;
         error = null;
         writing = false;
       });
@@ -84,10 +103,38 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
     setState(() {
       loading = true;
       error = null;
+      worksHasMore = false;
+      worksCursor = '';
+      worksLoadingMore = false;
     });
     try {
       final value = await service.creatorProfile(widget.anchor.id);
-      if (mounted && ticket == generation) setState(() => profile = value);
+      if (!mounted || ticket != generation) return;
+      List<Drama> fetchedWorks = works;
+      var hasMore = false;
+      var nextCursor = '';
+      var source = 1506;
+      var tab = 23;
+      try {
+        final page = await service.creatorWorks(value.id);
+        if (mounted && ticket == generation) {
+          fetchedWorks = page.items;
+          hasMore = page.hasMore && page.nextCursor.isNotEmpty;
+          nextCursor = page.nextCursor;
+          source = page.commentSource;
+          tab = page.tabType;
+        }
+      } catch (_) {}
+      if (mounted && ticket == generation) {
+        setState(() {
+          profile = value;
+          works = fetchedWorks;
+          worksHasMore = hasMore;
+          worksCursor = nextCursor;
+          worksSource = source;
+          worksTab = tab;
+        });
+      }
     } catch (issue) {
       if (mounted && ticket == generation) {
         setState(
@@ -98,6 +145,47 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
       }
     } finally {
       if (mounted && ticket == generation) setState(() => loading = false);
+    }
+  }
+
+  Future<void> _loadMoreWorks() async {
+    final current = profile;
+    if (!service.session.loggedIn ||
+        current == null ||
+        !worksHasMore ||
+        worksLoadingMore ||
+        worksCursor.isEmpty) {
+      return;
+    }
+    final ticket = generation;
+    final cursor = worksCursor;
+    setState(() => worksLoadingMore = true);
+    try {
+      final page = await service.creatorWorks(
+        current.id,
+        cursor: cursor,
+        commentSource: worksSource,
+        tabType: worksTab,
+      );
+      if (!mounted || ticket != generation) return;
+      final seen = {for (final d in works) d.id};
+      final merged = [...works];
+      for (final item in page.items) {
+        if (seen.add(item.id)) merged.add(item);
+      }
+      setState(() {
+        works = merged;
+        worksHasMore =
+            page.hasMore &&
+            page.nextCursor.isNotEmpty &&
+            page.nextCursor != cursor;
+        worksCursor = page.nextCursor;
+      });
+    } catch (_) {
+    } finally {
+      if (mounted && ticket == generation) {
+        setState(() => worksLoadingMore = false);
+      }
     }
   }
 
@@ -350,7 +438,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
               },
             ),
             const SizedBox(height: 24),
-            if (widget.initialDramas.isNotEmpty) ...[
+            if (displayDramas.isNotEmpty) ...[
               Row(
                 children: [
                   Container(
@@ -363,7 +451,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '短剧作品 (${widget.initialDramas.length})',
+                    '短剧作品 (${displayDramas.length})',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -373,7 +461,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              for (final drama in widget.initialDramas)
+              for (final drama in displayDramas)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Material(
@@ -432,9 +520,13 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    drama.displayCategory.isNotEmpty
-                                        ? '${drama.displayCategory} · 共 ${drama.episodes} 集'
-                                        : '共 ${drama.episodes} 集',
+                                    drama.episodes > 0
+                                        ? (drama.displayCategory.isNotEmpty
+                                            ? '${drama.displayCategory} · 共 ${drama.episodes} 集'
+                                            : '共 ${drama.episodes} 集')
+                                        : (drama.displayCategory.isNotEmpty
+                                            ? drama.displayCategory
+                                            : '点击查看剧集'),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: scheme.onSurfaceVariant,
@@ -455,7 +547,17 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                     ),
                   ),
                 ),
-            ] else
+              if (worksHasMore)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 12),
+                  child: Center(
+                    child: OutlinedButton(
+                      onPressed: worksLoadingMore ? null : _loadMoreWorks,
+                      child: Text(worksLoadingMore ? '正在加载更多...' : '加载更多作品'),
+                    ),
+                  ),
+                ),
+            ] else if (!loading)
               Text(
                 '暂无可展示的关联短剧',
                 key: const ValueKey('anchor-no-works'),

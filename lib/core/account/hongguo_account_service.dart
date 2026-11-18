@@ -994,6 +994,103 @@ class HongguoAccountService {
     return Anchor.fromOfficial(row);
   }
 
+  Future<
+    ({
+      List<Drama> items,
+      bool hasMore,
+      String nextCursor,
+      int commentSource,
+      int tabType,
+    })
+  >
+  creatorWorks(
+    String userId, {
+    String cursor = '',
+    int count = 20,
+    int commentSource = 1506,
+    int tabType = 23,
+  }) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    Future<({List<Drama> items, bool hasMore, String nextCursor})> fetch(
+      int source,
+      int tab,
+    ) async {
+      final result = await _call(
+        'creatorWorks',
+        {
+          'userId': userId,
+          'cursor': cursor,
+          'count': count,
+          'commentSource': source,
+          'tabType': tab,
+        },
+        null,
+        revision,
+      );
+      _check(revision);
+      final rows = (result['items'] as List?) ?? const [];
+      final dramas = <Drama>[];
+      for (final raw in rows) {
+        if (raw is! Map) continue;
+        final row = Map<String, dynamic>.from(raw);
+        final sid = row['id']?.toString() ?? '';
+        final title = row['title']?.toString() ?? '';
+        if (sid.isEmpty || title.isEmpty) continue;
+        final rawTags = (row['tags'] as List?) ?? const [];
+        dramas.add(
+          Drama(
+            id: 'hongguo:$sid',
+            source: 'hongguo',
+            sourceId: sid,
+            title: title,
+            cover: row['cover']?.toString() ?? '',
+            description: row['description']?.toString() ?? '',
+            episodes: (row['episodes'] as num?)?.toInt() ?? 0,
+            tags: rawTags.map((e) => e.toString()).where((e) => e.isNotEmpty).toList(),
+          ),
+        );
+      }
+      return (
+        items: dramas,
+        hasMore: result['hasMore'] == true,
+        nextCursor: result['nextCursor']?.toString() ?? '',
+      );
+    }
+
+    final primary = await fetch(commentSource, tabType);
+    if (primary.items.isNotEmpty ||
+        cursor.isNotEmpty ||
+        (commentSource == 1504 && tabType == 1)) {
+      return (
+        items: primary.items,
+        hasMore: primary.hasMore,
+        nextCursor: primary.nextCursor,
+        commentSource: commentSource,
+        tabType: tabType,
+      );
+    }
+    try {
+      final fallback = await fetch(1504, 1);
+      if (fallback.items.isNotEmpty) {
+        return (
+          items: fallback.items,
+          hasMore: fallback.hasMore,
+          nextCursor: fallback.nextCursor,
+          commentSource: 1504,
+          tabType: 1,
+        );
+      }
+    } catch (_) {}
+    return (
+      items: primary.items,
+      hasMore: primary.hasMore,
+      nextCursor: primary.nextCursor,
+      commentSource: commentSource,
+      tabType: tabType,
+    );
+  }
+
   ({int revision, String id})? _collectionIdentity;
 
   Future<HongguoCollectionPage<Anchor>> followingCreators({
