@@ -89,7 +89,7 @@ public struct SavedLibraryView: View {
                         }
                         Spacer()
                     }
-                    .frame(width: 200)
+                    .frame(width: 230)
                     .padding(.leading, 48)
                     .focusSection()
 

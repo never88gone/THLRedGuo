@@ -32,16 +32,16 @@ struct TVCapsuleButtonLabel: View {
 
     private var fontSize: CGFloat {
         if isLarge {
-            return isFocused ? 30 : 28
+            return isFocused ? 28 : 26
         }
         return isCompact ? (isFocused ? 22 : 20) : (isFocused ? 26 : 24)
     }
 
     private var horizontalPadding: CGFloat {
         if isLarge {
-            return isFocused ? 38 : 34
+            return isFocused ? 28 : 24
         }
-        return isCompact ? (isFocused ? 24 : 20) : (isFocused ? 34 : 30)
+        return isCompact ? (isFocused ? 24 : 20) : (isFocused ? 32 : 28)
     }
 
     private var verticalPadding: CGFloat {
@@ -58,6 +58,8 @@ struct TVCapsuleButtonLabel: View {
                 weight: (isFocused || isSelected) ? .heavy : .medium
             ))
             .foregroundColor(textColor)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, verticalPadding)
             .background(backgroundView)
