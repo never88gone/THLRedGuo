@@ -37,10 +37,17 @@ public final class LibraryViewModel: ObservableObject {
 
     func loadAccount(_ tab: LibraryTab, refresh: Bool = false, more: Bool = false) async {
         syncAccountOwner()
-        let refresh = refresh || failedRefresh.contains(tab)
+        let isCurrentTabEmpty: Bool = {
+            switch tab {
+            case .anchors: return officialAnchors.isEmpty
+            case .liked: return officialLikes.isEmpty
+            default: return (accountLists[tab] ?? []).isEmpty
+            }
+        }()
+        let shouldRefresh = refresh || failedRefresh.contains(tab) || (!more && isCurrentTabEmpty)
         let revision = accountRevision!
         guard officialAccount, !loadingTabs.contains(tab),
-              refresh || (more ? moreTabs.contains(tab) : !loadedTabs.contains(tab)) else { return }
+              shouldRefresh || (more ? moreTabs.contains(tab) : !loadedTabs.contains(tab)) else { return }
         loadingTabs.insert(tab); accountErrors[tab] = nil
         defer { if accountRevision == revision { loadingTabs.remove(tab) } }
         let offset = refresh ? 0 : offsets[tab] ?? 0
@@ -126,7 +133,21 @@ public final class LibraryViewModel: ObservableObject {
 
         HongguoAccountModel.shared.objectWillChange
             .sink { [weak self] _ in
-                self?.objectWillChange.send()
+                guard let self else { return }
+                self.objectWillChange.send()
+                Task { @MainActor in
+                    if self.officialAccount {
+                        let isEmpty: Bool
+                        switch self.selectedTab {
+                        case .anchors: isEmpty = self.officialAnchors.isEmpty
+                        case .liked: isEmpty = self.officialLikes.isEmpty
+                        default: isEmpty = (self.accountLists[self.selectedTab] ?? []).isEmpty
+                        }
+                        if isEmpty && !self.loadingTabs.contains(self.selectedTab) {
+                            await self.loadAccount(self.selectedTab)
+                        }
+                    }
+                }
             }
             .store(in: &cancellables)
     }

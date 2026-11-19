@@ -28,7 +28,13 @@ public struct SavedLibraryView: View {
     }
 
     private var entries: [WatchEntry] {
-        viewModel.officialAccount ? HongguoAccountLibraryCache.shared.entries(history: viewModel.selectedTab == .history) : viewModel.historyList
+        if viewModel.officialAccount {
+            if let cached = viewModel.accountLists[viewModel.selectedTab], !cached.isEmpty {
+                return cached
+            }
+            return HongguoAccountLibraryCache.shared.entries(history: viewModel.selectedTab == .history)
+        }
+        return viewModel.historyList
     }
     private var dramas: [Drama] {
         if viewModel.selectedTab == .liked {
@@ -142,7 +148,9 @@ public struct SavedLibraryView: View {
                         ScrollView {
                           VStack(spacing: 24) {
                             if viewModel.selectedTab == .anchors {
-                                if viewModel.followedAnchorsList.isEmpty {
+                                if viewModel.loadingTabs.contains(.anchors) && viewModel.followedAnchorsList.isEmpty {
+                                    ProgressView("正在载入关注主播...").frame(maxWidth: .infinity, minHeight: 300)
+                                } else if viewModel.followedAnchorsList.isEmpty {
                                     VStack(spacing: 24) {
                                         Text(emptyMessage).font(.system(size: 29, weight: .medium))
                                         TVButton(title: (!viewModel.officialAccount && viewModel.selectedTab == .anchors) ? "登录红果账号" : (viewModel.officialAccount ? "刷新列表" : "去探索短剧"),
@@ -156,7 +164,13 @@ public struct SavedLibraryView: View {
                                                 requestTopNavigation()
                                             }
                                         }.focused($focusedTarget, equals: .emptyAction).accessibilityIdentifier("library.emptyAction").id(LibraryFocusTarget.emptyAction)
-                                    }.frame(maxWidth: .infinity, minHeight: 300)
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: 300)
+                                    .onAppear {
+                                        if viewModel.officialAccount && !viewModel.loadingTabs.contains(.anchors) {
+                                            Task { await viewModel.loadAccount(.anchors, refresh: true) }
+                                        }
+                                    }
                                 } else {
                                     LazyVGrid(columns: columns, spacing: 36) {
                                         ForEach(Array(viewModel.followedAnchorsList.enumerated()), id: \.element.id) { index, anchor in
@@ -177,6 +191,8 @@ public struct SavedLibraryView: View {
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 24)
                                 }
+                            } else if viewModel.loadingTabs.contains(viewModel.selectedTab) && videoRows.isEmpty {
+                                ProgressView("正在获取列表内容...").frame(maxWidth: .infinity, minHeight: 300)
                             } else if videoRows.isEmpty {
                                 VStack(spacing: 24) {
                                     Text(emptyMessage).font(.system(size: 29, weight: .medium))
@@ -191,7 +207,13 @@ public struct SavedLibraryView: View {
                                             requestTopNavigation()
                                         }
                                     }.focused($focusedTarget, equals: .emptyAction).accessibilityIdentifier("library.emptyAction").id(LibraryFocusTarget.emptyAction)
-                                }.frame(maxWidth: .infinity, minHeight: 300)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 300)
+                                .onAppear {
+                                    if viewModel.officialAccount && !viewModel.loadingTabs.contains(viewModel.selectedTab) {
+                                        Task { await viewModel.loadAccount(viewModel.selectedTab, refresh: true) }
+                                    }
+                                }
                             } else {
                                 LazyVGrid(columns: columns, spacing: 36) {
                                     ForEach(Array(videoRows.enumerated()), id: \.element.id) { index, row in
@@ -287,6 +309,13 @@ public struct SavedLibraryView: View {
                 }
                 #endif
             }
+            .onAppear {
+                Task {
+                    viewModel.syncAccountOwner()
+                    if !viewModel.fixtureMode { await account.verify() }
+                    await viewModel.loadAccount(viewModel.selectedTab)
+                }
+            }
             .onChange(of: viewModel.selectedTab) { _, tab in Task { await viewModel.loadAccount(tab) } }
             .onChange(of: focusedTarget) { _, target in
                 if case .mainTab(let tab) = target {
@@ -302,6 +331,10 @@ public struct SavedLibraryView: View {
             }
             .onChange(of: focusCategoryTrigger) { _, _ in
                 focus(.mainTab(viewModel.selectedTab), with: proxy)
+                Task {
+                    if !viewModel.fixtureMode { await account.verify() }
+                    await viewModel.loadAccount(viewModel.selectedTab)
+                }
                 #if DEBUG
                 if !openedDebugLogin && CommandLine.arguments.contains("-openAccountLogin") {
                     openedDebugLogin = true
