@@ -5,6 +5,7 @@ import { DramaItem, DramaDetail, EpisodeInfo, SeasonInfo } from '../../models/Dr
 import { PlayResult } from '../../models/Episode';
 import { CategoryItem } from '../../models/Category';
 import { CommentItem, CommentPage, CommentReplyItem, CommentReplyPage } from '../../models/Comment';
+import { LikedVideoItem, LikedVideoPage, AnchorItem, FollowingCreatorsPage, CloudWatchEntry } from '../../models/Account';
 import { Constants } from '../../common/Constants';
 import { normalizeCoverUrl } from '../../common/CoverUtils';
 import {
@@ -20,7 +21,12 @@ import {
   bridgeSuggestions,
   bridgeComments,
   bridgeCommentReplies,
-  bridgeCreatorWorks
+  bridgeCreatorWorks,
+  bridgeLikedVideos,
+  bridgeFollowingCreators,
+  bridgeCloudLibrary,
+  bridgeCreatorProfile,
+  bridgeCreatorFollow
 } from './HongGuoBridge';
 
 const TAG = 'CatPawJsRuntime';
@@ -444,6 +450,154 @@ export class CatPawJsRuntime {
       hilog.error(DOMAIN, TAG, 'fetchCreatorWorks error: %{public}s', JSON.stringify(e));
     }
     return [];
+  }
+
+  /**
+   * 获取已点赞视频列表 (对齐 Flutter likedVideos)
+   */
+  public async fetchLikedVideos(offset: number = 0, count: number = 20): Promise<LikedVideoPage> {
+    try {
+      await this.init();
+      const res = await bridgeLikedVideos(offset, count);
+      if (res && typeof res === 'object') {
+        const rawItems: Record<string, Object>[] = Array.isArray(res.items) ? res.items : [];
+        const items: LikedVideoItem[] = [];
+        for (let i = 0; i < rawItems.length; i++) {
+          const item = rawItems[i];
+          const rawCover = String(item['cover'] || '');
+          items.push({
+            id: String(item['id'] || ''),
+            title: String(item['title'] || ''),
+            seriesId: String(item['seriesId'] || ''),
+            cover: normalizeCoverUrl(rawCover),
+            description: String(item['description'] || ''),
+            episode: typeof item['episode'] === 'number' ? Number(item['episode']) : undefined,
+            episodes: Number(item['episodes'] || 0),
+            kind: String(item['kind'] || 'episode'),
+            likedAt: Number(item['likedAt'] || 0)
+          });
+        }
+        return {
+          items: items,
+          hasMore: Boolean(res.hasMore),
+          nextOffset: typeof res.nextOffset === 'number' ? Number(res.nextOffset) : undefined,
+          unsupportedCount: Number(res.unsupportedCount || 0)
+        };
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'fetchLikedVideos error: %{public}s', JSON.stringify(e));
+    }
+    return { items: [], hasMore: false, unsupportedCount: 0 };
+  }
+
+  /**
+   * 获取关注的主播列表 (对齐 Flutter followingCreators)
+   */
+  public async fetchFollowingCreators(userId: string, offset: number = 0, count: number = 20): Promise<FollowingCreatorsPage> {
+    try {
+      await this.init();
+      const res = await bridgeFollowingCreators(userId, offset, count);
+      if (res && typeof res === 'object') {
+        const rawCreators: Record<string, Object>[] = Array.isArray(res.creators) ? res.creators : [];
+        const creators: AnchorItem[] = [];
+        for (let i = 0; i < rawCreators.length; i++) {
+          const c = rawCreators[i];
+          const rawAvatar = String(c['avatar'] || '');
+          creators.push({
+            id: String(c['id'] || ''),
+            name: String(c['name'] || '红果创作者'),
+            avatar: normalizeCoverUrl(rawAvatar),
+            bio: String(c['description'] || ''),
+            worksCount: typeof c['worksCount'] === 'number' ? Number(c['worksCount']) : undefined,
+            isFollowed: Boolean(c['following']),
+            officialFollowing: typeof c['following'] === 'boolean' ? Boolean(c['following']) : undefined,
+            canFollow: Boolean(c['canFollow']),
+            relativeType: Number(c['relativeType'] || 2)
+          });
+        }
+        return {
+          creators: creators,
+          hasMore: Boolean(res.hasMore),
+          nextOffset: typeof res.nextOffset === 'number' ? Number(res.nextOffset) : undefined,
+          followingDouyinNextOffset: typeof res.followingDouyinNextOffset === 'number' ? Number(res.followingDouyinNextOffset) : undefined
+        };
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'fetchFollowingCreators error: %{public}s', JSON.stringify(e));
+    }
+    return { creators: [], hasMore: false };
+  }
+
+  /**
+   * 获取云端追剧或历史记录 (对齐 Flutter service.library)
+   */
+  public async fetchCloudLibrary(history: boolean, userId: string): Promise<CloudWatchEntry[]> {
+    try {
+      await this.init();
+      const res = await bridgeCloudLibrary(history, userId);
+      if (res && Array.isArray(res.items)) {
+        const list: CloudWatchEntry[] = [];
+        for (let i = 0; i < res.items.length; i++) {
+          const item = res.items[i];
+          const id = String(item.id || item.series_id || item.book_id || '');
+          if (!id) continue;
+          const rawCover = String(item.cover || '');
+          list.push({
+            dramaId: id,
+            dramaTitle: String(item.title || '短剧'),
+            coverUrl: normalizeCoverUrl(rawCover),
+            episodeIndex: Math.max(1, Number(item.episode || 1)),
+            episodes: Number(item.episodes || 0),
+            updatedAt: Number(item.updatedAt || 0)
+          });
+        }
+        return list;
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'fetchCloudLibrary error: %{public}s', JSON.stringify(e));
+    }
+    return [];
+  }
+
+  /**
+   * 获取主播主页详情 (对齐 Flutter creatorProfile)
+   */
+  public async fetchCreatorProfile(userId: string): Promise<AnchorItem | null> {
+    try {
+      await this.init();
+      const res = await bridgeCreatorProfile(userId);
+      if (res && res.creator) {
+        const c = res.creator;
+        return {
+          id: String(c.id || ''),
+          name: String(c.name || '红果创作者'),
+          avatar: normalizeCoverUrl(String(c.avatar || '')),
+          bio: String(c.description || ''),
+          worksCount: typeof c.worksCount === 'number' ? Number(c.worksCount) : undefined,
+          isFollowed: Boolean(c.following),
+          officialFollowing: typeof c.following === 'boolean' ? Boolean(c.following) : undefined,
+          canFollow: Boolean(c.canFollow),
+          relativeType: Number(c.relativeType || 2)
+        };
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'fetchCreatorProfile error: %{public}s', JSON.stringify(e));
+    }
+    return null;
+  }
+
+  /**
+   * 关注/取消关注主播 (对齐 Flutter setProfileFollowing)
+   */
+  public async setCreatorFollowing(userId: string, relativeType: number, follow: boolean): Promise<boolean> {
+    try {
+      await this.init();
+      const res = await bridgeCreatorFollow(userId, relativeType, follow);
+      return res && res.valid === true;
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'setCreatorFollowing error: %{public}s', JSON.stringify(e));
+      return false;
+    }
   }
 
   private mapRawList(rawList: RawVodItem[]): DramaItem[] {

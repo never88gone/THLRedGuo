@@ -7,10 +7,10 @@ import { AppDimensions } from '../../common/AppDimensions';
 @Entry
 @Component
 struct ContactPage {
-  private static readonly EMAIL_ADDRESS: string = 'hawapp@163.com';
+  private static readonly EMAIL_ADDRESS: string = 'support@thltv.com';
   private static readonly GITHUB_URL: string = 'https://github.com/never88gone/THLRedGuo';
-  private static readonly TELEGRAM_URL: string = 'https://t.me/thlredguo';
-  private static readonly TELEGRAM_CHANNEL: string = '@thlredguo';
+  private static readonly TELEGRAM_URL: string = 'https://t.me/tanghulutvos';
+  private static readonly TELEGRAM_CHANNEL: string = '@tanghulutvos';
 
   private copyText(text: string, label: string): void {
     try {

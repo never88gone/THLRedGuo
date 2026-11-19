@@ -251,3 +251,82 @@ export async function bridgeCreatorWorks(userId, cursor, count) {
   });
 }
 
+/**
+ * 获取已点赞视频列表 (对齐 Flutter likedVideos)
+ */
+export async function bridgeLikedVideos(offset, count) {
+  return await bridgeAccountCall('likedVideos', {
+    offset: Number(offset || 0),
+    count: Number(count || 20)
+  });
+}
+
+/**
+ * 获取关注的主播列表 (对齐 Flutter followingCreators)
+ */
+export async function bridgeFollowingCreators(userId, offset, count) {
+  return await bridgeAccountCall('followingCreators', {
+    userId: String(userId || ''),
+    offset: Number(offset || 0),
+    count: Number(count || 20)
+  });
+}
+
+/**
+ * 获取云端收藏追剧或历史记录，并执行批量详情补全 (对齐 Flutter service.library)
+ */
+export async function bridgeCloudLibrary(history, userId) {
+  const payload = history ? {} : { userId: String(userId || '') };
+  const res = await bridgeAccountCall(history ? 'history' : 'favorites', payload);
+  if (!res || !Array.isArray(res.items)) {
+    return { items: [] };
+  }
+  const items = res.items;
+  // 补齐缺失封面或标题的条目
+  const missing = items.filter(v => !v.title || !v.cover).map(v => v.id).filter(Boolean);
+  if (missing.length > 0) {
+    for (let offset = 0; offset < missing.length; offset += 50) {
+      const chunkIds = missing.slice(offset, offset + 50).join(',');
+      try {
+        const details = await bridgeAccountCall('libraryDetails', { ids: chunkIds });
+        if (details && Array.isArray(details.items)) {
+          const map = new Map();
+          for (const d of details.items) {
+            if (d.id) map.set(String(d.id), d);
+          }
+          for (const item of items) {
+            const d = map.get(String(item.id));
+            if (d) {
+              if (!item.title && d.title) item.title = d.title;
+              if (!item.cover && d.cover) item.cover = d.cover;
+              if ((!item.episodes || item.episodes <= 0) && d.episodes) item.episodes = d.episodes;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
+  return { items };
+}
+
+/**
+ * 获取主播个人主页详情 (对齐 Flutter creatorProfile)
+ */
+export async function bridgeCreatorProfile(userId) {
+  return await bridgeAccountCall('creatorProfile', {
+    userId: String(userId || '')
+  });
+}
+
+/**
+ * 关注或取消关注主播 (对齐 Flutter setProfileFollowing)
+ */
+export async function bridgeCreatorFollow(userId, relativeType, follow) {
+  return await bridgeAccountCall('creatorFollow', {
+    userId: String(userId || ''),
+    relativeType: Number(relativeType || 2),
+    follow: follow ? '1' : '0'
+  });
+}
+
+

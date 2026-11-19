@@ -47,6 +47,9 @@ export class AppColors {
   // 强调半透明红色
   static readonly redAlpha12: string = 'rgba(255, 36, 66, 0.12)';
   static readonly redAlpha15: string = 'rgba(255, 36, 66, 0.15)';
+  static readonly hongguoRedAlpha10: string = 'rgba(255, 36, 66, 0.10)';
+  static readonly hongguoRedAlpha15: string = 'rgba(255, 36, 66, 0.15)';
+  static readonly hongguoRedAlpha20: string = 'rgba(255, 36, 66, 0.20)';
 
   // 基础文字色彩
   static readonly textPrimary: string = '#FFFFFF';

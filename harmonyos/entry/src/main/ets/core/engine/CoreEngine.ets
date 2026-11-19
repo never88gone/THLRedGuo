@@ -3,6 +3,7 @@ import { CategoryItem } from '../../models/Category';
 import { RankingBoard, RankingItem, RankingPageResult } from '../../models/Ranking';
 import { PlayResult } from '../../models/Episode';
 import { CommentPage, CommentReplyPage } from '../../models/Comment';
+import { LikedVideoPage, FollowingCreatorsPage, CloudWatchEntry, AnchorItem } from '../../models/Account';
 import { CatPawJsRuntime } from '../js/CatPawJsRuntime';
 
 /**
@@ -140,5 +141,40 @@ export class CoreEngine {
    */
   public async fetchCreatorWorks(userId: string, cursor: string = '', count: number = 20): Promise<DramaItem[]> {
     return await this.runtime.fetchCreatorWorks(userId, cursor, count);
+  }
+
+  /**
+   * 获取点赞视频列表 (对齐 Flutter likedVideos)
+   */
+  public async fetchLikedVideos(offset: number = 0, count: number = 20): Promise<LikedVideoPage> {
+    return await this.runtime.fetchLikedVideos(offset, count);
+  }
+
+  /**
+   * 获取关注的主播列表 (对齐 Flutter followingCreators)
+   */
+  public async fetchFollowingCreators(userId: string, offset: number = 0, count: number = 20): Promise<FollowingCreatorsPage> {
+    return await this.runtime.fetchFollowingCreators(userId, offset, count);
+  }
+
+  /**
+   * 获取云端追剧或历史记录 (对齐 Flutter service.library)
+   */
+  public async fetchCloudLibrary(history: boolean, userId: string): Promise<CloudWatchEntry[]> {
+    return await this.runtime.fetchCloudLibrary(history, userId);
+  }
+
+  /**
+   * 获取主播主页详情 (对齐 Flutter creatorProfile)
+   */
+  public async fetchCreatorProfile(userId: string): Promise<AnchorItem | null> {
+    return await this.runtime.fetchCreatorProfile(userId);
+  }
+
+  /**
+   * 关注/取消关注主播 (对齐 Flutter setProfileFollowing)
+   */
+  public async setCreatorFollowing(userId: string, relativeType: number, follow: boolean): Promise<boolean> {
+    return await this.runtime.setCreatorFollowing(userId, relativeType, follow);
   }
 }
