@@ -31,6 +31,7 @@ public struct MainTabView: View {
     @State private var directPlayerEpisodes: [Episode] = []
     @State private var directPlayerControls: Bool = false
     @State private var directPlayerDrawer: Bool = false
+    @State private var directPlayerCommentDrawer: Bool = false
     @State private var directPlayerFocusPiP: Bool = false
     @State private var isCardFocusedDemo: Bool = false
     @State private var isSettingsActiveDemo: Bool = false
@@ -57,6 +58,7 @@ public struct MainTabView: View {
         var initPlayerEpisodes: [Episode] = []
         var initPlayerControls: Bool = false
         var initPlayerDrawer: Bool = false
+        var initPlayerCommentDrawer: Bool = false
         var initPlayerFocusPiP: Bool = false
         var initCardFocused: Bool = false
         var initSettingsActive: Bool = false
@@ -154,11 +156,12 @@ public struct MainTabView: View {
                 initSettingsActive = true
             case "detail", "anchor":
                 initDetailDrama = representativeDrama
-            case "player", "controls", "drawer", "pipFocused":
+            case "player", "controls", "drawer", "pipFocused", "commentDrawer":
                 initPlayerDrama = representativeDrama
                 initPlayerEpisodes = representativeEpisodes
                 initPlayerControls = (p == "controls" || p == "pipFocused")
                 initPlayerDrawer = (p == "drawer")
+                initPlayerCommentDrawer = (p == "commentDrawer")
                 initPlayerFocusPiP = (p == "pipFocused")
             default:
                 break
@@ -171,6 +174,7 @@ public struct MainTabView: View {
         _directPlayerEpisodes = State(initialValue: initPlayerEpisodes)
         _directPlayerControls = State(initialValue: initPlayerControls)
         _directPlayerDrawer = State(initialValue: initPlayerDrawer)
+        _directPlayerCommentDrawer = State(initialValue: initPlayerCommentDrawer)
         _directPlayerFocusPiP = State(initialValue: initPlayerFocusPiP)
         _isCardFocusedDemo = State(initialValue: initCardFocused)
         _isSettingsActiveDemo = State(initialValue: initSettingsActive)
@@ -191,6 +195,7 @@ public struct MainTabView: View {
                     initialShowControls: directPlayerControls,
                     keepControlsVisible: directPlayerControls,
                     initialShowDrawer: directPlayerDrawer,
+                    initialShowCommentDrawer: directPlayerCommentDrawer,
                     initialRestoreFocusTarget: directPlayerFocusPiP ? .pip : nil,
                     onDismiss: {
                         directPlayerDrama = nil

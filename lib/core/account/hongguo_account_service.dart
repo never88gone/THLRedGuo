@@ -10,6 +10,7 @@ import 'hongguo_account_session.dart';
 import 'account_transfer_payload.dart';
 import 'hongguo_verification.dart';
 import '../../models/catalog/models.dart';
+import '../../models/comment/comment_model.dart';
 
 class HongguoQrLogin {
   HongguoQrLogin(
@@ -1303,6 +1304,52 @@ class HongguoAccountService {
       );
     }
     return rows;
+  }
+
+  Future<CommentPage> fetchCommentList({
+    required String bookId,
+    String cursor = '',
+    int count = 20,
+  }) async {
+    final cleanId = bookId.replaceFirst('hongguo:', '');
+    final revision = session.revision;
+    final payload = <String, dynamic>{
+      'bookId': cleanId,
+      'cursor': cursor,
+      'count': count,
+    };
+    final result = await _call(
+      'commentList',
+      payload,
+      null,
+      revision,
+    );
+    _check(revision);
+    return CommentPage.fromJson(result);
+  }
+
+  Future<CommentReplyPage> fetchCommentReplyList({
+    required String commentId,
+    required String bookId,
+    String cursor = '',
+    int count = 20,
+  }) async {
+    final cleanId = bookId.replaceFirst('hongguo:', '');
+    final revision = session.revision;
+    final payload = <String, dynamic>{
+      'commentId': commentId,
+      'bookId': cleanId,
+      'cursor': cursor,
+      'count': count,
+    };
+    final result = await _call(
+      'commentReplyList',
+      payload,
+      null,
+      revision,
+    );
+    _check(revision);
+    return CommentReplyPage.fromJson(result);
   }
 
   void dispose() {

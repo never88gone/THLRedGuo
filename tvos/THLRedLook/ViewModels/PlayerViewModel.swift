@@ -25,6 +25,7 @@ public final class PlayerViewModel: ObservableObject {
         set { visibilityCoordinator.isControlsVisible = newValue }
     }
     @Published public var isEpisodeDrawerVisible: Bool = false
+    @Published public var isCommentDrawerVisible: Bool = false
     @Published public var isDanmakuSettingsVisible: Bool = false
     @Published public var isSpeedSheetVisible: Bool = false
     @Published public var isQualitySheetVisible: Bool = false
@@ -96,15 +97,15 @@ public final class PlayerViewModel: ObservableObject {
     public init(
         drama: Drama, allEpisodes: [Episode], initialEpisodeIndex: Int = 1,
         initialPosition: Double = 0, initialShowControls: Bool = false, keepControlsVisible: Bool = false,
-        initialShowDrawer: Bool = false, initialRestoreFocusTarget: PlayerOverlayFocusTarget? = nil,
+        initialShowDrawer: Bool = false, initialShowCommentDrawer: Bool = false, initialRestoreFocusTarget: PlayerOverlayFocusTarget? = nil,
         preloadedPlan: PlaybackPlan? = nil, isFeedMode: Bool = false,
         repository: NativeRepository = .shared, preloadingRepository: NativeRepository? = nil,
         store: LocalStore = .shared, diagnostics: SourceDiagnostics = .shared
     ) {
         self.drama = drama; self.allEpisodes = allEpisodes
         self.currentEpisodeIndex = initialEpisodeIndex; self.currentTime = initialPosition
-        self.visibilityCoordinator = PlayerControlsVisibilityCoordinator(initialVisible: initialShowDrawer ? false : initialShowControls)
-        self.isEpisodeDrawerVisible = initialShowDrawer; self.keepControlsVisible = keepControlsVisible
+        self.visibilityCoordinator = PlayerControlsVisibilityCoordinator(initialVisible: (initialShowDrawer || initialShowCommentDrawer) ? false : initialShowControls)
+        self.isEpisodeDrawerVisible = initialShowDrawer; self.isCommentDrawerVisible = initialShowCommentDrawer; self.keepControlsVisible = keepControlsVisible
         self.restoreFocusTarget = initialRestoreFocusTarget; self.initialPreloadedPlan = preloadedPlan
         self.isFeedMode = isFeedMode
         self.danmakuManager = PlayerDanmakuManager(store: store, repository: repository)

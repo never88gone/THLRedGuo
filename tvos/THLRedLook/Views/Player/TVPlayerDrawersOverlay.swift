@@ -11,6 +11,12 @@ struct TVPlayerDrawersOverlay: View {
                     .zIndex(100)
             }
 
+            if viewModel.isCommentDrawerVisible {
+                TVCommentDrawer(viewModel: viewModel, isPresented: $viewModel.isCommentDrawerVisible)
+                    .ignoresSafeArea()
+                    .zIndex(100)
+            }
+
             if viewModel.isDanmakuSettingsVisible {
                 TVDanmakuSettingsDrawer(viewModel: viewModel, isPresented: $viewModel.isDanmakuSettingsVisible)
                     .ignoresSafeArea()

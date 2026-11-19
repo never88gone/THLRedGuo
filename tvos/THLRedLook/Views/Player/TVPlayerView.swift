@@ -34,6 +34,7 @@ public struct TVPlayerView: View {
         initialShowControls: Bool = false,
         keepControlsVisible: Bool = false,
         initialShowDrawer: Bool = false,
+        initialShowCommentDrawer: Bool = false,
         initialRestoreFocusTarget: PlayerOverlayFocusTarget? = nil,
         onDismiss: (() -> Void)? = nil,
         onSwitchSeason: ((Drama) -> Void)? = nil,
@@ -57,6 +58,7 @@ public struct TVPlayerView: View {
             initialShowControls: initialShowControls,
             keepControlsVisible: keepControlsVisible,
             initialShowDrawer: initialShowDrawer,
+            initialShowCommentDrawer: initialShowCommentDrawer,
             initialRestoreFocusTarget: initialRestoreFocusTarget,
             preloadedPlan: preloadedPlan,
             isFeedMode: feedActions != nil
@@ -384,6 +386,9 @@ public struct TVPlayerView: View {
             viewModel.showControls()
         } else if viewModel.isSpeedSheetVisible {
             withAnimation(.easeInOut(duration: 0.2)) { viewModel.isSpeedSheetVisible = false }
+            viewModel.showControls()
+        } else if viewModel.isCommentDrawerVisible {
+            withAnimation(.easeInOut(duration: 0.2)) { viewModel.isCommentDrawerVisible = false }
             viewModel.showControls()
         } else if viewModel.isEpisodeDrawerVisible {
             withAnimation(.easeInOut(duration: 0.2)) { viewModel.isEpisodeDrawerVisible = false }

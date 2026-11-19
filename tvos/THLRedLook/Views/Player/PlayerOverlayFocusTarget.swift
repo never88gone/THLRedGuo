@@ -21,4 +21,5 @@ public enum PlayerOverlayFocusTarget: Hashable {
     case social
     case pip
     case like
+    case commentDrawer
 }

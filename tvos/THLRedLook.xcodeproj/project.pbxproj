@@ -180,6 +180,9 @@
 		B33026D082DBB0E270CE945B /* TVAccountSocialSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82DFFFC7083B20DA031AF5C4 /* TVAccountSocialSheet.swift */; };
 		630220B6320BEFECD410BD91 /* TVPlannedDanmaku.swift in Sources */ = {isa = PBXBuildFile; fileRef = 052BF7B8B5280F620C4F141C /* TVPlannedDanmaku.swift */; };
 		5F15DDDAA5BCBD324A6C6E07 /* TVEpisodeDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E790808A689367BB25362F1C /* TVEpisodeDrawer.swift */; };
+		C0110001D922889EDD67FE01 /* TVCommentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0110002D922889EDD67FE02 /* TVCommentModel.swift */; };
+		C0110003D922889EDD67FE03 /* TVCommentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0110004D922889EDD67FE04 /* TVCommentService.swift */; };
+		C0110005D922889EDD67FE05 /* TVCommentDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0110006D922889EDD67FE06 /* TVCommentDrawer.swift */; };
 		8B105937E66163792CA3FC33 /* TVDanmakuSettingsDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DBE0D019403ABD4603EA61E /* TVDanmakuSettingsDrawer.swift */; };
 		4A6CD2A8CC15F08231850C04 /* TVSpeedSelectionDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44AE1079C7928E7084467350 /* TVSpeedSelectionDrawer.swift */; };
 		C1A3B602F4D3468399B31104 /* AccountPairingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A3B602F4D3468399B31103 /* AccountPairingTests.swift */; };
@@ -455,6 +458,9 @@
 		82DFFFC7083B20DA031AF5C4 /* TVAccountSocialSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVAccountSocialSheet.swift; path = THLRedLook/Views/Settings/TVAccountSocialSheet.swift; sourceTree = SOURCE_ROOT; };
 		052BF7B8B5280F620C4F141C /* TVPlannedDanmaku.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TVPlannedDanmaku.swift; sourceTree = "<group>"; };
 		E790808A689367BB25362F1C /* TVEpisodeDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVEpisodeDrawer.swift; path = THLRedLook/Views/Player/TVEpisodeDrawer.swift; sourceTree = SOURCE_ROOT; };
+		C0110002D922889EDD67FE02 /* TVCommentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVCommentModel.swift; sourceTree = "<group>"; };
+		C0110004D922889EDD67FE04 /* TVCommentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVCommentService.swift; sourceTree = "<group>"; };
+		C0110006D922889EDD67FE06 /* TVCommentDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVCommentDrawer.swift; path = THLRedLook/Views/Player/TVCommentDrawer.swift; sourceTree = SOURCE_ROOT; };
 		1DBE0D019403ABD4603EA61E /* TVDanmakuSettingsDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVDanmakuSettingsDrawer.swift; path = THLRedLook/Views/Player/TVDanmakuSettingsDrawer.swift; sourceTree = SOURCE_ROOT; };
 		44AE1079C7928E7084467350 /* TVSpeedSelectionDrawer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TVSpeedSelectionDrawer.swift; path = THLRedLook/Views/Player/TVSpeedSelectionDrawer.swift; sourceTree = SOURCE_ROOT; };
 		C1A3B602F4D3468399B31103 /* AccountPairingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountPairingTests.swift; sourceTree = "<group>"; };
@@ -698,6 +704,7 @@
 		G10000022C00000100000001 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				C0110002D922889EDD67FE02 /* TVCommentModel.swift */,
 				BFB1255DD922889EDD67FE28 /* Anchor.swift */,
 				B8528D890B81EE8B32D009E8 /* UserLikeRecord.swift */,
 				052BF7B8B5280F620C4F141C /* TVPlannedDanmaku.swift */,
@@ -751,6 +758,7 @@
 		G10000032C00000100000001 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				C0110004D922889EDD67FE04 /* TVCommentService.swift */,
 				B598ABF7807B6B28BD5233CF /* AnchorService.swift */,
 				BEF2BBDC9F7FDA31C36B1493 /* AnchorFollowStore.swift */,
 				B5304A5B2F99E3B609C23BF7 /* UserLikeStore.swift */,
@@ -879,6 +887,7 @@
 				DE2F3004F67EED702ACE4E11 /* TvButtonHelper.swift */,
 				0B7E3DA3FD90F5B888157F70 /* TvTransparentButtonHelper.swift */,
 				E790808A689367BB25362F1C /* TVEpisodeDrawer.swift */,
+				C0110006D922889EDD67FE06 /* TVCommentDrawer.swift */,
 				1DBE0D019403ABD4603EA61E /* TVDanmakuSettingsDrawer.swift */,
 				44AE1079C7928E7084467350 /* TVSpeedSelectionDrawer.swift */,
 				AF50CA6B97812315B8A1294F /* TVLoginMode.swift */,
@@ -1431,6 +1440,9 @@
 				00F6DAC96490A839B6FC75EA /* HongguoApkProfile.swift in Sources */,
 				6E79A4B5895BFF20763CC4EF /* HongguoPlaybackProfileVault.swift in Sources */,
 				5F15DDDAA5BCBD324A6C6E07 /* TVEpisodeDrawer.swift in Sources */,
+				C0110001D922889EDD67FE01 /* TVCommentModel.swift in Sources */,
+				C0110003D922889EDD67FE03 /* TVCommentService.swift in Sources */,
+				C0110005D922889EDD67FE05 /* TVCommentDrawer.swift in Sources */,
 				8B105937E66163792CA3FC33 /* TVDanmakuSettingsDrawer.swift in Sources */,
 				4A6CD2A8CC15F08231850C04 /* TVSpeedSelectionDrawer.swift in Sources */,
 				A10000012C00000100000001 /* THLRedLookApp.swift in Sources */,

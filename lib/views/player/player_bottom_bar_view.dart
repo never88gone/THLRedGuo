@@ -30,6 +30,7 @@ class PlayerBottomBarView extends StatelessWidget {
     this.onToggleMute,
     this.showVolumeControl,
     this.onEpisodes,
+    this.onComments,
     this.onPush,
     this.onPictureInPicture,
     this.pictureInPictureRequested = false,
@@ -57,6 +58,7 @@ class PlayerBottomBarView extends StatelessWidget {
   final ValueChanged<double> onSeekChange;
   final ValueChanged<double> onSeekEnd;
   final VoidCallback? onEpisodes;
+  final VoidCallback? onComments;
   final VoidCallback? onPush;
   final VoidCallback? onPictureInPicture;
 
@@ -320,6 +322,14 @@ class PlayerBottomBarView extends StatelessWidget {
           child: Text(qualityLabel),
         ),
       ],
+      if (onComments != null)
+        _toolButton(
+          context: context,
+          key: const ValueKey('player-comments'),
+          tooltip: '评论',
+          onPressed: enabled ? onComments : null,
+          child: const Icon(Icons.chat_bubble_outline_rounded),
+        ),
       if (isDesktop) _desktopVolumeControl(context),
       if (onPictureInPicture != null)
         _toolButton(

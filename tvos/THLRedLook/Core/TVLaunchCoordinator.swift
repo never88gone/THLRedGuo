@@ -213,7 +213,7 @@ final class TVLaunchCoordinator {
                     }
                 }
             }
-        case "player", "controls", "drawer":
+        case "player", "controls", "drawer", "commentDrawer":
             if directPlayerDrama.wrappedValue == nil {
                 Task {
                     await JSSourceService.shared.initialize()

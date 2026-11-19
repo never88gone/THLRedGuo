@@ -299,6 +299,8 @@ class CatPawJsRuntime {
         'creatorWorks',
         'likedVideos',
         'creatorProfile',
+        'commentList',
+        'commentReplyList',
       }.contains(action)) {
         throw const HongguoAccountFailure(
           '官方互动数据暂不可用，请刷新后重试',

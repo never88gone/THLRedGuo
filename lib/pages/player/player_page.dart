@@ -47,6 +47,8 @@ import 'package:THLRedLook/views/player/player_viewport_view.dart';
 import 'package:THLRedLook/views/player/player_quality_sheet_view.dart';
 import 'package:THLRedLook/views/player/player_speed_sheet_view.dart';
 import 'package:THLRedLook/views/player/player_danmaku_sheet_view.dart';
+import 'package:THLRedLook/core/account/hongguo_account_service.dart';
+import 'package:THLRedLook/views/comment/comment_sheet_view.dart';
 import 'package:THLRedLook/utils/player/player_dialog_helper.dart';
 import 'package:THLRedLook/core/player/playback_lease.dart';
 import 'package:THLRedLook/views/feed/feed_player_overlay.dart';
@@ -2139,6 +2141,24 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
   }
 
+  Future<void> _openComments() async {
+    if (_panelOpen || _closed) return;
+    _interactions.cancel();
+    setState(() => _panelOpen = true);
+    try {
+      await CommentSheetView.show(
+        context: context,
+        bookId: widget.detail.drama.id,
+        accountService: HongguoAccountService(),
+      );
+    } finally {
+      if (mounted && !_closed) {
+        setState(() => _panelOpen = false);
+        _playerFocus.requestFocus();
+      }
+    }
+  }
+
   Future<void> _openDanmakuSettings() async {
     if (_panelOpen || _closed) return;
     _interactions.cancel();
@@ -2723,6 +2743,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       onSwitchOnline: _switchOnline,
       onSaveProgress: _saveProgress,
       onOpenPanel: _openPanel,
+      onComments: _openComments,
       onToggleDanmaku: _toggleDanmaku,
       onDanmakuSettings: _openDanmakuSettings,
       onRetryDanmaku: _retryDanmakuFromControls,

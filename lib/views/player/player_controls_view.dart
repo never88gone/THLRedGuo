@@ -40,6 +40,7 @@ class PlayerControls extends StatefulWidget {
     this.swipeEnabled = false,
     this.panelOpen = false,
     this.onSeek,
+    this.onComments,
     this.onDanmaku,
     this.onDanmakuSettings,
     this.onRetryDanmaku,
@@ -74,6 +75,7 @@ class PlayerControls extends StatefulWidget {
   final bool swipeEnabled;
   final bool panelOpen;
   final Future<void> Function(Duration)? onSeek;
+  final Future<void> Function()? onComments;
   final Future<void> Function()? onDanmaku;
   final Future<void> Function()? onDanmakuSettings;
   final Future<void> Function()? onRetryDanmaku;
@@ -371,6 +373,9 @@ class _PlayerControlsState extends State<PlayerControls> {
                         onQuality: () => _panel(widget.onQuality),
                         onFullscreen: widget.onFullscreen,
                         onEpisodes: () => _panel(widget.onEpisodes),
+                        onComments: widget.onComments != null
+                            ? () => _panel(widget.onComments!)
+                            : null,
                         onPush: widget.onPush != null
                             ? () => _panel(widget.onPush!)
                             : null,

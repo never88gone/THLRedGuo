@@ -226,6 +226,31 @@ public struct TVPlayerControlsOverlay: View {
                             case .up: moveUpFromMiddleControls()
                             case .down: focusedControl = .danmakuSettings
                             case .left: focusedControl = .episodeDrawer
+                            case .right: focusedControl = .commentDrawer
+                            default: break
+                            }
+                        }
+
+                        // 7. 评论列表抽屉入口
+                        overlayBarButton(
+                            title: "评论",
+                            icon: "bubble.left.and.bubble.right",
+                            target: .commentDrawer
+                        ) {
+                            NSLog("🎬 [Overlay] 点击 评论 按钮")
+                            viewModel.restoreFocusTarget = .commentDrawer
+                            viewModel.isCommentDrawerVisible = true
+                        }
+                        .onMoveCommand { dir in
+                            switch dir {
+                            case .up: moveUpFromMiddleControls()
+                            case .down: focusedControl = .danmakuSettings
+                            case .left:
+                                if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
+                                    focusedControl = .nextEpisode
+                                } else {
+                                    focusedControl = .episodeDrawer
+                                }
                             case .right:
                                 if HongguoAccountModel.shared.loggedIn {
                                     focusedControl = .like
@@ -236,7 +261,7 @@ public struct TVPlayerControlsOverlay: View {
                             }
                         }
 
-                        // 7. 点赞/已点赞按钮（放到底部操作区域）
+                        // 8. 点赞/已点赞按钮（放到底部操作区域）
                         if HongguoAccountModel.shared.loggedIn {
                             let isLiked = UserLikeStore.shared.isLiked(dramaId: viewModel.drama.id, episode: viewModel.currentEpisodeIndex)
                             overlayBarButton(
@@ -252,14 +277,14 @@ public struct TVPlayerControlsOverlay: View {
                                 switch dir {
                                 case .up: moveUpFromMiddleControls()
                                 case .down: focusedControl = .danmakuSettings
-                                case .left: focusedControl = .nextEpisode
+                                case .left: focusedControl = .commentDrawer
                                 case .right: focusedControl = .pip
                                 default: break
                                 }
                             }
                         }
 
-                        // 8. 画中画 (核心控制栏显眼入口)
+                        // 9. 画中画 (核心控制栏显眼入口)
                         overlayBarButton(
                             title: "画中画",
                             icon: "pip.enter",
@@ -274,10 +299,8 @@ public struct TVPlayerControlsOverlay: View {
                             case .left:
                                 if HongguoAccountModel.shared.loggedIn {
                                     focusedControl = .like
-                                } else if viewModel.currentEpisodeIndex < viewModel.allEpisodes.count {
-                                    focusedControl = .nextEpisode
                                 } else {
-                                    focusedControl = .episodeDrawer
+                                    focusedControl = .commentDrawer
                                 }
                             case .right: focusedControl = .seekBackward
                             default: break
