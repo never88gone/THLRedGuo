@@ -38,7 +38,7 @@ struct DramaDetailInfoCard: View {
                     }
 
                     if !drama.heat.isEmpty {
-                        Text("热度：\(drama.heat)")
+                        Text("热度：\(drama.formattedHeat)")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }

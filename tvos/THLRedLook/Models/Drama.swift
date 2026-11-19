@@ -76,12 +76,74 @@ public struct Drama: Identifiable, Hashable, Codable {
         }
     }
 
+    public static func formatMetricNumber(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "0" { return "" }
+
+        if trimmed.contains("亿") {
+            let numStr = trimmed.filter { "0123456789.".contains($0) }
+            if let val = Double(numStr) {
+                let formatted = String(format: "%.1f", val)
+                return (formatted.hasSuffix(".0") ? String(formatted.dropLast(2)) : formatted) + "亿"
+            }
+            return trimmed
+        }
+
+        if trimmed.contains("万") || trimmed.contains("w") || trimmed.contains("W") {
+            let numStr = trimmed.filter { "0123456789.".contains($0) }
+            if let val = Double(numStr) {
+                if val >= 1000 {
+                    return "\(Int(round(val)))万"
+                } else {
+                    let formatted = String(format: "%.1f", val)
+                    return (formatted.hasSuffix(".0") ? String(formatted.dropLast(2)) : formatted) + "万"
+                }
+            }
+            return trimmed
+        }
+
+        let numStr = trimmed.filter { "0123456789.".contains($0) }
+        guard let val = Double(numStr), val > 0 else {
+            return trimmed
+        }
+
+        if val >= 100_000_000 {
+            let yi = val / 100_000_000.0
+            let formatted = String(format: "%.1f", yi)
+            return (formatted.hasSuffix(".0") ? String(formatted.dropLast(2)) : formatted) + "亿"
+        } else if val >= 10_000 {
+            let wan = val / 10_000.0
+            if wan >= 1000 {
+                return "\(Int(round(wan)))万"
+            } else {
+                let formatted = String(format: "%.1f", wan)
+                return (formatted.hasSuffix(".0") ? String(formatted.dropLast(2)) : formatted) + "万"
+            }
+        } else {
+            return "\(Int(val))"
+        }
+    }
+
+    public var formattedHeat: String {
+        Drama.formatMetricNumber(heat)
+    }
+
+    public var formattedViews: String {
+        Drama.formatMetricNumber(views)
+    }
+
     public var displaySubtitle: String {
         if !heat.isEmpty {
-            return "🔥 \(heat)"
+            let fmt = formattedHeat
+            if !fmt.isEmpty {
+                return fmt.contains("🔥") ? fmt : "🔥 \(fmt)"
+            }
         }
         if !views.isEmpty {
-            return "👁 \(views)"
+            let fmt = formattedViews
+            if !fmt.isEmpty {
+                return fmt.contains("👁") ? fmt : "👁 \(fmt)"
+            }
         }
         return releaseLabel
     }

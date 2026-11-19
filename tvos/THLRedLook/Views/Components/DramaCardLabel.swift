@@ -64,7 +64,9 @@ struct DramaCardLabel: View {
                 Text(drama.title)
                     .font(.system(size: effectiveFocused ? 26 : 24, weight: effectiveFocused ? .heavy : .bold))
                     .foregroundColor(effectiveFocused ? .white : Color.white.opacity(0.92))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(height: 68, alignment: .topLeading)
                     .shadow(color: effectiveFocused ? Color.red.opacity(0.4) : Color.clear, radius: 4)
 
                 if let pt = progressText {
