@@ -138,6 +138,22 @@ abstract final class AppColors {
   static const Color playerGestureHudHighlight = Color(0xFFFF9800);
   /// 播放器手势 HUD 次级说明文本
   static const Color playerGestureHudTextSecondary = Color(0xB3FFFFFF);
+  /// 播放器中央主播放按钮毛玻璃深色背景
+  static const Color playerCenterMainBg = Color(0x73000000);
+  /// 播放器中央主播放按钮悬停/高光背景 (融入微弱暖红微光)
+  static const Color playerCenterMainBgHover = Color(0x8A1A0B0E);
+  /// 播放器中央主播放按钮高光微白边框
+  static const Color playerCenterMainBorder = Color(0x40FFFFFF);
+  /// 播放器中央主播放按钮悬停边框
+  static const Color playerCenterMainBorderHover = Color(0x8CFFFFFF);
+  /// 播放器中央切集按钮毛玻璃背景
+  static const Color playerCenterSkipBg = Color(0x4D000000);
+  /// 播放器中央切集按钮悬停背景
+  static const Color playerCenterSkipBgHover = Color(0x6E000000);
+  /// 播放器中央切集按钮边框
+  static const Color playerCenterSkipBorder = Color(0x26FFFFFF);
+  /// 播放器中央切集按钮悬停边框
+  static const Color playerCenterSkipBorderHover = Color(0x66FFFFFF);
 
   // ==========================================
   // 7. 电影大片视觉微光与粒子 (Cinematic Glow & Sparks)
