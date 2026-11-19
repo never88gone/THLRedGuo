@@ -32,23 +32,23 @@ struct TVCapsuleButtonLabel: View {
 
     private var fontSize: CGFloat {
         if isLarge {
-            return isFocused ? 22 : 20
+            return isFocused ? 30 : 28
         }
-        return isCompact ? (isFocused ? 16 : 14) : (isFocused ? 19 : 17)
+        return isCompact ? (isFocused ? 22 : 20) : (isFocused ? 26 : 24)
     }
 
     private var horizontalPadding: CGFloat {
         if isLarge {
-            return isFocused ? 32 : 28
+            return isFocused ? 38 : 34
         }
-        return isCompact ? (isFocused ? 18 : 14) : (isFocused ? 28 : 24)
+        return isCompact ? (isFocused ? 24 : 20) : (isFocused ? 34 : 30)
     }
 
     private var verticalPadding: CGFloat {
         if isLarge {
-            return isFocused ? 15 : 13
+            return isFocused ? 18 : 16
         }
-        return isCompact ? (isFocused ? 9 : 7) : (isFocused ? 13 : 11)
+        return isCompact ? (isFocused ? 13 : 11) : (isFocused ? 16 : 14)
     }
 
     var body: some View {

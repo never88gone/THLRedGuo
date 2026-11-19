@@ -22,10 +22,10 @@ struct DramaCardLabel: View {
                 // VIP 徽章
                 if drama.isVIP {
                     Text("VIP")
-                        .font(.system(size: 11, weight: .black))
+                        .font(.system(size: 16, weight: .black))
                         .foregroundColor(.black)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(Color.yellow)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .padding(8)
@@ -36,11 +36,11 @@ struct DramaCardLabel: View {
                     Spacer()
                     HStack {
                         Text(drama.displaySubtitle)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.black.opacity(0.7))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.black.opacity(0.75))
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                         Spacer()
                     }
@@ -60,22 +60,22 @@ struct DramaCardLabel: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             // 剧集标题与进度文字（完整包裹在卡片边框内）
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(drama.title)
-                    .font(.system(size: 16, weight: effectiveFocused ? .bold : .medium))
-                    .foregroundColor(effectiveFocused ? .white : Color.white.opacity(0.85))
+                    .font(.system(size: effectiveFocused ? 26 : 24, weight: effectiveFocused ? .heavy : .bold))
+                    .foregroundColor(effectiveFocused ? .white : Color.white.opacity(0.92))
                     .lineLimit(1)
                     .shadow(color: effectiveFocused ? Color.red.opacity(0.4) : Color.clear, radius: 4)
 
                 if let pt = progressText {
                     Text(pt)
-                        .font(.caption2)
-                        .foregroundColor(effectiveFocused ? TVTheme.primary.opacity(0.9) : TVTheme.textMuted)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(effectiveFocused ? TVTheme.primary.opacity(0.95) : TVTheme.textMuted)
                         .lineLimit(1)
                 }
             }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 4)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 6)
         }
         .padding(6)
         .background(

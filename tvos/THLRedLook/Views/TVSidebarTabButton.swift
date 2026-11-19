@@ -72,22 +72,22 @@ public struct TVSidebarTabButton: View {
 
     public var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundColor(iconColor)
-                    .frame(width: 32)
+                    .frame(width: 36)
 
                 Text(tab.title)
-                    .font(.system(size: 20, weight: isFocused || isSelected ? .bold : .semibold))
+                    .font(.system(size: 24, weight: isFocused || isSelected ? .heavy : .bold))
                     .foregroundColor(contentColor)
                     .lineLimit(1)
 
                 Spacer()
             }
-            .padding(.vertical, 14)
-            .padding(.horizontal, 16)
-            .frame(minHeight: 58)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 18)
+            .frame(minHeight: 68)
             .background(
                 RoundedRectangle(cornerRadius: 18)
                     .fill(buttonBackgroundStyle)

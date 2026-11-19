@@ -34,18 +34,18 @@ public struct AnchorCardView: View {
 
             // 主播名称
             Text(anchor.name)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundColor(isFocused ? .white : TVColors.textPrimary)
                 .lineLimit(1)
 
             // 粉丝数量
             Text(anchor.intro.isEmpty ? "主播详情" : anchor.intro)
-                .font(.system(size: 16))
+                .font(.system(size: 18))
                 .foregroundColor(TVColors.textMuted)
                 .lineLimit(1)
         }
-        .frame(width: 180, height: 210)
-        .padding(.vertical, 12)
+        .frame(width: 200, height: 230)
+        .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 18)
                 .fill(isFocused ? TVColors.surfaceFocused : TVColors.surfaceCard)

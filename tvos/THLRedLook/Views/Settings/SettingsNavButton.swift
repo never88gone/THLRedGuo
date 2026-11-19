@@ -28,16 +28,16 @@ public struct SettingsNavButton: View {
                     .frame(width: isFocused ? 5 : 4, height: isFocused ? 28 : 22)
 
                 Image(systemName: category.icon)
-                    .font(.system(size: isFocused ? 22 : 20, weight: (isFocused || isSelected) ? .bold : .semibold))
+                    .font(.system(size: isFocused ? 26 : 24, weight: (isFocused || isSelected) ? .bold : .semibold))
                     .foregroundColor(isFocused ? .white : (isSelected ? TVTheme.primary : Color.white.opacity(0.55)))
-                    .frame(width: 26)
+                    .frame(width: 32)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(category.title)
-                        .font(.system(size: 19, weight: isFocused ? .heavy : (isSelected ? .bold : .medium)))
+                        .font(.system(size: 24, weight: isFocused ? .heavy : (isSelected ? .bold : .medium)))
                         .foregroundColor(isFocused ? .white : (isSelected ? Color.white : Color.white.opacity(0.72)))
                     Text(category.subtitle)
-                        .font(.system(size: 12))
+                        .font(.system(size: 16))
                         .foregroundColor(isFocused ? Color.white.opacity(0.95) : (isSelected ? Color.white.opacity(0.75) : Color.white.opacity(0.45)))
                 }
 
@@ -45,7 +45,7 @@ public struct SettingsNavButton: View {
 
                 if isFocused {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .black))
+                        .font(.system(size: 16, weight: .black))
                         .foregroundColor(.white)
                 } else if isSelected {
                     Circle()
@@ -53,8 +53,8 @@ public struct SettingsNavButton: View {
                         .frame(width: 8, height: 8)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 18)
                     .fill(

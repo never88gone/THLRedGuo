@@ -236,6 +236,7 @@
 		A10000322C00000100000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000322C00000100000001 /* SettingsView.swift */; };
 		A10000332C00000100000001 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000332C00000100000001 /* MainTabView.swift */; };
 		A10000352C00000100000001 /* TVTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000352C00000100000001 /* TVTheme.swift */; };
+		A10000352C00000100000099 /* TVTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000352C00000100000099 /* TVTypography.swift */; };
 		A10000382C00000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000382C00000100000001 /* Assets.xcassets */; };
 		A10000392C00000100000001 /* AVPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000392C00000100000001 /* AVPlayerView.swift */; };
 		A10000452C00000100000001 /* TVBlankStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000452C00000100000001 /* TVBlankStateView.swift */; };
@@ -519,6 +520,7 @@
 		B10000332C00000100000001 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		B10000342C00000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10000352C00000100000001 /* TVTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVTheme.swift; sourceTree = "<group>"; };
+		B10000352C00000100000099 /* TVTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVTypography.swift; sourceTree = "<group>"; };
 		B10000382C00000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B10000392C00000100000001 /* AVPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerView.swift; sourceTree = "<group>"; };
 		B10000402C00000100000001 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -862,6 +864,7 @@
 				E34571822EE6222200000032 /* TVCustomSplitView.swift */,
 				E34571822EE6222200000034 /* TVSidebarView.swift */,
 				B10000352C00000100000001 /* TVTheme.swift */,
+				B10000352C00000100000099 /* TVTypography.swift */,
 				G10000072C00000100000001 /* Components */,
 				G10000082C00000100000001 /* Home */,
 				G10000092C00000100000001 /* Detail */,
@@ -1506,6 +1509,7 @@
 				E34571822EE6222200000031 /* TVCustomSplitView.swift in Sources */,
 				E34571822EE6222200000033 /* TVSidebarView.swift in Sources */,
 				A10000352C00000100000001 /* TVTheme.swift in Sources */,
+				A10000352C00000100000099 /* TVTypography.swift in Sources */,
 				308BB92FAD6A638F5B858747 /* CENCMediaDownloader.swift in Sources */,
 				7A25873DCEE90B41E3C04905 /* ApkProfileImportServer.swift in Sources */,
 				1F6926DCCD8AAF72AD718D1E /* ApkProfileImportSheet.swift in Sources */,

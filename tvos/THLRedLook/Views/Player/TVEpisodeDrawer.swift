@@ -25,22 +25,21 @@ public struct TVEpisodeDrawer: View {
             VStack(alignment: .leading, spacing: 0) {
                 // 顶部标题与提示
                 HStack {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("选集播放")
-                            .font(.title2)
-                            .bold()
+                            .font(.system(size: 34, weight: .bold))
                             .foregroundColor(TVColors.textPrimary)
                         Text("共 \(viewModel.allEpisodes.count) 集 · 当前第 \(viewModel.currentEpisodeIndex) 集")
-                            .font(.subheadline)
+                            .font(.system(size: 20))
                             .foregroundColor(TVColors.textSecondary)
                     }
                     Spacer()
                     Text("按 Menu 返回")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(TVColors.textSecondary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.08))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.12))
                         .clipShape(Capsule())
                 }
                 .padding(.horizontal, 32)
