@@ -23,9 +23,13 @@ public struct TVSidebarView: View {
         self.onRefreshCurrentTab = onRefreshCurrentTab
     }
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 顶部 Logo 与应用名称区（采用真实 App 图标，与全局品牌视觉统一）
+            // 顶部 Logo 与应用名称区（品牌标识统一为糖葫芦Haw）
             HStack(spacing: 12) {
                 Image("applogo")
                     .resizable()
@@ -38,15 +42,10 @@ public struct TVSidebarView: View {
                     )
                     .shadow(color: TVTheme.primary.opacity(0.4), radius: 8, x: 0, y: 3)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("糖葫芦")
-                        .font(.system(size: 24, weight: .black, design: .rounded))
-                        .foregroundColor(.white)
-                        .tracking(1.0)
-                    Text("红果短剧")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(TVTheme.textSecondary)
-                }
+                Text("糖葫芦Haw")
+                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .foregroundColor(.white)
+                    .tracking(0.5)
             }
             .padding(.horizontal, 16)
             .padding(.top, 36)
@@ -81,10 +80,10 @@ public struct TVSidebarView: View {
 
             // 底部版本与平台标识
             VStack(alignment: .leading, spacing: 3) {
-                Text("THLRedLook v1.0.0")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                Text("糖葫芦Haw v\(appVersion)")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundColor(Color.white.opacity(0.45))
-                Text("Apple TVOS • 原生播放")
+                Text("Apple TV • 原生播放")
                     .font(.system(size: 11, weight: .regular))
                     .foregroundColor(Color.white.opacity(0.3))
             }
