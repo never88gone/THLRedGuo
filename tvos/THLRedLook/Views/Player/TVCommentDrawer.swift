@@ -279,7 +279,7 @@ public struct TVCommentDrawer: View {
                 Text(mainComment.text)
                     .font(.system(size: 15))
                     .foregroundColor(TVColors.textPrimary)
-                    .lineLimit(4)
+                    .lineLimit(3)
             }
             .padding(16)
             .background(Color.white.opacity(0.06))
@@ -389,7 +389,7 @@ public struct TVCommentDrawer: View {
             Text(comment.text)
                 .font(.system(size: 15))
                 .foregroundColor(isFocused ? .white : Color.white.opacity(0.92))
-                .lineLimit(5)
+                .lineLimit(3)
                 .multilineTextAlignment(.leading)
 
             if comment.replyCount > 0 {

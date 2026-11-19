@@ -373,8 +373,9 @@ class _CommentSheetViewState extends State<CommentSheetView> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    comment.text,
+                  _ExpandableCommentText(
+                    text: comment.text,
+                    maxLines: 3,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14.5,
@@ -503,8 +504,9 @@ class _CommentSheetViewState extends State<CommentSheetView> {
                   ],
                 ),
                 const SizedBox(height: 5),
-                Text(
-                  reply.text,
+                _ExpandableCommentText(
+                  text: reply.text,
+                  maxLines: 3,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -600,52 +602,62 @@ class _CommentSheetViewState extends State<CommentSheetView> {
     return Column(
       children: [
         // 置顶展示主评
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
-            color: Color(0x14FFFFFF),
-            border: Border(
-              bottom: BorderSide(color: Color(0x1FFFFFFF), width: 0.8),
-            ),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.28,
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildAvatar(mainComment.userAvatar, mainComment.userName, size: 36),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      mainComment.userName,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      mainComment.text,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _formatTime(mainComment.createTime),
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0x14FFFFFF),
+              border: Border(
+                bottom: BorderSide(color: Color(0x1FFFFFFF), width: 0.8),
               ),
-            ],
+            ),
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildAvatar(mainComment.userAvatar, mainComment.userName, size: 36),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          mainComment.userName,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        _ExpandableCommentText(
+                          text: mainComment.text,
+                          maxLines: 3,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _formatTime(mainComment.createTime),
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
 
@@ -748,6 +760,115 @@ class _CommentSheetViewState extends State<CommentSheetView> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 支持超过 maxLines（默认 3 行）折叠与展开收起的多行评论文本组件
+class _ExpandableCommentText extends StatefulWidget {
+  const _ExpandableCommentText({
+    required this.text,
+    this.maxLines = 3,
+    this.style,
+  });
+
+  final String text;
+  final int maxLines;
+  final TextStyle? style;
+
+  @override
+  State<_ExpandableCommentText> createState() => _ExpandableCommentTextState();
+}
+
+class _ExpandableCommentTextState extends State<_ExpandableCommentText> {
+  bool _expanded = false;
+
+  @override
+  void didUpdateWidget(covariant _ExpandableCommentText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) {
+      _expanded = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = widget.style ??
+        const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          height: 1.4,
+        );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        if (!maxWidth.isFinite || maxWidth <= 0) {
+          return Text(
+            widget.text,
+            style: textStyle,
+            maxLines: _expanded ? null : widget.maxLines,
+            overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          );
+        }
+
+        final span = TextSpan(text: widget.text, style: textStyle);
+        final tp = TextPainter(
+          text: span,
+          maxLines: widget.maxLines,
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: maxWidth);
+
+        final bool isExceeded = tp.didExceedMaxLines;
+
+        if (!isExceeded) {
+          return Text(
+            widget.text,
+            style: textStyle,
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.text,
+              style: textStyle,
+              maxLines: _expanded ? null : widget.maxLines,
+              overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 3),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _expanded ? '收起' : '展开全文',
+                      style: const TextStyle(
+                        color: AppColors.hongguoRed,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 15,
+                      color: AppColors.hongguoRed,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
