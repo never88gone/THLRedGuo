@@ -24,8 +24,13 @@ final class PlayerDanmakuManager: ObservableObject {
     }
 
     func toggleDanmaku() {
-        danmakuEnabled.toggle()
-        store.danmakuEnabled = danmakuEnabled
+        setDanmakuEnabled(!danmakuEnabled)
+    }
+
+    func setDanmakuEnabled(_ enabled: Bool) {
+        guard danmakuEnabled != enabled else { return }
+        danmakuEnabled = enabled
+        store.danmakuEnabled = enabled
     }
 
     func updateStyle(_ style: TVDanmakuStyle) {

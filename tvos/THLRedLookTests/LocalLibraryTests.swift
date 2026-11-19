@@ -320,6 +320,35 @@ final class LocalLibraryTests: XCTestCase {
         XCTAssertTrue(LocalStore(defaults: defaults).danmakuEnabled)
         print("THL_TV_LOCAL danmakuPreference=true reload=true")
     }
+
+    func testDanmakuStyleAutoSavesOnChange() throws {
+        let (defaults, name) = try storage()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let store = LocalStore(defaults: defaults)
+        let drama = Drama(id: "test_local_danmaku_style", title: "弹幕样式自动保存验证")
+        let player = PlayerViewModel(drama: drama, allEpisodes: [], store: store)
+        defer { player.onDisappear() }
+
+        player.setDanmakuFontSize(34.0)
+        XCTAssertEqual(store.danmakuStyle.fontSize, 34.0)
+        XCTAssertEqual(LocalStore(defaults: defaults).danmakuStyle.fontSize, 34.0)
+
+        player.setDanmakuOpacity(0.5)
+        XCTAssertEqual(store.danmakuStyle.opacity, 0.5)
+        XCTAssertEqual(LocalStore(defaults: defaults).danmakuStyle.opacity, 0.5)
+
+        player.setDanmakuLaneCount(8)
+        XCTAssertEqual(store.danmakuStyle.laneCount, 8)
+        XCTAssertEqual(LocalStore(defaults: defaults).danmakuStyle.laneCount, 8)
+
+        player.danmakuEnabled = false
+        XCTAssertFalse(store.danmakuEnabled)
+        XCTAssertFalse(LocalStore(defaults: defaults).danmakuEnabled)
+
+        player.danmakuEnabled = true
+        XCTAssertTrue(store.danmakuEnabled)
+        XCTAssertTrue(LocalStore(defaults: defaults).danmakuEnabled)
+    }
     func testInactivePlayerRestoresLatestHistoryAfterDetailPlayback() throws {
         let (defaults, name) = try storage()
         defer { defaults.removePersistentDomain(forName: name) }

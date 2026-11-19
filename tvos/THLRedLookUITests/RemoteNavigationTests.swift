@@ -1506,7 +1506,7 @@ final class RemoteNavigationTests: XCTestCase {
     func testPlayerDanmakuSettingsAndSpeedSelection() throws {
         continueAfterFailure = false
         app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
-        app.launchArguments = ["-testPage", "controls", "-testEpisode", "5"]
+        app.launchArguments = ["-testPage", "controls"]
         app.launch()
 
         // 1. 等待播放器浮层出现并聚焦在主播放/暂停键
@@ -1514,10 +1514,13 @@ final class RemoteNavigationTests: XCTestCase {
             self.app.buttons["player.playPause"].exists && self.app.buttons["player.playPause"].hasFocus
         }
 
-        // 2. 向右导航至弹幕快捷开关
-        for _ in 0..<10 {
-            if app.buttons["player.danmaku"].hasFocus { break }
-            press(.right)
+        // 2. 向下进入第二层操作栏，并向右导航至弹幕快捷开关
+        if !app.buttons["player.danmaku"].hasFocus {
+            press(.down)
+            for _ in 0..<10 {
+                if app.buttons["player.danmaku"].hasFocus { break }
+                press(.right)
+            }
         }
         wait("focus danmaku toggle") { self.app.buttons["player.danmaku"].hasFocus }
         let initialLabel = app.buttons["player.danmaku"].label
@@ -1564,11 +1567,10 @@ final class RemoteNavigationTests: XCTestCase {
         press(.right, focus: "danmaku.area.full")
         press(.select)
 
-        // 4.5 向下聚焦至完成按钮并关闭抽屉
-        press(.down, focus: "danmaku.close")
-        press(.select)
+        // 4.5 样式切换后自动保存，无需点击底部保存按钮；按 Menu 键退出弹幕抽屉
+        press(.menu)
         wait("danmaku settings drawer closed", seconds: 10) {
-            !self.app.buttons["danmaku.close"].exists
+            !self.app.buttons["danmaku.area.full"].exists
         }
 
         // 5. 测试倍速选择抽屉与功能

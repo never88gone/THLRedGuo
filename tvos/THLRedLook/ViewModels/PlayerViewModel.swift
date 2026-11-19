@@ -58,18 +58,9 @@ public final class PlayerViewModel: ObservableObject {
     private let pipCoordinator = PlayerPiPCoordinator()
 
     public var isPictureInPictureSupported: Bool { pipCoordinator.isSupported }
-    public var pipController: AVPictureInPictureController? {
-        get { pipCoordinator.pipController }
-        set { pipCoordinator.pipController = newValue }
-    }
-    public var danmakuEnabled: Bool {
-        get { danmakuManager.danmakuEnabled }
-        set { danmakuManager.danmakuEnabled = newValue }
-    }
-    public var danmakuStyle: TVDanmakuStyle {
-        get { danmakuManager.danmakuStyle }
-        set { danmakuManager.danmakuStyle = newValue }
-    }
+    public var pipController: AVPictureInPictureController? { get { pipCoordinator.pipController } set { pipCoordinator.pipController = newValue } }
+    public var danmakuEnabled: Bool { get { danmakuManager.danmakuEnabled } set { danmakuManager.setDanmakuEnabled(newValue) } }
+    public var danmakuStyle: TVDanmakuStyle { get { danmakuManager.danmakuStyle } set { danmakuManager.updateStyle(newValue) } }
     public var activeDanmakus: [DanmakuItem] { danmakuManager.activeDanmakus }
     public var qualityOptions: [Int] { [0] + Set(plan?.qualities.filter { $0 > 0 } ?? []).sorted(by: >) }
     public func toggleDanmaku() { danmakuManager.toggleDanmaku() }
@@ -377,9 +368,9 @@ public final class PlayerViewModel: ObservableObject {
         guard !isLoading, target.isFinite, duration > 0 else { return }
         seek(to: max(0, min(target, duration)))
     }
-    public func setDanmakuFontSize(_ size: CGFloat) { danmakuManager.danmakuStyle.fontSize = size }
-    public func setDanmakuOpacity(_ op: Double) { danmakuManager.danmakuStyle.opacity = op }
-    public func setDanmakuLaneCount(_ lanes: Int) { danmakuManager.danmakuStyle.laneCount = lanes }
+    public func setDanmakuFontSize(_ size: CGFloat) { danmakuManager.setFontSize(size) }
+    public func setDanmakuOpacity(_ op: Double) { danmakuManager.setOpacity(op) }
+    public func setDanmakuLaneCount(_ lanes: Int) { danmakuManager.setLaneCount(lanes) }
 
     private func seek(to target: Double) {
         seekCoordinator.seek(

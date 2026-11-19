@@ -161,7 +161,6 @@ public struct TVDanmakuSettingsDrawer: View {
                             isSelected: viewModel.danmakuStyle.laneCount == 4,
                             id: "danmaku.area.half",
                             up: "danmaku.opacity.50",
-                            down: "danmaku.close",
                             right: "danmaku.area.full"
                         ) {
                             viewModel.setDanmakuLaneCount(4)
@@ -171,7 +170,6 @@ public struct TVDanmakuSettingsDrawer: View {
                             isSelected: viewModel.danmakuStyle.laneCount == 8,
                             id: "danmaku.area.full",
                             up: "danmaku.opacity.100",
-                            down: "danmaku.close",
                             left: "danmaku.area.half"
                         ) {
                             viewModel.setDanmakuLaneCount(8)
@@ -180,28 +178,6 @@ public struct TVDanmakuSettingsDrawer: View {
                 }
 
                 Spacer()
-
-                Button(action: {
-                    isPresented = false
-                }) {
-                    Text("完成设置")
-                        .font(.system(size: 20, weight: .bold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(focusedButton == "danmaku.close" ? TVColors.primaryHover : TVColors.primary)
-                        )
-                        .foregroundColor(.white)
-                        .tvFocusBorder(isFocused: focusedButton == "danmaku.close", cornerRadius: 14)
-                }
-                .buttonStyle(TVZeroHighlightButtonStyle())
-                .focused($focusedButton, equals: "danmaku.close")
-                .accessibilityIdentifier("danmaku.close")
-                .focusEffectDisabled()
-                .onMoveCommand { dir in
-                    if dir == .up { focusedButton = "danmaku.area.half" }
-                }
             }
             .padding(40)
             .frame(width: 720)
