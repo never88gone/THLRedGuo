@@ -154,21 +154,29 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          _mobileFollowControl(drama),
-          HongguoSocialButton(
-            drama: drama,
-            repository: widget.repository,
-            store: widget.store,
-            episode: widget.detail.episodes.isEmpty
-                ? 1
-                : widget
-                      .detail
-                      .episodes[widget.currentIndex.clamp(
-                        0,
-                        widget.detail.episodes.length - 1,
-                      )]
-                      .number,
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _mobileFollowControl(drama),
+              HongguoSocialButton(
+                drama: drama,
+                repository: widget.repository,
+                store: widget.store,
+                episode: widget.detail.episodes.isEmpty
+                    ? 1
+                    : widget
+                          .detail
+                          .episodes[widget.currentIndex.clamp(
+                            0,
+                            widget.detail.episodes.length - 1,
+                          )]
+                          .number,
+                likeOnly: true,
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Text(
@@ -185,79 +193,78 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
   }
 
   Widget _mobileFollowControl(Drama drama) {
-    final state = widget.store.following(drama.id);
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final fgColor = state == null ? colors.onSurface : colors.onSecondaryContainer;
-    return PopupMenuButton<String>(
-      key: const ValueKey('player-follow-status'),
-      tooltip: '追剧与观看状态',
-      onSelected: (value) async {
-        if (value == 'remove') {
-          await saveUserChange(
-            context,
-            () => widget.store.setFavorite(drama, false),
-          );
-        } else {
-          final status = FollowStatus.values.firstWhere(
-            (status) => status.name == value,
-          );
-          await saveUserChange(
-            context,
-            () => widget.store.setFollowStatus(drama, status),
-          );
-        }
-        if (mounted) setState(() {});
-      },
-      itemBuilder: (_) => [
-        for (final status in FollowStatus.values.where(
-          (value) =>
-              !widget.store.usesAccountLibrary(drama.id) ||
-              value == FollowStatus.planned,
-        ))
-          CheckedPopupMenuItem(
-            value: status.name,
-            checked: state?.status == status,
-            child: Text(
-              widget.store.usesAccountLibrary(drama.id) ? '追剧' : status.label,
-            ),
-          ),
-        if (state != null)
-          const PopupMenuItem(value: 'remove', child: Text('取消追剧')),
-      ],
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 36),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: state == null
-              ? colors.surfaceContainerHighest
-              : colors.secondaryContainer,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              state == null
-                  ? Icons.bookmark_add_outlined
-                  : Icons.bookmark_rounded,
-              size: 18,
-              color: fgColor,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              state?.label ?? '加入追剧',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: fgColor,
+    return ListenableBuilder(
+      listenable: widget.store,
+      builder: (context, _) {
+        final state = widget.store.following(drama.id);
+        final theme = Theme.of(context);
+        final colors = theme.colorScheme;
+        final isFollowed = state != null;
+        final statusColor = isFollowed
+            ? (state.status == FollowStatus.watched
+                ? AppColors.success
+                : (state.status == FollowStatus.planned
+                    ? AppColors.hongguoAmber
+                    : AppColors.hongguoRed))
+            : colors.onSurface;
+
+        return Material(
+          color: Colors.transparent,
+          child: Tooltip(
+            message: isFollowed ? '取消追剧' : '加入追剧',
+            child: InkWell(
+              key: const ValueKey('player-follow-status'),
+              onTap: () => saveUserChange(
+                context,
+                () => widget.store.setFavorite(drama, !isFollowed),
+              ),
+              borderRadius: BorderRadius.circular(16),
+              child: Ink(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: isFollowed
+                      ? statusColor.withValues(alpha: 0.14)
+                      : colors.surfaceContainerHighest.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isFollowed
+                        ? statusColor.withValues(alpha: 0.45)
+                        : colors.outlineVariant.withValues(alpha: 0.3),
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isFollowed
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_add_outlined,
+                      size: 16,
+                      color: isFollowed ? statusColor : colors.onSurface,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      isFollowed
+                          ? ((state.status != FollowStatus.planned)
+                              ? state.label
+                              : '已追剧')
+                          : '追剧',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight:
+                            isFollowed ? FontWeight.w700 : FontWeight.w600,
+                        color: isFollowed ? statusColor : colors.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 2),
-            Icon(Icons.expand_more_rounded, size: 16, color: fgColor),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

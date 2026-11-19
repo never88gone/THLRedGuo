@@ -6,22 +6,22 @@ import 'package:THLRedLook/utils/theme/app_colors.dart';
 class PlayerDanmakuSheetView extends StatefulWidget {
   const PlayerDanmakuSheetView({
     super.key,
-    required this.enabled,
+    this.enabled = true,
     required this.style,
-    required this.onEnabledChanged,
+    this.onEnabledChanged,
     required this.onStyleChanged,
   });
 
   final bool enabled;
   final DanmakuStyle style;
-  final ValueChanged<bool> onEnabledChanged;
+  final ValueChanged<bool>? onEnabledChanged;
   final ValueChanged<DanmakuStyle> onStyleChanged;
 
   static Future<void> show({
     required BuildContext context,
-    required bool enabled,
+    bool enabled = true,
     required DanmakuStyle style,
-    required ValueChanged<bool> onEnabledChanged,
+    ValueChanged<bool>? onEnabledChanged,
     required ValueChanged<DanmakuStyle> onStyleChanged,
   }) {
     return showModalBottomSheet<void>(
@@ -43,19 +43,12 @@ class PlayerDanmakuSheetView extends StatefulWidget {
 }
 
 class _PlayerDanmakuSheetViewState extends State<PlayerDanmakuSheetView> {
-  late bool _enabled;
   late DanmakuStyle _style;
 
   @override
   void initState() {
     super.initState();
-    _enabled = widget.enabled;
     _style = widget.style;
-  }
-
-  void _updateEnabled(bool val) {
-    setState(() => _enabled = val);
-    widget.onEnabledChanged(val);
   }
 
   void _updateStyle(DanmakuStyle next) {
@@ -146,67 +139,9 @@ class _PlayerDanmakuSheetViewState extends State<PlayerDanmakuSheetView> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-
-                // 1. 弹幕开关
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.darkCard,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        '显示弹幕',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.whiteWithAlpha(0.95),
-                        ),
-                      ),
-                      const Spacer(),
-                      Switch.adaptive(
-                        key: const ValueKey('danmaku-sheet-switch'),
-                        value: _enabled,
-                        activeThumbColor: AppColors.white,
-                        activeTrackColor: AppColors.hongguoRed,
-                        onChanged: _updateEnabled,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 2. 实时预览条
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.blackWithAlpha(0.50),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.whiteWithAlpha(0.08)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '这是一条弹幕效果预览 🚀',
-                    style: TextStyle(
-                      fontSize: 15.0 * _style.fontSizeScale,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.white.withValues(alpha: _style.opacity),
-                      shadows: [
-                        Shadow(
-                          color: AppColors.black.withValues(alpha: _style.opacity * 0.85),
-                          blurRadius: 3,
-                          offset: const Offset(1, 1),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 14),
 
-                // 3. 字体大小
+                // 字体大小
                 _buildSectionHeader('字体大小', '${_style.fontSizeScale}x'),
                 const SizedBox(height: 8),
                 Row(

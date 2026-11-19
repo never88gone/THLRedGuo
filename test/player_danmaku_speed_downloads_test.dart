@@ -92,7 +92,7 @@ void main() {
       expect(restored.danmakuStyle.displayArea, 1.0);
     });
 
-    testWidgets('PlayerDanmakuSheetView 渲染且能调节开关与样式', (tester) async {
+    testWidgets('PlayerDanmakuSheetView 渲染且能调节字体、不透明度与区域', (tester) async {
       bool currentEnabled = true;
       DanmakuStyle currentStyle = const DanmakuStyle();
 
@@ -110,16 +110,11 @@ void main() {
       );
 
       expect(find.text('弹幕设置'), findsOneWidget);
-      expect(find.text('显示弹幕'), findsOneWidget);
+      expect(find.text('显示弹幕'), findsNothing);
+      expect(find.text('这是一条弹幕效果预览 🚀'), findsNothing);
       expect(find.text('字体大小'), findsOneWidget);
       expect(find.text('不透明度'), findsOneWidget);
       expect(find.text('显示区域'), findsOneWidget);
-      expect(find.text('这是一条弹幕效果预览 🚀'), findsOneWidget);
-
-      // 测试点击切换开关
-      await tester.tap(find.byKey(const ValueKey('danmaku-sheet-switch')));
-      await tester.pumpAndSettle();
-      expect(currentEnabled, false);
 
       // 切换字体大小为 大 (1.25x)
       await tester.tap(find.text('大 (1.25x)'));
