@@ -13,15 +13,16 @@ export class AppColors {
   static readonly hongguoAmber: string = '#FF9800';
   static readonly hongguoCyan: string = '#00E5FF';
 
-  // 基础背景色彩
-  static readonly bgDark: string = '#0D0E13';
-  static readonly bgCard: string = '#15171F';
-  static readonly bgCardHover: string = '#1C1F2A';
-  static readonly bgElevated: string = '#242836';
-  static readonly bgDialog: string = '#1F2026';
-  static readonly darkSurfaceHighest70: string = 'rgba(45, 50, 68, 0.7)';
-  static readonly bottomNavBg: string = '#E612141C';
-  static readonly bottomNavBorder: string = 'rgba(255, 255, 255, 0.18)';
+  // 基础背景色彩（融入淡淡暖橙质感炭黑，告别冷暗死黑）
+  static readonly bgDark: string = '#1F1714';
+  static readonly bgCard: string = '#2E221D';
+  static readonly bgCardHover: string = '#382923';
+  static readonly bgElevated: string = '#382923';
+  static readonly bgDialog: string = '#2E221D';
+  static readonly darkSurfaceHighest70: string = 'rgba(69, 50, 42, 0.7)';
+  static readonly bottomNavBg: string = '#F5261D19';
+  static readonly bottomNavBorder: string = 'rgba(255, 255, 255, 0.12)';
+  static readonly lightBackground: string = '#FAF7F2';
 
   // 半透明黑色遮罩
   static readonly maskDark45: string = 'rgba(0, 0, 0, 0.45)';

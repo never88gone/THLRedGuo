@@ -183,3 +183,71 @@ export async function bridgeSuggestions(query) {
     return [];
   }
 }
+
+/**
+ * 账号与逆向接口通用桥接调度器
+ */
+export async function bridgeAccountCall(action, payload) {
+  if (!isBridgeReady()) return null;
+  try {
+    if (!spider || typeof spider.accountRequest !== 'function' || typeof spider.accountParse !== 'function') {
+      hilog.error(DOMAIN, TAG, 'spider.accountRequest or accountParse not implemented');
+      return null;
+    }
+    const req = await spider.accountRequest(action, payload || {});
+    if (!req || !req.url) {
+      hilog.warn(DOMAIN, TAG, 'spider.accountRequest returned invalid request for %{public}s', action);
+      return null;
+    }
+    const fetchOptions = {
+      method: (req.method || 'GET').toUpperCase(),
+      headers: req.headers || {},
+      body: req.body || req.data
+    };
+    const res = await globalThis.fetch(req.url, fetchOptions);
+    const text = await res.text();
+    return spider.accountParse(action, text);
+  } catch (e) {
+    hilog.error(DOMAIN, TAG, 'bridgeAccountCall error for %{public}s: %{public}s', action, formatError(e));
+    return null;
+  }
+}
+
+/**
+ * 获取短剧评论列表 (对齐 Flutter fetchCommentList)
+ */
+export async function bridgeComments(bookId, cursor, count) {
+  const cleanId = String(bookId || '').replace(/^hongguo:/, '');
+  return await bridgeAccountCall('commentList', {
+    bookId: cleanId,
+    cursor: cursor || '',
+    count: count || 20
+  });
+}
+
+/**
+ * 获取评论回复列表 (对齐 Flutter fetchCommentReplyList)
+ */
+export async function bridgeCommentReplies(commentId, bookId, cursor, count) {
+  const cleanId = String(bookId || '').replace(/^hongguo:/, '');
+  return await bridgeAccountCall('commentReplyList', {
+    commentId: String(commentId || ''),
+    bookId: cleanId,
+    cursor: cursor || '',
+    count: count || 20
+  });
+}
+
+/**
+ * 获取红果创作者/主播短剧作品列表 (对齐 Flutter creatorWorks)
+ */
+export async function bridgeCreatorWorks(userId, cursor, count) {
+  return await bridgeAccountCall('creatorWorks', {
+    userId: String(userId || ''),
+    cursor: cursor || '',
+    count: count || 20,
+    commentSource: 1506,
+    tabType: 23
+  });
+}
+

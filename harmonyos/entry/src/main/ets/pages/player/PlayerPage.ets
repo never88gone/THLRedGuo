@@ -4,6 +4,7 @@ import hilog from '@ohos.hilog';
 import { AppColors } from '../../common/AppColors';
 import { DramaDetail, DramaItem } from '../../models/Drama';
 import { PlaybackState } from '../../models/Episode';
+import { CommentItem, CommentReplyItem } from '../../models/Comment';
 import { PlayerController } from '../../core/player/PlayerController';
 import { CoreEngine } from '../../core/engine/CoreEngine';
 import { LocalStore } from '../../core/store/LocalStore';
@@ -30,8 +31,18 @@ struct PlayerPage {
   @State videoRatio: number = 9 / 16;
   @State showControls: boolean = true;
   @State isFullscreen: boolean = false;
-  @State currentTab: number = 0; // 0: 选集, 1: 简介
+  @State currentTab: number = 0; // 0: 选集, 1: 简介, 2: 评论
   @State isFavorite: boolean = false;
+
+  // 评论与回复状态
+  @State comments: CommentItem[] = [];
+  @State totalComments: number = 0;
+  @State isLoadingComments: boolean = false;
+  @State hasMoreComments: boolean = false;
+  @State commentCursor: string = '';
+  @State selectedComment: CommentItem | null = null;
+  @State replies: CommentReplyItem[] = [];
+  @State isLoadingReplies: boolean = false;
 
   private playerController: PlayerController = new PlayerController();
   private xComponentController: XComponentController = new XComponentController();
@@ -81,6 +92,7 @@ struct PlayerPage {
 
       this.loadDetail();
       this.checkFavorite();
+      this.loadComments();
       this.resetControlsTimer();
     } catch (e) {
       hilog.error(DOMAIN, TAG, 'aboutToAppear error: %{public}s', JSON.stringify(e));
@@ -130,6 +142,56 @@ struct PlayerPage {
         }
       }
     }
+  }
+
+  async loadComments(): Promise<void> {
+    if (!this.dramaId) return;
+    this.isLoadingComments = true;
+    try {
+      const page = await CoreEngine.getInstance().fetchComments(this.dramaId, '', 20);
+      this.comments = page.list;
+      this.totalComments = page.total;
+      this.hasMoreComments = page.hasMore;
+      this.commentCursor = page.cursor;
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'loadComments error: %{public}s', JSON.stringify(e));
+    } finally {
+      this.isLoadingComments = false;
+    }
+  }
+
+  async loadMoreComments(): Promise<void> {
+    if (!this.dramaId || this.isLoadingComments || !this.hasMoreComments) return;
+    this.isLoadingComments = true;
+    try {
+      const page = await CoreEngine.getInstance().fetchComments(this.dramaId, this.commentCursor, 20);
+      this.comments = this.comments.concat(page.list);
+      this.hasMoreComments = page.hasMore;
+      this.commentCursor = page.cursor;
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'loadMoreComments error: %{public}s', JSON.stringify(e));
+    } finally {
+      this.isLoadingComments = false;
+    }
+  }
+
+  async selectComment(comment: CommentItem): Promise<void> {
+    this.selectedComment = comment;
+    this.replies = [];
+    this.isLoadingReplies = true;
+    try {
+      const res = await CoreEngine.getInstance().fetchCommentReplies(comment.id, this.dramaId, '', 20);
+      this.replies = res.list;
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'selectComment error: %{public}s', JSON.stringify(e));
+    } finally {
+      this.isLoadingReplies = false;
+    }
+  }
+
+  backToComments(): void {
+    this.selectedComment = null;
+    this.replies = [];
   }
 
   async startPlayback(epIndex: number): Promise<void> {
@@ -302,6 +364,9 @@ struct PlayerPage {
             onCycleSpeed: () => {
               this.cycleSpeed();
             },
+            onOpenComments: () => {
+              this.currentTab = 2;
+            },
             onToggleFullscreen: () => {
               this.isFullscreen = !this.isFullscreen;
               this.resetControlsTimer();
@@ -326,6 +391,13 @@ struct PlayerPage {
           detail: this.detail,
           coverUrl: this.coverUrl,
           dramaTitle: this.dramaTitle,
+          comments: this.comments,
+          totalComments: this.totalComments,
+          isLoadingComments: this.isLoadingComments,
+          hasMoreComments: this.hasMoreComments,
+          selectedComment: this.selectedComment,
+          replies: this.replies,
+          isLoadingReplies: this.isLoadingReplies,
           onTabChange: (tab: number) => {
             this.currentTab = tab;
           },
@@ -334,6 +406,15 @@ struct PlayerPage {
           },
           onSelectEpisode: (epIndex: number) => {
             this.startPlayback(epIndex);
+          },
+          onLoadMoreComments: () => {
+            this.loadMoreComments();
+          },
+          onSelectComment: (comment: CommentItem) => {
+            this.selectComment(comment);
+          },
+          onBackToComments: () => {
+            this.backToComments();
           }
         })
       }

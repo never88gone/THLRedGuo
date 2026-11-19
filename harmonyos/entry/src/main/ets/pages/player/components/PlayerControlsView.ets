@@ -27,6 +27,7 @@ export struct PlayerControlsView {
   onCycleSpeed: () => void = () => {};
   onToggleFullscreen: () => void = () => {};
   onSeek: (val: number) => void = () => {};
+  onOpenComments: () => void = () => {};
 
   build() {
     Column() {
@@ -67,51 +68,54 @@ export struct PlayerControlsView {
 
       Blank()
 
-      // B. 居中操作区 (PlayerCenterView: 上一集 + 播放/暂停 + 下一集)
+      // B. 居中现代化毛玻璃悬浮操作区 (对齐 Flutter commit b4b10ce)
       if (!this.isBuffering) {
-        Row({ space: 28 }) {
-          // 上一集
+        Row({ space: 24 }) {
+          // 上一集 (轻量毛玻璃质感悬浮圆钮)
           Button({ type: ButtonType.Circle }) {
             Image($r('app.media.ic_skip_previous'))
-              .width(24)
-              .height(24)
+              .width(22)
+              .height(22)
               .fillColor(AppColors.white)
           }
-          .backgroundColor(AppColors.maskDark45)
-          .border({ width: 0.8, color: AppColors.whiteAlpha20 })
-          .width(44)
-          .height(44)
+          .backgroundColor('rgba(35, 26, 22, 0.65)')
+          .border({ width: 1.0, color: AppColors.whiteAlpha25 })
+          .width(42)
+          .height(42)
+          .shadow({ radius: 12, color: AppColors.maskDark50 })
           .onClick(() => {
             this.onPrevious();
           })
 
-          // 中央大播放/暂停按键
+          // 中央现代化毛玻璃质感主播放圆钮 (校准重心并支持微光按压弹性)
           Button({ type: ButtonType.Circle }) {
             Image(this.isPlaying ? $r('app.media.ic_pause') : $r('app.media.ic_play_arrow'))
-              .width(32)
-              .height(32)
+              .width(30)
+              .height(30)
               .fillColor(AppColors.white)
+              .margin(this.isPlaying ? { left: 0 } : { left: 2 }) // 校准播放图标三角形视觉重心偏移
           }
-          .backgroundColor(AppColors.controlsBg)
-          .border({ width: 1.2, color: AppColors.whiteAlpha35 })
-          .width(58)
-          .height(58)
-          .shadow({ radius: 16, color: AppColors.maskDark50 })
+          .backgroundColor(this.isPlaying ? 'rgba(46, 34, 29, 0.75)' : AppColors.hongguoRed)
+          .border({ width: 1.5, color: this.isPlaying ? AppColors.whiteAlpha35 : 'rgba(255, 255, 255, 0.45)' })
+          .width(56)
+          .height(56)
+          .shadow({ radius: 18, color: this.isPlaying ? AppColors.maskDark65 : AppColors.redAlpha15 })
           .onClick(() => {
             this.onTogglePlay();
           })
 
-          // 下一集
+          // 下一集 (轻量毛玻璃质感悬浮圆钮)
           Button({ type: ButtonType.Circle }) {
             Image($r('app.media.ic_skip_next'))
-              .width(24)
-              .height(24)
+              .width(22)
+              .height(22)
               .fillColor(AppColors.white)
           }
-          .backgroundColor(AppColors.maskDark45)
-          .border({ width: 0.8, color: AppColors.whiteAlpha20 })
-          .width(44)
-          .height(44)
+          .backgroundColor('rgba(35, 26, 22, 0.65)')
+          .border({ width: 1.0, color: AppColors.whiteAlpha25 })
+          .width(42)
+          .height(42)
+          .shadow({ radius: 12, color: AppColors.maskDark50 })
           .onClick(() => {
             this.onNext();
           })
@@ -124,20 +128,39 @@ export struct PlayerControlsView {
 
       // C. 底部工具栏与进度条
       Column({ space: 4 }) {
-        // 工具栏行：倍速 + 全屏按钮
+        // 工具栏行：评论 + 倍速 + 全屏按钮
         Row({ space: 10 }) {
           Blank()
+
+          // 评论入口按钮 (对齐 Flutter commit e171586)
+          Button({ type: ButtonType.Capsule }) {
+            Row({ space: 4 }) {
+              Text('💬')
+                .fontSize(12)
+              Text('评论')
+                .fontSize(11.5)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppColors.white)
+            }
+            .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          }
+          .backgroundColor('rgba(35, 26, 22, 0.65)')
+          .border({ width: 0.8, color: AppColors.whiteAlpha20 })
+          .height(28)
+          .onClick(() => {
+            this.onOpenComments();
+          })
 
           // 倍速切换胶囊
           Button(`${this.speed}x`)
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppColors.white)
-            .backgroundColor(AppColors.maskDark45)
+            .backgroundColor('rgba(35, 26, 22, 0.65)')
             .border({ width: 0.8, color: AppColors.whiteAlpha20 })
-            .height(30)
-            .padding({ left: 12, right: 12 })
-            .borderRadius(15)
+            .height(28)
+            .padding({ left: 10, right: 10 })
+            .borderRadius(14)
             .onClick(() => {
               this.onCycleSpeed();
             })
@@ -145,14 +168,14 @@ export struct PlayerControlsView {
           // 全屏切换按钮
           Button({ type: ButtonType.Circle }) {
             Image(this.isFullscreen ? $r('app.media.ic_fullscreen_exit') : $r('app.media.ic_fullscreen'))
-              .width(20)
-              .height(20)
+              .width(18)
+              .height(18)
               .fillColor(AppColors.white)
           }
-          .backgroundColor(AppColors.maskDark45)
+          .backgroundColor('rgba(35, 26, 22, 0.65)')
           .border({ width: 0.8, color: AppColors.whiteAlpha20 })
-          .width(34)
-          .height(34)
+          .width(32)
+          .height(32)
           .onClick(() => {
             this.onToggleFullscreen();
           })

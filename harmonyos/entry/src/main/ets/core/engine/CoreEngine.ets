@@ -2,6 +2,7 @@ import { DramaItem, DramaDetail } from '../../models/Drama';
 import { CategoryItem } from '../../models/Category';
 import { RankingBoard, RankingItem, RankingPageResult } from '../../models/Ranking';
 import { PlayResult } from '../../models/Episode';
+import { CommentPage, CommentReplyPage } from '../../models/Comment';
 import { CatPawJsRuntime } from '../js/CatPawJsRuntime';
 
 /**
@@ -118,5 +119,26 @@ export class CoreEngine {
     } catch (e) {
       return { items: [], page: page, hasMore: false };
     }
+  }
+
+  /**
+   * 获取短剧评论列表 (对齐 Flutter fetchCommentList)
+   */
+  public async fetchComments(bookId: string, cursor: string = '', count: number = 20): Promise<CommentPage> {
+    return await this.runtime.fetchComments(bookId, cursor, count);
+  }
+
+  /**
+   * 获取评论回复列表 (对齐 Flutter fetchCommentReplyList)
+   */
+  public async fetchCommentReplies(commentId: string, bookId: string, cursor: string = '', count: number = 20): Promise<CommentReplyPage> {
+    return await this.runtime.fetchCommentReplies(commentId, bookId, cursor, count);
+  }
+
+  /**
+   * 获取创作者短剧作品 (对齐 Flutter creatorWorks)
+   */
+  public async fetchCreatorWorks(userId: string, cursor: string = '', count: number = 20): Promise<DramaItem[]> {
+    return await this.runtime.fetchCreatorWorks(userId, cursor, count);
   }
 }

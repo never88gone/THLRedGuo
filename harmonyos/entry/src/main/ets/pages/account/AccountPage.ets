@@ -20,6 +20,7 @@ export struct AccountPage {
   @State currentTab: number = 0; // 0: 追剧, 1: 历史记录
   @State historyList: WatchHistoryItem[] = [];
   @State favoriteList: DramaItem[] = [];
+  @State isRefreshing: boolean = false;
 
   aboutToAppear(): void {
     this.refreshData();
@@ -30,9 +31,14 @@ export struct AccountPage {
   }
 
   async refreshData(): Promise<void> {
-    this.user = AccountService.getInstance().getCurrentUser();
-    this.historyList = await LocalStore.getInstance().getHistory();
-    this.favoriteList = await LocalStore.getInstance().getFavorites();
+    this.isRefreshing = true;
+    try {
+      this.user = AccountService.getInstance().getCurrentUser();
+      this.historyList = await LocalStore.getInstance().getHistory();
+      this.favoriteList = await LocalStore.getInstance().getFavorites();
+    } finally {
+      this.isRefreshing = false;
+    }
   }
 
   goToLogin(): void {
@@ -166,7 +172,7 @@ export struct AccountPage {
           Row({ space: 6 }) {
             Text('🔖')
               .fontSize(13)
-            Text('追剧')
+            Text(`追剧${this.favoriteList.length > 0 ? ` (${this.favoriteList.length})` : ''}`)
               .fontSize(13)
               .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
               .fontColor(this.currentTab === 0 ? AppColors.white : AppColors.textSecondary)
@@ -175,16 +181,17 @@ export struct AccountPage {
         }
         .backgroundColor(this.currentTab === 0 ? AppColors.bgElevated : AppColors.transparent)
         .border({ width: 0.8, color: this.currentTab === 0 ? AppColors.hongguoRed : AppColors.whiteAlpha10 })
-        .height(36)
+        .height(34)
         .onClick(() => {
           this.currentTab = 0;
+          this.refreshData(); // 自动拉取本地数据，防止白屏
         })
 
         Button({ type: ButtonType.Capsule }) {
           Row({ space: 6 }) {
             Text('🕒')
               .fontSize(13)
-            Text('历史记录')
+            Text(`历史记录${this.historyList.length > 0 ? ` (${this.historyList.length})` : ''}`)
               .fontSize(13)
               .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
               .fontColor(this.currentTab === 1 ? AppColors.white : AppColors.textSecondary)
@@ -193,29 +200,44 @@ export struct AccountPage {
         }
         .backgroundColor(this.currentTab === 1 ? AppColors.bgElevated : AppColors.transparent)
         .border({ width: 0.8, color: this.currentTab === 1 ? AppColors.hongguoRed : AppColors.whiteAlpha10 })
-        .height(36)
+        .height(34)
         .onClick(() => {
           this.currentTab = 1;
+          this.refreshData(); // 修复初次切换时未自动拉取数据需手动刷新的问题 (对齐 commit 9101b3a)
         })
 
         Blank()
 
+        // 刷新列表按钮
+        Button({ type: ButtonType.Circle }) {
+          Text('🔄')
+            .fontSize(13)
+        }
+        .width(32)
+        .height(32)
+        .backgroundColor(AppColors.whiteAlpha08)
+        .onClick(() => {
+          this.refreshData();
+        })
+
         if (this.currentTab === 1 && this.historyList.length > 0) {
-          Button('清空历史')
+          Button('清空')
             .fontSize(12)
             .fontColor(AppColors.textSecondaryDark)
             .backgroundColor(AppColors.transparent)
+            .height(32)
+            .padding({ left: 8, right: 8 })
             .onClick(() => {
               this.clearAllHistory();
             })
         }
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 4, bottom: 12 })
+      .padding({ left: 16, right: 16, top: 2, bottom: 10 })
 
-      // 主内容区
+      // 主内容区: 升级为紧凑多列自适应网格 (3列，对齐 Flutter commit 0f8c861)
       if (this.currentTab === 0) {
-        // "追剧" 收藏列表
+        // "追剧" 收藏网格
         if (this.favoriteList.length === 0) {
           Column({ space: 12 }) {
             Text('🎬')
@@ -232,75 +254,70 @@ export struct AccountPage {
           .width('100%')
           .justifyContent(FlexAlign.Center)
         } else {
-          List({ space: 10 }) {
+          Grid() {
             ForEach(this.favoriteList, (drama: DramaItem) => {
-              ListItem() {
-                Row({ space: 12 }) {
-                  Image(drama.coverUrl)
-                    .width(60)
-                    .height(80)
-                    .borderRadius(AppDimensions.radiusSm)
-                    .objectFit(ImageFit.Cover)
-                    .backgroundColor(AppColors.bgCard)
+              GridItem() {
+                Column() {
+                  Stack({ alignContent: Alignment.BottomEnd }) {
+                    Image(drama.coverUrl)
+                      .width('100%')
+                      .height(148)
+                      .borderRadius(AppDimensions.radiusSm)
+                      .objectFit(ImageFit.Cover)
+                      .backgroundColor(AppColors.bgCardHover)
 
-                  Column({ space: 6 }) {
-                    Text(drama.title)
-                      .fontSize(15)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(AppColors.textPrimary)
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-                    Text(drama.remarks || '连载中')
-                      .fontSize(12)
-                      .fontColor(AppColors.textSecondary)
-
-                    Blank()
-
-                    Row({ space: 8 }) {
-                      Button('继续播放')
-                        .fontSize(11)
+                    if (drama.remarks) {
+                      Text(drama.remarks)
+                        .fontSize(9.5)
                         .fontColor(AppColors.white)
-                        .backgroundColor(AppColors.hongguoRed)
-                        .height(26)
-                        .borderRadius(13)
-                        .padding({ left: 12, right: 12 })
-                        .onClick(() => {
-                          this.openDramaDetail(drama);
-                        })
-
-                      Button('取消追剧')
-                        .fontSize(11)
-                        .fontColor(AppColors.textSecondary)
-                        .backgroundColor(AppColors.bgElevated)
-                        .height(26)
-                        .borderRadius(13)
-                        .padding({ left: 10, right: 10 })
-                        .onClick(() => {
-                          this.removeFavorite(drama.id);
-                        })
+                        .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+                        .backgroundColor(AppColors.maskDark65)
+                        .borderRadius({ topLeft: 4, bottomRight: AppDimensions.radiusSm })
                     }
                   }
-                  .layoutWeight(1)
-                  .height(80)
-                  .alignItems(HorizontalAlign.Start)
+                  .width('100%')
+                  .height(148)
+
+                  Text(drama.title)
+                    .fontSize(12.5)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(AppColors.textPrimary)
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .margin({ top: 5, bottom: 2 })
+                    .width('100%')
+
+                  Row() {
+                    Text('连载中')
+                      .fontSize(10.5)
+                      .fontColor(AppColors.textSecondary)
+                      .layoutWeight(1)
+
+                    Text('取消')
+                      .fontSize(10)
+                      .fontColor(AppColors.hongguoRed)
+                      .onClick(() => {
+                        this.removeFavorite(drama.id);
+                      })
+                  }
+                  .width('100%')
                 }
                 .width('100%')
-                .padding(AppDimensions.paddingMd)
-                .backgroundColor(AppColors.bgCard)
-                .borderRadius(AppDimensions.radiusMd)
                 .onClick(() => {
                   this.openDramaDetail(drama);
                 })
               }
             })
           }
+          .columnsTemplate('1fr 1fr 1fr')
+          .columnsGap(10)
+          .rowsGap(12)
           .width('100%')
           .layoutWeight(1)
-          .padding({ left: 16, right: 16, bottom: 16 })
+          .padding({ left: 14, right: 14, bottom: 16 })
         }
       } else {
-        // "历史记录" 观看历史列表
+        // "历史记录" 观看历史网格 (3列紧凑网格)
         if (this.historyList.length === 0) {
           Column({ space: 12 }) {
             Text('🕒')
@@ -317,72 +334,65 @@ export struct AccountPage {
           .width('100%')
           .justifyContent(FlexAlign.Center)
         } else {
-          List({ space: 10 }) {
+          Grid() {
             ForEach(this.historyList, (item: WatchHistoryItem) => {
-              ListItem() {
-                Row({ space: 12 }) {
-                  Image(item.coverUrl)
-                    .width(60)
-                    .height(80)
-                    .borderRadius(AppDimensions.radiusSm)
-                    .objectFit(ImageFit.Cover)
-                    .backgroundColor(AppColors.bgCard)
+              GridItem() {
+                Column() {
+                  Stack({ alignContent: Alignment.BottomEnd }) {
+                    Image(item.coverUrl)
+                      .width('100%')
+                      .height(148)
+                      .borderRadius(AppDimensions.radiusSm)
+                      .objectFit(ImageFit.Cover)
+                      .backgroundColor(AppColors.bgCardHover)
 
-                  Column({ space: 6 }) {
-                    Text(item.dramaTitle)
-                      .fontSize(15)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(AppColors.textPrimary)
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-                    Text(`观看到第 ${item.episodeIndex} 集`)
-                      .fontSize(12)
-                      .fontColor(AppColors.hongguoRed)
-
-                    Blank()
-
-                    Row({ space: 8 }) {
-                      Button('续播')
-                        .fontSize(11)
-                        .fontColor(AppColors.white)
-                        .backgroundColor(AppColors.hongguoRed)
-                        .height(26)
-                        .borderRadius(13)
-                        .padding({ left: 12, right: 12 })
-                        .onClick(() => {
-                          this.playFromHistory(item);
-                        })
-
-                      Button('删除')
-                        .fontSize(11)
-                        .fontColor(AppColors.textSecondary)
-                        .backgroundColor(AppColors.bgElevated)
-                        .height(26)
-                        .borderRadius(13)
-                        .padding({ left: 10, right: 10 })
-                        .onClick(() => {
-                          this.removeHistory(item.dramaId);
-                        })
-                    }
+                    Text(`第 ${item.episodeIndex} 集`)
+                      .fontSize(9.5)
+                      .fontColor(AppColors.white)
+                      .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+                      .backgroundColor(AppColors.hongguoRed)
+                      .borderRadius({ topLeft: 4, bottomRight: AppDimensions.radiusSm })
                   }
-                  .layoutWeight(1)
-                  .height(80)
-                  .alignItems(HorizontalAlign.Start)
+                  .width('100%')
+                  .height(148)
+
+                  Text(item.dramaTitle)
+                    .fontSize(12.5)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(AppColors.textPrimary)
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .margin({ top: 5, bottom: 2 })
+                    .width('100%')
+
+                  Row() {
+                    Text('继续观看')
+                      .fontSize(10.5)
+                      .fontColor(AppColors.hongguoOrange)
+                      .layoutWeight(1)
+
+                    Text('删除')
+                      .fontSize(10)
+                      .fontColor(AppColors.textSecondary)
+                      .onClick(() => {
+                        this.removeHistory(item.dramaId);
+                      })
+                  }
+                  .width('100%')
                 }
                 .width('100%')
-                .padding(AppDimensions.paddingMd)
-                .backgroundColor(AppColors.bgCard)
-                .borderRadius(AppDimensions.radiusMd)
                 .onClick(() => {
                   this.playFromHistory(item);
                 })
               }
             })
           }
+          .columnsTemplate('1fr 1fr 1fr')
+          .columnsGap(10)
+          .rowsGap(12)
           .width('100%')
           .layoutWeight(1)
-          .padding({ left: 16, right: 16, bottom: 16 })
+          .padding({ left: 14, right: 14, bottom: 16 })
         }
       }
     }

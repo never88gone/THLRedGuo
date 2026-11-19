@@ -4,6 +4,7 @@ import hilog from '@ohos.hilog';
 import { DramaItem, DramaDetail, EpisodeInfo, SeasonInfo } from '../../models/Drama';
 import { PlayResult } from '../../models/Episode';
 import { CategoryItem } from '../../models/Category';
+import { CommentItem, CommentPage, CommentReplyItem, CommentReplyPage } from '../../models/Comment';
 import { Constants } from '../../common/Constants';
 import { normalizeCoverUrl } from '../../common/CoverUtils';
 import {
@@ -16,7 +17,10 @@ import {
   bridgeFeed,
   bridgeRankingBoards,
   bridgeRankings,
-  bridgeSuggestions
+  bridgeSuggestions,
+  bridgeComments,
+  bridgeCommentReplies,
+  bridgeCreatorWorks
 } from './HongGuoBridge';
 
 const TAG = 'CatPawJsRuntime';
@@ -352,6 +356,94 @@ export class CatPawJsRuntime {
       const fallback: RawRankingResult = { list: [], page: page, hasMore: false };
       return fallback;
     }
+  }
+
+  /**
+   * 获取短剧评论列表 (对齐 Flutter fetchCommentList)
+   */
+  public async fetchComments(bookId: string, cursor: string = '', count: number = 20): Promise<CommentPage> {
+    try {
+      await this.init();
+      const res = await bridgeComments(bookId, cursor, count);
+      if (res && typeof res === 'object') {
+        const rawList: Record<string, Object>[] = Array.isArray(res.list) ? res.list : [];
+        const list: CommentItem[] = [];
+        for (let i = 0; i < rawList.length; i++) {
+          const item = rawList[i];
+          list.push({
+            id: String(item['id'] || ''),
+            text: String(item['text'] || ''),
+            userName: String(item['userName'] || '红果用户'),
+            userAvatar: String(item['userAvatar'] || ''),
+            userId: String(item['userId'] || ''),
+            createTime: Number(item['createTime'] || 0),
+            diggCount: Number(item['diggCount'] || 0),
+            replyCount: Number(item['replyCount'] || 0)
+          });
+        }
+        return {
+          total: Number(res.total || 0),
+          hasMore: Boolean(res.hasMore),
+          cursor: String(res.cursor || ''),
+          list: list
+        };
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'fetchComments error: %{public}s', JSON.stringify(e));
+    }
+    return { total: 0, hasMore: false, cursor: '', list: [] };
+  }
+
+  /**
+   * 获取评论回复列表 (对齐 Flutter fetchCommentReplyList)
+   */
+  public async fetchCommentReplies(commentId: string, bookId: string, cursor: string = '', count: number = 20): Promise<CommentReplyPage> {
+    try {
+      await this.init();
+      const res = await bridgeCommentReplies(commentId, bookId, cursor, count);
+      if (res && typeof res === 'object') {
+        const rawList: Record<string, Object>[] = Array.isArray(res.list) ? res.list : [];
+        const list: CommentReplyItem[] = [];
+        for (let i = 0; i < rawList.length; i++) {
+          const item = rawList[i];
+          list.push({
+            id: String(item['id'] || ''),
+            text: String(item['text'] || ''),
+            userName: String(item['userName'] || '红果用户'),
+            userAvatar: String(item['userAvatar'] || ''),
+            userId: String(item['userId'] || ''),
+            replyToUserName: String(item['replyToUserName'] || ''),
+            createTime: Number(item['createTime'] || 0),
+            diggCount: Number(item['diggCount'] || 0)
+          });
+        }
+        return {
+          total: Number(res.total || 0),
+          hasMore: Boolean(res.hasMore),
+          cursor: String(res.cursor || ''),
+          list: list
+        };
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'fetchCommentReplies error: %{public}s', JSON.stringify(e));
+    }
+    return { total: 0, hasMore: false, cursor: '', list: [] };
+  }
+
+  /**
+   * 获取红果创作者/主播短剧作品 (对齐 Flutter creatorWorks)
+   */
+  public async fetchCreatorWorks(userId: string, cursor: string = '', count: number = 20): Promise<DramaItem[]> {
+    try {
+      await this.init();
+      const res = await bridgeCreatorWorks(userId, cursor, count);
+      if (res && Array.isArray(res.items)) {
+        return this.mapRawList(res.items);
+      }
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'fetchCreatorWorks error: %{public}s', JSON.stringify(e));
+    }
+    return [];
   }
 
   private mapRawList(rawList: RawVodItem[]): DramaItem[] {
