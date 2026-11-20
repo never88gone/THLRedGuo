@@ -3,6 +3,16 @@ import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
 
 const playbackSpeeds = [.5, .75, 1.0, 1.25, 1.5, 2.0, 3.0];
 
+enum PlayerFillStyle {
+  black('纯黑', '传统经典纯黑底色，沉浸无干扰'),
+  theme('目前应该使用的主题色', '融合当前应用深色或浅色主题背景色'),
+  cover('短剧的图片', '提取当前播放短剧海报进行氛围高斯模糊填充');
+
+  const PlayerFillStyle(this.label, this.description);
+  final String label;
+  final String description;
+}
+
 enum PlaybackDecoderMode {
   hardware('极速硬解优先', '启用 GPU/MediaCodec 硬件加速，大屏低功耗更流畅'),
   compatible('兼容稳定模式', 'MediaKit 兼容软解引擎，专治黑屏无画面、声音正常但无图像');
@@ -24,6 +34,7 @@ class PlaybackPreferences {
     this.enhancement = const VideoEnhancementPreferences(),
     this.decoderMode = PlaybackDecoderMode.hardware,
     this.volume = 100.0,
+    this.fillStyle = PlayerFillStyle.black,
   });
 
   final double speed;
@@ -36,6 +47,7 @@ class PlaybackPreferences {
   final VideoEnhancementPreferences enhancement;
   final PlaybackDecoderMode decoderMode;
   final double volume;
+  final PlayerFillStyle fillStyle;
 
   PlaybackPreferences copyWith({
     double? speed,
@@ -48,6 +60,7 @@ class PlaybackPreferences {
     VideoEnhancementPreferences? enhancement,
     PlaybackDecoderMode? decoderMode,
     double? volume,
+    PlayerFillStyle? fillStyle,
   }) => PlaybackPreferences(
     speed: speed ?? this.speed,
     quality: quality ?? this.quality,
@@ -59,6 +72,7 @@ class PlaybackPreferences {
     enhancement: enhancement ?? this.enhancement,
     decoderMode: decoderMode ?? this.decoderMode,
     volume: volume ?? this.volume,
+    fillStyle: fillStyle ?? this.fillStyle,
   );
 
   Map<String, dynamic> toJson() => {
@@ -72,6 +86,7 @@ class PlaybackPreferences {
     'enhancement': enhancement.toJson(),
     'decoderMode': decoderMode.name,
     'volume': volume,
+    'fillStyle': fillStyle.name,
   };
 
   factory PlaybackPreferences.fromJson(Map<String, dynamic> value) {
@@ -90,6 +105,11 @@ class PlaybackPreferences {
       orElse: () => PlaybackDecoderMode.hardware,
     );
     final volume = (value['volume'] as num? ?? 100.0).toDouble().clamp(0.0, 100.0);
+    final fillStyleStr = value['fillStyle'] as String?;
+    final fillStyle = PlayerFillStyle.values.firstWhere(
+      (e) => e.name == fillStyleStr,
+      orElse: () => PlayerFillStyle.black,
+    );
     if (!playbackSpeeds.contains(speed) || quality < 0 || quality > 4320) {
       throw const FormatException('播放偏好无效');
     }
@@ -104,6 +124,7 @@ class PlaybackPreferences {
       enhancement: VideoEnhancementPreferences.fromJson(value['enhancement']),
       decoderMode: decoderMode,
       volume: volume,
+      fillStyle: fillStyle,
     );
   }
 }

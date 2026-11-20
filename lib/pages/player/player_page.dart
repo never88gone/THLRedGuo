@@ -201,6 +201,7 @@ class PlayerScreenState extends State<PlayerScreen>
     preload: _preloadEnabled,
     enhancement: _enhancement.preferences,
     volume: _player.state.volume,
+    fillStyle: widget.store.playbackPreferences.fillStyle,
   );
   String get _qualityLabel {
     if (_plan?.offline == true) return '本地原画';

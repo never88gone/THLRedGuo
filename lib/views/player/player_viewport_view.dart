@@ -22,6 +22,7 @@ import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 import 'package:THLRedLook/views/player/player_controls_view.dart';
 import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
+import 'package:THLRedLook/core/player/playback_preferences.dart';
 
 /// 播放器画面视口组件（视频画面、手势、HUD、弹幕图层、加载中/错误兜底面板）
 class PlayerViewportView extends StatelessWidget {
@@ -84,10 +85,12 @@ class PlayerViewportView extends StatelessWidget {
     required this.onTelevisionSettings,
     this.onComments,
     this.onFetchDiagnostics,
+    this.fillStyle,
     this.topPadding = 0.0,
   });
 
   final double topPadding;
+  final PlayerFillStyle? fillStyle;
   final VoidCallback? onComments;
   final Future<PlaybackTechnicalDiagnostics?> Function()? onFetchDiagnostics;
   final bool television;
@@ -379,16 +382,8 @@ class PlayerViewportView extends StatelessWidget {
               Positioned.fill(
                 child: IgnorePointer(child: SizedBox.expand(key: videoPaneKey)),
               ),
-              // 0. 最底层托底背景（电视大屏使用纯黑底衬，避免彩色漫反射破坏电视背光分区控光与黑位对比度；移动端保留适度毛玻璃）
-              if (!television && !pictureInPictureVisible)
-                DramaBackdrop(
-                  drama: detail.drama,
-                  repository: repository,
-                  sigma: 32.0,
-                  dimColor: AppColors.blackWithAlpha(0.72),
-                )
-              else
-                const ColoredBox(color: AppColors.black),
+              // 0. 最底层托底背景（根据用户设置的播放器填充样式：纯黑 / 当前主题色 / 短剧海报氛围）
+              _buildFillBackground(context),
               Positioned(
                 top: topPadding,
                 left: 0,
@@ -570,5 +565,40 @@ class PlayerViewportView extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Widget _buildFillBackground(BuildContext context) {
+    if (pictureInPictureVisible) {
+      return const ColoredBox(color: AppColors.black);
+    }
+    final effectiveStyle = fillStyle ?? store.playbackPreferences.fillStyle;
+    switch (effectiveStyle) {
+      case PlayerFillStyle.black:
+        return const ColoredBox(
+          key: ValueKey('player-fill-background-black'),
+          color: AppColors.black,
+        );
+      case PlayerFillStyle.theme:
+        final mode = store.themeMode;
+        final isDark = mode == 'dark' ||
+            (mode != 'light' &&
+                MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+        final themeColor =
+            isDark ? AppColors.darkBackground : AppColors.lightBackground;
+        return ColoredBox(
+          key: const ValueKey('player-fill-background-theme'),
+          color: themeColor,
+        );
+      case PlayerFillStyle.cover:
+        return KeyedSubtree(
+          key: const ValueKey('player-fill-background-cover'),
+          child: DramaBackdrop(
+            drama: detail.drama,
+            repository: repository,
+            sigma: 32.0,
+            dimColor: AppColors.blackWithAlpha(0.72),
+          ),
+        );
+    }
   }
 }

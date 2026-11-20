@@ -16,6 +16,7 @@ import 'package:THLRedLook/core/sync/icloud_sync_service.dart';
 import 'package:THLRedLook/pages/settings/display_mode_page.dart';
 import 'package:THLRedLook/pages/settings/js_sources_page.dart';
 import 'package:THLRedLook/pages/settings/playback_settings_page.dart';
+import 'package:THLRedLook/pages/settings/player_fill_settings_page.dart';
 import 'package:THLRedLook/pages/settings/resource_settings_page.dart';
 import 'package:THLRedLook/pages/settings/source_diagnostics_page.dart';
 import 'package:THLRedLook/pages/settings/storage_page.dart';
@@ -159,6 +160,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       MaterialPageRoute<void>(
                         builder: (_) =>
                             PlaybackSettingsPage(store: widget.store),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  ListTile(
+                    key: const ValueKey('settings-player-fill-entry'),
+                    leading: const Icon(Icons.aspect_ratio_rounded),
+                    title: const Text('播放器填充样式'),
+                    subtitle: Text(
+                      '当前：${playPrefs.fillStyle.label} · 视频未铺满区域背景样式',
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            PlayerFillSettingsPage(store: widget.store),
                       ),
                     ),
                   ),

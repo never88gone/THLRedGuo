@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/pages/settings/player_fill_settings_page.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 
@@ -149,6 +150,20 @@ class PlaybackSettingsPage extends StatelessWidget {
                       subtitle: Text('${prefs.speed}x'),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => _chooseSpeed(context),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    ListTile(
+                      key: const ValueKey('playback-settings-fill-style-entry'),
+                      leading: const Icon(Icons.aspect_ratio_rounded),
+                      title: const Text('播放器填充样式'),
+                      subtitle: Text(prefs.fillStyle.label),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => PlayerFillSettingsPage(store: store),
+                        ),
+                      ),
                     ),
                     if (defaultTargetPlatform == TargetPlatform.android ||
                         defaultTargetPlatform == TargetPlatform.iOS) ...[
