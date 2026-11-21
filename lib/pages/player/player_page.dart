@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'player_pip_coordinator.dart';
 import '../../core/account/hongguo_account_session.dart';
 import 'dart:io';
 
@@ -125,7 +126,6 @@ class PlayerScreenState extends State<PlayerScreen>
   Timer? _saveTimer;
   Timer? _healthTimer;
   Timer? _errorTimer;
-  Timer? _pictureInPictureExitTimer;
   Timer? _diagnosticsTimer;
   Timer? _volumeSaveTimer;
   Future<void> _operations = Future<void>.value();
@@ -155,14 +155,11 @@ class PlayerScreenState extends State<PlayerScreen>
   bool _pendingError = false;
   bool _requireRecovery = false;
   bool _encryptedVideoOutputFailed = false;
-  bool _pictureInPictureSupported = false;
-  bool _pictureInPictureActive = false;
-  bool _pictureInPictureRequested = false;
-  bool _pictureInPictureHandlerInstalled = false;
-  bool _lastNativePipAutoEnter = false;
-  int _lastNativePipWidth = 0;
-  int _lastNativePipHeight = 0;
-  int? _pipOriginalIndex;
+  late final PlayerPipCoordinator _pipCoordinator;
+  bool get _pictureInPictureActive => _pipCoordinator.active;
+  bool get _pictureInPictureRequested => _pipCoordinator.requested;
+  bool get _pictureInPictureVisible => _pipCoordinator.isVisible;
+  bool get _canUsePictureInPicture => !_television && _pipCoordinator.canUse;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   String _loadingMessage = '正在准备播放';
   String? _error;
@@ -174,16 +171,6 @@ class PlayerScreenState extends State<PlayerScreen>
   bool _rotating = false;
   bool _television = false;
   AppOrientationController? _orientationController;
-  bool get _pictureInPictureVisible =>
-      _pictureInPictureActive ||
-      (defaultTargetPlatform == TargetPlatform.android &&
-          _pictureInPictureRequested);
-  bool get _canUsePictureInPicture =>
-      !_television &&
-      widget.store.playbackPreferences.pictureInPicture &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS) &&
-      _pictureInPictureSupported;
   bool get _mobile =>
       !_television &&
       (defaultTargetPlatform == TargetPlatform.android ||
@@ -305,6 +292,44 @@ class PlayerScreenState extends State<PlayerScreen>
     _playerFocus.addListener(() {
       if (!_playerFocus.hasPrimaryFocus && !_closed) _interactions.cancel();
     });
+    _pipCoordinator = PlayerPipCoordinator(
+      getContext: () => context,
+      isMounted: () => mounted,
+      isClosed: () => _closed,
+      getDetail: () => _detail,
+      getCurrentIndex: () => _index,
+      setCurrentIndex: (idx) {
+        _index = idx;
+        _openedIndex = idx;
+        _menuRevision.value++;
+        unawaited(_saveProgress(flush: true));
+      },
+      getPlan: () => _plan,
+      getPlayer: () => _player,
+      getRequestedQuality: () => _requestedQuality,
+      getSpeed: () => _speed,
+      getAspectRatio: () => _aspectRatio,
+      getVideoPaneKey: () => _videoPaneKey,
+      isFeed: widget.feed,
+      isLocalOnly: widget.localOnly,
+      getPlayIntent: () => _playIntent,
+      getIsLoading: () => _loading,
+      getError: () => _error,
+      getOpenedIndex: () => _openedIndex,
+      getLifecycleState: () => _lifecycleState,
+      getStore: () => widget.store,
+      getEncryptedPlayback: () => _encryptedPlayback,
+      onStatusChanged: () {
+        if (mounted && !_closed) setState(() {});
+      },
+      onEpisodeAdvanced: (nextIndex) {},
+      onPlay: (idx, {position = 0.0}) => _play(idx, position: position),
+      onSeekTo: (target) => _seekTo(target),
+      onDismissOverlays: _dismissOverlaysForPictureInPicture,
+      onNotice: (msg) => _notice(msg),
+      onApplyLifecycleVisibility: ({pauseWhenHidden = true}) =>
+          _applyLifecycleVisibility(pauseWhenHidden: pauseWhenHidden),
+    );
     _configurePictureInPicture();
     _subscriptions.add(
       _player.stream.error.listen((error) {
@@ -470,7 +495,9 @@ class PlayerScreenState extends State<PlayerScreen>
           _seriesEntries = entries;
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      DiaryService.warn('Series', '多季信息发现失败', e);
+    }
   }
 
   Future<void> _switchSeason(Drama seasonDrama) async {
@@ -640,172 +667,9 @@ class PlayerScreenState extends State<PlayerScreen>
     _syncNativePictureInPictureConfig();
   }
 
-  void _syncPictureInPictureSession() {
-    _pictureInPictureHandlerInstalled = true;
-    _pipOriginalIndex ??= _index;
-    PipManager.instance.registerPictureInPictureSession(
-      detail: _detail,
-      episodeIndex: _index,
-      positionMs: _player.state.position.inMilliseconds,
-      quality: _requestedQuality,
-      speed: _speed,
-      localOnly: widget.localOnly,
-      onEpisodeAdvanced: (nextIndex) {
-        if (mounted && !_closed) {
-          setState(() {
-            _index = nextIndex;
-            _openedIndex = nextIndex;
-          });
-          _menuRevision.value++;
-          unawaited(_saveProgress(flush: true));
-        }
-      },
-      onRestoreCurrentPlayer: (positionMs) {
-        if (mounted && !_closed) {
-          final advanced =
-              _pipOriginalIndex != null && _pipOriginalIndex != _index;
-          _pipOriginalIndex = null;
-          _setPictureInPictureStatus(active: false);
-          if (advanced) {
-            unawaited(
-              _play(
-                _index,
-                position: positionMs > 0 ? positionMs / 1000.0 : 0.0,
-              ),
-            );
-          } else {
-            if (positionMs > 0) {
-              unawaited(_seekTo(Duration(milliseconds: positionMs)));
-            }
-            if (_playIntent && !_loading && _error == null) {
-              unawaited(_player.play());
-            }
-          }
-        }
-      },
-      onPictureInPictureStatusChanged: (active, error, position) {
-        if (mounted && !_closed) {
-          if (active) {
-            _dismissOverlaysForPictureInPicture();
-          }
-          if (error != null && error.isNotEmpty) {
-            _notice('画中画提示: ${_localizePipError(error)}');
-          }
-          if (active) {
-            _pipOriginalIndex = _index;
-            if (Platform.isIOS && _player.state.playing) {
-              unawaited(_player.pause());
-            }
-          } else {
-            final advanced =
-                _pipOriginalIndex != null && _pipOriginalIndex != _index;
-            _pipOriginalIndex = null;
-            if (advanced) {
-              unawaited(
-                _play(
-                  _index,
-                  position: position != null && position > 0
-                      ? position / 1000.0
-                      : 0.0,
-                ),
-              );
-            } else {
-              if (position != null && position > 0) {
-                unawaited(_seekTo(Duration(milliseconds: position)));
-              }
-              if (_playIntent && !_loading && _error == null) {
-                unawaited(_player.play());
-              }
-            }
-          }
-          _setPictureInPictureStatus(
-            active: active,
-            requested: false,
-            delayHiddenPause: !active,
-          );
-          _syncNativePictureInPictureConfig();
-        }
-      },
-    );
-  }
+  void _syncPictureInPictureSession() => _pipCoordinator.syncSession();
 
-  void _configurePictureInPicture() {
-    if (widget.feed) return;
-    if (defaultTargetPlatform != TargetPlatform.android &&
-        defaultTargetPlatform != TargetPlatform.iOS) {
-      return;
-    }
-    _syncPictureInPictureSession();
-    unawaited(_refreshPictureInPictureStatus());
-  }
-
-  Future<void> _refreshPictureInPictureStatus() async {
-    if (defaultTargetPlatform != TargetPlatform.android &&
-        defaultTargetPlatform != TargetPlatform.iOS) {
-      return;
-    }
-    try {
-      final status = await AppDevice.channel.invokeMapMethod<String, dynamic>(
-        'pictureInPictureStatus',
-      );
-      if (!mounted || _closed) return;
-      _setPictureInPictureStatus(
-        supported: status?['supported'] == true,
-        active: status?['active'] == true,
-      );
-    } on PlatformException {
-      if (mounted && !_closed) {
-        _setPictureInPictureStatus(supported: false, active: false);
-      }
-    } on MissingPluginException {
-      if (mounted && !_closed) {
-        _setPictureInPictureStatus(supported: false, active: false);
-      }
-    }
-  }
-
-  void _setPictureInPictureStatus({
-    bool? supported,
-    bool? active,
-    bool? requested,
-    bool delayHiddenPause = false,
-  }) {
-    final nextSupported = supported ?? _pictureInPictureSupported;
-    final nextActive = active ?? _pictureInPictureActive;
-    final nextRequested =
-        requested ?? (nextActive ? false : _pictureInPictureRequested);
-    void assign() {
-      _pictureInPictureSupported = nextSupported;
-      _pictureInPictureActive = nextActive;
-      _pictureInPictureRequested = nextRequested;
-    }
-
-    if (mounted && !_closed) {
-      setState(assign);
-    } else {
-      assign();
-    }
-    _syncNativePictureInPictureConfig();
-    if (_pictureInPictureVisible ||
-        _lifecycleState == AppLifecycleState.resumed ||
-        _lifecycleState == AppLifecycleState.inactive) {
-      _pictureInPictureExitTimer?.cancel();
-      _applyLifecycleVisibility(pauseWhenHidden: false);
-      return;
-    }
-    _pictureInPictureExitTimer?.cancel();
-    _applyLifecycleVisibility(pauseWhenHidden: !delayHiddenPause);
-    if (delayHiddenPause) {
-      _pictureInPictureExitTimer = Timer(const Duration(milliseconds: 700), () {
-        if (!_closed &&
-            !_pictureInPictureVisible &&
-            _lifecycleState != AppLifecycleState.resumed &&
-            _lifecycleState != AppLifecycleState.inactive) {
-          _applyLifecycleVisibility();
-        }
-      });
-    }
-  }
+  void _configurePictureInPicture() => _pipCoordinator.configure();
 
   void _dismissOverlaysForPictureInPicture() {
     _interactions.cancel();
@@ -822,56 +686,8 @@ class PlayerScreenState extends State<PlayerScreen>
     }
   }
 
-  (int, int) _pictureInPictureAspectDimensions() {
-    final rawRatio = _aspectRatio.isFinite && _aspectRatio > 0
-        ? _aspectRatio
-        : 16 / 9;
-    final ratio = rawRatio.clamp(1 / 2.39, 2.39).toDouble();
-    final width = ratio >= 1 ? (1000 * ratio).round() : 1000;
-    final height = ratio >= 1 ? 1000 : (1000 / ratio).round();
-    return (width, height);
-  }
-
-  bool get _shouldAutoEnterPictureInPicture =>
-      defaultTargetPlatform == TargetPlatform.android &&
-      !widget.feed &&
-      !_closed &&
-      _canUsePictureInPicture &&
-      !_loading &&
-      _error == null &&
-      _openedIndex == _index &&
-      _playIntent;
-
-  void _syncNativePictureInPictureConfig({bool force = false}) {
-    if (defaultTargetPlatform != TargetPlatform.android || widget.feed) {
-      return;
-    }
-    final autoEnter = _shouldAutoEnterPictureInPicture;
-    final dimensions = _pictureInPictureAspectDimensions();
-    final width = dimensions.$1;
-    final height = dimensions.$2;
-    if (!force &&
-        autoEnter == _lastNativePipAutoEnter &&
-        width == _lastNativePipWidth &&
-        height == _lastNativePipHeight) {
-      return;
-    }
-    _lastNativePipAutoEnter = autoEnter;
-    _lastNativePipWidth = width;
-    _lastNativePipHeight = height;
-    final sourceRect = autoEnter ? _pictureInPictureSourceRect() : null;
-    final arguments = <String, dynamic>{
-      'autoEnter': autoEnter,
-      'width': width,
-      'height': height,
-      ...?sourceRect,
-    };
-    unawaited(
-      AppDevice.channel
-          .invokeMethod<dynamic>('updatePictureInPictureConfig', arguments)
-          .catchError((Object _) => null),
-    );
-  }
+  void _syncNativePictureInPictureConfig({bool force = false}) =>
+      _pipCoordinator.syncNativeConfig(force: force);
 
   void _applyLifecycleVisibility({bool pauseWhenHidden = true}) {
     if (_closed) return;
@@ -911,237 +727,11 @@ class PlayerScreenState extends State<PlayerScreen>
     }
   }
 
-  String _localizePipError(String? error) {
-    if (error == null || error.trim().isEmpty) {
-      return '无法启动画中画，请检查系统画中画设置或稍后重试';
-    }
-    final lower = error.toLowerCase();
-    if (lower.contains('cannot be completed') ||
-        lower.contains('could not be completed') ||
-        lower.contains('couldn’t be completed')) {
-      return '系统画中画启动未就绪，请稍后重试';
-    }
-    return error;
-  }
+  Future<void> _enterPictureInPicture() =>
+      _pipCoordinator.enterPictureInPicture();
 
-  Future<void> _enterPictureInPicture() async {
-    if (_closed) return;
-    if (!_canUsePictureInPicture) {
-      _notice('画中画未开启或当前设备暂不支持');
-      return;
-    }
-    if (_loading) {
-      _notice('正在加载视频，请稍候开启画中画');
-      return;
-    }
-    if (_error != null) {
-      _notice('视频播放出错，无法开启画中画');
-      return;
-    }
-    if (_pictureInPictureRequested) {
-      if (defaultTargetPlatform != TargetPlatform.android) {
-        _notice('正在启动画中画，请稍候...');
-      }
-      return;
-    }
-    _dismissOverlaysForPictureInPicture();
-    final wasPlaying = _player.state.playing;
-    if (Platform.isIOS && wasPlaying) {
-      await _player.pause();
-    }
-    final (width, height) = _pictureInPictureAspectDimensions();
-    if (defaultTargetPlatform != TargetPlatform.android) {
-      _notice('正在启动画中画...');
-    }
-    _setPictureInPictureStatus(requested: true);
-
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || _closed) return;
-
-    final mediaUrl = _plan?.url.isNotEmpty == true
-        ? _plan!.url
-        : (_player is LunaExoPlayer ? _player.mediaUri : '');
-    final headers = _plan?.headers ?? const <String, String>{};
-
-    String targetUrl = mediaUrl;
-    Map<String, String> targetHeaders = headers;
-    final isEncryptedStream =
-        Platform.isIOS &&
-        _plan != null &&
-        _plan!.decryptionKey.isNotEmpty &&
-        !_plan!.local;
-
-    if (isEncryptedStream) {
-      _notice('正在准备画中画视频...');
-      try {
-        final prepared = await _encryptedPlayback.prepare(
-          _plan!,
-          forceCache: true,
-          progress: (val) {
-            if (mounted && !_closed) {
-              _notice('正在准备画中画 ${(val * 100).round()}%');
-            }
-          },
-        );
-        if (_closed || !mounted) return;
-        targetUrl = prepared.url;
-        targetHeaders = prepared.headers;
-      } catch (e) {
-        debugPrint('[PiP-Dart] 准备画中画加密视频失败: $e');
-        _notice('准备画中画视频失败: $e');
-        _setPictureInPictureStatus(requested: false);
-        if (Platform.isIOS && wasPlaying && !_closed) {
-          unawaited(_player.play());
-        }
-        return;
-      }
-    }
-
-    _pictureInPictureExitTimer?.cancel();
-    _pictureInPictureExitTimer = Timer(const Duration(seconds: 8), () {
-      if (!_closed && _pictureInPictureRequested && !_pictureInPictureActive) {
-        _setPictureInPictureStatus(requested: false);
-        _notice('无法进入画中画，请检查系统设置');
-        if (Platform.isIOS && wasPlaying && !_closed) {
-          unawaited(_player.play());
-        }
-      }
-    });
-
-    final sourceRect = _pictureInPictureSourceRect();
-    final arguments = <String, dynamic>{
-      'width': width,
-      'height': height,
-      if (targetUrl.isNotEmpty) 'url': targetUrl,
-      if (targetHeaders.isNotEmpty) 'headers': targetHeaders,
-      'title': _detail.drama.title,
-      'dramaId': _detail.drama.id,
-      'episodeIndex': _index,
-      'detail': _detail.toJson(),
-      'position': _player.state.position.inMilliseconds,
-      'speed': _speed,
-    };
-    if (sourceRect != null) arguments.addAll(sourceRect);
-    _syncPictureInPictureSession();
-    debugPrint(
-      '[PiP-Dart] enterPictureInPicture args: url=$targetUrl, pos=${arguments['position']}, sourceRect=$sourceRect',
-    );
-    try {
-      final status = await AppDevice.channel.invokeMapMethod<String, dynamic>(
-        'enterPictureInPicture',
-        arguments,
-      );
-      debugPrint('[PiP-Dart] enterPictureInPicture return: $status');
-      if (!mounted || _closed) return;
-      final supported = status?['supported'] == true;
-      final active = status?['active'] == true;
-      final requested = status?['requested'] == true;
-      final error = status?['error'] as String?;
-      _setPictureInPictureStatus(
-        supported: supported,
-        active: active,
-        requested: requested && !active,
-      );
-      if (!supported) {
-        _pictureInPictureExitTimer?.cancel();
-        _notice('当前系统或设备不支持画中画');
-        if (Platform.isIOS && wasPlaying && !_closed) {
-          unawaited(_player.play());
-        }
-      } else if (!active && !requested) {
-        _pictureInPictureExitTimer?.cancel();
-        _notice(_localizePipError(error));
-        if (Platform.isIOS && wasPlaying && !_closed) {
-          unawaited(_player.play());
-        }
-      }
-    } on PlatformException catch (e) {
-      _pictureInPictureExitTimer?.cancel();
-      _setPictureInPictureStatus(requested: false);
-      _notice(_localizePipError(e.message));
-      if (Platform.isIOS && wasPlaying && !_closed) {
-        unawaited(_player.play());
-      }
-    } on MissingPluginException {
-      _pictureInPictureExitTimer?.cancel();
-      _setPictureInPictureStatus(supported: false, requested: false);
-      _notice('当前平台不支持画中画');
-      if (Platform.isIOS && wasPlaying && !_closed) {
-        unawaited(_player.play());
-      }
-    } catch (e) {
-      _pictureInPictureExitTimer?.cancel();
-      _setPictureInPictureStatus(requested: false);
-      _notice('启动画中画异常: $e');
-      if (Platform.isIOS && wasPlaying && !_closed) {
-        unawaited(_player.play());
-      }
-    }
-  }
-
-  Future<void> _restoreFromPictureInPicture() async {
-    try {
-      final status = await AppDevice.channel.invokeMapMethod<String, dynamic>(
-        'stopPictureInPicture',
-      );
-      final position = (status?['position'] as num?)?.toInt();
-      if (position != null && position > 0) {
-        await _seekTo(Duration(milliseconds: position));
-      }
-    } catch (_) {}
-    _setPictureInPictureStatus(active: false, requested: false);
-    if (_playIntent && !_loading && _error == null) {
-      unawaited(_player.play());
-    }
-  }
-
-  Map<String, int>? _pictureInPictureSourceRect() {
-    final paneContext = _videoPaneKey.currentContext;
-    final renderObject = paneContext?.findRenderObject();
-    if (paneContext == null ||
-        renderObject is! RenderBox ||
-        !renderObject.hasSize) {
-      return null;
-    }
-    final topLeft = renderObject.localToGlobal(Offset.zero);
-    final size = renderObject.size;
-    if (size.width <= 0 || size.height <= 0) return null;
-    final rawRatio = _aspectRatio.isFinite && _aspectRatio > 0
-        ? _aspectRatio
-        : size.width / size.height;
-    final targetRatio = rawRatio.clamp(1 / 2.39, 2.39).toDouble();
-    final containerRatio = size.width / size.height;
-    late final double dx;
-    late final double dy;
-    late final double videoWidth;
-    late final double videoHeight;
-    if (containerRatio > targetRatio) {
-      videoHeight = size.height;
-      videoWidth = size.height * targetRatio;
-      dx = (size.width - videoWidth) / 2;
-      dy = 0;
-    } else {
-      videoWidth = size.width;
-      videoHeight = size.width / targetRatio;
-      dx = 0;
-      dy = (size.height - videoHeight) / 2;
-    }
-    final ratio =
-        MediaQuery.maybeOf(paneContext)?.devicePixelRatio ??
-        View.of(paneContext).devicePixelRatio;
-    final left = ((topLeft.dx + dx) * ratio).round().clamp(0, 100000);
-    final top = ((topLeft.dy + dy) * ratio).round().clamp(0, 100000);
-    final right = ((topLeft.dx + dx + videoWidth) * ratio).round().clamp(
-      0,
-      100000,
-    );
-    final bottom = ((topLeft.dy + dy + videoHeight) * ratio).round().clamp(
-      0,
-      100000,
-    );
-    if (right <= left || bottom <= top) return null;
-    return {'left': left, 'top': top, 'right': right, 'bottom': bottom};
-  }
+  Future<void> _restoreFromPictureInPicture() =>
+      _pipCoordinator.restoreFromPictureInPicture();
 
   void _attachLanPlayback() {
     LanController.current?.attachPlayback(
@@ -1418,7 +1008,9 @@ class PlayerScreenState extends State<PlayerScreen>
             await widget.repository.release(current.session);
           }
         });
-      } catch (_) {}
+      } catch (e) {
+        DiaryService.warn('Recover', '恢复过程释放资源异常', e);
+      }
       if (mounted && !_closed && ticket == _generation) {
         setState(() {
           _loading = false;
@@ -1944,7 +1536,8 @@ class PlayerScreenState extends State<PlayerScreen>
               ));
         }
       }
-    } catch (_) {
+    } catch (e) {
+      DiaryService.warn('Screen', '全屏旋转切换失败', e);
       if (mounted && !_closed) {
         setState(() {
           _fullscreen = previous;
@@ -2032,7 +1625,8 @@ class PlayerScreenState extends State<PlayerScreen>
     try {
       await widget.store.toggleFavorite(_detail.drama);
       if (mounted && !_closed) setState(() {});
-    } catch (_) {
+    } catch (e) {
+      DiaryService.warn('Store', '保存追剧记录失败', e);
       _notice('追剧记录未能保存，请检查存储空间后重试');
     }
   }
@@ -2041,7 +1635,8 @@ class PlayerScreenState extends State<PlayerScreen>
     if (_detail.drama.source != 'hongguo') return;
     try {
       await _setPreferences(_preferences.copyWith(danmaku: !_danmakuEnabled));
-    } catch (_) {
+    } catch (e) {
+      DiaryService.warn('Danmaku', '保存弹幕偏好失败', e);
       _notice('弹幕偏好未能保存，请重试');
     }
   }
@@ -2050,7 +1645,8 @@ class PlayerScreenState extends State<PlayerScreen>
     try {
       _danmaku.retry();
       _menuRevision.value++;
-    } catch (_) {
+    } catch (e) {
+      DiaryService.warn('Danmaku', '弹幕重试异常', e);
       _notice('弹幕重试失败，请稍后再试');
     }
   }
@@ -2230,7 +1826,8 @@ class PlayerScreenState extends State<PlayerScreen>
     try {
       await _player.seek(target);
       succeeded = true;
-    } catch (_) {
+    } catch (e) {
+      DiaryService.warn('Seek', '跳播寻址失败 target=$target', e);
       _notice('跳转失败，请重试');
     } finally {
       if (!_closed && ticket == _seekSequence && generation == _generation) {
@@ -2341,7 +1938,8 @@ class PlayerScreenState extends State<PlayerScreen>
           decoderMode: selection.decoderMode,
         ),
       );
-    } catch (_) {
+    } catch (e) {
+      DiaryService.warn('Preferences', '播放偏好保存失败', e);
       _notice('播放偏好未能保存，请重试');
     }
   }
@@ -2382,7 +1980,7 @@ class PlayerScreenState extends State<PlayerScreen>
     _saveTimer?.cancel();
     _healthTimer?.cancel();
     _errorTimer?.cancel();
-    _pictureInPictureExitTimer?.cancel();
+    _pipCoordinator.dispose();
     _diagnosticsTimer?.cancel();
     _volumeSaveTimer?.cancel();
     final latestVolume = _player.state.volume;
@@ -2391,9 +1989,6 @@ class PlayerScreenState extends State<PlayerScreen>
       unawaited(
         widget.store.setPlaybackPreferences(pref.copyWith(volume: latestVolume)),
       );
-    }
-    if (_pictureInPictureHandlerInstalled) {
-      PipManager.instance.notifyPlayerDisposed();
     }
     _interactions.dispose();
     _playerFocus.dispose();

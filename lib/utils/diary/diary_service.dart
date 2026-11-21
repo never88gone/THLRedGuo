@@ -24,6 +24,25 @@ class DiaryService {
     debugPrint('[Diary] $message');
   }
 
+  /// 记录一条警告日记
+  static void warn(String tag, String message, [Object? error]) {
+    final text =
+        error != null ? '[$tag] [警告] $message: $error' : '[$tag] [警告] $message';
+    add(text);
+  }
+
+  /// 记录一条错误日记
+  static void error(
+    String tag,
+    String message, [
+    Object? error,
+    StackTrace? stackTrace,
+  ]) {
+    final text =
+        error != null ? '[$tag] [错误] $message: $error' : '[$tag] [错误] $message';
+    add(text);
+  }
+
   /// 获取当前所有日记副本
   static List<String> get entries => List<String>.unmodifiable(_entries);
 

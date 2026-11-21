@@ -5,7 +5,6 @@ on:
     branches:
       - main
       - master
-      - dev
     tags:
       - 'v*'
     paths-ignore:
@@ -15,7 +14,6 @@ on:
     branches:
       - main
       - master
-      - dev
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -93,7 +91,7 @@ jobs:
   release-harmonyos:
     name: HarmonyOS HAP 产物自动发布至 GitHub Release
     needs: harmonyos
-    if: always() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' || github.ref_type == 'tag') && needs.harmonyos.result == 'success'
+    if: always() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref_type == 'tag') && needs.harmonyos.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

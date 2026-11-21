@@ -11,6 +11,7 @@ on:
       - '.github/ci/**'
       - '.github/workflows/build-tvos.yml'
   pull_request:
+    branches: [main, master]
     paths:
       - 'tvos/**'
       - 'shared/**'

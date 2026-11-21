@@ -3,6 +3,7 @@ import 'hongguo_social_models.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../js/catpaw_js_runtime.dart';
 import '../diagnostics/source_diagnostics.dart';
@@ -308,8 +309,9 @@ class HongguoAccountService {
       _check(revision);
       _trace(action, cookies, code: 'NETWORK_ERROR');
       throw const HongguoAccountFailure('账号网络连接失败，请检查网络后重试', 'NETWORK_ERROR');
-    } catch (_) {
+    } catch (e, st) {
       _check(revision);
+      debugPrint('[HongguoAccount] action=$action phase=$phase error=$e\n$st');
       final code = phase == 'prepare'
           ? 'PREPARATION_FAILED'
           : phase == 'parse'
@@ -781,8 +783,9 @@ class HongguoAccountService {
       } on HongguoAccountFailure catch (failure) {
         if (_isFatalAccountFailure(failure, revision)) rethrow;
         batchErrorCode = failure.code;
-      } catch (_) {
+      } catch (e) {
         _check(revision);
+        debugPrint('[HongguoAccount] 批量详情拉取异常: $e');
         batchErrorCode = 'BATCH_DETAIL_FAILED';
       }
     }
@@ -842,8 +845,9 @@ class HongguoAccountService {
               }
             } on HongguoAccountFailure catch (failure) {
               if (_isFatalAccountFailure(failure, revision)) rethrow;
-            } catch (_) {
+            } catch (e) {
               _check(revision);
+              debugPrint('[HongguoAccount] 详情回退拉取失败: $e');
             }
           }
         }),

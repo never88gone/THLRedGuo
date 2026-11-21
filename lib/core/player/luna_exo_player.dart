@@ -1120,7 +1120,9 @@ class LunaExoPlayer implements Player {
     if (c == null) return;
     try {
       await c.play();
-    } catch (_) {}
+    } catch (e) {
+      DiaryService.warn('ExoPlayer', 'controller.play() 失败', e);
+    }
   }
 
   @override
@@ -1130,7 +1132,9 @@ class LunaExoPlayer implements Player {
     if (c == null) return;
     try {
       await c.pause();
-    } catch (_) {}
+    } catch (e) {
+      DiaryService.warn('ExoPlayer', 'controller.pause() 失败', e);
+    }
   }
 
   @override
@@ -1192,7 +1196,9 @@ class LunaExoPlayer implements Player {
     if (c == null) return;
     try {
       await c.setPlaybackSpeed(r);
-    } catch (_) {}
+    } catch (e) {
+      DiaryService.warn('ExoPlayer', 'setPlaybackSpeed($r) 失败', e);
+    }
   }
 
   @override
@@ -1205,7 +1211,9 @@ class LunaExoPlayer implements Player {
     if (c == null) return;
     try {
       await c.setVolume(v / 100.0);
-    } catch (_) {}
+    } catch (e) {
+      DiaryService.warn('ExoPlayer', 'setVolume($v) 失败', e);
+    }
   }
 
   @override

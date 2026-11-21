@@ -350,17 +350,19 @@ class PlayerViewportView extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         if (!hideOverlayForPictureInPicture) ...[
-          DanmakuOverlay(
-            controller: danmaku,
-            aspectRatio: aspectRatio,
-            style: danmakuStyle ?? const DanmakuStyle(),
+          RepaintBoundary(
+            child: DanmakuOverlay(
+              controller: danmaku,
+              aspectRatio: aspectRatio,
+              style: danmakuStyle ?? const DanmakuStyle(),
+            ),
           ),
           ?controlsOverlay,
         ],
         if (hideOverlayForPictureInPicture)
           controls
         else if (controlsOverlay == null)
-          controls,
+          RepaintBoundary(child: controls),
       ],
     );
 
