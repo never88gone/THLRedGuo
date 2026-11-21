@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:THLRedLook/core/series/hongguo_series.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/player/episode_grid_tile.dart';
 
 /// 移动端沉浸式选集半屏抽屉面板
 class PlayerEpisodesSheetView extends StatefulWidget {
@@ -445,82 +446,11 @@ class _PlayerEpisodesSheetViewState extends State<PlayerEpisodesSheetView> {
                               final ep = episodes[epIndex];
                               final isPlaying = epIndex == widget.currentIndex;
 
-                              return InkWell(
-                                key: ValueKey('episode-option-$epIndex'),
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () {
-                                  widget.onEpisodeSelected(epIndex);
-                                },
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 150),
-                                  decoration: BoxDecoration(
-                                    color: isPlaying
-                                        ? null
-                                        : AppColors.darkSurfaceHigh,
-                                    gradient: isPlaying
-                                        ? const LinearGradient(
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                            colors: [
-                                              AppColors.hongguoRed,
-                                              AppColors.hongguoOrange,
-                                            ],
-                                          )
-                                        : null,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: isPlaying
-                                        ? null
-                                        : Border.all(
-                                            color: AppColors.whiteWithAlpha(0.03),
-                                            width: 0.8,
-                                          ),
-                                    boxShadow: isPlaying
-                                        ? [
-                                            BoxShadow(
-                                              color: AppColors.hongguoRedWithAlpha(
-                                                0.35,
-                                              ),
-                                              blurRadius: 10,
-                                              offset: const Offset(0, 3),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            '${ep.number}',
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: isPlaying
-                                                  ? FontWeight.w800
-                                                  : FontWeight.w600,
-                                              color: isPlaying
-                                                  ? AppColors.white
-                                                  : AppColors.textPrimaryDark,
-                                            ),
-                                          ),
-                                          if (isPlaying) ...[
-                                            const SizedBox(height: 2),
-                                            const Text(
-                                              '播放中',
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.white,
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              return EpisodeGridTile(
+                                episode: ep,
+                                epIndex: epIndex,
+                                isPlaying: isPlaying,
+                                onTap: () => widget.onEpisodeSelected(epIndex),
                               );
                             },
                             childCount: groupIndices.length,

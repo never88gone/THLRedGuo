@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:THLRedLook/core/sync/icloud_payload_codec.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/core/store/follow_state.dart';
@@ -134,28 +135,12 @@ class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
       final historyRaw = await _channel.invokeMethod<String>('getString', {
         'key': keyHistory,
       });
-      final List<WatchEntry> remoteHistory = [];
-      var historySkipped = false;
-      if (historyRaw != null && historyRaw.isNotEmpty) {
-        try {
-          final list = jsonDecode(historyRaw) as List;
-          for (final item in list) {
-            try {
-              remoteHistory.add(
-                WatchEntry.fromJson(Map<String, dynamic>.from(item as Map)),
-              );
-            } catch (_) {
-              historySkipped = true;
-            }
-          }
-          if (remoteHistory.length > maxHistoryCount) {
-            remoteHistory.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-            remoteHistory.removeRange(maxHistoryCount, remoteHistory.length);
-          }
-        } catch (e) {
-          rethrow;
-        }
-      }
+      final decodedHistoryResult = ICloudPayloadCodec.decodeHistory(
+        historyRaw,
+        maxHistoryCount,
+      );
+      final remoteHistory = decodedHistoryResult.history;
+      final historySkipped = decodedHistoryResult.skipped;
 
       // 2. 获取远端追剧信息 (Follows)
       final followsRaw = await _channel.invokeMethod<String>('getString', {
@@ -165,79 +150,13 @@ class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
       final List<Drama> remoteDramas = [];
       final Map<String, int> remoteDeletedFollows = {};
       final Map<String, int> remoteDeletedHistory = {};
-      var dramasSkipped = false;
-      if (followsRaw != null && followsRaw.isNotEmpty) {
-        try {
-          final map = jsonDecode(followsRaw) as Map<String, dynamic>;
-          if (map['follows'] is Map) {
-            final fMap = map['follows'] as Map;
-            for (final entry in fMap.entries) {
-              final key = entry.key.toString();
-              if (entry.value is String) {
-                final statusStr = (entry.value as String).toLowerCase();
-                FollowStatus status;
-                if (statusStr == 'watching') {
-                  status = FollowStatus.watching;
-                } else if (statusStr == 'watched' ||
-                    statusStr == 'finished' ||
-                    statusStr == 'completed') {
-                  status = FollowStatus.watched;
-                } else {
-                  status = FollowStatus.planned;
-                }
-                remoteFollows[key] = FollowState(status: status);
-              } else if (entry.value is Map) {
-                try {
-                  remoteFollows[key] = FollowState.fromJson(
-                    Map<String, dynamic>.from(entry.value as Map),
-                  );
-                } catch (_) {}
-              }
-            }
-          }
-          if (map['dramas'] is List) {
-            for (final d in map['dramas'] as List) {
-              try {
-                remoteDramas.add(
-                  Drama.fromJson(Map<String, dynamic>.from(d as Map)),
-                );
-              } catch (_) {
-                dramasSkipped = true;
-              }
-            }
-          }
-          final rawDelFollows = map['deletedFollows'] ?? map['deleted'];
-          if (rawDelFollows is Map) {
-            for (final entry in rawDelFollows.entries) {
-              final ts = entry.value is int
-                  ? entry.value as int
-                  : int.tryParse(entry.value.toString()) ?? 0;
-              if (ts > 0) remoteDeletedFollows[entry.key.toString()] = ts;
-            }
-          } else if (rawDelFollows is List) {
-            final now = DateTime.now().millisecondsSinceEpoch;
-            for (final item in rawDelFollows) {
-              if (item != null) remoteDeletedFollows[item.toString()] = now;
-            }
-          }
-          final rawDelHistory = map['deletedHistory'];
-          if (rawDelHistory is Map) {
-            for (final entry in rawDelHistory.entries) {
-              final ts = entry.value is int
-                  ? entry.value as int
-                  : int.tryParse(entry.value.toString()) ?? 0;
-              if (ts > 0) remoteDeletedHistory[entry.key.toString()] = ts;
-            }
-          } else if (rawDelHistory is List) {
-            final now = DateTime.now().millisecondsSinceEpoch;
-            for (final item in rawDelHistory) {
-              if (item != null) remoteDeletedHistory[item.toString()] = now;
-            }
-          }
-        } catch (e) {
-          rethrow;
-        }
-      }
+      final dramasSkipped = ICloudPayloadCodec.decodeFollows(
+        followsRaw,
+        outFollows: remoteFollows,
+        outDramas: remoteDramas,
+        outDeletedFollows: remoteDeletedFollows,
+        outDeletedHistory: remoteDeletedHistory,
+      );
 
       // 3. 获取远端配置项 (Settings)
       final settingsRaw = await _channel.invokeMethod<String>('getString', {
