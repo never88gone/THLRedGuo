@@ -20,10 +20,10 @@ public struct SettingsSyncPanel: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("iCloud 多端同步")
                     .font(.system(size: 32, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
                 Text("通过 Apple 官方 iCloud 键值存储，在登录同一 Apple ID 的 iOS、macOS 和 Apple TV 设备间实时同步配置、观看进度与追剧收藏。")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.65))
+                    .foregroundColor(TVColors.white.opacity(0.65))
             }
 
             // 1. 开关卡片
@@ -35,11 +35,11 @@ public struct SettingsSyncPanel: View {
                             .foregroundColor(TVTheme.primary)
                         Text("启用 iCloud 云端同步")
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(TVColors.white)
                     }
                     Text(icloudSync.isSyncEnabled ? "已开启 · 自动在苹果全生态设备间实时同步观看历史、追剧收藏与偏好设置" : "已停用 · 所有记录仅保存在当前设备，不进行云端同步")
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(TVColors.white.opacity(0.6))
                 }
                 Spacer()
                 Button(action: {
@@ -51,14 +51,14 @@ public struct SettingsSyncPanel: View {
                         Text(icloudSync.isSyncEnabled ? "已开启" : "已关闭")
                             .font(.system(size: 18, weight: .bold))
                     }
-                    .foregroundColor(icloudSync.isSyncEnabled ? .white : .white.opacity(0.85))
+                    .foregroundColor(icloudSync.isSyncEnabled ? TVColors.white : TVColors.white.opacity(0.85))
                     .padding(.horizontal, 28)
                     .padding(.vertical, 14)
                     .background(
                         RoundedRectangle(cornerRadius: 14)
                             .fill(icloudFocus == .toggle 
-                                  ? (icloudSync.isSyncEnabled ? TVTheme.primaryHover : Color.white.opacity(0.28)) 
-                                  : (icloudSync.isSyncEnabled ? TVTheme.primary : Color.white.opacity(0.14)))
+                                  ? (icloudSync.isSyncEnabled ? TVTheme.primaryHover : TVColors.white.opacity(0.28)) 
+                                  : (icloudSync.isSyncEnabled ? TVTheme.primary : TVColors.white.opacity(0.14)))
                     )
                     .tvFocusBorder(isFocused: icloudFocus == .toggle, cornerRadius: 14)
                 }
@@ -75,7 +75,7 @@ public struct SettingsSyncPanel: View {
                 }
             }
             .padding(24)
-            .background(Color.white.opacity(0.06))
+            .background(TVColors.white.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .focusSection()
 
@@ -89,18 +89,18 @@ public struct SettingsSyncPanel: View {
                                 .foregroundColor(TVTheme.primary)
                             Text("同步概览与状态")
                                 .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(TVColors.white)
                         }
 
                         Text(icloudSync.lastStatusMessage)
                             .font(.system(size: 15))
-                            .foregroundColor(.white.opacity(0.85))
+                            .foregroundColor(TVColors.white.opacity(0.85))
                             .accessibilityIdentifier("settings.icloud.status")
 
                         if let date = icloudSync.lastSyncDate {
                             Text("上次同步时间: " + DateFormatter.localizedString(from: date, dateStyle: .short, timeStyle: .medium))
                                 .font(.system(size: 13))
-                                .foregroundColor(.white.opacity(0.55))
+                                .foregroundColor(TVColors.white.opacity(0.55))
                         }
                     }
 
@@ -115,7 +115,7 @@ public struct SettingsSyncPanel: View {
                             Text(icloudSync.isSyncing ? "正在同步..." : "立刻同步")
                                 .font(.system(size: 18, weight: .bold))
                         }
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                         .padding(.horizontal, 28)
                         .padding(.vertical, 14)
                         .background(
@@ -138,7 +138,7 @@ public struct SettingsSyncPanel: View {
                     }
                 }
                 .padding(24)
-                .background(Color.white.opacity(0.06))
+                .background(TVColors.white.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .focusSection()
             }
@@ -150,4 +150,10 @@ public struct SettingsSyncPanel: View {
             }
         }
     }
+}
+
+#Preview {
+    SettingsSyncPanel()
+        .padding(50)
+        .background(TVColors.background)
 }

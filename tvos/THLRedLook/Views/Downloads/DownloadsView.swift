@@ -23,20 +23,20 @@ public struct DownloadsView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("下载与离线管理")
                                 .font(.system(size: 34, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(TVColors.white)
                             Text("管理本地存储的高清短剧切片，无网络环境下依然畅享大屏极致流畅播放。")
                                 .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(TVColors.white.opacity(0.6))
                         }
 
                         Spacer()
 
                         Text("共 \(viewModel.jobs.count) 个离线任务")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.65))
+                            .foregroundColor(TVColors.white.opacity(0.65))
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .background(Color.white.opacity(0.08))
+                            .background(TVColors.white.opacity(0.08))
                             .clipShape(Capsule())
 
                         if !viewModel.jobs.isEmpty {
@@ -61,20 +61,20 @@ public struct DownloadsView: View {
 
                             ZStack {
                                 Circle()
-                                    .fill(Color.white.opacity(0.05))
+                                    .fill(TVColors.white.opacity(0.05))
                                     .frame(width: 140, height: 140)
                                 Image(systemName: "arrow.down.circle")
                                     .font(.system(size: 72))
-                                    .foregroundColor(.white.opacity(0.4))
+                                    .foregroundColor(TVColors.white.opacity(0.4))
                             }
 
                             Text("暂无离线缓存短剧")
                                 .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(TVColors.white)
 
                             Text("在剧集详情页面中选择「缓存全剧」或指定剧集，即可下载至电视本地存储。\n离线切片独立保存在本地沙盒，无需网络随时打开畅看。")
                                 .font(.system(size: 18))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(TVColors.white.opacity(0.6))
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: 580)
                                 .lineSpacing(6)
@@ -95,7 +95,7 @@ public struct DownloadsView: View {
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 24)
-                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                                .stroke(TVColors.white.opacity(0.06), lineWidth: 1)
                         )
                         .padding(.horizontal, 48)
                         .padding(.bottom, 36)
@@ -111,32 +111,32 @@ public struct DownloadsView: View {
                                         VStack(alignment: .leading, spacing: 8) {
                                             Text("\(job.drama.title) · \(job.episode.displayTitle)")
                                                 .font(.system(size: 20, weight: .bold))
-                                                .foregroundColor(.white)
+                                                .foregroundColor(TVColors.white)
 
                                             HStack(spacing: 14) {
                                                 Text(job.stateLabel)
                                                     .font(.caption)
                                                     .fontWeight(.semibold)
-                                                    .foregroundColor(job.state == "failed" ? .red : (job.isCompleted ? .green : .secondary))
+                                                    .foregroundColor(job.state == "failed" ? TVColors.red : (job.isCompleted ? TVColors.green : TVColors.secondary))
                                                 if job.bytes > 0 {
                                                     let mbDone = String(format: "%.1f", Double(job.bytes) / 1024 / 1024)
                                                     let mbTotal = job.total > 0 ? String(format: "%.1f MB", Double(job.total) / 1024 / 1024) : "--"
                                                     Text("\(mbDone) MB / \(mbTotal)")
                                                         .font(.caption2)
-                                                        .foregroundColor(.secondary)
+                                                        .foregroundColor(TVColors.secondary)
                                                 }
                                             }
 
                                             if job.isActive {
                                                 ProgressView(value: job.progress)
-                                                    .progressViewStyle(LinearProgressViewStyle(tint: .red))
+                                                    .progressViewStyle(LinearProgressViewStyle(tint: TVColors.red))
                                                     .frame(width: 320)
                                             }
 
                                             if job.state == "failed" && !job.error.isEmpty {
                                                 Text(job.error)
                                                     .font(.caption2)
-                                                    .foregroundColor(.red.opacity(0.85))
+                                                    .foregroundColor(TVColors.red.opacity(0.85))
                                                     .lineLimit(1)
                                             }
                                         }
@@ -204,4 +204,9 @@ public struct DownloadsView: View {
             }
         }
     }
+}
+
+#Preview {
+    DownloadsView()
+        .background(TVColors.background)
 }

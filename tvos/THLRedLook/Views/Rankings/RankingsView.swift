@@ -60,7 +60,7 @@ public struct RankingsView: View {
                                 .foregroundColor(TVTheme.primary.opacity(0.8))
                             Text(viewModel.errorMessage ?? "当前榜单暂无可展示剧集")
                                 .font(.system(size: 24, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(TVColors.white.opacity(0.6))
                             TVButton(
                                 title: "重新加载榜单",
                                 icon: "arrow.clockwise",
@@ -102,10 +102,10 @@ public struct RankingsView: View {
                                         // 前三名金银铜徽章
                                         Text("\(viewModel.ranks[drama.id] ?? index + 1)")
                                             .font(.system(size: 14, weight: .black))
-                                            .foregroundColor(.white)
+                                            .foregroundColor(TVColors.white)
                                             .frame(width: 28, height: 28)
                                             .background(
-                                                index == 0 ? Color.yellow : (index == 1 ? Color.gray : (index == 2 ? Color.orange : Color.black.opacity(0.6)))
+                                                index == 0 ? TVColors.yellow : (index == 1 ? TVColors.gray : (index == 2 ? TVColors.orange : TVColors.black.opacity(0.6)))
                                             )
                                             .clipShape(Circle())
                                             .padding(8)
@@ -118,7 +118,7 @@ public struct RankingsView: View {
                                 }
                                 if viewModel.isLoadingMore { ProgressView("正在加载更多榜单剧集...") }
                                 if let message = viewModel.errorMessage {
-                                    Text(message).foregroundColor(.secondary)
+                                    Text(message).foregroundColor(TVColors.secondary)
                                     TVButton(title: "刷新榜单", icon: "arrow.clockwise") {
                                         Task { await viewModel.loadRankings() }
                                     }
@@ -296,4 +296,11 @@ public struct RankingsView: View {
         guard selectedDrama == nil else { return }
         focusedTarget = .card(nextID)
     }
+}
+
+#Preview {
+    RankingsView()
+        .environmentObject(JSSourceService.shared)
+        .environmentObject(LocalStore.shared)
+        .background(TVColors.background)
 }

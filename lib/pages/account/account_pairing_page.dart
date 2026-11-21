@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/account/account_pairing_crypto.dart';
 import '../../core/account/account_pairing_service.dart';
 import '../../core/account/hongguo_account_session.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 class AccountPairingReceiveScreen extends StatefulWidget {
   const AccountPairingReceiveScreen({super.key, required this.deviceName});
@@ -114,7 +115,7 @@ class _AccountPairingReceiveScreenState
                       data: receiver!.code!.encode(),
                       size: 280,
                       padding: const EdgeInsets.all(20),
-                      backgroundColor: Colors.white,
+                      backgroundColor: AppColors.white,
                       semanticsLabel: '糖葫芦 Haw 设备登录配对码',
                     )
                   else

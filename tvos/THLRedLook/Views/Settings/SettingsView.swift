@@ -190,3 +190,9 @@ public struct SettingsView: View {
         }
     }
 }
+
+#Preview {
+    SettingsView()
+        .environmentObject(JSSourceService.shared)
+        .background(TVColors.background)
+}

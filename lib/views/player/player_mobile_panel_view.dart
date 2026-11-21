@@ -209,7 +209,7 @@ class _PlayerMobilePanelViewState extends State<PlayerMobilePanelView> {
             : colors.onSurface;
 
         return Material(
-          color: Colors.transparent,
+          color: AppColors.transparent,
           child: Tooltip(
             message: isFollowed ? '取消追剧' : '加入追剧',
             child: InkWell(

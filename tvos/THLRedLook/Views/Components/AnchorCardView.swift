@@ -19,12 +19,12 @@ public struct AnchorCardView: View {
                 .overlay(
                     Circle()
                         .stroke(
-                            isFocused ? TVColors.activeRed : Color.white.opacity(0.18),
+                            isFocused ? TVColors.activeRed : TVColors.white.opacity(0.18),
                             lineWidth: isFocused ? 3 : 1
                         )
                 )
                 .shadow(
-                    color: isFocused ? TVColors.focusedShadowStrong : Color.black.opacity(0.3),
+                    color: isFocused ? TVColors.focusedShadowStrong : TVColors.black.opacity(0.3),
                     radius: isFocused ? 12 : 6,
                     x: 0,
                     y: 4
@@ -35,7 +35,7 @@ public struct AnchorCardView: View {
             // 主播名称
             Text(anchor.name)
                 .font(.system(size: 24, weight: .bold))
-                .foregroundColor(isFocused ? .white : TVColors.textPrimary)
+                .foregroundColor(isFocused ? TVColors.white : TVColors.textPrimary)
                 .lineLimit(1)
 
             // 粉丝数量
@@ -52,7 +52,7 @@ public struct AnchorCardView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(isFocused ? TVColors.activeRed : Color.white.opacity(0.1), lineWidth: isFocused ? 2.5 : 1)
+                .stroke(isFocused ? TVColors.activeRed : TVColors.white.opacity(0.1), lineWidth: isFocused ? 2.5 : 1)
         )
     }
 
@@ -77,4 +77,12 @@ public struct AnchorCardView: View {
             }
         }
     }
+}
+
+#Preview {
+    AnchorCardView(
+        anchor: Anchor(id: "a1", name: "主播昵称", avatar: "", intro: "粉丝 10.5万", worksCount: 12),
+        isFocused: false
+    )
+    .background(TVColors.background)
 }

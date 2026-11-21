@@ -131,7 +131,7 @@ class DisplayModePage extends StatelessWidget {
                           : (isDark ? AppColors.darkSurfaceHighest : AppColors.greyLight),
                       child: Icon(
                         mode.icon,
-                        color: isSelected ? Colors.white : theme.iconTheme.color,
+                        color: isSelected ? AppColors.white : theme.iconTheme.color,
                         size: 22,
                       ),
                     ),

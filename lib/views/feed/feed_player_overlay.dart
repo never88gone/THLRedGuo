@@ -62,7 +62,7 @@ class FeedPlayerOverlay extends StatelessWidget {
     IconData icon,
     String label,
     VoidCallback action, {
-    Color color = Colors.white,
+    Color color = AppColors.white,
     String? subText,
   }) =>
       Padding(
@@ -76,7 +76,7 @@ class FeedPlayerOverlay extends StatelessWidget {
               onPressed: action,
               style: IconButton.styleFrom(
                 foregroundColor: color,
-                backgroundColor: const Color(0x55000000),
+                backgroundColor: AppColors.black33,
                 minimumSize: const Size(48, 48),
               ),
               icon: Icon(icon, size: 27, color: color),
@@ -86,11 +86,11 @@ class FeedPlayerOverlay extends StatelessWidget {
               Text(
                 subText,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.white,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   shadows: [
-                    Shadow(color: Colors.black, blurRadius: 4),
+                    Shadow(color: AppColors.black, blurRadius: 4),
                   ],
                 ),
               ),
@@ -111,7 +111,7 @@ class FeedPlayerOverlay extends StatelessWidget {
             isLiked ? Icons.favorite : Icons.favorite_border,
             isLiked ? '取消点赞' : '点赞',
             onLike!,
-            color: isLiked ? AppColors.hongguoRed : Colors.white,
+            color: isLiked ? AppColors.hongguoRed : AppColors.white,
             subText: likeCount > 0 ? '$likeCount' : '点赞',
           )
         else if (onSocial != null)
@@ -149,7 +149,7 @@ class FeedPlayerOverlay extends StatelessWidget {
                   ? const Icon(
                       Icons.play_arrow_rounded,
                       size: 76,
-                      color: Colors.white70,
+                      color: AppColors.white70,
                     )
                   : const SizedBox.shrink(),
             ),
@@ -165,7 +165,7 @@ class FeedPlayerOverlay extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Color(0xD9000000)],
+                    colors: [AppColors.transparent, AppColors.black85],
                   ),
                 ),
               ),
@@ -204,7 +204,7 @@ class FeedPlayerOverlay extends StatelessWidget {
                                             effectiveAnchor.substring(0, 1),
                                             style: const TextStyle(
                                               fontSize: 12,
-                                              color: Colors.white,
+                                              color: AppColors.white,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -213,7 +213,7 @@ class FeedPlayerOverlay extends StatelessWidget {
                                         Text(
                                           '@$effectiveAnchor',
                                           style: const TextStyle(
-                                            color: Colors.white,
+                                            color: AppColors.white,
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -231,7 +231,7 @@ class FeedPlayerOverlay extends StatelessWidget {
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
                                           color: isAnchorFollowed
-                                              ? const Color(0x33FFFFFF)
+                                              ? AppColors.white20
                                               : AppColors.hongguoRed,
                                           borderRadius: BorderRadius.circular(12),
                                         ),
@@ -241,13 +241,13 @@ class FeedPlayerOverlay extends StatelessWidget {
                                             Icon(
                                               isAnchorFollowed ? Icons.check : Icons.add,
                                               size: 13,
-                                              color: Colors.white,
+                                              color: AppColors.white,
                                             ),
                                             const SizedBox(width: 2),
                                             Text(
                                               isAnchorFollowed ? '已关注' : '关注',
                                               style: const TextStyle(
-                                                color: Colors.white,
+                                                color: AppColors.white,
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -266,7 +266,7 @@ class FeedPlayerOverlay extends StatelessWidget {
                               maxLines: compact ? 1 : 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppColors.white,
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -276,7 +276,7 @@ class FeedPlayerOverlay extends StatelessWidget {
                               key: const ValueKey('feed-current-episode'),
                               onPressed: onEpisodes,
                               style: TextButton.styleFrom(
-                                foregroundColor: Colors.white,
+                                foregroundColor: AppColors.white,
                                 padding: EdgeInsets.zero,
                                 alignment: Alignment.centerLeft,
                               ),
@@ -298,7 +298,7 @@ class FeedPlayerOverlay extends StatelessWidget {
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: Colors.white70,
+                                    color: AppColors.white70,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -318,7 +318,7 @@ class FeedPlayerOverlay extends StatelessWidget {
                     data: SliderTheme.of(context).copyWith(
                       thumbColor: AppColors.hongguoRed,
                       activeTrackColor: AppColors.hongguoRed,
-                      inactiveTrackColor: Colors.white24,
+                      inactiveTrackColor: AppColors.white24,
                       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
                       trackHeight: 2,
                       trackShape: const RectangularSliderTrackShape(),

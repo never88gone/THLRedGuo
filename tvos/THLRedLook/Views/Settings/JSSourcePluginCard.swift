@@ -46,18 +46,18 @@ public struct JSSourcePluginCard: View {
                             .frame(width: 52, height: 52)
                         Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: 26))
-                            .foregroundColor(isActive ? TVTheme.primary : Color.white.opacity(0.45))
+                            .foregroundColor(isActive ? TVTheme.primary : TVColors.white.opacity(0.45))
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 12) {
                             Text(name)
                                 .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(TVColors.white)
                             if isActive {
                                 Text("当前活跃源")
                                     .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(TVColors.white)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 3)
                                     .background(TVTheme.primary)
@@ -66,23 +66,23 @@ public struct JSSourcePluginCard: View {
                             if isBuiltIn {
                                 Text("官方内置")
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(TVColors.white.opacity(0.7))
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
-                                    .background(Color.white.opacity(0.12))
+                                    .background(TVColors.white.opacity(0.12))
                                     .clipShape(Capsule())
                             }
                         }
                         Text("v\(version) · 作者: \(author) · 脚本: \(id).js")
                             .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(TVColors.white.opacity(0.6))
                     }
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(isCardFocused ? TVTheme.primary : Color.white.opacity(0.3))
+                        .foregroundColor(isCardFocused ? TVTheme.primary : TVColors.white.opacity(0.3))
                 }
                 .padding(20)
                 .background(
@@ -97,14 +97,14 @@ public struct JSSourcePluginCard: View {
                     RoundedRectangle(cornerRadius: 18)
                         .stroke(
                             isCardFocused
-                                ? Color.white
-                                : (isActive ? TVTheme.primary.opacity(0.55) : Color.white.opacity(0.06)),
+                                ? TVColors.white
+                                : (isActive ? TVTheme.primary.opacity(0.55) : TVColors.white.opacity(0.06)),
                             lineWidth: isCardFocused ? 3.0 : (isActive ? 1.5 : 1.0)
                         )
                 )
                 .scaleEffect(isCardFocused ? 1.02 : 1.0)
                 .shadow(
-                    color: isCardFocused ? TVTheme.primary.opacity(0.5) : Color.clear,
+                    color: isCardFocused ? TVTheme.primary.opacity(0.5) : TVColors.clear,
                     radius: isCardFocused ? 14 : 0,
                     x: 0,
                     y: isCardFocused ? 4 : 0
@@ -139,10 +139,10 @@ public struct JSSourcePluginCard: View {
                     VStack(spacing: 4) {
                         Image(systemName: "trash")
                             .font(.system(size: 24, weight: .semibold))
-                            .foregroundColor(isTrashFocused ? .white : .red.opacity(0.85))
+                            .foregroundColor(isTrashFocused ? TVColors.white : TVColors.red.opacity(0.85))
                         Text("删除")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(isTrashFocused ? .white : .red.opacity(0.75))
+                            .foregroundColor(isTrashFocused ? TVColors.white : TVColors.red.opacity(0.75))
                     }
                     .frame(width: 80, height: 86)
                     .background(
@@ -151,7 +151,7 @@ public struct JSSourcePluginCard: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 18)
-                            .stroke(isTrashFocused ? Color.white : TVColors.sourceDeleteBorder, lineWidth: isTrashFocused ? 3 : 1)
+                            .stroke(isTrashFocused ? TVColors.white : TVColors.sourceDeleteBorder, lineWidth: isTrashFocused ? 3 : 1)
                     )
                     .tvFocusBorder(isFocused: isTrashFocused, cornerRadius: 18)
                 }
@@ -172,4 +172,18 @@ public struct JSSourcePluginCard: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
     }
+}
+
+#Preview {
+    JSSourcePluginCard(
+        id: "custom_source",
+        name: "第三方解析源",
+        version: "1.2.0",
+        author: "社区",
+        isActive: false,
+        onSelect: {},
+        onRemove: {}
+    )
+    .padding(40)
+    .background(TVColors.background)
 }

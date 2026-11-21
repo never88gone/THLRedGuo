@@ -14,7 +14,7 @@ public struct TVDanmakuSettingsDrawer: View {
 
     public var body: some View {
         ZStack(alignment: .trailing) {
-            Color.black.opacity(0.65)
+            TVColors.black.opacity(0.65)
                 .ignoresSafeArea()
                 .onTapGesture { isPresented = false }
 
@@ -34,7 +34,7 @@ public struct TVDanmakuSettingsDrawer: View {
                         .foregroundColor(TVColors.textSecondary)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(Color.white.opacity(0.12))
+                        .background(TVColors.white.opacity(0.12))
                         .clipShape(Capsule())
                 }
                 .padding(.bottom, 8)

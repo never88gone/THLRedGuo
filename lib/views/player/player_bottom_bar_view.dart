@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/utils/theme/app_shadows.dart';
 
 /// 播放器底部控制层（进度条、清晰度、倍速、音量、画中画、全屏）
 class PlayerBottomBarView extends StatelessWidget {
@@ -77,10 +78,10 @@ class PlayerBottomBarView extends StatelessWidget {
         : AppColors.whiteWithAlpha(isEnabled ? 0.92 : 0.36);
     final background = selected
         ? AppColors.hongguoRed
-        : const Color(0x40000000);
+        : AppColors.black25;
     final border = selected
         ? AppColors.hongguoRed
-        : const Color(0x26FFFFFF);
+        : AppColors.white15;
     final targetWidth = visualWidth < 40 ? 48.0 : visualWidth + 8;
 
     return Tooltip(
@@ -154,9 +155,9 @@ class PlayerBottomBarView extends StatelessWidget {
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: const Color(0x40000000),
+          color: AppColors.black25,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0x26FFFFFF), width: 0.8),
+          border: Border.all(color: AppColors.white15, width: 0.8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -345,7 +346,7 @@ class PlayerBottomBarView extends StatelessWidget {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: AppColors.white,
                   ),
                 )
               : const Icon(Icons.picture_in_picture_alt_rounded),

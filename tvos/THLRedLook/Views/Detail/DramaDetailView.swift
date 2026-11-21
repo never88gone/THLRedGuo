@@ -43,7 +43,7 @@ public struct DramaDetailView: View {
 
     public var body: some View {
         detailBody.onChange(of: accountLibrary.libraryVersion) { _, _ in viewModel.refreshWatchHistory() }.overlay(alignment: .top) {
-            if let error = accountLibrary.libraryWriteError { Text(error).font(.system(size: 29)).foregroundStyle(.orange).padding(24).background(.black.opacity(0.8)) }
+            if let error = accountLibrary.libraryWriteError { Text(error).font(.system(size: 29)).foregroundStyle(TVColors.orange).padding(24).background(TVColors.black.opacity(0.8)) }
         }
     }
 
@@ -52,10 +52,10 @@ public struct DramaDetailView: View {
             // 背景沉浸式深邃氛围底色（受 GeometryReader 严格限制，杜绝图片撑大溢出）
             GeometryReader { geo in
                 ZStack {
-                    Color.black
+                    TVColors.black
 
                     LinearGradient(
-                        colors: [TVColors.detailTopGradient, Color.black],
+                        colors: [TVColors.detailTopGradient, TVColors.black],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -236,17 +236,17 @@ public struct DramaDetailView: View {
                                 Text("选集播放")
                                     .font(.title2)
                                     .bold()
-                                    .foregroundColor(.white.opacity(0.85))
+                                    .foregroundColor(TVColors.white.opacity(0.85))
 
                                 HStack(spacing: 16) {
                                     ForEach(1...8, id: \.self) { idx in
                                         RoundedRectangle(cornerRadius: 12)
-                                            .fill(Color.white.opacity(0.06))
+                                            .fill(TVColors.white.opacity(0.06))
                                             .frame(width: 86, height: 64)
                                             .overlay(
                                                 Text("\(idx)")
                                                     .font(.system(size: 18, weight: .semibold))
-                                                    .foregroundColor(.white.opacity(0.2))
+                                                    .foregroundColor(TVColors.white.opacity(0.2))
                                             )
                                     }
                                 }
@@ -368,17 +368,17 @@ public struct DramaDetailView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundColor(.green)
+                        .foregroundColor(TVColors.green)
                     Text("全剧集已安排后台下载，您可在「下载」标签页查看。")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                 }
                 .padding(.horizontal, 28)
                 .padding(.vertical, 18)
                 .background(
                     Capsule()
                         .fill(TVColors.detailCardBg.opacity(0.95))
-                        .shadow(color: .black.opacity(0.5), radius: 10, y: 5)
+                        .shadow(color: TVColors.black.opacity(0.5), radius: 10, y: 5)
                 )
                 .padding(.bottom, 60)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -422,4 +422,17 @@ public struct DramaDetailView: View {
         proxy.scrollTo(identifier, anchor: .center)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { focusedTarget = target }
     }
+}
+
+#Preview {
+    DramaDetailView(
+        drama: Drama(
+            id: "drama_1",
+            title: "都市之逆天神豪",
+            cover: "",
+            episodes: 80,
+            tags: ["神豪", "爽文", "都市"]
+        )
+    )
+    .background(TVColors.background)
 }

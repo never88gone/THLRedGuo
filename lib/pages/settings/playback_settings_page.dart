@@ -387,7 +387,7 @@ class PlaybackSettingsPage extends StatelessWidget {
           border: Border.all(
             color: selected
                 ? AppColors.hongguoRed
-                : (isDark ? const Color(0x26FFFFFF) : const Color(0x1F000000)),
+                : (isDark ? AppColors.white15 : AppColors.black12),
             width: 1,
           ),
           boxShadow: selected

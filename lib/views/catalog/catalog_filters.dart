@@ -101,7 +101,7 @@ class _CatalogFiltersState extends State<CatalogFilters> {
                               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                               selectedColor: AppColors.hongguoRed,
                               backgroundColor: Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0x1FFFFFFF)
+                                  ? AppColors.white12
                                   : Theme.of(context).colorScheme.surfaceContainerHighest,
                               labelStyle: TextStyle(
                                 fontWeight: entry.id == widget.category ? FontWeight.w700 : FontWeight.w500,
@@ -114,12 +114,12 @@ class _CatalogFiltersState extends State<CatalogFilters> {
                                 color: entry.id == widget.category
                                     ? AppColors.hongguoRed
                                     : (Theme.of(context).brightness == Brightness.dark
-                                        ? const Color(0x26FFFFFF)
+                                        ? AppColors.white15
                                         : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3)),
                                 width: 0.8,
                               ),
                               elevation: entry.id == widget.category ? 3 : 0,
-                              shadowColor: entry.id == widget.category ? const Color(0x66FF2442) : null,
+                              shadowColor: entry.id == widget.category ? AppColors.accentBorder40 : null,
                             ),
                     ),
                 ],

@@ -31,6 +31,7 @@ final class HongguoAccountModel: ObservableObject {
     private let vault = HongguoAccountVault.shared
     private let transportService = HongguoAccountTransport()
     private lazy var loginService = HongguoAccountLoginService(transportService: transportService, vault: vault)
+    private lazy var socialService = HongguoAccountSocialService(transportService: transportService, vault: vault)
 
     var loggedIn: Bool {
         #if DEBUG
@@ -326,23 +327,8 @@ final class HongguoAccountModel: ObservableObject {
         }
     }
 
-    private var collectionIdentity: (revision: UInt64, id: String)?
-
-    private func readCollection(_ action: String, payload: [String: String]) async throws -> [String: Any] {
-        guard loggedIn else { throw HongguoAccountError.invalid }
-        let revision = vault.snapshot.revision
-        let result = try await transportService.call(action, payload: payload, owner: attempt, attempt: attempt,
-            existing: true, account: account, cookies: []).result
-        guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
-        return result
-    }
-
     func creatorProfile(_ id: String, dramas: [Drama] = []) async throws -> Anchor {
-        let result = try await readCollection("creatorProfile", payload: ["userId": id])
-        guard let row = result["creator"] as? [String: Any],
-              row["id"] as? String == id || row["businessId"] as? String == id,
-              let anchor = Anchor(official: row, dramas: dramas) else { throw HongguoAccountError.interactionInvalid }
-        return anchor
+        try await socialService.creatorProfile(id, dramas: dramas, loggedIn: loggedIn, attempt: attempt, account: account)
     }
 
     func creatorWorks(
@@ -352,83 +338,24 @@ final class HongguoAccountModel: ObservableObject {
         commentSource: Int = 1506,
         tabType: Int = 23
     ) async throws -> (items: [Drama], hasMore: Bool, nextCursor: String, commentSource: Int, tabType: Int) {
-        func fetch(source: Int, tab: Int) async throws -> (items: [Drama], hasMore: Bool, nextCursor: String) {
-            let result = try await readCollection("creatorWorks", payload: [
-                "userId": id,
-                "cursor": cursor,
-                "count": String(count),
-                "commentSource": String(source),
-                "tabType": String(tab)
-            ])
-            guard let rows = result["items"] as? [[String: Any]] else {
-                throw HongguoAccountError.interactionInvalid
-            }
-            let dramas: [Drama] = rows.compactMap { row in
-                guard let sid = row["id"] as? String, !sid.isEmpty,
-                      let title = row["title"] as? String, !title.isEmpty else { return nil }
-                return Drama(
-                    id: "hongguo:\(sid)",
-                    source: "hongguo",
-                    sourceId: sid,
-                    title: title,
-                    description: row["description"] as? String ?? "",
-                    cover: row["cover"] as? String ?? "",
-                    episodes: (row["episodes"] as? NSNumber)?.intValue ?? 0,
-                    tags: row["tags"] as? [String] ?? []
-                )
-            }
-            let hasMore = result["hasMore"] as? Bool ?? false
-            let nextCursor = result["nextCursor"] as? String ?? ""
-            return (dramas, hasMore, nextCursor)
-        }
-        let primary = try await fetch(source: commentSource, tab: tabType)
-        if !primary.items.isEmpty || !cursor.isEmpty || (commentSource == 1504 && tabType == 1) {
-            return (primary.items, primary.hasMore, primary.nextCursor, commentSource, tabType)
-        }
-        if let fallback = try? await fetch(source: 1504, tab: 1), !fallback.items.isEmpty {
-            return (fallback.items, fallback.hasMore, fallback.nextCursor, 1504, 1)
-        }
-        return (primary.items, primary.hasMore, primary.nextCursor, commentSource, tabType)
-    }
-
-    func followingCreators(offset: Int = 0, douyinOffset: Int = 0) async throws -> HongguoCollectionPage<Anchor> {
-        let revision = vault.snapshot.revision
-        if collectionIdentity?.revision != revision {
-            var targetId = account?.id ?? ""
-            if let profile = try? await creatorProfile(targetId), !profile.id.isEmpty {
-                targetId = profile.id
-            }
-            guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
-            collectionIdentity = (revision, targetId)
-        }
-        let userId = collectionIdentity?.id ?? account?.id ?? ""
-        let result = try await readCollection("followingCreators", payload: [
-            "userId": userId,
-            "offset": String(offset),
-            "count": "20"
-        ])
-        guard let rows = result["creators"] as? [[String: Any]], let more = result["hasMore"] as? Bool else {
-            throw HongguoAccountError.interactionInvalid
-        }
-        return HongguoCollectionPage(
-            items: rows.compactMap { Anchor(official: $0) },
-            hasMore: more,
-            nextOffset: result["nextOffset"] as? Int,
-            douyinOffset: result["followingDouyinNextOffset"] as? Int ?? 0
+        try await socialService.creatorWorks(
+            id, cursor: cursor, count: count, commentSource: commentSource, tabType: tabType,
+            loggedIn: loggedIn, attempt: attempt, account: account
         )
     }
 
+    func followingCreators(offset: Int = 0, douyinOffset: Int = 0) async throws -> HongguoCollectionPage<Anchor> {
+        try await socialService.followingCreators(offset: offset, loggedIn: loggedIn, attempt: attempt, account: account)
+    }
+
     func likedVideos(offset: Int = 0) async throws -> HongguoCollectionPage<HongguoLikedVideo> {
-        let result = try await readCollection("likedVideos", payload: ["offset": String(offset), "count": "20"])
-        guard let rows = result["items"] as? [[String: Any]], let more = result["hasMore"] as? Bool else { throw HongguoAccountError.interactionInvalid }
-        return HongguoCollectionPage(items: rows.compactMap { HongguoLikedVideo(row: $0) }, hasMore: more,
-            nextOffset: result["nextOffset"] as? Int, unsupportedCount: result["unsupportedCount"] as? Int ?? 0)
+        try await socialService.likedVideos(offset: offset, loggedIn: loggedIn, attempt: attempt, account: account)
     }
 
     func creators(for drama: Drama) async throws -> [HongguoCreator] {
         guard loggedIn else { throw HongguoAccountError.invalid }
         let revision = vault.snapshot.revision
-        let rows = try await readCreators(drama, owner: attempt)
+        let rows = try await socialService.readCreators(drama, owner: attempt, attempt: attempt, account: account)
         guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
         return rows
     }
@@ -437,35 +364,16 @@ final class HongguoAccountModel: ObservableObject {
         try await enqueueSocialWrite {
             let current = try await self.creatorProfile(anchor.id)
             guard current.following != nil, current.canFollow == true || !follow else { throw HongguoAccountError.interactionInvalid }
-            _ = try await self.readCollection("creatorFollow", payload: ["userId": current.id,
-                "relativeType": String(current.relativeType ?? 2), "follow": follow ? "1" : "0"])
+            _ = try await self.socialService.readCollection(
+                "creatorFollow",
+                payload: ["userId": current.id, "relativeType": String(current.relativeType ?? 2), "follow": follow ? "1" : "0"],
+                loggedIn: self.loggedIn,
+                attempt: self.attempt,
+                account: self.account
+            )
             let confirmed = try await self.creatorProfile(current.id)
             guard confirmed.following == follow else { throw HongguoAccountError.writeNotConfirmed }
         }
-    }
-
-    private func readCreators(_ drama: Drama, owner: Int) async throws -> [HongguoCreator] {
-        let result = try await transportService.call("creatorList", payload: ["id": drama.cleanSourceId], owner: owner, attempt: attempt, existing: true, account: account, cookies: []).result
-        guard let rows = result["creators"] as? [[String: Any]] else { throw HongguoAccountError.invalid }
-        return rows.compactMap(HongguoCreator.init)
-    }
-
-    private func readSocial(_ drama: Drama, owner: Int) async throws -> HongguoSocialSnapshot {
-        let revision = vault.snapshot.revision
-        let result = try await transportService.call("socialDetail", payload: ["id": drama.cleanSourceId], owner: owner, attempt: attempt, existing: true, account: account, cookies: []).result
-        guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
-        guard result["id"] as? String == drama.cleanSourceId, let rows = result["episodes"] as? [[String: Any]] else {
-            throw HongguoAccountError.invalid
-        }
-        var creators: [HongguoCreator] = []
-        var creatorError: String?
-        do {
-            creators = try await readCreators(drama, owner: owner)
-        } catch {
-            try transportService.check(owner: owner, attempt: attempt)
-            creatorError = error.localizedDescription
-        }
-        return HongguoSocialSnapshot(episodes: rows.compactMap(HongguoEpisodeLike.init), creators: creators, creatorError: creatorError)
     }
 
     func loadSocial(_ drama: Drama) async throws {
@@ -474,7 +382,7 @@ final class HongguoAccountModel: ObservableObject {
         let revision = vault.snapshot.revision
         let id = drama.cleanSourceId
         let generation = socialGeneration[drama.cleanSourceId] ?? 0
-        let result = try await readSocial(drama, owner: attempt)
+        let result = try await socialService.readSocial(drama, owner: attempt, attempt: attempt, account: account)
         guard vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
         if socialGeneration[id] ?? 0 == generation {
             socialStates[id] = result
@@ -490,9 +398,17 @@ final class HongguoAccountModel: ObservableObject {
         socialBusy.insert(id)
         defer { if vault.snapshot.revision == revision { socialBusy.remove(id) } }
         try await enqueueSocialWrite {
-            _ = try await self.transportService.call("likeUpdate", payload: ["itemId": episode.id, "like": liked ? "1" : "0"], owner: self.attempt, attempt: self.attempt, existing: true, account: self.account, cookies: [])
+            _ = try await self.transportService.call(
+                "likeUpdate",
+                payload: ["itemId": episode.id, "like": liked ? "1" : "0"],
+                owner: self.attempt,
+                attempt: self.attempt,
+                existing: true,
+                account: self.account,
+                cookies: []
+            )
             guard self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
-            let result = try await self.readSocial(drama, owner: self.attempt)
+            let result = try await self.socialService.readSocial(drama, owner: self.attempt, attempt: self.attempt, account: self.account)
             guard self.vault.snapshot.revision == revision, let row = result.episode(episode.number), row.id == episode.id, row.liked == liked else {
                 throw HongguoAccountError.writeNotConfirmed
             }
@@ -512,10 +428,20 @@ final class HongguoAccountModel: ObservableObject {
         socialBusy.insert(id)
         defer { if vault.snapshot.revision == revision { socialBusy.remove(id) } }
         try await enqueueSocialWrite {
-            _ = try await self.transportService.call("creatorFollow", payload: ["userId": creator.id, "relativeType": String(creator.relativeType), "follow": follow ? "1" : "0"], owner: self.attempt, attempt: self.attempt, existing: true, account: self.account, cookies: [])
+            _ = try await self.transportService.call(
+                "creatorFollow",
+                payload: ["userId": creator.id, "relativeType": String(creator.relativeType), "follow": follow ? "1" : "0"],
+                owner: self.attempt,
+                attempt: self.attempt,
+                existing: true,
+                account: self.account,
+                cookies: []
+            )
             guard self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
-            let rows = try await self.readCreators(drama, owner: self.attempt)
-            guard self.vault.snapshot.revision == revision, let row = rows.first(where: { $0.id == creator.id && $0.relativeType == creator.relativeType }), row.following == follow else {
+            let rows = try await self.socialService.readCreators(drama, owner: self.attempt, attempt: self.attempt, account: self.account)
+            guard self.vault.snapshot.revision == revision,
+                  let row = rows.first(where: { $0.id == creator.id && $0.relativeType == creator.relativeType }),
+                  row.following == follow else {
                 throw HongguoAccountError.writeNotConfirmed
             }
             self.socialGeneration[id] = (self.socialGeneration[id] ?? 0) + 1
@@ -536,6 +462,7 @@ final class HongguoAccountModel: ObservableObject {
         socialStates = [:]
         socialBusy = []
         favoriteRevision = nil
+        socialService.resetIdentity()
         HongguoAccountLibraryCache.shared.update([], history: true, owner: vault.snapshot.revision)
         HongguoAccountLibraryCache.shared.update([], history: false, owner: vault.snapshot.revision)
         publishLibraryChange()

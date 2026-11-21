@@ -15,7 +15,7 @@ public struct TVEpisodeDrawer: View {
     public var body: some View {
         ZStack(alignment: .trailing) {
             // 全屏一体化深色蒙层
-            Color.black.opacity(0.65)
+            TVColors.black.opacity(0.65)
                 .ignoresSafeArea()
                 .onTapGesture {
                     isPresented = false
@@ -39,7 +39,7 @@ public struct TVEpisodeDrawer: View {
                         .foregroundColor(TVColors.textSecondary)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(Color.white.opacity(0.12))
+                        .background(TVColors.white.opacity(0.12))
                         .clipShape(Capsule())
                 }
                 .padding(.horizontal, 32)

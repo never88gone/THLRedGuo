@@ -52,7 +52,7 @@ public struct SearchRootView: View {
                     HStack(spacing: 20) {
                         HStack(spacing: 12) {
                             Image(systemName: "magnifyingglass")
-                                .foregroundColor(.gray)
+                                .foregroundColor(TVColors.gray)
                                 .font(.system(size: 22))
 
                             TextField("输入剧名或关键词搜索...", text: Binding(
@@ -96,22 +96,22 @@ public struct SearchRootView: View {
                                             .fill(
                                                 isIconFocused
                                                     ? AnyShapeStyle(TVColors.prominentGradient)
-                                                    : AnyShapeStyle(Color.white.opacity(0.12))
+                                                    : AnyShapeStyle(TVColors.white.opacity(0.12))
                                             )
                                             .frame(width: 34, height: 34)
 
                                         Image(systemName: "xmark")
                                             .font(.system(size: 15, weight: .bold))
-                                            .foregroundColor(isIconFocused ? .white : .white.opacity(0.65))
+                                            .foregroundColor(isIconFocused ? TVColors.white : TVColors.white.opacity(0.65))
 
                                         if isIconFocused {
                                             Circle()
-                                                .stroke(Color.white, lineWidth: 2.5)
+                                                .stroke(TVColors.white, lineWidth: 2.5)
                                                 .frame(width: 34, height: 34)
                                         }
                                     }
                                     .scaleEffect(isIconFocused ? 1.15 : 1.0)
-                                    .shadow(color: isIconFocused ? Color.red.opacity(0.85) : Color.clear, radius: 10, x: 0, y: 0)
+                                    .shadow(color: isIconFocused ? TVColors.red.opacity(0.85) : TVColors.clear, radius: 10, x: 0, y: 0)
                                     .animation(TVTheme.focusSpringAnimation, value: isIconFocused)
                                 }
                                 .buttonStyle(TVZeroHighlightButtonStyle())
@@ -207,7 +207,7 @@ public struct SearchRootView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             Text(viewModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "猜你想搜" : "搜索联想")
                                 .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.white.opacity(0.75))
+                                .foregroundColor(TVColors.white.opacity(0.75))
                                 .padding(.horizontal, 48)
 
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -245,7 +245,7 @@ public struct SearchRootView: View {
                             HStack {
                                 Text("历史搜索")
                                     .font(.system(size: 20, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.75))
+                                    .foregroundColor(TVColors.white.opacity(0.75))
                                 Spacer()
                                 TVButton(
                                     title: "清空历史",
@@ -293,17 +293,17 @@ public struct SearchRootView: View {
                         Spacer()
                         ProgressView("正在搜索中...")
                             .font(.system(size: 22))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(TVColors.white.opacity(0.8))
                         Spacer()
                     } else if viewModel.hasSearched && viewModel.searchResults.isEmpty {
                         Spacer()
                         VStack(spacing: 18) {
                             Image(systemName: "film.stack")
                                 .font(.system(size: 54))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(TVColors.secondary)
                             Text(viewModel.errorMessage ?? "未找到相关剧集，请尝试更换关键词")
                                 .font(.system(size: 22))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(TVColors.secondary)
 
                             HStack(spacing: 20) {
                                 TVButton(title: "清空重新搜索", icon: "arrow.counterclockwise", isProminent: true) {
@@ -356,7 +356,7 @@ public struct SearchRootView: View {
                                 if let message = viewModel.errorMessage {
                                     Text(message)
                                         .font(.system(size: 16))
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(TVColors.secondary)
                                 }
 
                                 if viewModel.isLoadingMore {
@@ -364,7 +364,7 @@ public struct SearchRootView: View {
                                         ProgressView()
                                         Text("正在加载更多短剧...")
                                             .font(.system(size: 16, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.6))
+                                            .foregroundColor(TVColors.white.opacity(0.6))
                                     }
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 28)
@@ -456,4 +456,9 @@ public struct SearchRootView: View {
         NSLog("🎬 [SearchRootView] runInitialSearchIfNeeded 执行搜索: query=%@", query)
         Task { await viewModel.executeSearch(keyword: query) }
     }
+}
+
+#Preview {
+    SearchRootView()
+        .background(TVColors.background)
 }

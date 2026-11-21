@@ -31,7 +31,7 @@ public struct TVLoginQRCodeCard: View {
         VStack(spacing: 24) {
             ZStack {
                 RoundedRectangle(cornerRadius: 24)
-                    .fill(Color.white)
+                    .fill(TVColors.white)
                     .frame(width: 380, height: 380)
                     .shadow(color: TVColors.focusedShadowColor, radius: 30, x: 0, y: 12)
 
@@ -50,7 +50,7 @@ public struct TVLoginQRCodeCard: View {
                             .foregroundColor(TVColors.successGreen)
                         Text("登录成功")
                             .font(.system(size: 26, weight: .bold))
-                            .foregroundColor(.black)
+                            .foregroundColor(TVColors.black)
                     }
                     .frame(width: 380, height: 380)
                 } else if selectedMode == .officialQR && isBusy {
@@ -89,7 +89,7 @@ public struct TVLoginQRCodeCard: View {
                         .foregroundColor(TVColors.textSecondary)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.08))
+                        .background(TVColors.white.opacity(0.08))
                         .clipShape(Capsule())
                 }
             }
@@ -97,4 +97,18 @@ public struct TVLoginQRCodeCard: View {
         .frame(width: 440)
         .focusSection()
     }
+}
+
+#Preview {
+    TVLoginQRCodeCard(
+        qrImage: nil,
+        isSuccess: false,
+        selectedMode: .officialQR,
+        isBusy: false,
+        statusMessage: "请使用红果短剧 App 扫码登录",
+        remainingSeconds: 120,
+        hasQrURL: true
+    )
+    .padding(40)
+    .background(TVColors.background)
 }

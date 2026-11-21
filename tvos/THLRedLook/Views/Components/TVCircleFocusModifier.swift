@@ -20,10 +20,10 @@ public struct TVCircleFocusModifier: ViewModifier {
         content
             .overlay(
                 Circle()
-                    .stroke(isFocused ? TVColors.focusedBorderColor : Color.clear, lineWidth: lineWidth)
+                    .stroke(isFocused ? TVColors.focusedBorderColor : TVColors.clear, lineWidth: lineWidth)
             )
             .shadow(
-                color: isFocused ? TVColors.focusedShadowColor : Color.black.opacity(0.4),
+                color: isFocused ? TVColors.focusedShadowColor : TVColors.black.opacity(0.4),
                 radius: isFocused ? 16 : 4,
                 y: isFocused ? 4 : 2
             )

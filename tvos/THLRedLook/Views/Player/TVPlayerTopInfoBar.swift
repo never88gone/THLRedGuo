@@ -73,7 +73,7 @@ public struct TVPlayerTopInfoBar: View {
                 }
                 Text(feedActions.errorMessage ?? "画面模式下按上下键切换短剧，点按显示控制")
                     .font(.system(size: 22))
-                    .foregroundStyle(feedActions.errorMessage == nil ? .white.opacity(0.8) : .yellow)
+                    .foregroundStyle(feedActions.errorMessage == nil ? TVColors.white.opacity(0.8) : TVColors.yellow)
                     .padding(.horizontal, 56)
                     .padding(.top, 8)
                     .lineLimit(2)
@@ -83,7 +83,7 @@ public struct TVPlayerTopInfoBar: View {
         .padding(.bottom, 24)
         .background(
             LinearGradient(
-                colors: [Color.black.opacity(0.88), Color.black.opacity(0.45), Color.clear],
+                colors: [TVColors.black.opacity(0.88), TVColors.black.opacity(0.45), TVColors.clear],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -124,4 +124,22 @@ public struct TVPlayerTopInfoBar: View {
         .accessibilityIdentifier("player.\(target)")
         .focusEffectDisabled()
     }
+}
+
+#Preview {
+    struct PreviewWrapper: View {
+        @FocusState var focusedControl: PlayerOverlayFocusTarget?
+        var body: some View {
+            TVPlayerTopInfoBar(
+                title: "都市之至尊归来",
+                episodeText: "第 1 集 / 共 80 集",
+                episodeNumber: 1,
+                feedActions: nil,
+                drama: Drama(id: "1", title: "都市之至尊归来", cover: "", episodes: 80, tags: []),
+                focusedControl: $focusedControl
+            )
+            .background(TVColors.background)
+        }
+    }
+    return PreviewWrapper()
 }

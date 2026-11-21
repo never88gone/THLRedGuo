@@ -80,17 +80,17 @@ struct TVCapsuleButtonLabel: View {
 
     private var textColor: Color {
         if isFocused {
-            return isSelected ? .white : .black
+            return isSelected ? TVColors.white : TVColors.black
         }
         if isSelected {
-            return .white
+            return TVColors.white
         }
-        return Color.white.opacity(0.85)
+        return TVColors.white.opacity(0.85)
     }
 
     private var borderStrokeColor: Color {
         if isFocused {
-            return isSelected ? Color.white : TVColors.focusedBorderColor
+            return isSelected ? TVColors.white : TVColors.focusedBorderColor
         }
         if isSelected {
             return TVColors.borderSelected
@@ -113,9 +113,9 @@ struct TVCapsuleButtonLabel: View {
             return isSelected ? TVColors.focusedShadowStrong : TVColors.focusedShadowColor
         }
         if isSelected {
-            return Color.red.opacity(0.4)
+            return TVColors.red.opacity(0.4)
         }
-        return Color.clear
+        return TVColors.clear
     }
 
     private var shadowRadius: CGFloat {
@@ -144,4 +144,17 @@ struct TVCapsuleButtonLabel: View {
             }
         }
     }
+}
+
+#Preview {
+    TVCapsuleButtonLabel(
+        title: "第 1-30 集",
+        isSelected: true,
+        externalFocused: false,
+        isCompact: false,
+        isLarge: false,
+        onFocused: nil
+    )
+    .padding()
+    .background(TVColors.black)
 }

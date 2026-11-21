@@ -29,10 +29,10 @@ public struct TVVideoFeedView: View {
                 VStack(spacing: 24) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 56))
-                        .foregroundColor(.yellow)
+                        .foregroundColor(TVColors.yellow)
                     Text(error)
                         .font(.system(size: 24))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                     TVButton(title: "重试", icon: "arrow.clockwise", isProminent: true) {
                         Task { await viewModel.retry() }
                     }
@@ -67,4 +67,13 @@ public struct TVVideoFeedView: View {
             onRequestFocusTopNav()
         }
     }
+}
+
+#Preview {
+    TVVideoFeedView(
+        viewModel: VideoFeedViewModel(),
+        focusTrigger: 0,
+        onRequestFocusTopNav: {}
+    )
+    .background(TVColors.background)
 }

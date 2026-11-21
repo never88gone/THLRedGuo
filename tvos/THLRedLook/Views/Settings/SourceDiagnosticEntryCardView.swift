@@ -18,21 +18,21 @@ struct SourceDiagnosticEntryCardView: View {
         if activeFocused {
             return entry.failed ? TVColors.diagnosticFailedBg : TVColors.diagnosticSuccessBg
         } else {
-            return entry.failed ? Color.red.opacity(0.12) : Color.white.opacity(0.06)
+            return entry.failed ? TVColors.red.opacity(0.12) : TVColors.white.opacity(0.06)
         }
     }
 
     private var cardBorderColor: Color {
         if activeFocused {
-            return Color.white
+            return TVColors.white
         } else {
-            return entry.failed ? Color.red.opacity(0.4) : Color.white.opacity(0.08)
+            return entry.failed ? TVColors.red.opacity(0.4) : TVColors.white.opacity(0.08)
         }
     }
 
     private var cardShadowColor: Color {
-        guard activeFocused else { return Color.clear }
-        return entry.failed ? Color.red.opacity(0.45) : Color.white.opacity(0.3)
+        guard activeFocused else { return TVColors.clear }
+        return entry.failed ? TVColors.red.opacity(0.45) : TVColors.white.opacity(0.3)
     }
 
     var body: some View {
@@ -41,7 +41,7 @@ struct SourceDiagnosticEntryCardView: View {
                 headerRow
                 Text(entry.text)
                     .font(.system(size: 20))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(TVColors.white.opacity(0.9))
                     .lineLimit(2)
 
                 if !entry.errorDetail.isEmpty {
@@ -96,10 +96,10 @@ struct SourceDiagnosticEntryCardView: View {
                 .foregroundStyle(statusColor)
 
             if entry.category != .unknown {
-                let badgeBg: Color = entry.failed ? Color.red.opacity(0.85) : Color.blue.opacity(0.8)
+                let badgeBg: Color = entry.failed ? TVColors.red.opacity(0.85) : TVColors.blue.opacity(0.8)
                 Text(entry.category.tag)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(badgeBg)
@@ -109,7 +109,7 @@ struct SourceDiagnosticEntryCardView: View {
             if entry.elapsedMs > 0 {
                 Text("\(entry.elapsedMs)ms")
                     .font(.system(size: 16, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(TVColors.secondary)
             }
 
             Spacer()
@@ -120,10 +120,10 @@ struct SourceDiagnosticEntryCardView: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .bold))
             }
-            .foregroundColor(activeFocused ? .white : .white.opacity(0.45))
+            .foregroundColor(activeFocused ? TVColors.white : TVColors.white.opacity(0.45))
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
-            .background(activeFocused ? TVTheme.primary : Color.white.opacity(0.08))
+            .background(activeFocused ? TVTheme.primary : TVColors.white.opacity(0.08))
             .clipShape(Capsule())
         }
     }
@@ -132,10 +132,10 @@ struct SourceDiagnosticEntryCardView: View {
         HStack(alignment: .top, spacing: 8) {
             Text("失败原因:")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.orange)
+                .foregroundColor(TVColors.orange)
             Text(entry.errorDetail)
                 .font(.system(size: 18, weight: .medium, design: .monospaced))
-                .foregroundColor(.orange.opacity(0.95))
+                .foregroundColor(TVColors.orange.opacity(0.95))
         }
     }
 
@@ -146,7 +146,24 @@ struct SourceDiagnosticEntryCardView: View {
                 .foregroundColor(TVTheme.primaryHover)
             Text(entry.suggestion)
                 .font(.system(size: 18))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(TVColors.white.opacity(0.8))
         }
     }
+}
+
+#Preview {
+    SourceDiagnosticEntryCardView(
+        entry: SourceDiagnosticEntry(
+            context: "剧集详情",
+            stage: "获取播放地址",
+            host: "api.example.com",
+            status: 200,
+            elapsedMs: 120,
+            suggestion: "网络正常"
+        ),
+        isFocused: false,
+        onSelect: {}
+    )
+    .padding(40)
+    .background(TVColors.background)
 }

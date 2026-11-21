@@ -19,26 +19,26 @@ struct SourceDiagnosticEntryDetailSheet: View {
                 HStack(spacing: 16) {
                     Image(systemName: entry.failed ? "exclamationmark.triangle.fill" : "checkmark.seal.fill")
                         .font(.system(size: 38))
-                        .foregroundColor(entry.failed ? .red : .green)
+                        .foregroundColor(entry.failed ? TVColors.red : TVColors.green)
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 12) {
                             Text("诊断项详细信息")
                                 .font(.system(size: 38, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(TVColors.white)
                             if entry.category != .unknown {
                                 Text(entry.category.tag)
                                     .font(.system(size: 16, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(TVColors.white)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 4)
-                                    .background(entry.failed ? Color.red.opacity(0.85) : Color.blue.opacity(0.8))
+                                    .background(entry.failed ? TVColors.red.opacity(0.85) : TVColors.blue.opacity(0.8))
                                     .clipShape(Capsule())
                             }
                         }
                         Text("探测阶段: \(entry.stage) · 检测时间: \(formattedDate)")
                             .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.65))
+                            .foregroundColor(TVColors.white.opacity(0.65))
                     }
                 }
 
@@ -64,25 +64,25 @@ struct SourceDiagnosticEntryDetailSheet: View {
                         detailStatusPill(
                             title: "状态",
                             value: entry.failed ? "探测失败" : "探测成功",
-                            color: entry.failed ? .red : .green
+                            color: entry.failed ? TVColors.red : TVColors.green
                         )
                         detailStatusPill(
                             title: "响应耗时",
                             value: entry.elapsedMs > 0 ? "\(entry.elapsedMs) ms" : "< 1 ms",
-                            color: entry.elapsedMs > 1000 ? .orange : .blue
+                            color: entry.elapsedMs > 1000 ? TVColors.orange : TVColors.blue
                         )
                         if entry.status > 0 {
                             detailStatusPill(
                                 title: "HTTP 状态码",
                                 value: "\(entry.status)",
-                                color: entry.status == 200 ? .green : .red
+                                color: entry.status == 200 ? TVColors.green : TVColors.red
                             )
                         }
                         if !entry.businessCode.isEmpty {
                             detailStatusPill(
                                 title: "业务返回码",
                                 value: entry.businessCode,
-                                color: entry.businessCode == "0" ? .green : .orange
+                                color: entry.businessCode == "0" ? TVColors.green : TVColors.orange
                             )
                         }
                     }
@@ -90,7 +90,7 @@ struct SourceDiagnosticEntryDetailSheet: View {
                     VStack(alignment: .leading, spacing: 14) {
                         Text("探测参数与链路环境")
                             .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(TVColors.white)
 
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                             infoRow(label: "探测阶段", value: entry.stage)
@@ -106,29 +106,29 @@ struct SourceDiagnosticEntryDetailSheet: View {
                         }
                     }
                     .padding(24)
-                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+                    .background(TVColors.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
 
                     if !entry.errorDetail.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 10) {
                                 Image(systemName: "exclamationmark.circle.fill")
-                                    .foregroundColor(.orange)
+                                    .foregroundColor(TVColors.orange)
                                 Text("失败具体原因与技术诊断")
                                     .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.orange)
+                                    .foregroundColor(TVColors.orange)
                             }
                             Text(entry.errorDetail)
                                 .font(.system(size: 20, weight: .medium, design: .monospaced))
-                                .foregroundColor(.white)
+                                .foregroundColor(TVColors.white)
                                 .padding(18)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.red.opacity(0.15))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.35), lineWidth: 1))
+                                .background(TVColors.red.opacity(0.15))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(TVColors.red.opacity(0.35), lineWidth: 1))
                                 .cornerRadius(12)
                                 .accessibilityIdentifier("sourceDiagnostics.detailError")
                         }
                         .padding(24)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+                        .background(TVColors.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
                     }
 
                     if !entry.suggestion.isEmpty {
@@ -142,7 +142,7 @@ struct SourceDiagnosticEntryDetailSheet: View {
                             }
                             Text(entry.suggestion)
                                 .font(.system(size: 22))
-                                .foregroundColor(.white.opacity(0.95))
+                                .foregroundColor(TVColors.white.opacity(0.95))
                                 .padding(18)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(TVTheme.primary.opacity(0.15))
@@ -151,7 +151,7 @@ struct SourceDiagnosticEntryDetailSheet: View {
                                 .accessibilityIdentifier("sourceDiagnostics.detailSuggestion")
                         }
                         .padding(24)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+                        .background(TVColors.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
                     }
 
                     if !entry.url.isEmpty || !entry.logId.isEmpty || !entry.searchTabsSummary.isEmpty {
@@ -183,57 +183,57 @@ struct SourceDiagnosticEntryDetailSheet: View {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text("脱敏请求 URL:")
                                         .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.6))
+                                        .foregroundColor(TVColors.white.opacity(0.6))
                                     Text(entry.url)
                                         .font(.system(size: 16, design: .monospaced))
                                         .foregroundColor(.cyan)
                                         .padding(12)
                                         .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(Color.black.opacity(0.35))
+                                        .background(TVColors.black.opacity(0.35))
                                         .cornerRadius(8)
                                 }
                             }
                         }
                         .padding(24)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+                        .background(TVColors.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
                     }
 
                     if !entry.responseSnippet.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 10) {
                                 Image(systemName: "curlybraces")
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(TVColors.yellow)
                                 Text("脱敏响应结构摘要")
                                     .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(TVColors.yellow)
                             }
                             Text(entry.responseSnippet)
                                 .font(.system(size: 16, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.9))
+                                .foregroundColor(TVColors.white.opacity(0.9))
                                 .padding(16)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.black.opacity(0.55))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.15), lineWidth: 1))
+                                .background(TVColors.black.opacity(0.55))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(TVColors.white.opacity(0.15), lineWidth: 1))
                                 .cornerRadius(12)
                         }
                         .padding(24)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+                        .background(TVColors.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
                     }
 
                     VStack(alignment: .leading, spacing: 12) {
                         Text("原始摘要信息")
                             .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(TVColors.white.opacity(0.8))
                         Text(entry.text)
                             .font(.system(size: 18, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.75))
+                            .foregroundColor(TVColors.white.opacity(0.75))
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.black.opacity(0.4))
+                            .background(TVColors.black.opacity(0.4))
                             .cornerRadius(12)
                     }
                     .padding(24)
-                    .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
+                    .background(TVColors.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
                 }
                 .padding(12)
                 .focusable()
@@ -255,7 +255,7 @@ struct SourceDiagnosticEntryDetailSheet: View {
         VStack(spacing: 6) {
             Text(title)
                 .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(TVColors.white.opacity(0.6))
             Text(value)
                 .font(.system(size: 22, weight: .bold))
                 .foregroundColor(color)
@@ -271,12 +271,26 @@ struct SourceDiagnosticEntryDetailSheet: View {
         HStack(alignment: .top, spacing: 12) {
             Text(label + ":")
                 .font(.system(size: 18, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(TVColors.white.opacity(0.6))
                 .frame(width: 140, alignment: .leading)
             Text(value)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(TVColors.white)
             Spacer()
         }
     }
+}
+
+#Preview {
+    SourceDiagnosticEntryDetailSheet(
+        entry: SourceDiagnosticEntry(
+            context: "网络诊断",
+            stage: "网络连接",
+            host: "api.example.com",
+            status: 200,
+            elapsedMs: 85
+        ),
+        onClose: {}
+    )
+    .background(TVColors.background)
 }

@@ -16,7 +16,7 @@ import 'package:THLRedLook/core/account/hongguo_account_session.dart';
 import 'package:THLRedLook/core/js/hongguo_guest_session.dart';
 import 'package:THLRedLook/core/account/account_transfer_payload.dart';
 import 'package:THLRedLook/core/diagnostics/source_diagnostics.dart';
-import 'package:THLRedLook/views/drama/drama_cover_view.dart';
+import 'package:THLRedLook/views/drama/cached_cover_image.dart';
 
 class _Reply extends Stream<List<int>> implements HttpClientResponse {
   _Reply(this.payload, [List<String> cookies = const [], this.statusCode = 200])

@@ -38,13 +38,13 @@ public struct TVSidebarView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 11))
                     .overlay(
                         RoundedRectangle(cornerRadius: 11)
-                            .stroke(Color.white.opacity(0.18), lineWidth: 1.2)
+                            .stroke(TVColors.white.opacity(0.18), lineWidth: 1.2)
                     )
                     .shadow(color: TVTheme.primary.opacity(0.4), radius: 8, x: 0, y: 3)
 
                 Text("糖葫芦Haw")
                     .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
                     .tracking(0.5)
             }
             .padding(.horizontal, 16)
@@ -82,10 +82,10 @@ public struct TVSidebarView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("糖葫芦Haw v\(appVersion)")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundColor(Color.white.opacity(0.45))
+                    .foregroundColor(TVColors.white.opacity(0.45))
                 Text("Apple TV • 原生播放")
                     .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(Color.white.opacity(0.3))
+                    .foregroundColor(TVColors.white.opacity(0.3))
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 28)
@@ -95,4 +95,22 @@ public struct TVSidebarView: View {
             onRefreshCurrentTab?()
         }
     }
+}
+
+#Preview {
+    struct PreviewWrapper: View {
+        @State var selectedTab: TVAppTab = .catalog
+        @FocusState var focusedTab: TVAppTab?
+        var body: some View {
+            TVSidebarView(
+                selectedTab: $selectedTab,
+                focusedNavTab: $focusedTab,
+                onSelectTab: { _ in },
+                onMoveRight: { _ in }
+            )
+            .frame(width: 320)
+            .background(TVColors.background)
+        }
+    }
+    return PreviewWrapper()
 }

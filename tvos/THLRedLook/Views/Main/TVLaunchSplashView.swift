@@ -38,3 +38,7 @@ public struct TVLaunchSplashView: View {
         }
     }
 }
+
+#Preview {
+    TVLaunchSplashView()
+}

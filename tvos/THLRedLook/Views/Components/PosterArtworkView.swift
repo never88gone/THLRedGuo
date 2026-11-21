@@ -51,7 +51,7 @@ public struct PosterArtworkView: View {
                 }
 
                 LinearGradient(
-                    colors: [Color.clear, Color.black.opacity(0.85)],
+                    colors: [TVColors.clear, TVColors.black.opacity(0.85)],
                     startPoint: .center,
                     endPoint: .bottom
                 )
@@ -78,7 +78,7 @@ public struct PosterArtworkView: View {
             VStack {
                 HStack {
                     Circle()
-                        .fill(Color.white.opacity(0.12))
+                        .fill(TVColors.white.opacity(0.12))
                         .frame(width: 80, height: 80)
                         .blur(radius: 20)
                     Spacer()
@@ -92,18 +92,18 @@ public struct PosterArtworkView: View {
                 HStack {
                     Image(systemName: "film.stack.fill")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.white.opacity(0.85))
+                        .foregroundColor(TVColors.white.opacity(0.85))
                     Text("糖葫芦剧场")
                         .font(.system(size: 11, weight: .black))
-                        .foregroundColor(.white.opacity(0.85))
+                        .foregroundColor(TVColors.white.opacity(0.85))
                     Spacer()
                     if !drama.category.isEmpty {
                         Text(drama.category)
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(TVColors.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.white.opacity(0.2))
+                            .background(TVColors.white.opacity(0.2))
                             .clipShape(Capsule())
                     }
                 }
@@ -115,8 +115,8 @@ public struct PosterArtworkView: View {
                 // 中间大图标
                 Image(systemName: "play.tv.fill")
                     .font(.system(size: 42, weight: .light))
-                    .foregroundColor(.white.opacity(0.35))
-                    .shadow(color: .black.opacity(0.4), radius: 6)
+                    .foregroundColor(TVColors.white.opacity(0.35))
+                    .shadow(color: TVColors.black.opacity(0.4), radius: 6)
 
                 Spacer()
 
@@ -124,15 +124,15 @@ public struct PosterArtworkView: View {
                 VStack(spacing: 4) {
                     Text(drama.title)
                         .font(.system(size: 18, weight: .black))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
-                        .shadow(color: .black, radius: 4, x: 0, y: 2)
+                        .shadow(color: TVColors.black, radius: 4, x: 0, y: 2)
 
                     if !drama.tags.isEmpty {
                         Text(drama.tags.joined(separator: " · "))
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.75))
+                            .foregroundColor(TVColors.white.opacity(0.75))
                             .lineLimit(1)
                     }
                 }
@@ -141,4 +141,10 @@ public struct PosterArtworkView: View {
             }
         }
     }
+}
+
+#Preview {
+    PosterArtworkView(drama: Drama(id: "p1", title: "测试海报", cover: "", episodes: 100))
+        .frame(width: 250, height: 350)
+        .background(TVColors.background)
 }

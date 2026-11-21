@@ -6,6 +6,7 @@ import 'package:THLRedLook/core/player/playback_preferences.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/utils/theme/app_gradients.dart';
 
 /// 播放器视口默认填充样式设置子页面
 class PlayerFillSettingsPage extends StatelessWidget {
@@ -158,7 +159,7 @@ class PlayerFillSettingsPage extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isDark ? const Color(0x33FFFFFF) : const Color(0x1F000000),
+                color: isDark ? AppColors.white20 : AppColors.black12,
                 width: 1,
               ),
               boxShadow: [
@@ -187,11 +188,7 @@ class PlayerFillSettingsPage extends StatelessWidget {
                         gradient: const LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [
-                            Color(0xFF3A2420),
-                            Color(0xFF221411),
-                            Color(0xFF140B09),
-                          ],
+                          colors: AppGradients.playerFillThemeDarkColors,
                         ),
                         border: Border.all(
                           color: AppColors.whiteWithAlpha(0.25),
@@ -326,11 +323,7 @@ class PlayerFillSettingsPage extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF8B2500),
-                    Color(0xFF5E1914),
-                    Color(0xFF1E0807),
-                  ],
+                  colors: AppGradients.playerFillThemePosterColors,
                 ),
               ),
             ),

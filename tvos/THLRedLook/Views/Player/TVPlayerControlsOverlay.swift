@@ -38,7 +38,7 @@ public struct TVPlayerControlsOverlay: View {
                     viewModel.hideControls()
                 }
             }) {
-                Color.clear
+                TVColors.clear
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
             }
@@ -53,17 +53,17 @@ public struct TVPlayerControlsOverlay: View {
                     Text(formatTime(viewModel.currentTime))
                         .accessibilityIdentifier("player.position")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
 
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Rectangle()
-                                .fill(Color.white.opacity(0.25))
+                                .fill(TVColors.white.opacity(0.25))
                                 .frame(height: 6)
                                 .cornerRadius(3)
 
                             Rectangle()
-                                .fill(Color.red)
+                                .fill(TVColors.red)
                                 .frame(
                                     width: viewModel.duration > 0
                                         ? geo.size.width * CGFloat(min(1.0, max(0, viewModel.currentTime / viewModel.duration)))
@@ -78,7 +78,7 @@ public struct TVPlayerControlsOverlay: View {
                     Text(formatTime(viewModel.duration))
                         .accessibilityIdentifier("player.duration")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                 }
 
                 // 底部两层操作栏：第一层（主播放控制） + 第二层（播放设置与增强），均整体水平居中对齐
@@ -387,7 +387,7 @@ public struct TVPlayerControlsOverlay: View {
             .frame(maxWidth: .infinity)
             .background(
                 LinearGradient(
-                    colors: [Color.clear, Color.black.opacity(0.45), Color.black.opacity(0.92)],
+                    colors: [TVColors.clear, TVColors.black.opacity(0.45), TVColors.black.opacity(0.92)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -472,4 +472,16 @@ public struct TVPlayerControlsOverlay: View {
             focusedControl = .nextDrama
         }
     }
+}
+
+#Preview {
+    TVPlayerControlsOverlay(
+        viewModel: PlayerViewModel(
+            drama: Drama(id: "1", title: "测试短剧", cover: "", episodes: 20, tags: []),
+            allEpisodes: [],
+            initialEpisodeIndex: 1
+        ),
+        onDismiss: {}
+    )
+    .background(TVColors.background)
 }

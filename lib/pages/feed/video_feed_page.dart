@@ -1,3 +1,4 @@
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -166,12 +167,12 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
       );
     }
     return ColoredBox(
-      color: Colors.black,
+      color: AppColors.black,
       child: Center(
         child: !current || !feed.active
             ? Text(
                 feed.items[index].drama.title,
-                style: const TextStyle(color: Colors.white54),
+                style: const TextStyle(color: AppColors.white54),
               )
             : feed.detailError != null
             ? StatusPanel(
@@ -179,7 +180,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                 message: feed.detailError!,
                 onRetry: () => unawaited(feed.prepare()),
               )
-            : const CircularProgressIndicator(color: Colors.white),
+            : const CircularProgressIndicator(color: AppColors.white),
       ),
     );
   }
@@ -191,7 +192,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
       data: ThemeData.dark(),
       child: ColoredBox(
         key: const ValueKey('video-feed'),
-        color: Colors.black,
+        color: AppColors.black,
         child: !feed.allowed
             ? const StatusPanel(title: '当前用户未开放精选短剧', message: '可在设置中调整站源权限。')
             : feed.items.isEmpty
@@ -200,12 +201,12 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircularProgressIndicator(color: Colors.white70),
+                          CircularProgressIndicator(color: AppColors.white70),
                           SizedBox(height: 16),
                           Text(
                             '正在加载精彩短剧视频...',
                             style: TextStyle(
-                              color: Colors.white70,
+                              color: AppColors.white70,
                               fontSize: 14,
                             ),
                           ),
@@ -246,7 +247,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                                 const Text(
                                   '推荐',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: AppColors.white,
                                     fontSize: 21,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -256,7 +257,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                                   child: Text(
                                     '上滑换剧',
                                     style: TextStyle(
-                                      color: Colors.white70,
+                                      color: AppColors.white70,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -265,7 +266,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                                   key: const ValueKey('feed-refresh'),
                                   tooltip: '刷新推荐',
                                   onPressed: feed.loading ? null : _refresh,
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   icon: const Icon(Icons.refresh),
                                 ),
                                 IconButton(
@@ -274,14 +275,14 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                                   onPressed: feed.index > 0
                                       ? () => unawaited(_move(-1))
                                       : null,
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   icon: const Icon(Icons.keyboard_arrow_up),
                                 ),
                                 IconButton(
                                   key: const ValueKey('feed-next'),
                                   tooltip: '下一部',
                                   onPressed: () => unawaited(_move(1)),
-                                  color: Colors.white,
+                                  color: AppColors.white,
                                   icon: const Icon(Icons.keyboard_arrow_down),
                                 ),
                               ],
@@ -290,7 +291,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen>
                               const LinearProgressIndicator(minHeight: 2),
                             if (feed.moreError != null)
                               Material(
-                                color: const Color(0xD9222222),
+                                color: AppColors.feedOverlayDark,
                                 borderRadius: BorderRadius.circular(8),
                                 child: Row(
                                   children: [

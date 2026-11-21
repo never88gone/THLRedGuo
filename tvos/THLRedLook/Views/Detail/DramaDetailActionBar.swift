@@ -109,11 +109,11 @@ public struct DramaDetailActionBar: View {
             } else if viewModel.isLoading {
                 HStack(spacing: 16) {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .progressViewStyle(CircularProgressViewStyle(tint: TVColors.white))
                         .scaleEffect(1.2)
                     Text("正在载入剧集选集与播放源...")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(.white.opacity(0.85))
+                        .foregroundColor(TVColors.white.opacity(0.85))
                 }
                 .padding(.top, 16)
                 .padding(.leading, 6)
@@ -121,7 +121,7 @@ public struct DramaDetailActionBar: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("剧集详情加载出错：\(error)")
                         .font(.system(size: 18))
-                        .foregroundColor(Color.red.opacity(0.9))
+                        .foregroundColor(TVColors.red.opacity(0.9))
                     TVButton(title: "重试加载", icon: "arrow.clockwise", isProminent: true) {
                         Task { await viewModel.loadDetail() }
                     }
@@ -134,4 +134,34 @@ public struct DramaDetailActionBar: View {
         .opacity(appearAnimation ? 1.0 : 0.0)
         .animation(.easeOut(duration: 0.45).delay(0.08), value: appearAnimation)
     }
+}
+
+#Preview {
+    struct PreviewWrapper: View {
+        @FocusState var focus: DetailFocus?
+        @State var ep = 1
+        @State var pos: Double = 0
+        @State var playing: Int? = nil
+        @State var dl = false
+        var body: some View {
+            ScrollViewReader { proxy in
+                DramaDetailActionBar(
+                    viewModel: DetailViewModel(drama: Drama(id: "1", title: "测试", cover: "", episodes: 20, tags: [])),
+                    accountLibrary: HongguoAccountModel.shared,
+                    detail: nil,
+                    appearAnimation: true,
+                    focusedTarget: $focus,
+                    selectedEpisodeNumber: $ep,
+                    resumePosition: $pos,
+                    playingEpisodeIndex: $playing,
+                    showingDownloadSuccess: $dl,
+                    scrollProxy: proxy,
+                    onFocus: { _ in }
+                )
+            }
+            .padding(40)
+            .background(TVColors.background)
+        }
+    }
+    return PreviewWrapper()
 }

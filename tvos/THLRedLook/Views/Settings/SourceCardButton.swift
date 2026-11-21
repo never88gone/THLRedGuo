@@ -18,20 +18,20 @@ public struct SourceCardButton: View {
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(isSelected ? TVTheme.primary.opacity(0.3) : Color.white.opacity(0.08))
+                        .fill(isSelected ? TVTheme.primary.opacity(0.3) : TVColors.white.opacity(0.08))
                         .frame(width: 48, height: 48)
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "antenna.radiowaves.left.and.right")
                         .font(.system(size: 24))
-                        .foregroundColor(isSelected ? TVTheme.primary : .white)
+                        .foregroundColor(isSelected ? TVTheme.primary : TVColors.white)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(source.name)
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                     Text(source.description)
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(TVColors.white.opacity(0.6))
                         .lineLimit(1)
                 }
                 Spacer()
@@ -43,7 +43,7 @@ public struct SourceCardButton: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? TVTheme.primary : Color.clear, lineWidth: 2)
+                    .stroke(isSelected ? TVTheme.primary : TVColors.clear, lineWidth: 2)
             )
             .tvFocusBorder(isFocused: isFocused, cornerRadius: 16)
         }
@@ -53,4 +53,18 @@ public struct SourceCardButton: View {
         .focused($isFocused)
         .focusEffectDisabled()
     }
+}
+
+#Preview {
+    SourceCardButton(
+        source: SourceSite(
+            id: "src1",
+            name: "红果官方源",
+            description: "内置稳定高清播放源"
+        ),
+        isSelected: true,
+        action: {}
+    )
+    .padding(40)
+    .background(TVColors.background)
 }

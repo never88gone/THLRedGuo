@@ -246,7 +246,7 @@ Future<void> showPresetSourceSelectionDialog({
                                 child: const Text(
                                   '已激活',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: AppColors.white,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),

@@ -22,6 +22,8 @@ import 'package:THLRedLook/pages/sources/sources_page.dart';
 import 'package:THLRedLook/views/browser/episode_browser.dart';
 import 'package:THLRedLook/core/store/follow_state.dart';
 import 'package:THLRedLook/core/series/hongguo_series.dart';
+import 'package:THLRedLook/utils/theme/app_gradients.dart';
+import 'package:THLRedLook/utils/theme/app_shadows.dart';
 
 class DetailScreen extends StatefulWidget {
   const DetailScreen({
@@ -461,21 +463,21 @@ class _DetailScreenState extends State<DetailScreen> {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
+          backgroundColor: AppColors.transparent,
+          surfaceTintColor: AppColors.transparent,
           elevation: 0,
           toolbarHeight: television ? 64 : null,
           systemOverlayStyle: SystemUiOverlayStyle.light,
-          foregroundColor: Colors.white,
-          iconTheme: const IconThemeData(color: Colors.white),
+          foregroundColor: AppColors.white,
+          iconTheme: const IconThemeData(color: AppColors.white),
           leading: Navigator.of(context).canPop()
               ? Center(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: const Color(0x66000000),
+                      color: AppColors.black40,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: const Color(0x33FFFFFF),
+                        color: AppColors.white20,
                         width: 0.8,
                       ),
                     ),
@@ -488,7 +490,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       padding: EdgeInsets.zero,
                       icon: const Icon(
                         Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
+                        color: AppColors.white,
                         size: 18,
                       ),
                       onPressed: () => Navigator.of(context).maybePop(),
@@ -501,10 +503,10 @@ class _DetailScreenState extends State<DetailScreen> {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: AppColors.white,
               shadows: [
                 Shadow(
-                  color: Color(0xD9000000),
+                  color: AppColors.black85,
                   blurRadius: 6,
                   offset: Offset(0, 1),
                 ),
@@ -517,10 +519,10 @@ class _DetailScreenState extends State<DetailScreen> {
               child: Center(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: const Color(0x66000000),
+                    color: AppColors.black40,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: const Color(0x33FFFFFF),
+                      color: AppColors.white20,
                       width: 0.8,
                     ),
                   ),
@@ -743,7 +745,7 @@ class _DetailScreenState extends State<DetailScreen> {
             border: Border(
               top: BorderSide(
                 color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0x26FFFFFF)
+                    ? AppColors.white15
                     : Theme.of(
                         context,
                       ).colorScheme.outlineVariant.withValues(alpha: 0.5),
@@ -752,7 +754,7 @@ class _DetailScreenState extends State<DetailScreen> {
             ),
             boxShadow: const [
               BoxShadow(
-                color: Color(0x33000000),
+                color: AppColors.black20,
                 blurRadius: 16,
                 offset: Offset(0, -4),
               ),
@@ -1711,7 +1713,7 @@ class _DetailScreenState extends State<DetailScreen> {
     final statusColor = _followStatusColor(status);
 
     return Material(
-      color: Colors.transparent,
+      color: AppColors.transparent,
       child: InkWell(
         onTap: () async {
           Navigator.of(sheetContext).pop();
@@ -1804,7 +1806,7 @@ class _DetailScreenState extends State<DetailScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       builder: (sheetContext) {
         return SafeArea(
           top: false,
@@ -1969,7 +1971,7 @@ class _DetailScreenState extends State<DetailScreen> {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Material(
-              color: Colors.transparent,
+              color: AppColors.transparent,
               child: Tooltip(
                 message: isFollowed ? '取消追剧（长按更多状态）' : '点击追剧（长按更多状态）',
                 child: InkWell(

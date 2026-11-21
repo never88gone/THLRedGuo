@@ -29,7 +29,7 @@ public struct TVQuickSeekIndicatorView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(formatTime(targetTime))
                             .font(.system(size: 34, weight: .heavy, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(TVColors.white)
                         Text("/ \(formatTime(duration))")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(TVTheme.textSecondary)
@@ -45,7 +45,7 @@ public struct TVQuickSeekIndicatorView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color.white.opacity(0.2))
+                        .fill(TVColors.white.opacity(0.2))
                         .frame(height: 6)
 
                     let progress = duration > 0 ? max(0, min(targetTime / duration, 1.0)) : 0
@@ -73,9 +73,9 @@ public struct TVQuickSeekIndicatorView: View {
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(
             RoundedRectangle(cornerRadius: 24)
-                .stroke(Color.white.opacity(0.18), lineWidth: 1.2)
+                .stroke(TVColors.white.opacity(0.18), lineWidth: 1.2)
         )
-        .shadow(color: Color.black.opacity(0.85), radius: 28, x: 0, y: 10)
+        .shadow(color: TVColors.black.opacity(0.85), radius: 28, x: 0, y: 10)
         .accessibilityIdentifier("player.quickSeek")
     }
 
@@ -86,4 +86,10 @@ public struct TVQuickSeekIndicatorView: View {
         let s = total % 60
         return String(format: "%02d:%02d", m, s)
     }
+}
+
+#Preview {
+    TVQuickSeekIndicatorView(targetTime: 120, duration: 300, delta: 15, isScrubbing: false)
+        .padding()
+        .background(TVColors.black)
 }

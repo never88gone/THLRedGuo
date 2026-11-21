@@ -5,7 +5,7 @@ public struct HelpItemCard: View {
     public let title: String
     public let subtitle: String
     public let icon: String
-    public var accentColor: Color = .purple
+    public var accentColor: Color = TVColors.purple
     public let identifier: String
     public let tips: [String]
 
@@ -15,7 +15,7 @@ public struct HelpItemCard: View {
         title: String,
         subtitle: String,
         icon: String,
-        accentColor: Color = .purple,
+        accentColor: Color = TVColors.purple,
         identifier: String,
         tips: [String]
     ) {
@@ -38,17 +38,17 @@ public struct HelpItemCard: View {
 
                         Image(systemName: icon)
                             .font(.system(size: 26, weight: .bold))
-                            .foregroundColor(isFocused ? .white : accentColor)
+                            .foregroundColor(isFocused ? TVColors.white : accentColor)
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title)
                             .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(TVColors.white)
 
                         Text(subtitle)
                             .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.68))
+                            .foregroundColor(TVColors.white.opacity(0.68))
                     }
 
                     Spacer()
@@ -59,13 +59,13 @@ public struct HelpItemCard: View {
                     ForEach(Array(tips.enumerated()), id: \.offset) { _, tip in
                         HStack(alignment: .top, spacing: 10) {
                             Circle()
-                                .fill(isFocused ? accentColor : Color.white.opacity(0.4))
+                                .fill(isFocused ? accentColor : TVColors.white.opacity(0.4))
                                 .frame(width: 6, height: 6)
                                 .padding(.top, 7)
 
                             Text(tip)
                                 .font(.system(size: 15))
-                                .foregroundColor(isFocused ? .white.opacity(0.95) : .white.opacity(0.72))
+                                .foregroundColor(isFocused ? TVColors.white.opacity(0.95) : TVColors.white.opacity(0.72))
                                 .lineSpacing(4)
                         }
                     }
@@ -80,7 +80,7 @@ public struct HelpItemCard: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(isFocused ? TVTheme.primary : Color.white.opacity(0.06), lineWidth: isFocused ? 2 : 1)
+                    .stroke(isFocused ? TVTheme.primary : TVColors.white.opacity(0.06), lineWidth: isFocused ? 2 : 1)
             )
             .tvFocusBorder(isFocused: isFocused, cornerRadius: 20)
         }
@@ -91,4 +91,16 @@ public struct HelpItemCard: View {
         .focusEffectDisabled()
         .accessibilityIdentifier(identifier)
     }
+}
+
+#Preview {
+    HelpItemCard(
+        title: "如何导入数据源？",
+        subtitle: "进入设置页面，选择数据源管理",
+        icon: "questionmark.circle",
+        identifier: "help_import",
+        tips: ["点击导入官方源", "支持局域网同步配置"]
+    )
+    .padding()
+    .background(TVColors.background)
 }

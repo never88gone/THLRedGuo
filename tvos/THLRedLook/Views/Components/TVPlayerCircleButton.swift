@@ -36,7 +36,7 @@ public struct TVPlayerCircleButton: View {
                 .padding(padding)
                 .background(
                     Circle()
-                        .fill(isProminent ? (effectiveFocused ? TVColors.primaryHover : TVColors.primary) : (effectiveFocused ? TVColors.surfaceFocused : Color.black.opacity(0.85)))
+                        .fill(isProminent ? (effectiveFocused ? TVColors.primaryHover : TVColors.primary) : (effectiveFocused ? TVColors.surfaceFocused : TVColors.black.opacity(0.85)))
                 )
                 .tvCircleFocus(isFocused: effectiveFocused)
         }

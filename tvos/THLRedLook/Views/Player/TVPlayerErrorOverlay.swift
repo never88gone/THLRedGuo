@@ -14,11 +14,11 @@ struct TVPlayerErrorOverlay: View {
         VStack(spacing: 24) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 48))
-                .foregroundColor(.yellow)
+                .foregroundColor(TVColors.yellow)
             Text("播放失败：\(errorMessage)")
                 .font(.headline)
                 .multilineTextAlignment(.center)
-                .foregroundColor(.white)
+                .foregroundColor(TVColors.white)
                 .lineSpacing(6)
                 .padding(.horizontal, 24)
 
@@ -35,7 +35,7 @@ struct TVPlayerErrorOverlay: View {
                         RoundedRectangle(cornerRadius: 14)
                             .fill(errorFocusTarget == .backToEpisodes ? TVTheme.primaryHover : TVTheme.primary)
                     )
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
                     .tvFocusBorder(isFocused: errorFocusTarget == .backToEpisodes, cornerRadius: 14)
                 }
                 .buttonStyle(TVZeroHighlightButtonStyle())
@@ -53,7 +53,7 @@ struct TVPlayerErrorOverlay: View {
                         RoundedRectangle(cornerRadius: 14)
                             .fill(errorFocusTarget == .retry ? TVTheme.surfaceFocused : TVTheme.surfaceCard)
                     )
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
                     .tvFocusBorder(isFocused: errorFocusTarget == .retry, cornerRadius: 14)
                 }
                 .buttonStyle(TVZeroHighlightButtonStyle())
@@ -66,17 +66,29 @@ struct TVPlayerErrorOverlay: View {
             }
         }
         .padding(40)
-        .background(Color.black.opacity(0.92))
+        .background(TVColors.black.opacity(0.92))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                .stroke(TVColors.white.opacity(0.15), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.8), radius: 30)
+        .shadow(color: TVColors.black.opacity(0.8), radius: 30)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 errorFocusTarget = .backToEpisodes
             }
         }
     }
+}
+
+#Preview {
+    TVPlayerErrorOverlay(
+        errorMessage: "网络连接超时",
+        isFeedMode: false,
+        canGoNextDrama: false,
+        onBack: {},
+        onRetry: {},
+        onNextDrama: nil
+    )
+    .background(TVColors.black)
 }

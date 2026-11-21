@@ -13,6 +13,7 @@ import 'package:THLRedLook/pages/downloads/offline_player_page.dart';
 import 'package:THLRedLook/views/remote/remote_widgets.dart';
 import 'package:THLRedLook/pages/settings/settings_page.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({
@@ -762,7 +763,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             title: Text(title),
             actions: actions,
             automaticallyImplyLeading: false,
-            backgroundColor: Colors.transparent,
+            backgroundColor: AppColors.transparent,
             elevation: 0,
             scrolledUnderElevation: 0,
           ),

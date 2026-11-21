@@ -42,6 +42,7 @@ import 'package:THLRedLook/views/home/home_app_bar_view.dart';
 import 'package:THLRedLook/core/js/js_source_service.dart';
 import 'package:THLRedLook/core/feed/video_feed_controller.dart';
 import 'package:THLRedLook/pages/feed/video_feed_page.dart';
+import 'package:THLRedLook/utils/theme/app_gradients.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -1237,7 +1238,7 @@ class _HomeScreenState extends State<HomeScreen> {
             gradient: isDark ? AppGradients.darkAtmosphere : null,
           ),
           child: Scaffold(
-            backgroundColor: Colors.transparent,
+            backgroundColor: AppColors.transparent,
             appBar: _tab == 0
                 ? HomeAppBarView(
                     selectionMode: _selectionMode,

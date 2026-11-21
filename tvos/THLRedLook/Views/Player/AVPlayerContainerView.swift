@@ -83,7 +83,7 @@ public class AVPlayerContainerView: UIView {
     }
 
     private func setupLayers() {
-        backgroundColor = .black
+        backgroundColor = TVColors.uiBlack
 
         let bgLayer = AVPlayerLayer()
         bgLayer.videoGravity = .resizeAspectFill

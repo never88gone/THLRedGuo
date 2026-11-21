@@ -9,10 +9,10 @@ public struct SettingsHelpPanel: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("帮助说明")
                     .font(.system(size: 32, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
                 Text("了解 Apple TV 遥控器核心手势操作与系统特色功能使用技巧。")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.65))
+                    .foregroundColor(TVColors.white.opacity(0.65))
             }
 
             // 1. 遥控器与手势操作指引
@@ -20,7 +20,7 @@ public struct SettingsHelpPanel: View {
                 title: "Apple TV 遥控器操作指南",
                 subtitle: "全屏播放与导航专属按键映射",
                 icon: "appletvremote.gen4.fill",
-                accentColor: .purple,
+                accentColor: TVColors.purple,
                 identifier: "settings.help.remote",
                 tips: [
                     "左右方向键：单按独立快退/快进 10 秒，弹出轻量胶囊进度条，不遮挡画面",
@@ -36,7 +36,7 @@ public struct SettingsHelpPanel: View {
                 title: "iCloud 多端观看记录同步",
                 subtitle: "iOS、macOS 与 Apple TV 全生态漫游",
                 icon: "icloud.fill",
-                accentColor: .blue,
+                accentColor: TVColors.blue,
                 identifier: "settings.help.icloud",
                 tips: [
                     "同一账号：在所有苹果设备登录同一个 Apple ID 即可自动开启",
@@ -50,7 +50,7 @@ public struct SettingsHelpPanel: View {
                 title: "播放故障重试与站源诊断",
                 subtitle: "如何自测网络并排查播放异常",
                 icon: "wrench.and.screwdriver.fill",
-                accentColor: .orange,
+                accentColor: TVColors.orange,
                 identifier: "settings.help.troubleshooting",
                 tips: [
                     "原地重试：播放失败时画面将弹出「重试」与「返回剧集」按钮",
@@ -60,4 +60,10 @@ public struct SettingsHelpPanel: View {
             )
         }
     }
+}
+
+#Preview {
+    SettingsHelpPanel()
+        .padding(50)
+        .background(TVColors.background)
 }

@@ -25,11 +25,11 @@ public struct TVSourceBlankStateView: View {
             VStack(spacing: 14) {
                 Text("当前未添加数据源插件")
                     .font(.system(size: 40, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
 
                 Text("当前未激活数据源，可直接一键导入官方短剧源\n或添加自定义 JS 插件网络订阅。")
                     .font(.system(size: 22))
-                    .foregroundColor(.white.opacity(0.65))
+                    .foregroundColor(TVColors.white.opacity(0.65))
                     .multilineTextAlignment(.center)
                     .lineSpacing(6)
             }
@@ -80,12 +80,12 @@ public struct TVSourceBlankStateView: View {
 
     private var importAlertOverlay: some View {
         ZStack {
-            Color.black.opacity(0.85).ignoresSafeArea()
+            TVColors.black.opacity(0.85).ignoresSafeArea()
 
             VStack(spacing: 32) {
                 Text("导入数据源插件")
                     .font(.system(size: 34, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
 
                 TextField("请输入 JS 插件链接 (URL)", text: $importURLString)
                     .frame(width: 600)
@@ -94,7 +94,7 @@ public struct TVSourceBlankStateView: View {
                 if isImporting {
                     ProgressView("正在下载并校验插件...")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                 }
 
                 HStack(spacing: 24) {
@@ -150,4 +150,9 @@ public struct TVSourceBlankStateView: View {
             }
         }
     }
+}
+
+#Preview {
+    TVSourceBlankStateView()
+        .environmentObject(JSSourceService.shared)
 }

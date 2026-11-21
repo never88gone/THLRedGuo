@@ -40,9 +40,9 @@ public struct TVCustomSplitView<Sidebar: View, Detail: View>: View {
                         .cornerRadius(26)
                         .overlay(
                             RoundedRectangle(cornerRadius: 26)
-                                .stroke(Color.white.opacity(0.14), lineWidth: 1.2)
+                                .stroke(TVColors.white.opacity(0.14), lineWidth: 1.2)
                         )
-                        .shadow(color: Color.black.opacity(0.85), radius: 36, x: 12, y: 0)
+                        .shadow(color: TVColors.black.opacity(0.85), radius: 36, x: 12, y: 0)
                         .padding(.leading, 32)
                         .padding(.vertical, 32)
                         .transition(.move(edge: .leading).combined(with: .opacity))
@@ -57,4 +57,21 @@ public struct TVCustomSplitView<Sidebar: View, Detail: View>: View {
         .ignoresSafeArea()
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: columnVisibility)
     }
+}
+
+#Preview {
+    TVCustomSplitView(
+        columnVisibility: .constant(.all),
+        sidebar: {
+            Text("侧边栏")
+                .foregroundColor(TVColors.textPrimary)
+                .padding()
+        },
+        detail: {
+            Text("主内容区域")
+                .foregroundColor(TVColors.textPrimary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(TVColors.backgroundGradient)
+        }
+    )
 }

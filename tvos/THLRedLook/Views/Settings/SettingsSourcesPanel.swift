@@ -34,17 +34,17 @@ public struct SettingsSourcesPanel: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("站源管理")
                     .font(.system(size: 32, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
                 Text("配置并选择当前要使用的影视数据源。内置支持官方标准短剧源，也可导入自定义 JS 插件。")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.65))
+                    .foregroundColor(TVColors.white.opacity(0.65))
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("应用 " + SourceDiagnostics.version + " · " + SourceDiagnostics.sourceRevision)
                     .font(.system(size: 29)).accessibilityIdentifier("settings.sourceRevision")
                 Text(SourceDiagnostics.sourceBundleStatus + " · " + sourceDiagnostics.sourceRuntimeStatus)
-                    .font(.system(size: 25)).foregroundStyle(.secondary)
+                    .font(.system(size: 25)).foregroundStyle(TVColors.secondary)
                     .accessibilityIdentifier("settings.sourceRuntime")
             }
 
@@ -136,13 +136,13 @@ public struct SettingsSourcesPanel: View {
             
             Text("已安装插件列表")
                 .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(TVColors.white.opacity(0.8))
             
             if jsService.sources.isEmpty {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("暂无任何数据源。推荐立即导入官方标准数据源，即刻开启全量短剧在线播放体验。")
                         .font(.system(size: 16))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(TVColors.white.opacity(0.6))
 
                     TVButton(title: "立即导入官方数据源", icon: "sparkles.tv.fill", isProminent: true) {
                         Task {
@@ -227,7 +227,7 @@ public struct SettingsSourcesPanel: View {
 
     private var importAlertOverlay: some View {
         ZStack {
-            Color.black.opacity(0.85).ignoresSafeArea()
+            TVColors.black.opacity(0.85).ignoresSafeArea()
             
             VStack(spacing: 32) {
                 Text("添加网络订阅链接")
@@ -239,7 +239,7 @@ public struct SettingsSourcesPanel: View {
                 
                 Text("提示：导入官方数据源时将默认自动选中并激活")
                     .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(TVColors.white.opacity(0.6))
 
                 if isImporting {
                     ProgressView()
@@ -295,4 +295,21 @@ public struct SettingsSourcesPanel: View {
             }
         }
     }
+}
+
+#Preview {
+    struct PreviewWrapper: View {
+        @State var showingDiag = false
+        @State var notice: String? = nil
+        var body: some View {
+            SettingsSourcesPanel(
+                showingSourceDiagnostics: $showingDiag,
+                saveNotice: $notice
+            )
+            .environmentObject(JSSourceService.shared)
+            .padding(50)
+            .background(TVColors.background)
+        }
+    }
+    return PreviewWrapper()
 }

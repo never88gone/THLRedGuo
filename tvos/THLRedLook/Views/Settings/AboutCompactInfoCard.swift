@@ -18,7 +18,7 @@ public struct AboutCompactInfoCard: View {
                 // 应用图标
                 ZStack {
                     RoundedRectangle(cornerRadius: 26)
-                        .fill(Color.black.opacity(0.3))
+                        .fill(TVColors.black.opacity(0.3))
                         .frame(width: 120, height: 120)
 
                     Image("applogo")
@@ -28,7 +28,7 @@ public struct AboutCompactInfoCard: View {
                         .clipShape(RoundedRectangle(cornerRadius: 26))
                         .overlay(
                             RoundedRectangle(cornerRadius: 26)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1.5)
+                                .stroke(TVColors.white.opacity(0.2), lineWidth: 1.5)
                         )
                         .shadow(color: TVTheme.primary.opacity(0.4), radius: 16, x: 0, y: 8)
                 }
@@ -37,22 +37,22 @@ public struct AboutCompactInfoCard: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("糖葫芦Haw")
                         .font(.system(size: 38, weight: .heavy))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
 
                     HStack(spacing: 20) {
                         HStack(spacing: 8) {
                             Text("版本号:")
                                 .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(TVColors.white.opacity(0.6))
                             Text("v\(appVersion)")
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(TVColors.white)
                         }
 
                         HStack(spacing: 8) {
                             Text("编译号:")
                                 .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(TVColors.white.opacity(0.6))
                             Text(appBuild)
                                 .font(.system(size: 16, weight: .bold, design: .monospaced))
                                 .foregroundColor(TVTheme.primaryHover)
@@ -79,7 +79,7 @@ public struct AboutCompactInfoCard: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 22)
-                    .stroke(isFocused ? TVTheme.primary : Color.white.opacity(0.08), lineWidth: isFocused ? 2 : 1)
+                    .stroke(isFocused ? TVTheme.primary : TVColors.white.opacity(0.08), lineWidth: isFocused ? 2 : 1)
             )
             .tvFocusBorder(isFocused: isFocused, cornerRadius: 22)
         }
@@ -90,4 +90,10 @@ public struct AboutCompactInfoCard: View {
         .focusEffectDisabled()
         .accessibilityIdentifier("settings.about.compact_info")
     }
+}
+
+#Preview {
+    AboutCompactInfoCard(appVersion: "1.0.0", appBuild: "20261121")
+        .padding()
+        .background(TVColors.black)
 }

@@ -20,10 +20,10 @@ public struct TVCapsuleFocusModifier: ViewModifier {
         content
             .overlay(
                 Capsule()
-                    .stroke(isFocused ? TVColors.focusedBorderColor : Color.clear, lineWidth: lineWidth)
+                    .stroke(isFocused ? TVColors.focusedBorderColor : TVColors.clear, lineWidth: lineWidth)
             )
             .shadow(
-                color: isFocused ? TVColors.focusedShadowColor : Color.clear,
+                color: isFocused ? TVColors.focusedShadowColor : TVColors.clear,
                 radius: 12,
                 y: 0
             )

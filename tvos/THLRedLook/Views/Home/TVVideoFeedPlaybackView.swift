@@ -86,3 +86,10 @@ public struct TVVideoFeedPlaybackView: View {
         }
     }
 }
+
+#Preview {
+    TVVideoFeedPlaybackView(
+        viewModel: VideoFeedViewModel(),
+        onDismiss: {}
+    )
+}

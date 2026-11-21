@@ -102,9 +102,9 @@ public struct TVDanmakuView: View {
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { context in
             let origin = CGPoint(x: 8, y: 4)
-            let outline = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: UIColor.black])
+            let outline = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: TVColors.uiBlack])
             context.cgContext.saveGState()
-            context.cgContext.setShadow(offset: CGSize(width: 0, height: 1.5), blur: 3, color: UIColor.black.withAlphaComponent(0.8).cgColor)
+            context.cgContext.setShadow(offset: CGSize(width: 0, height: 1.5), blur: 3, color: TVColors.uiBlack.withAlphaComponent(0.8).cgColor)
             outline.draw(at: origin)
             context.cgContext.restoreGState()
             for offset in [CGPoint(x: 1.5, y: 0), CGPoint(x: -1.5, y: 0),
@@ -113,7 +113,7 @@ public struct TVDanmakuView: View {
                            CGPoint(x: 1.2, y: -1.2), CGPoint(x: -1.2, y: 1.2)] {
                 outline.draw(at: CGPoint(x: origin.x + offset.x, y: origin.y + offset.y))
             }
-            NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: UIColor.white])
+            NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: TVColors.uiWhite])
                 .draw(at: origin)
         }.withRenderingMode(.alwaysOriginal)
     }

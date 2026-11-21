@@ -30,7 +30,7 @@ public struct ActiveSourceCard: View {
                     HStack(spacing: 12) {
                         Text(source.name)
                             .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(TVColors.white)
                         Text("当前活跃源")
                             .font(.system(size: 12, weight: .bold))
                             .padding(.horizontal, 10)
@@ -40,13 +40,13 @@ public struct ActiveSourceCard: View {
                     }
                     Text(source.description)
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.75))
+                        .foregroundColor(TVColors.white.opacity(0.75))
                 }
                 Spacer()
 
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(TVColors.white.opacity(0.6))
             }
             .padding(22)
             .background(
@@ -55,7 +55,7 @@ public struct ActiveSourceCard: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(effectiveFocused ? Color.white : TVTheme.primary.opacity(0.45), lineWidth: effectiveFocused ? 3.0 : 1.5)
+                    .stroke(effectiveFocused ? TVColors.white : TVTheme.primary.opacity(0.45), lineWidth: effectiveFocused ? 3.0 : 1.5)
             )
             .scaleEffect(effectiveFocused ? 1.02 : 1.0)
             .animation(TVTheme.focusSpringAnimation, value: effectiveFocused)
@@ -67,4 +67,17 @@ public struct ActiveSourceCard: View {
         .focused($isFocused)
         .focusEffectDisabled()
     }
+}
+
+#Preview {
+    ActiveSourceCard(
+        source: SourceSite(
+            id: "hongguo",
+            name: "红果短剧",
+            description: "官方正版免费短剧站源"
+        ),
+        action: {}
+    )
+    .padding(40)
+    .background(TVColors.background)
 }

@@ -18,7 +18,7 @@ struct TVSeasonCapsuleCardLabel: View {
                 .clipped()
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(isFocused ? (item.isCurrent ? Color.white : TVTheme.focusedBorderColor) : Color.white.opacity(0.12), lineWidth: 1)
+                        .stroke(isFocused ? (item.isCurrent ? TVColors.white : TVTheme.focusedBorderColor) : TVColors.white.opacity(0.12), lineWidth: 1)
                 )
 
             VStack(alignment: .leading, spacing: 3) {
@@ -29,11 +29,11 @@ struct TVSeasonCapsuleCardLabel: View {
                 if item.isCurrent {
                     HStack(spacing: 5) {
                         Circle()
-                            .fill(isFocused ? Color.white : Color.red)
+                            .fill(isFocused ? TVColors.white : TVColors.red)
                             .frame(width: 6, height: 6)
                         Text("当前播放")
                             .font(.system(size: 13, weight: .heavy))
-                            .foregroundColor(isFocused ? Color.white : TVColors.activeRedHighlight)
+                            .foregroundColor(isFocused ? TVColors.white : TVColors.activeRedHighlight)
                     }
                 } else {
                     Text(item.drama.releaseLabel)
@@ -58,26 +58,26 @@ struct TVSeasonCapsuleCardLabel: View {
 
     private var titleColor: Color {
         if isFocused {
-            return item.isCurrent ? .white : .black
+            return item.isCurrent ? TVColors.white : TVColors.black
         }
-        return .white
+        return TVColors.white
     }
 
     private var subTitleColor: Color {
         if isFocused {
-            return item.isCurrent ? .white.opacity(0.9) : Color.black.opacity(0.75)
+            return item.isCurrent ? TVColors.white.opacity(0.9) : TVColors.black.opacity(0.75)
         }
-        return Color.white.opacity(0.65)
+        return TVColors.white.opacity(0.65)
     }
 
     private var borderStrokeColor: Color {
         if isFocused {
-            return item.isCurrent ? Color.white : TVTheme.focusedBorderColor
+            return item.isCurrent ? TVColors.white : TVTheme.focusedBorderColor
         }
         if item.isCurrent {
-            return Color.red.opacity(0.85)
+            return TVColors.red.opacity(0.85)
         }
-        return Color.white.opacity(0.12)
+        return TVColors.white.opacity(0.12)
     }
 
     private var borderWidth: CGFloat {
@@ -92,12 +92,12 @@ struct TVSeasonCapsuleCardLabel: View {
 
     private var shadowColor: Color {
         if isFocused {
-            return item.isCurrent ? Color.red.opacity(0.85) : TVTheme.focusedShadowColor
+            return item.isCurrent ? TVColors.red.opacity(0.85) : TVTheme.focusedShadowColor
         }
         if item.isCurrent {
-            return Color.red.opacity(0.4)
+            return TVColors.red.opacity(0.4)
         }
-        return Color.clear
+        return TVColors.clear
     }
 
     private var shadowRadius: CGFloat {
@@ -120,10 +120,18 @@ struct TVSeasonCapsuleCardLabel: View {
             }
         } else {
             if item.isCurrent {
-                Color.red.opacity(0.25)
+                TVColors.red.opacity(0.25)
             } else {
                 TVTheme.surfaceCard
             }
         }
     }
+}
+
+#Preview {
+    TVSeasonCapsuleCardLabel(
+        item: SeasonItem(drama: Drama(id: "d1", title: "第一季", cover: "", episodes: 50), seasonNumber: 1, title: "第一季", isCurrent: true),
+        externalFocused: false
+    )
+    .background(TVColors.background)
 }

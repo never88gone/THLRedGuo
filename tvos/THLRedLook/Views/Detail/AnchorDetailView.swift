@@ -59,7 +59,7 @@ public struct AnchorDetailView: View {
                 }
                 if loading || writing { ProgressView(writing ? "正在确认关注状态" : "正在获取主播资料").accessibilityIdentifier("anchor.loading") }
                 if let error {
-                    Text(error).foregroundStyle(.orange).accessibilityIdentifier("anchor.error")
+                    Text(error).foregroundStyle(TVColors.orange).accessibilityIdentifier("anchor.error")
                     Button("重试") { Task { await load() } }.disabled(loading || writing)
                         .focused($actionFocus, equals: .retry).accessibilityIdentifier("anchor.retry")
                         .onMoveCommand { direction in
@@ -210,4 +210,10 @@ public struct AnchorDetailView: View {
         }
         writing = false
     }
+}
+
+#Preview {
+    AnchorDetailView(
+        anchor: Anchor(id: "anchor_1", name: "金牌主播", avatar: "", worksCount: 30)
+    )
 }

@@ -27,9 +27,9 @@ class PlayerTopBarView extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 2),
     child: DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0x59000000),
+        color: AppColors.black35,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0x26FFFFFF), width: 0.8),
+        border: Border.all(color: AppColors.white15, width: 0.8),
       ),
       child: IconButton(
         tooltip: tooltip,

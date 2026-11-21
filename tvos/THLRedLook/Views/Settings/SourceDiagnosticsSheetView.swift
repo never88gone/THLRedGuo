@@ -31,16 +31,16 @@ public struct SourceDiagnosticsSheetView: View {
             Text("红果官方源 · 应用 \(SourceDiagnostics.version) · 源指纹 \(SourceDiagnostics.sourceHash.prefix(12))")
                 .font(.system(size: 29))
             Text(SourceDiagnostics.sourceRevision + " · " + recorder.sourceRuntimeStatus)
-                .font(.system(size: 25)).foregroundStyle(.secondary)
+                .font(.system(size: 25)).foregroundStyle(TVColors.secondary)
                 .accessibilityIdentifier("sourceDiagnostics.sourceRuntime")
             Text("检测使用当前游客会话，不影响收藏、历史和当前数据源。包含网络DNS、JS引擎、游客会话与剧集解析全链路检测。")
-                .font(.system(size: 24)).foregroundStyle(.secondary)
+                .font(.system(size: 24)).foregroundStyle(TVColors.secondary)
             VStack(alignment: .leading, spacing: 4) {
                 Text(recorder.networkEgress?.summary ?? "出口 IP：正在检测…")
                     .font(.system(size: 24, weight: .medium))
                     .accessibilityIdentifier("sourceDiagnostics.egress")
                 Text(NetworkEgressResult.notice + " 来源：" + (recorder.networkEgress?.provider ?? "IP.SB / IPWho.is"))
-                    .font(.system(size: 20)).foregroundStyle(.secondary)
+                    .font(.system(size: 20)).foregroundStyle(TVColors.secondary)
             }
 
             // 操作按钮栏
@@ -121,15 +121,15 @@ public struct SourceDiagnosticsSheetView: View {
                 if runner.result.contains("失败") {
                     Image(systemName: "exclamationmark.octagon.fill")
                         .font(.system(size: 26))
-                        .foregroundColor(.red)
+                        .foregroundColor(TVColors.red)
                 } else if runner.result.contains("完成") {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 26))
-                        .foregroundColor(.green)
+                        .foregroundColor(TVColors.green)
                 }
                 Text(runner.result)
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundColor(runner.result.contains("失败") ? .red : (runner.result.contains("完成") ? .green : .white))
+                    .foregroundColor(runner.result.contains("失败") ? TVColors.red : (runner.result.contains("完成") ? TVColors.green : TVColors.white))
                     .accessibilityIdentifier("sourceDiagnostics.result")
             }
 
@@ -142,7 +142,7 @@ public struct SourceDiagnosticsSheetView: View {
                         if let failure = recorder.entries.last(where: { $0.failed && !$0.host.isEmpty }) {
                             Text("最近失败提示：" + SourceDiagnostics.advice(failure))
                                 .font(.system(size: 24, weight: .medium))
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(TVColors.orange)
                                 .padding(.horizontal, 4)
                         }
 
@@ -150,14 +150,14 @@ public struct SourceDiagnosticsSheetView: View {
                             VStack(spacing: 16) {
                                 Image(systemName: "stethoscope")
                                     .font(.system(size: 44))
-                                    .foregroundColor(.white.opacity(0.35))
+                                    .foregroundColor(TVColors.white.opacity(0.35))
                                 Text("暂无诊断记录，请点击上方「开始检测」进行全链路连通性检查。")
                                     .font(.system(size: 24))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(TVColors.secondary)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(48)
-                            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
+                            .background(TVColors.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
                         } else {
                             ForEach(Array(displayEntries.enumerated()), id: \.element.id) { index, entry in
                                 SourceDiagnosticEntryCardView(
@@ -229,4 +229,9 @@ public struct SourceDiagnosticsSheetView: View {
             }
         }
     }
+}
+
+#Preview {
+    SourceDiagnosticsSheetView()
+        .background(TVColors.background)
 }

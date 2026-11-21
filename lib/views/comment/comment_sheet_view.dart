@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:THLRedLook/core/account/hongguo_account_service.dart';
 import 'package:THLRedLook/models/comment/comment_model.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/comment/comment_item_tile.dart';
+import 'package:THLRedLook/views/comment/comment_reply_sheet_view.dart';
 
 /// 视频播放页面底部的评论与回复一体化浮层
 class CommentSheetView extends StatefulWidget {
@@ -22,7 +24,7 @@ class CommentSheetView extends StatefulWidget {
   }) {
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       isScrollControlled: true,
       builder: (_) => CommentSheetView(
         bookId: bookId,
@@ -196,333 +198,32 @@ class _CommentSheetViewState extends State<CommentSheetView> {
     }
   }
 
-  String _formatTime(int timestamp) {
-    if (timestamp <= 0) return '';
-    final timeMs = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-    final date = DateTime.fromMillisecondsSinceEpoch(timeMs);
-    final now = DateTime.now();
-    final diff = now.difference(date);
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
-    if (diff.inHours < 24) return '${diff.inHours}小时前';
-    if (diff.inDays < 30) return '${diff.inDays}天前';
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
-  String _formatNumber(int count) {
-    if (count <= 0) return '';
-    if (count < 10000) return count.toString();
-    return '${(count / 10000).toStringAsFixed(1)}万';
-  }
-
-  Widget _buildAvatar(String avatarUrl, String name, {double size = 36}) {
-    final hasUrl = avatarUrl.trim().isNotEmpty && avatarUrl.startsWith('http');
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(size / 2),
-      child: Container(
-        width: size,
-        height: size,
-        color: const Color(0x33FFFFFF),
-        child: hasUrl
-            ? Image.network(
-                avatarUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    _buildFallbackAvatar(name, size),
-              )
-            : _buildFallbackAvatar(name, size),
-      ),
-    );
-  }
-
-  Widget _buildFallbackAvatar(String name, double size) {
-    return Center(
-      child: Text(
-        name.isNotEmpty ? name.substring(0, 1) : '果',
-        style: TextStyle(
-          color: Colors.white70,
-          fontSize: size * 0.45,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
   Widget _buildHeader() {
-    final isReplyView = _selectedComment != null;
     return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Color(0x1AFFFFFF), width: 0.8),
+          bottom: BorderSide(color: AppColors.white10, width: 0.8),
         ),
       ),
       child: Row(
         children: [
-          if (isReplyView) ...[
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _selectedComment = null),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      '全部评论',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          const SizedBox(width: 32),
+          const Spacer(),
+          Text(
+            '评论 (${_totalComments > 0 ? _totalComments : _comments.length})',
+            style: const TextStyle(
+              color: AppColors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
-            const Spacer(),
-            Text(
-              '回复 (${_totalReplies > 0 ? _totalReplies : _replies.length})',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Spacer(),
-          ] else ...[
-            const SizedBox(width: 32),
-            const Spacer(),
-            Text(
-              '评论 (${_totalComments > 0 ? _totalComments : _comments.length})',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Spacer(),
-          ],
+          ),
+          const Spacer(),
           IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+            icon: const Icon(Icons.close_rounded, color: AppColors.white70, size: 22),
             onPressed: () => Navigator.of(context).pop(),
             tooltip: '关闭',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommentItem(CommentItem comment) {
-    final diggText = _formatNumber(comment.diggCount);
-    return InkWell(
-      onTap: () => _selectComment(comment),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildAvatar(comment.userAvatar, comment.userName, size: 36),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          comment.userName,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.favorite_border_rounded,
-                            size: 15,
-                            color: Colors.white54,
-                          ),
-                          if (diggText.isNotEmpty) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              diggText,
-                              style: const TextStyle(
-                                color: Colors.white54,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  _ExpandableCommentText(
-                    text: comment.text,
-                    maxLines: 3,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14.5,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        _formatTime(comment.createTime),
-                        style: const TextStyle(
-                          color: Colors.white38,
-                          fontSize: 12,
-                        ),
-                      ),
-                      if (comment.replyCount > 0) ...[
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0x1FFFFFFF),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${comment.replyCount} 条回复 >',
-                            style: const TextStyle(
-                              color: AppColors.hongguoRed,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReplyItem(CommentReplyItem reply) {
-    final diggText = _formatNumber(reply.diggCount);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildAvatar(reply.userAvatar, reply.userName, size: 30),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              reply.userName,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (reply.replyToUserName.isNotEmpty) ...[
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 4),
-                              child: Text(
-                                '▶',
-                                style: TextStyle(
-                                  color: Colors.white38,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                            Flexible(
-                              child: Text(
-                                reply.replyToUserName,
-                                style: const TextStyle(
-                                  color: Colors.white60,
-                                  fontSize: 12.5,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.favorite_border_rounded,
-                          size: 14,
-                          color: Colors.white54,
-                        ),
-                        if (diggText.isNotEmpty) ...[
-                          const SizedBox(width: 4),
-                          Text(
-                            diggText,
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 11.5,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                _ExpandableCommentText(
-                  text: reply.text,
-                  maxLines: 3,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _formatTime(reply.createTime),
-                  style: const TextStyle(
-                    color: Colors.white38,
-                    fontSize: 11.5,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -542,13 +243,13 @@ class _CommentSheetViewState extends State<CommentSheetView> {
           children: [
             Text(
               _commentError!,
-              style: const TextStyle(color: Colors.white70),
+              style: const TextStyle(color: AppColors.white70),
             ),
             const SizedBox(height: 12),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.hongguoRed,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.white,
               ),
               onPressed: _loadInitialComments,
               child: const Text('重试'),
@@ -561,7 +262,7 @@ class _CommentSheetViewState extends State<CommentSheetView> {
       return const Center(
         child: Text(
           '暂无评论，快来抢首评吧～',
-          style: TextStyle(color: Colors.white54, fontSize: 14),
+          style: TextStyle(color: AppColors.white54, fontSize: 14),
         ),
       );
     }
@@ -570,7 +271,7 @@ class _CommentSheetViewState extends State<CommentSheetView> {
       padding: const EdgeInsets.only(bottom: 24),
       itemCount: _comments.length + (_loadingMoreComments ? 1 : 0),
       separatorBuilder: (context, index) => const Divider(
-        color: Color(0x0FFFFFFF),
+        color: AppColors.white06,
         height: 1,
         indent: 64,
       ),
@@ -590,141 +291,12 @@ class _CommentSheetViewState extends State<CommentSheetView> {
             ),
           );
         }
-        return _buildCommentItem(_comments[index]);
+        final comment = _comments[index];
+        return CommentItemTile(
+          comment: comment,
+          onTap: () => _selectComment(comment),
+        );
       },
-    );
-  }
-
-  Widget _buildRepliesList() {
-    final mainComment = _selectedComment;
-    if (mainComment == null) return const SizedBox.shrink();
-
-    return Column(
-      children: [
-        // 置顶展示主评
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.28,
-          ),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Color(0x14FFFFFF),
-              border: Border(
-                bottom: BorderSide(color: Color(0x1FFFFFFF), width: 0.8),
-              ),
-            ),
-            child: SingleChildScrollView(
-              physics: const ClampingScrollPhysics(),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildAvatar(mainComment.userAvatar, mainComment.userName, size: 36),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          mainComment.userName,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        _ExpandableCommentText(
-                          text: mainComment.text,
-                          maxLines: 3,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _formatTime(mainComment.createTime),
-                          style: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // 回复列表
-        Expanded(
-          child: _loadingReplies
-              ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.hongguoRed),
-                )
-              : _replyError != null
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _replyError!,
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                          const SizedBox(height: 12),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.hongguoRed,
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: () => _selectComment(mainComment),
-                            child: const Text('重试'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : _replies.isEmpty
-                      ? const Center(
-                          child: Text(
-                            '暂无回复',
-                            style: TextStyle(color: Colors.white54, fontSize: 14),
-                          ),
-                        )
-                      : ListView.separated(
-                          controller: _replyScrollController,
-                          padding: const EdgeInsets.only(bottom: 24),
-                          itemCount: _replies.length + (_loadingMoreReplies ? 1 : 0),
-                          separatorBuilder: (context, index) => const Divider(
-                            color: Color(0x0FFFFFFF),
-                            height: 1,
-                            indent: 56,
-                          ),
-                          itemBuilder: (context, index) {
-                            if (index >= _replies.length) {
-                              return const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 16),
-                                  child: SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.hongguoRed,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-                            return _buildReplyItem(_replies[index]);
-                          },
-                        ),
-        ),
-      ],
     );
   }
 
@@ -732,6 +304,7 @@ class _CommentSheetViewState extends State<CommentSheetView> {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final sheetHeight = mediaQuery.size.height * 0.72;
+    final selectedComment = _selectedComment;
 
     return Container(
       height: sheetHeight,
@@ -741,134 +314,36 @@ class _CommentSheetViewState extends State<CommentSheetView> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black54,
+            color: AppColors.black54,
             blurRadius: 16,
             spreadRadius: 4,
           ),
         ],
       ),
-      child: Column(
-        children: [
-          _buildHeader(),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              child: _selectedComment == null
-                  ? _buildCommentsList()
-                  : _buildRepliesList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 支持超过 maxLines（默认 3 行）折叠与展开收起的多行评论文本组件
-class _ExpandableCommentText extends StatefulWidget {
-  const _ExpandableCommentText({
-    required this.text,
-    this.maxLines = 3,
-    this.style,
-  });
-
-  final String text;
-  final int maxLines;
-  final TextStyle? style;
-
-  @override
-  State<_ExpandableCommentText> createState() => _ExpandableCommentTextState();
-}
-
-class _ExpandableCommentTextState extends State<_ExpandableCommentText> {
-  bool _expanded = false;
-
-  @override
-  void didUpdateWidget(covariant _ExpandableCommentText oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text) {
-      _expanded = false;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textStyle = widget.style ??
-        const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          height: 1.4,
-        );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
-        if (!maxWidth.isFinite || maxWidth <= 0) {
-          return Text(
-            widget.text,
-            style: textStyle,
-            maxLines: _expanded ? null : widget.maxLines,
-            overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-          );
-        }
-
-        final span = TextSpan(text: widget.text, style: textStyle);
-        final tp = TextPainter(
-          text: span,
-          maxLines: widget.maxLines,
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: maxWidth);
-
-        final bool isExceeded = tp.didExceedMaxLines;
-
-        if (!isExceeded) {
-          return Text(
-            widget.text,
-            style: textStyle,
-          );
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.text,
-              style: textStyle,
-              maxLines: _expanded ? null : widget.maxLines,
-              overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 3),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _expanded = !_expanded),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _expanded ? '收起' : '展开全文',
-                      style: const TextStyle(
-                        color: AppColors.hongguoRed,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Icon(
-                      _expanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      size: 15,
-                      color: AppColors.hongguoRed,
-                    ),
-                  ],
-                ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        child: selectedComment == null
+            ? Column(
+                key: const ValueKey('comments-main-list'),
+                children: [
+                  _buildHeader(),
+                  Expanded(child: _buildCommentsList()),
+                ],
+              )
+            : CommentReplySheetView(
+                key: ValueKey('replies-${selectedComment.id}'),
+                mainComment: selectedComment,
+                replies: _replies,
+                loadingReplies: _loadingReplies,
+                loadingMoreReplies: _loadingMoreReplies,
+                replyError: _replyError,
+                scrollController: _replyScrollController,
+                onRetry: () => _selectComment(selectedComment),
+                onBack: () => setState(() => _selectedComment = null),
+                onClose: () => Navigator.of(context).pop(),
+                totalReplies: _totalReplies,
               ),
-            ),
-          ],
-        );
-      },
+      ),
     );
   }
 }

@@ -13,7 +13,7 @@ public struct FilterSortSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("排序方式")
                     .font(.headline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(TVColors.secondary)
 
                 HStack(spacing: 16) {
                     ForEach(CatalogSort.allCases) { sort in
@@ -32,7 +32,7 @@ public struct FilterSortSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("连载状态")
                     .font(.headline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(TVColors.secondary)
 
                 HStack(spacing: 16) {
                     ForEach(CatalogReleaseFilter.allCases) { filter in
@@ -56,6 +56,13 @@ public struct FilterSortSheet: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.opacity(0.85))
+        .background(TVColors.black.opacity(0.85))
     }
+}
+
+#Preview {
+    FilterSortSheet(
+        viewModel: HomeViewModel(),
+        isPresented: .constant(true)
+    )
 }

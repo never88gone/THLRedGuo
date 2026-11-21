@@ -57,7 +57,7 @@ class HongguoSocialButton extends StatelessWidget {
           : null;
 
       final likeBtn = Material(
-        color: Colors.transparent,
+        color: AppColors.transparent,
         child: InkWell(
           key: const ValueKey('account-social-like-btn'),
           onTap: () {
@@ -73,14 +73,14 @@ class HongguoSocialButton extends StatelessWidget {
               color: isLiked
                   ? AppColors.hongguoRed.withValues(alpha: 0.16)
                   : (isDark
-                      ? const Color(0x14FFFFFF)
+                      ? AppColors.white08
                       : scheme.surfaceContainerHighest.withValues(alpha: 0.8)),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isLiked
                     ? AppColors.hongguoRed.withValues(alpha: 0.5)
                     : (isDark
-                        ? const Color(0x26FFFFFF)
+                        ? AppColors.white15
                         : scheme.outlineVariant.withValues(alpha: 0.5)),
                 width: 0.8,
               ),
@@ -93,7 +93,7 @@ class HongguoSocialButton extends StatelessWidget {
                   size: 14,
                   color: isLiked
                       ? AppColors.hongguoRed
-                      : (isDark ? Colors.white70 : scheme.onSurfaceVariant),
+                      : (isDark ? AppColors.white70 : scheme.onSurfaceVariant),
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -107,7 +107,7 @@ class HongguoSocialButton extends StatelessWidget {
                   style: TextStyle(
                     color: isLiked
                         ? AppColors.hongguoRed
-                        : (isDark ? Colors.white : scheme.onSurface),
+                        : (isDark ? AppColors.white : scheme.onSurface),
                     fontSize: 11.5,
                     fontWeight: isLiked ? FontWeight.w700 : FontWeight.w600,
                   ),
@@ -130,7 +130,7 @@ class HongguoSocialButton extends StatelessWidget {
             hasAnchorAvatar ? NetworkImage(anchor.avatar) : null;
 
         anchorEntry = Material(
-          color: Colors.transparent,
+          color: AppColors.transparent,
           child: InkWell(
             key: const ValueKey('detail-anchor-entry'),
             borderRadius: BorderRadius.circular(13),
@@ -154,12 +154,12 @@ class HongguoSocialButton extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: isDark
-                    ? const Color(0x14FFFFFF)
+                    ? AppColors.white08
                     : scheme.surfaceContainerHighest.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(13),
                 border: Border.all(
                   color: isDark
-                      ? const Color(0x1AFFFFFF)
+                      ? AppColors.white10
                       : scheme.outlineVariant.withValues(alpha: 0.5),
                   width: 0.6,
                 ),
@@ -186,14 +186,14 @@ class HongguoSocialButton extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 11,
-                      color: isDark ? Colors.white : scheme.onSurface,
+                      color: isDark ? AppColors.white : scheme.onSurface,
                     ),
                   ),
                   const SizedBox(width: 2),
                   Icon(
                     Icons.chevron_right_rounded,
                     size: 14,
-                    color: isDark ? Colors.white54 : scheme.onSurfaceVariant,
+                    color: isDark ? AppColors.white54 : scheme.onSurfaceVariant,
                   ),
                 ],
               ),

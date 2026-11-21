@@ -9,10 +9,10 @@ public struct SettingsContactPanel: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("联系方式")
                     .font(.system(size: 32, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
                 Text("如有任何功能建议、体验反馈或技术问题，欢迎加入官方群组或通过邮件联系我们。")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.65))
+                    .foregroundColor(TVColors.white.opacity(0.65))
             }
 
             // 1. Telegram 官方交流与反馈卡片（大屏扫码）
@@ -22,4 +22,10 @@ public struct SettingsContactPanel: View {
             ContactEmailCard()
         }
     }
+}
+
+#Preview {
+    SettingsContactPanel()
+        .padding(50)
+        .background(TVColors.background)
 }

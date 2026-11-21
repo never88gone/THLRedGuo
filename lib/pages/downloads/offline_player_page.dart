@@ -210,14 +210,14 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                   const Text(
                     '离线已下载集数',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    icon: const Icon(Icons.close_rounded, color: AppColors.white70),
                   ),
                 ],
               ),
@@ -245,14 +245,14 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                         decoration: BoxDecoration(
                           color: isCurrent
                               ? AppColors.hongguoRed
-                              : const Color(0xFF2B2F3D),
+                              : AppColors.offlinePlayerPanel,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         alignment: Alignment.center,
                         child: Text(
                           '${job.episode.number}',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: AppColors.white,
                             fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
@@ -299,7 +299,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xCC000000), Color(0x00000000)],
+            colors: [AppColors.black80, AppColors.transparent],
           ),
         ),
         child: SafeArea(
@@ -310,7 +310,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
               children: [
                 IconButton(
                   key: const ValueKey('offline-player-back'),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.white),
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),
                 const SizedBox(width: 4),
@@ -324,7 +324,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppColors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -332,7 +332,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                       Text(
                         '第 ${_currentJob.episode.number} 集 · 本地离线播放',
                         style: const TextStyle(
-                          color: Colors.white70,
+                          color: AppColors.white70,
                           fontSize: 12,
                         ),
                       ),
@@ -342,13 +342,13 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0x33FFFFFF),
+                    color: AppColors.white20,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
                     '离线无网络',
                     style: TextStyle(
-                      color: Colors.white70,
+                      color: AppColors.white70,
                       fontSize: 11,
                     ),
                   ),
@@ -420,7 +420,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
           gradient: LinearGradient(
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
-            colors: [Color(0xCC000000), Color(0x00000000)],
+            colors: [AppColors.black80, AppColors.transparent],
           ),
         ),
         child: SafeArea(
@@ -434,13 +434,13 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                   children: [
                     Text(
                       _formatDuration(Duration(milliseconds: currentMs.toInt())),
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: const TextStyle(color: AppColors.white70, fontSize: 12),
                     ),
                     Expanded(
                       child: SliderTheme(
                         data: SliderTheme.of(context).copyWith(
                           activeTrackColor: AppColors.hongguoRed,
-                          inactiveTrackColor: Colors.white24,
+                          inactiveTrackColor: AppColors.white24,
                           thumbColor: AppColors.hongguoRed,
                           trackHeight: 2.5,
                           thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
@@ -468,7 +468,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                     ),
                     Text(
                       _formatDuration(totalDur),
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: const TextStyle(color: AppColors.white70, fontSize: 12),
                     ),
                   ],
                 ),
@@ -485,7 +485,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                             isPlaying
                                 ? Icons.pause_rounded
                                 : Icons.play_arrow_rounded,
-                            color: Colors.white,
+                            color: AppColors.white,
                             size: 32,
                           ),
                           onPressed: () {
@@ -494,7 +494,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
+                          icon: const Icon(Icons.replay_10_rounded, color: AppColors.white),
                           tooltip: '后退 10 秒',
                           onPressed: () {
                             if (player == null) return;
@@ -504,7 +504,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
+                          icon: const Icon(Icons.forward_10_rounded, color: AppColors.white),
                           tooltip: '快进 10 秒',
                           onPressed: () {
                             if (player == null) return;
@@ -521,10 +521,10 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                           TextButton.icon(
                             key: const ValueKey('offline-episodes-btn'),
                             onPressed: _showOfflineEpisodesSheet,
-                            icon: const Icon(Icons.video_library_outlined, color: Colors.white, size: 18),
+                            icon: const Icon(Icons.video_library_outlined, color: AppColors.white, size: 18),
                             label: Text(
                               '选集 (${widget.completedJobs.length})',
-                              style: const TextStyle(color: Colors.white),
+                              style: const TextStyle(color: AppColors.white),
                             ),
                           ),
                         IconButton(
@@ -532,7 +532,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                             _isFullScreen
                                 ? Icons.fullscreen_exit_rounded
                                 : Icons.fullscreen_rounded,
-                            color: Colors.white,
+                            color: AppColors.white,
                           ),
                           tooltip: _isFullScreen ? '退出全屏' : '全屏',
                           onPressed: _toggleFullScreen,
@@ -570,7 +570,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
   Widget build(BuildContext context) {
     if (widget.videoBuilder != null) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.black,
         body: widget.videoBuilder!(context, _buildControls(context)),
       );
     }
@@ -579,7 +579,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
     final video = _video!;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.black,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light,
         child: GestureDetector(
@@ -597,11 +597,11 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.error_outline_rounded, color: Colors.white54, size: 48),
+                                const Icon(Icons.error_outline_rounded, color: AppColors.white54, size: 48),
                                 const SizedBox(height: 12),
                                 Text(
                                   _loadError!,
-                                  style: const TextStyle(color: Colors.white70),
+                                  style: const TextStyle(color: AppColors.white70),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 16),
@@ -626,7 +626,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
                     return Center(
                       child: IconButton(
                         iconSize: 64,
-                        color: Colors.white70,
+                        color: AppColors.white70,
                         icon: const Icon(Icons.play_circle_fill_rounded),
                         onPressed: () {
                           player.play();

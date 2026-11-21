@@ -19,10 +19,10 @@ public struct SettingsStoragePanel: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("缓存与存储管理")
                     .font(.system(size: 38, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
                 Text("查看当前设备缓存占用、剩余磁盘空间及沙盒存储目录路径。")
                     .font(.system(size: 20))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(TVColors.white.opacity(0.6))
             }
 
             if isLoading {
@@ -30,7 +30,7 @@ public struct SettingsStoragePanel: View {
                     .padding(.top, 40)
             } else if let error = errorMessage {
                 Text("无法获取存储信息：\(error)")
-                    .foregroundColor(.red)
+                    .foregroundColor(TVColors.red)
                     .padding(.top, 40)
             } else if let info = storageInfo {
                 let bytes = info["bytes"] as? Int ?? 0
@@ -51,7 +51,7 @@ public struct SettingsStoragePanel: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("缓存与空间维护")
                     .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.white.opacity(0.95))
+                    .foregroundColor(TVColors.white.opacity(0.95))
 
                 HStack(spacing: 24) {
                     TVButton(title: "清理播放切片缓存", icon: "trash.fill", isProminent: false) {
@@ -124,4 +124,10 @@ public struct SettingsStoragePanel: View {
         if bytes < 1024 * 1024 * 1024 { return String(format: "%.1f MB", Double(bytes) / (1024 * 1024)) }
         return String(format: "%.2f GB", Double(bytes) / (1024 * 1024 * 1024))
     }
+}
+
+#Preview {
+    SettingsStoragePanel()
+        .padding(50)
+        .background(TVColors.background)
 }

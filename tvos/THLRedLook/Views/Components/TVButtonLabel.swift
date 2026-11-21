@@ -13,12 +13,12 @@ struct TVButtonLabel: View {
             if let ic = icon {
                 Image(systemName: ic)
                     .font(.system(size: 26, weight: .bold))
-                    .foregroundColor(effectiveFocused ? .white : (isProminent ? .white : TVColors.primary))
+                    .foregroundColor(effectiveFocused ? TVColors.white : (isProminent ? TVColors.white : TVColors.primary))
             }
             if !title.isEmpty {
                 Text(title)
                     .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(effectiveFocused ? .white : TVColors.textPrimary)
+                    .foregroundColor(effectiveFocused ? TVColors.white : TVColors.textPrimary)
             }
         }
         .padding(.horizontal, title.isEmpty ? 26 : 34)
@@ -35,17 +35,23 @@ struct TVButtonLabel: View {
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
-                    effectiveFocused ? Color.white : (isProminent ? Color.clear : TVColors.borderSubtle),
+                    effectiveFocused ? TVColors.white : (isProminent ? TVColors.clear : TVColors.borderSubtle),
                     lineWidth: effectiveFocused ? 3.0 : 1.0
                 )
         )
         .scaleEffect(effectiveFocused ? 1.08 : 1.0)
         .shadow(
-            color: effectiveFocused ? TVColors.focusedShadowStrong : Color.clear,
+            color: effectiveFocused ? TVColors.focusedShadowStrong : TVColors.clear,
             radius: effectiveFocused ? 18 : 0,
             x: 0,
             y: effectiveFocused ? 4 : 0
         )
         .animation(TVTheme.focusSpringAnimation, value: effectiveFocused)
     }
+}
+
+#Preview {
+    TVButtonLabel(title: "播放正片", icon: "play.fill", isProminent: true, isFocused: true)
+        .padding()
+        .background(TVColors.black)
 }

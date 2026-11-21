@@ -20,7 +20,7 @@ class PlayerSpeedSheetView extends StatefulWidget {
   }) {
     return showModalBottomSheet<double>(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       elevation: 0,
       isScrollControlled: true,
       builder: (sheetContext) => PlayerSpeedSheetView(

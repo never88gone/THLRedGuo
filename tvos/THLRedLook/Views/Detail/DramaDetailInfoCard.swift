@@ -12,7 +12,7 @@ struct DramaDetailInfoCard: View {
                 .frame(width: 220, height: 320)
                 .clipped()
                 .shadow(
-                    color: Color.black.opacity(appearAnimation ? 0.75 : 0.2),
+                    color: TVColors.black.opacity(appearAnimation ? 0.75 : 0.2),
                     radius: appearAnimation ? 24 : 6,
                     x: 0,
                     y: appearAnimation ? 12 : 3
@@ -25,7 +25,7 @@ struct DramaDetailInfoCard: View {
             VStack(alignment: .leading, spacing: 18) {
                 Text(drama.title)
                     .font(.system(size: 40, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
 
                 HStack(spacing: 12) {
                     if !drama.releaseLabel.isEmpty {
@@ -33,20 +33,20 @@ struct DramaDetailInfoCard: View {
                             .font(.subheadline)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(Color.red.opacity(0.8))
+                            .background(TVColors.red.opacity(0.8))
                             .clipShape(Capsule())
                     }
 
                     if !drama.heat.isEmpty {
                         Text("热度：\(drama.formattedHeat)")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(TVColors.secondary)
                     }
 
                     if !drama.onlineDate.isEmpty {
                         Text("上线：\(drama.onlineDate)")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(TVColors.secondary)
                     }
                 }
 
@@ -54,7 +54,7 @@ struct DramaDetailInfoCard: View {
                 if !drama.description.isEmpty {
                     Text(drama.description)
                         .font(.body)
-                        .foregroundColor(.white.opacity(0.85))
+                        .foregroundColor(TVColors.white.opacity(0.85))
                         .lineLimit(isDescriptionExpanded ? nil : 3)
                         .onTapGesture {
                             withAnimation {
@@ -65,4 +65,13 @@ struct DramaDetailInfoCard: View {
             }
         }
     }
+}
+
+#Preview {
+    DramaDetailInfoCard(
+        drama: Drama(id: "d1", title: "测试短剧", description: "这是短剧简介测试内容", cover: "", episodes: 80),
+        appearAnimation: true,
+        isDescriptionExpanded: .constant(false)
+    )
+    .background(TVColors.background)
 }

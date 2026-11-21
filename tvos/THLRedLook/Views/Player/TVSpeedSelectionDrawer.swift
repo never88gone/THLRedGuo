@@ -22,7 +22,7 @@ public struct TVSpeedSelectionDrawer: View {
 
     public var body: some View {
         ZStack(alignment: .trailing) {
-            Color.black.opacity(0.65)
+            TVColors.black.opacity(0.65)
                 .ignoresSafeArea()
                 .onTapGesture { isPresented = false }
 
@@ -43,7 +43,7 @@ public struct TVSpeedSelectionDrawer: View {
                         .foregroundColor(TVColors.textSecondary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.08))
+                        .background(TVColors.white.opacity(0.08))
                         .clipShape(Capsule())
                 }
                 .padding(.bottom, 8)

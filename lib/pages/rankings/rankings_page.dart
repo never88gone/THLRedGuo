@@ -10,6 +10,7 @@ import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/models/ranking/ranking_models.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/utils/theme/app_gradients.dart';
 
 class RankingsScreen extends StatefulWidget {
   const RankingsScreen({
@@ -477,40 +478,28 @@ class _RankingsScreenState extends State<RankingsScreen> {
 
     final (badgeBg, badgeTextColor, badgeLabel) = switch (item.rank) {
       1 => (
-        const LinearGradient(
-          colors: [Color(0xFFFF3366), Color(0xFFFF5E3A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        Colors.white,
+        AppGradients.rankingRank1,
+        AppColors.white,
         'TOP 1',
       ),
       2 => (
-        const LinearGradient(
-          colors: [Color(0xFFFF8C00), Color(0xFFFFA500)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        Colors.white,
+        AppGradients.rankingRank2,
+        AppColors.white,
         'TOP 2',
       ),
       3 => (
-        const LinearGradient(
-          colors: [Color(0xFF00B4DB), Color(0xFF0083B0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        Colors.white,
+        AppGradients.rankingRank3,
+        AppColors.white,
         'TOP 3',
       ),
       _ => (
         LinearGradient(
           colors: [
-            Colors.black.withValues(alpha: 0.72),
-            Colors.black.withValues(alpha: 0.85),
+            AppColors.black.withValues(alpha: 0.72),
+            AppColors.black.withValues(alpha: 0.85),
           ],
         ),
-        Colors.white.withValues(alpha: 0.95),
+        AppColors.white.withValues(alpha: 0.95),
         '#${item.rank}',
       ),
     };
@@ -519,7 +508,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
       key: ValueKey('rank-${item.rank}-${item.drama.id}'),
       margin: EdgeInsets.zero,
       elevation: 0,
-      color: Colors.transparent,
+      color: AppColors.transparent,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -567,7 +556,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
                         borderRadius: BorderRadius.circular(6),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.35),
+                            color: AppColors.black.withValues(alpha: 0.35),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),

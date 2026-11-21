@@ -23,10 +23,10 @@ public struct TVFocusBorderModifier: ViewModifier {
         content
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(isFocused ? TVColors.focusedBorderColor : Color.clear, lineWidth: lineWidth)
+                    .stroke(isFocused ? TVColors.focusedBorderColor : TVColors.clear, lineWidth: lineWidth)
             )
             .shadow(
-                color: isFocused ? TVColors.focusedShadowColor : Color.clear,
+                color: isFocused ? TVColors.focusedShadowColor : TVColors.clear,
                 radius: isFocused ? TVTheme.focusedShadowRadius : 0,
                 y: isFocused ? 4 : 0
             )

@@ -101,7 +101,7 @@ public struct SavedLibraryView: View {
 
                     VStack(spacing: 20) {
                         HStack {
-                            Text(viewModel.officialAccount ? "红果账号" : "本机记录").foregroundStyle(.secondary)
+                            Text(viewModel.officialAccount ? "红果账号" : "本机记录").foregroundStyle(TVColors.secondary)
                             Spacer()
                             if viewModel.officialAccount {
                                 TVButton(title: "刷新", icon: "arrow.clockwise", isFocused: focusedTarget == .refresh,
@@ -143,7 +143,7 @@ public struct SavedLibraryView: View {
                         }
                         if viewModel.officialAccount && viewModel.loadingTabs.contains(viewModel.selectedTab) { ProgressView("正在获取账号列表") }
                         if viewModel.officialAccount, let error = viewModel.accountErrors[viewModel.selectedTab] {
-                            Text(error).foregroundStyle(.orange).font(.system(size: 24)).padding(.horizontal, 20).accessibilityIdentifier("library.error")
+                            Text(error).foregroundStyle(TVColors.orange).font(.system(size: 24)).padding(.horizontal, 20).accessibilityIdentifier("library.error")
                         }
                         ScrollView {
                           VStack(spacing: 24) {
@@ -254,7 +254,7 @@ public struct SavedLibraryView: View {
                                 }
                             }
                             if viewModel.officialAccount && viewModel.selectedTab == .liked && viewModel.officialLikes.contains(where: { $0.drama == nil }) {
-                                Text("部分点赞内容暂无关联短剧，暂不支持打开").foregroundStyle(.secondary)
+                                Text("部分点赞内容暂无关联短剧，暂不支持打开").foregroundStyle(TVColors.secondary)
                             }
                           }.padding(.bottom, 36)
                         }.focusSection()
@@ -424,40 +424,45 @@ public struct SavedLibraryView: View {
             if viewModel.officialAccount {
                 avatar
                     .frame(width: 36, height: 36)
-                    .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1.2))
+                    .overlay(Circle().stroke(TVColors.white.opacity(0.35), lineWidth: 1.2))
                 Text(account.account?.nickname ?? "红果用户")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(isFocused ? .white : TVColors.textPrimary)
+                    .foregroundColor(isFocused ? TVColors.white : TVColors.textPrimary)
                     .lineLimit(1)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(isFocused ? .white.opacity(0.8) : TVColors.textMuted)
+                    .foregroundColor(isFocused ? TVColors.white.opacity(0.8) : TVColors.textMuted)
             } else {
                 Image(systemName: "person.crop.circle.badge.plus")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(isFocused ? .white : TVColors.primary)
+                    .foregroundColor(isFocused ? TVColors.white : TVColors.primary)
                 Text("登录")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(isFocused ? .white : TVColors.textPrimary)
+                    .foregroundColor(isFocused ? TVColors.white : TVColors.textPrimary)
             }
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 18)
-                .fill(isFocused ? AnyShapeStyle(TVColors.prominentGradient) : AnyShapeStyle(Color.white.opacity(0.08)))
+                .fill(isFocused ? AnyShapeStyle(TVColors.prominentGradient) : AnyShapeStyle(TVColors.white.opacity(0.08)))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(isFocused ? Color.white : Color.white.opacity(0.14), lineWidth: isFocused ? 2.5 : 1.0)
+                .stroke(isFocused ? TVColors.white : TVColors.white.opacity(0.14), lineWidth: isFocused ? 2.5 : 1.0)
         )
         .scaleEffect(isFocused ? 1.05 : 1.0)
         .shadow(
-            color: isFocused ? TVColors.focusedShadowStrong : Color.clear,
+            color: isFocused ? TVColors.focusedShadowStrong : TVColors.clear,
             radius: isFocused ? 14 : 0,
             x: 0,
             y: isFocused ? 4 : 0
         )
         .animation(TVTheme.focusSpringAnimation, value: isFocused)
     }
+}
+
+#Preview {
+    SavedLibraryView()
+        .background(TVColors.background)
 }

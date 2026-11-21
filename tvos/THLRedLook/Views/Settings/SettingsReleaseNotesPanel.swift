@@ -148,7 +148,7 @@ public struct SettingsReleaseNotesPanel: View {
             )
             .scaleEffect(isFocused ? 1.02 : 1.0)
             .shadow(
-                color: isFocused ? TVColors.focusedShadowColor : Color.clear,
+                color: isFocused ? TVColors.focusedShadowColor : TVColors.clear,
                 radius: isFocused ? 14 : 0,
                 x: 0,
                 y: isFocused ? 4 : 0

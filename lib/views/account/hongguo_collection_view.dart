@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/account/hongguo_collection_controller.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 class HongguoCollectionView<T> extends StatefulWidget {
   const HongguoCollectionView({
@@ -115,7 +116,7 @@ class _HongguoCollectionViewState<T> extends State<HongguoCollectionView<T>> {
                 icon: Icon(
                   Icons.refresh,
                   size: 18,
-                  color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                  color: isDark ? AppColors.white70 : scheme.onSurfaceVariant,
                 ),
               ),
             ],

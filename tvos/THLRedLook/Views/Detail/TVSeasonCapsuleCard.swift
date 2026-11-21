@@ -42,3 +42,17 @@ public struct TVSeasonCapsuleCard: View {
         }
     }
 }
+
+#Preview {
+    TVSeasonCapsuleCard(
+        item: SeasonItem(
+            drama: Drama(id: "season_1", title: "第一季", cover: "", episodes: 50),
+            seasonNumber: 1,
+            title: "第一季",
+            isCurrent: true
+        ),
+        action: {}
+    )
+    .padding(40)
+    .background(TVColors.background)
+}

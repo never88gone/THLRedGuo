@@ -23,10 +23,10 @@ struct DramaCardLabel: View {
                 if drama.isVIP {
                     Text("VIP")
                         .font(.system(size: 16, weight: .black))
-                        .foregroundColor(.black)
+                        .foregroundColor(TVColors.black)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.yellow)
+                        .background(TVColors.yellow)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .padding(8)
                 }
@@ -37,10 +37,10 @@ struct DramaCardLabel: View {
                     HStack {
                         Text(drama.displaySubtitle)
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(TVColors.white)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(Color.black.opacity(0.75))
+                            .background(TVColors.black.opacity(0.75))
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                         Spacer()
                     }
@@ -63,11 +63,11 @@ struct DramaCardLabel: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(drama.title)
                     .font(.system(size: effectiveFocused ? 26 : 24, weight: effectiveFocused ? .heavy : .bold))
-                    .foregroundColor(effectiveFocused ? .white : Color.white.opacity(0.92))
+                    .foregroundColor(effectiveFocused ? TVColors.white : TVColors.white.opacity(0.92))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(height: 68, alignment: .topLeading)
-                    .shadow(color: effectiveFocused ? Color.red.opacity(0.4) : Color.clear, radius: 4)
+                    .shadow(color: effectiveFocused ? TVColors.red.opacity(0.4) : TVColors.clear, radius: 4)
 
                 if let pt = progressText {
                     Text(pt)
@@ -82,8 +82,20 @@ struct DramaCardLabel: View {
         .padding(6)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(effectiveFocused ? TVColors.cardOverlayBg.opacity(0.85) : Color.clear)
+                .fill(effectiveFocused ? TVColors.cardOverlayBg.opacity(0.85) : TVColors.clear)
         )
         .tvFocusBorder(isFocused: effectiveFocused, cornerRadius: 16, scale: TVTheme.cardScale)
     }
+}
+
+#Preview {
+    DramaCardLabel(
+        drama: Drama(id: "preview_1", title: "示例短剧标题", cover: "", episodes: 80),
+        externalFocused: false,
+        watchProgress: 0.5,
+        progressText: "看至第 40 集",
+        forceFocused: false
+    )
+    .frame(width: 260, height: 380)
+    .background(TVColors.background)
 }

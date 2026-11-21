@@ -1,7 +1,25 @@
 import SwiftUI
+import UIKit
 
 // MARK: - 统一全局色彩系统 (全 App 所有颜色集中于此文件)
 public enum TVColors {
+    // MARK: - 基础纯色与系统色
+    public static let white = Color.white
+    public static let black = Color.black
+    public static let clear = Color.clear
+    public static let red = Color.red
+    public static let blue = Color.blue
+    public static let green = Color.green
+    public static let yellow = Color.yellow
+    public static let orange = Color.orange
+    public static let purple = Color.purple
+    public static let pink = Color.pink
+    public static let gray = Color.gray
+    public static let secondary = Color.secondary
+    public static let uiWhite = UIColor.white
+    public static let uiBlack = UIColor.black
+    public static let uiClear = UIColor.clear
+
     // MARK: - 核心品牌与高亮强调色
     public static let primary = Color.red
     public static let accent = Color.red
@@ -145,59 +163,37 @@ public enum TVColors {
     ]
 }
 
-// MARK: - SwiftUI Color 语义化拓展
-public extension Color {
-    enum TV {
-        public static var primary: Color { TVColors.primary }
-        public static var primaryHover: Color { TVColors.primaryHover }
-        public static var background: Color { TVColors.background }
-        public static var surfaceDark: Color { TVColors.surfaceDark }
-        public static var surfaceCard: Color { TVColors.surfaceCard }
-        public static var surfaceFocused: Color { TVColors.surfaceFocused }
-        public static var textPrimary: Color { TVColors.textPrimary }
-        public static var textSecondary: Color { TVColors.textSecondary }
-        public static var textMuted: Color { TVColors.textMuted }
-        public static var vipAccent: Color { TVColors.vipAccent }
-        public static var releaseLatestBadge: Color { TVColors.releaseLatestBadge }
-        public static var releaseDateText: Color { TVColors.releaseDateText }
-    }
-}
-
 // MARK: - 全局色彩预览
 #Preview("TV Colors Palette") {
+    let tiles: [(String, Color)] = [
+        ("primary", TVColors.primary),
+        ("primaryHover", TVColors.primaryHover),
+        ("activeRed", TVColors.activeRed),
+        ("background", TVColors.background),
+        ("surfaceDark", TVColors.surfaceDark),
+        ("surfaceCard", TVColors.surfaceCard),
+        ("surfaceFocused", TVColors.surfaceFocused),
+        ("vipAccent", TVColors.vipAccent)
+    ]
     ScrollView {
         VStack(alignment: .leading, spacing: 20) {
-            Text("TVColors Palette").font(.title.bold()).foregroundColor(.white)
-            
+            Text("TVColors Palette").font(.title.bold()).foregroundColor(TVColors.white)
+
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
-                ColorTile_Previews(name: "primary", color: TVColors.primary)
-                ColorTile_Previews(name: "primaryHover", color: TVColors.primaryHover)
-                ColorTile_Previews(name: "activeRed", color: TVColors.activeRed)
-                ColorTile_Previews(name: "background", color: TVColors.background)
-                ColorTile_Previews(name: "surfaceDark", color: TVColors.surfaceDark)
-                ColorTile_Previews(name: "surfaceCard", color: TVColors.surfaceCard)
-                ColorTile_Previews(name: "surfaceFocused", color: TVColors.surfaceFocused)
-                ColorTile_Previews(name: "vipAccent", color: TVColors.vipAccent)
+                ForEach(tiles, id: \.0) { name, color in
+                    VStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(color)
+                            .frame(height: 80)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(TVColors.white.opacity(0.2), lineWidth: 1))
+                        Text(name)
+                            .font(.caption)
+                            .foregroundColor(TVColors.white)
+                    }
+                }
             }
         }
         .padding(40)
     }
     .background(TVColors.backgroundGradient)
-}
-
-private struct ColorTile_Previews: View {
-    let name: String
-    let color: Color
-
-    var body: some View {
-        VStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color)
-                .frame(height: 80)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.2), lineWidth: 1))
-            Text(name)
-                .font(.caption)
-                .foregroundColor(.white)
-        }
-    }
 }

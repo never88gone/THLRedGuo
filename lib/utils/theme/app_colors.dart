@@ -40,6 +40,7 @@ abstract final class AppColors {
   static const Color orange = Color(0xFFFF9800);
   static const Color amber = Color(0xFFFFC107);
   static const Color purple = Color(0xFF9C27B0);
+  static const Color brown = Color(0xFF795548);
 
   // ==========================================
   // 3. 深色主题环境色彩 (Dark Mode Surfaces)
@@ -198,7 +199,89 @@ abstract final class AppColors {
   static const Color blackSubtle20 = Color(0x33000000);
 
   // ==========================================
-  // 10. 辅助透明度工厂函数（杜绝业务层硬编码）
+  // 10. 标准半透明白色阶梯 (White with Opacity)
+  // ==========================================
+  static const Color white06 = Color(0x0FFFFFFF);
+  static const Color white08 = Color(0x14FFFFFF);
+  static const Color white10 = Color(0x1AFFFFFF);
+  static const Color white12 = Color(0x1FFFFFFF);
+  static const Color white15 = Color(0x26FFFFFF);
+  static const Color white20 = Color(0x33FFFFFF);
+  static const Color white24 = Color(0x3DFFFFFF);
+  static const Color white30 = Color(0x4DFFFFFF);
+  static const Color white38 = Color(0x62FFFFFF);
+  static const Color white40 = Color(0x66FFFFFF);
+  static const Color white50 = Color(0x80FFFFFF);
+  static const Color white54 = Color(0x8AFFFFFF);
+  static const Color white60 = Color(0x99FFFFFF);
+  static const Color white70 = Color(0xB3FFFFFF);
+  static const Color white80 = Color(0xCCFFFFFF);
+
+  // ==========================================
+  // 11. 标准半透明黑色阶梯 (Black with Opacity)
+  // ==========================================
+  static const Color black10 = Color(0x1A000000);
+  static const Color black12 = Color(0x1F000000);
+  static const Color black20 = Color(0x33000000);
+  static const Color black24 = Color(0x3D000000);
+  static const Color black25 = Color(0x40000000);
+  static const Color black30 = Color(0x4D000000);
+  static const Color black33 = Color(0x55000000);
+  static const Color black35 = Color(0x59000000);
+  static const Color black38 = Color(0x61000000);
+  static const Color black40 = Color(0x66000000);
+  static const Color black45 = Color(0x73000000);
+  static const Color black46 = Color(0x77000000);
+  static const Color black54 = Color(0x8A000000);
+  static const Color black60 = Color(0x99000000);
+  static const Color black80 = Color(0xCC000000);
+  static const Color black85 = Color(0xD9000000);
+
+  // ==========================================
+  // 12. 业务特定场景颜色
+  // ==========================================
+  static const Color goldTagBg = Color(0x66FFC028);
+  static const Color diagnosticErrorDark = Color(0xFF281414);
+  static const Color diagnosticErrorDeeper = Color(0xFF1E0E0E);
+  static const Color redShade50 = Color(0xFFFFEBEE);
+  static const Color orangeShade200 = Color(0xFFFFCC80);
+  static const Color brownShade800 = Color(0xFF4E342E);
+  static const Color offlinePlayerPanel = Color(0xFF2B2F3D);
+  static const Color feedOverlayDark = Color(0xD9222222);
+  static const Color rankingGold1 = Color(0xFFFF3366);
+  static const Color rankingGold2 = Color(0xFFFF5E3A);
+  static const Color rankingSilver1 = Color(0xFFFF8C00);
+  static const Color rankingSilver2 = Color(0xFFFFA500);
+  static const Color rankingBronze1 = Color(0xFF00B4DB);
+  static const Color rankingBronze2 = Color(0xFF0083B0);
+  static const Color darkAtmosphereTop = Color(0xFF332018);
+  static const Color darkAtmosphereMid = Color(0xFF241814);
+  static const Color surfaceCardGradStart = Color(0xFF32241E);
+  static const Color surfaceCardGradEnd = Color(0xFF231915);
+  static const Color surfaceActiveGradStart = Color(0xFF42251B);
+  static const Color surfaceActiveGradEnd = Color(0xFF2C1913);
+  static const Color glassBorderStart = Color(0x38FFFFFF);
+  static const Color glassBorderEnd = Color(0x0AFFFFFF);
+  static const Color posterOverlayMid20 = Color(0x20000000);
+  static const Color posterOverlayMid80 = Color(0x80000000);
+  static const Color playerTopMaskStart = Color(0xCC000000);
+  static const Color playerTopMaskMid = Color(0x66000000);
+  static const Color playerBottomMaskStart = Color(0xF0000000);
+  static const Color playerBottomMaskMid = Color(0x99000000);
+  static const Color bottomNavGlassStart = Color(0xF5261D19);
+  static const Color bottomNavGlassEnd = Color(0xFC1C1512);
+  static const Color playerFillDark1 = Color(0xFF3A2420);
+  static const Color playerFillDark2 = Color(0xFF221411);
+  static const Color playerFillDark3 = Color(0xFF140B09);
+  static const Color playerFillPoster1 = Color(0xFF8B2500);
+  static const Color playerFillPoster2 = Color(0xFF5E1914);
+  static const Color playerFillPoster3 = Color(0xFF1E0807);
+  static const Color shadowPrimaryGlow = Color(0x59FF2442);
+  static const Color shadowSoftCard = Color(0x52000000);
+  static const Color shadowPillGlow = Color(0x3DFF2442);
+
+  // ==========================================
+  // 13. 辅助透明度工厂函数（杜绝业务层硬编码）
   // ==========================================
   /// 生成纯白半透明色
   static Color whiteWithAlpha(double alpha) =>
@@ -215,191 +298,4 @@ abstract final class AppColors {
   /// 生成成功绿半透明色
   static Color successWithAlpha(double alpha) =>
       Color.fromRGBO(0, 200, 83, alpha.clamp(0.0, 1.0));
-}
-
-/// 全局统一渐变设计系统（杜绝粗糙扁平，打造现代流媒体轻奢质感）
-abstract final class AppGradients {
-  /// 品牌主活力渐变（亮粉红 -> 活力红 -> 暖橙，用于主行动点 CTA、播放键、高亮标签）
-  static const LinearGradient primary = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      AppColors.hongguoRedLight,
-      AppColors.hongguoRed,
-      AppColors.hongguoOrange,
-    ],
-  );
-
-  /// 品牌微光水平渐变
-  static const LinearGradient primaryHorizontal = LinearGradient(
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-    colors: [
-      AppColors.hongguoRedLight,
-      AppColors.hongguoOrange,
-    ],
-  );
-
-  /// 金牌 VIP / 排行榜前三名耀金渐变
-  static const LinearGradient gold = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      AppColors.hongguoGold,
-      AppColors.hongguoAmber,
-    ],
-  );
-
-  /// 深色影院级背景纵深氛围微渐变（顶部暖橙微晕 -> 柔和温润暖调黑底）
-  static const LinearGradient darkAtmosphere = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFF332018),
-      Color(0xFF241814),
-      Color(0xFF1F1714),
-    ],
-    stops: [0.0, 0.35, 1.0],
-  );
-
-  /// 高阶微光立体卡片渐变（顶部透亮光泽 -> 沉稳微暗底色）
-  static const LinearGradient surfaceCard = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF32241E),
-      Color(0xFF231915),
-    ],
-  );
-
-  /// 激活卡片微光渐变（融入暖橙微光的暗夜高光卡片）
-  static const LinearGradient surfaceActiveCard = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF42251B),
-      Color(0xFF2C1913),
-    ],
-  );
-
-  /// 磨砂玻璃/半透明卡片微光细边框渐变
-  static const LinearGradient glassBorder = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0x38FFFFFF),
-      Color(0x0AFFFFFF),
-    ],
-  );
-
-  /// 激活状态渐变发光描边
-  static const LinearGradient activeBorder = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      AppColors.hongguoRedLight,
-      AppColors.hongguoOrange,
-    ],
-  );
-
-  /// 电影海报沉浸式底部渐变遮罩（全平滑多阶曲线）
-  static const LinearGradient posterOverlay = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color(0x00000000),
-      Color(0x20000000),
-      Color(0x80000000),
-      Color(0xE6000000),
-    ],
-    stops: [0.0, 0.4, 0.75, 1.0],
-  );
-
-  /// 播放器顶部状态栏平滑下落黑渐变
-  static const LinearGradient playerTopMask = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color(0xCC000000),
-      Color(0x66000000),
-      Color(0x00000000),
-    ],
-  );
-
-  /// 播放器底部控制栏平滑上托黑渐变
-  static const LinearGradient playerBottomMask = LinearGradient(
-    begin: Alignment.bottomCenter,
-    end: Alignment.topCenter,
-    colors: [
-      Color(0xF0000000),
-      Color(0x99000000),
-      Color(0x00000000),
-    ],
-  );
-
-  /// 底部导航栏磨砂渐变底色（暖调暗夜质感）
-  static const LinearGradient bottomNavGlass = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color(0xF5261D19),
-      Color(0xFC1C1512),
-    ],
-  );
-}
-
-/// 全局统一微光发光与现代投影（拒绝生硬 Material 单边重阴影）
-abstract final class AppShadows {
-  /// 主品牌红微光发光（用于主 CTA 按钮悬浮、激活芯片）
-  static const List<BoxShadow> primaryGlow = [
-    BoxShadow(
-      color: Color(0x59FF2442),
-      blurRadius: 18,
-      spreadRadius: -2,
-      offset: Offset(0, 6),
-    ),
-  ];
-
-  /// 柔和现代卡片弥散微阴影（提升立体景深感）
-  static const List<BoxShadow> softCard = [
-    BoxShadow(
-      color: Color(0x52000000),
-      blurRadius: 16,
-      spreadRadius: 0,
-      offset: Offset(0, 6),
-    ),
-  ];
-
-  /// 悬浮胶囊微妙光晕
-  static const List<BoxShadow> pillGlow = [
-    BoxShadow(
-      color: Color(0x3DFF2442),
-      blurRadius: 10,
-      spreadRadius: -1,
-      offset: Offset(0, 3),
-    ),
-  ];
-}
-
-/// 全局统一现代圆角系统（拒绝直角和过于僵硬的默认圆角，采用大圆角与连续曲率手感）
-abstract final class AppRadii {
-  /// 微小组件（标签、角标）：8.0
-  static const double badge = 8.0;
-  static final BorderRadius badgeBorder = BorderRadius.circular(badge);
-
-  /// 中小卡片（选集按钮、分集方块）：14.0
-  static const double episode = 14.0;
-  static final BorderRadius episodeBorder = BorderRadius.circular(episode);
-
-  /// 标准卡片与海报（短剧海报卡片、设置项卡片）：18.0
-  static const double card = 18.0;
-  static final BorderRadius cardBorder = BorderRadius.circular(card);
-
-  /// 大卡片与弹窗浮层（Sheet、Dialog）：24.0
-  static const double sheet = 24.0;
-  static final BorderRadius sheetBorder = BorderRadius.circular(sheet);
-
-  /// 极致胶囊形状（主播放按钮、分类 Pill、搜索栏）：999.0
-  static const double pill = 999.0;
-  static final BorderRadius pillBorder = BorderRadius.circular(pill);
 }

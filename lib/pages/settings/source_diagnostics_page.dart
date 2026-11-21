@@ -237,14 +237,14 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: AppColors.white,
                             ),
                           )
                         : const Icon(Icons.play_arrow_rounded),
                     label: Text(runner.running ? '检测中…' : '开始检测'),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.hongguoRed,
-                      foregroundColor: Colors.white,
+                      foregroundColor: AppColors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -305,7 +305,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                       ? colors.errorContainer.withValues(alpha: 0.35)
                       : (runner.result.contains('完成') ||
                                 runner.result.contains('通过')
-                            ? Colors.green.withValues(alpha: 0.12)
+                            ? AppColors.green.withValues(alpha: 0.12)
                             : (isDark
                                   ? AppColors.darkSurfaceElevated
                                   : colors.surfaceContainerLow)),
@@ -317,7 +317,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                         ? colors.error.withValues(alpha: 0.5)
                         : (runner.result.contains('完成') ||
                                   runner.result.contains('通过')
-                              ? Colors.green.withValues(alpha: 0.4)
+                              ? AppColors.green.withValues(alpha: 0.4)
                               : colors.outlineVariant.withValues(alpha: 0.2)),
                   ),
                 ),
@@ -338,7 +338,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                           ? colors.error
                           : (runner.result.contains('完成') ||
                                     runner.result.contains('通过')
-                                ? Colors.green
+                                ? AppColors.green
                                 : colors.primary),
                       size: 22,
                     ),
@@ -369,7 +369,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                   children: [
                     _buildStatPill('总记录', '${entries.length}', colors.primary),
                     const SizedBox(width: 8),
-                    _buildStatPill('正常', '${successes.length}', Colors.green),
+                    _buildStatPill('正常', '${successes.length}', AppColors.green),
                     const SizedBox(width: 8),
                     _buildStatPill(
                       '异常',
@@ -453,7 +453,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
       ),
       color: isFailed
           ? (isDark
-                ? const Color(0xFF281414)
+                ? AppColors.diagnosticErrorDark
                 : colors.errorContainer.withValues(alpha: 0.2))
           : (isDark ? AppColors.darkSurfaceElevated : colors.surface),
       child: Padding(
@@ -466,7 +466,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
               children: [
                 Icon(
                   isFailed ? Icons.error_rounded : Icons.check_circle_rounded,
-                  color: isFailed ? colors.error : Colors.green,
+                  color: isFailed ? colors.error : AppColors.green,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -522,8 +522,8 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: isDark
-                      ? const Color(0xFF1E0E0E)
-                      : Colors.red.shade50.withValues(alpha: 0.7),
+                      ? AppColors.diagnosticErrorDeeper
+                      : AppColors.redShade50.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: colors.error.withValues(alpha: 0.25),
@@ -565,7 +565,7 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                           const Icon(
                             Icons.lightbulb_outline_rounded,
                             size: 16,
-                            color: Colors.orange,
+                            color: AppColors.orange,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -574,8 +574,8 @@ class _SourceDiagnosticsPageState extends State<SourceDiagnosticsPage> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark
-                                    ? Colors.orange.shade200
-                                    : Colors.brown.shade800,
+                                    ? AppColors.orangeShade200
+                                    : AppColors.brownShade800,
                                 height: 1.35,
                               ),
                             ),

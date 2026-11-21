@@ -11,6 +11,8 @@ import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/views/remote/remote_widgets.dart';
 import 'package:THLRedLook/views/drama/drama_cover_view.dart';
 
+export 'package:THLRedLook/views/drama/cached_cover_image.dart';
+export 'package:THLRedLook/views/drama/drama_backdrop.dart';
 export 'package:THLRedLook/views/drama/drama_cover_view.dart';
 export 'mouse_horizontal_scroll.dart';
 

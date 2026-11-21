@@ -75,3 +75,21 @@ public struct AnchorDramaGridView: View {
         }
     }
 }
+
+#Preview {
+    struct PreviewWrapper: View {
+        @FocusState var focus: AnchorHeaderFocus?
+        var body: some View {
+            AnchorDramaGridView(
+                dramas: [
+                    Drama(id: "1", title: "逆袭首富", cover: "", episodes: 80, tags: ["都市"])
+                ],
+                focus: $focus,
+                onSelectDrama: { _ in },
+                onUpCommand: {}
+            )
+            .background(TVColors.background)
+        }
+    }
+    return PreviewWrapper()
+}

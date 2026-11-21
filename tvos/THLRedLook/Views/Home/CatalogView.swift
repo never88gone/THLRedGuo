@@ -54,7 +54,7 @@ public struct CatalogView: View {
                     Spacer()
                 } else if viewModel.items.isEmpty {
                     Spacer()
-                    Text(viewModel.errorMessage ?? "当前分类暂无短剧").foregroundColor(.secondary)
+                    Text(viewModel.errorMessage ?? "当前分类暂无短剧").foregroundColor(TVColors.secondary)
                     retryButton
                     Spacer()
                 } else {
@@ -225,7 +225,7 @@ public struct CatalogView: View {
                 ProgressView("正在加载更多短剧...").padding(.vertical, 28)
             }
             if let message = viewModel.errorMessage {
-                Text(message).foregroundColor(.secondary)
+                Text(message).foregroundColor(TVColors.secondary)
                 retryButton.padding(.bottom, 28)
             }
         }
@@ -338,4 +338,10 @@ public struct CatalogView: View {
         pendingNextRow = nil
         focusedTarget = .card(nextID)
     }
+}
+
+#Preview {
+    CatalogView(store: .shared)
+        .environmentObject(JSSourceService.shared)
+        .background(TVColors.background)
 }

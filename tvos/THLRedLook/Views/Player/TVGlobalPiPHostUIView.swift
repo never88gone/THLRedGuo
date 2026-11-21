@@ -17,11 +17,11 @@ public final class TVGlobalPiPHostUIView: UIView {
     }
 
     private func setupLayers() {
-        backgroundColor = .clear
+        backgroundColor = TVColors.uiClear
         isUserInteractionEnabled = false
 
         playerLayer.videoGravity = .resizeAspect
-        playerLayer.backgroundColor = UIColor.clear.cgColor
+        playerLayer.backgroundColor = TVColors.uiClear.cgColor
         layer.addSublayer(playerLayer)
 
         if AVPictureInPictureController.isPictureInPictureSupported() {

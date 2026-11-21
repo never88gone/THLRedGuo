@@ -32,9 +32,9 @@ public struct AnchorHeaderView: View {
                 .clipShape(Circle())
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(0.2), lineWidth: 3)
+                        .stroke(TVColors.white.opacity(0.2), lineWidth: 3)
                 )
-                .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 6)
+                .shadow(color: TVColors.black.opacity(0.4), radius: 10, x: 0, y: 6)
 
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 24) {
@@ -64,7 +64,7 @@ public struct AnchorHeaderView: View {
                             .foregroundColor(TVColors.textPrimary)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Color.white.opacity(focus.wrappedValue == .follow ? 0.9 : 0.2), lineWidth: 2)
+                                    .stroke(TVColors.white.opacity(focus.wrappedValue == .follow ? 0.9 : 0.2), lineWidth: 2)
                             )
                         }
                         .buttonStyle(TVZeroHighlightButtonStyle())
@@ -115,4 +115,23 @@ public struct AnchorHeaderView: View {
             }
         }
     }
+}
+
+#Preview {
+    struct PreviewWrapper: View {
+        @FocusState var focus: AnchorHeaderFocus?
+        var body: some View {
+            AnchorHeaderView(
+                anchor: Anchor(id: "anchor_1", name: "金牌主播", avatar: "", worksCount: 42),
+                isFollowed: true,
+                followEnabled: true,
+                focus: $focus,
+                onToggleFollow: {},
+                onDownCommand: {}
+            )
+            .padding(40)
+            .background(TVColors.background)
+        }
+    }
+    return PreviewWrapper()
 }

@@ -26,7 +26,7 @@ class PlayerDanmakuSheetView extends StatefulWidget {
   }) {
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       elevation: 0,
       isScrollControlled: true,
       builder: (_) => PlayerDanmakuSheetView(

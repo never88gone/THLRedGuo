@@ -110,3 +110,9 @@ public struct AVPlayerView: UIViewRepresentable {
         uiView.cleanup()
     }
 }
+
+#Preview {
+    AVPlayerView()
+        .frame(width: 640, height: 360)
+        .background(TVColors.background)
+}

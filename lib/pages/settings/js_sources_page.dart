@@ -9,6 +9,8 @@ import 'package:THLRedLook/core/js/js_source_models.dart';
 import 'package:THLRedLook/core/js/js_source_presets.dart';
 import 'package:THLRedLook/core/js/js_source_service.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/utils/theme/app_gradients.dart';
+import 'package:THLRedLook/utils/theme/app_shadows.dart';
 
 class JsSourcesPage extends StatefulWidget {
   const JsSourcesPage({
@@ -576,7 +578,7 @@ class _JsSourcesPageState extends State<JsSourcesPage> {
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
                     color: isDark
-                        ? const Color(0x26FFFFFF)
+                        ? AppColors.white15
                         : AppColors.lightBorder,
                     width: 0.8,
                   ),

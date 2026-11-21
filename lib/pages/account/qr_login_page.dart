@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:gal/gal.dart';
 import '../../core/account/hongguo_account_session.dart';
 import '../../core/account/hongguo_account_service.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
 
 class HongguoQrLoginScreen extends StatefulWidget {
   const HongguoQrLoginScreen({super.key});
@@ -141,7 +142,7 @@ class _HongguoQrLoginScreenState extends State<HongguoQrLoginScreen>
       final canvas = Canvas(recorder);
       canvas.drawRect(
         const Rect.fromLTWH(0, 0, 1024, 1024),
-        Paint()..color = Colors.white,
+        Paint()..color = AppColors.white,
       );
       canvas.save();
       canvas.translate(160, 160);
@@ -151,11 +152,11 @@ class _HongguoQrLoginScreenState extends State<HongguoQrLoginScreen>
         gapless: true,
         eyeStyle: const QrEyeStyle(
           eyeShape: QrEyeShape.square,
-          color: Colors.black,
+          color: AppColors.black,
         ),
         dataModuleStyle: const QrDataModuleStyle(
           dataModuleShape: QrDataModuleShape.square,
-          color: Colors.black,
+          color: AppColors.black,
         ),
       );
       painter.paint(canvas, const Size(704, 704));
@@ -232,7 +233,7 @@ class _HongguoQrLoginScreenState extends State<HongguoQrLoginScreen>
                       data: login!.url,
                       size: 280,
                       padding: const EdgeInsets.all(16),
-                      backgroundColor: Colors.white,
+                      backgroundColor: AppColors.white,
                       semanticsLabel: '红果登录二维码',
                     ),
                   )

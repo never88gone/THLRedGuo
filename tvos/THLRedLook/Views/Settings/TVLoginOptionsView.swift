@@ -76,22 +76,22 @@ public struct TVLoginOptionsView: View {
                         HStack(spacing: 16) {
                             Image(systemName: "qrcode.viewfinder")
                                 .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(isOfficialFocused ? .white : (selectedMode == .officialQR ? TVColors.primary : Color.white.opacity(0.8)))
+                                .foregroundColor(isOfficialFocused ? TVColors.white : (selectedMode == .officialQR ? TVColors.primary : TVColors.white.opacity(0.8)))
                                 .frame(width: 36)
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("红果 App 扫码")
                                     .font(.system(size: 22, weight: isOfficialFocused || selectedMode == .officialQR ? .bold : .semibold))
-                                    .foregroundColor(isOfficialFocused ? .white : TVColors.textPrimary)
+                                    .foregroundColor(isOfficialFocused ? TVColors.white : TVColors.textPrimary)
                                 Text("官方推荐 · 手机红果扫一扫")
                                     .font(.system(size: 14, weight: .regular))
-                                    .foregroundColor(isOfficialFocused ? Color.white.opacity(0.85) : TVColors.textSecondary)
+                                    .foregroundColor(isOfficialFocused ? TVColors.white.opacity(0.85) : TVColors.textSecondary)
                             }
                             Spacer()
                             if selectedMode == .officialQR {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 22, weight: .bold))
-                                    .foregroundColor(isOfficialFocused ? .white : TVColors.primaryHover)
+                                    .foregroundColor(isOfficialFocused ? TVColors.white : TVColors.primaryHover)
                             }
                         }
                         .padding(.horizontal, 22)
@@ -107,19 +107,19 @@ public struct TVLoginOptionsView: View {
                                                 endPoint: .bottomTrailing
                                             )
                                         )
-                                        : (selectedMode == .officialQR ? AnyShapeStyle(Color.white.opacity(0.10)) : AnyShapeStyle(Color.white.opacity(0.04)))
+                                        : (selectedMode == .officialQR ? AnyShapeStyle(TVColors.white.opacity(0.10)) : AnyShapeStyle(TVColors.white.opacity(0.04)))
                                 )
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
                                 .stroke(
-                                    isOfficialFocused ? Color.white : (selectedMode == .officialQR ? TVTheme.primary.opacity(0.6) : Color.white.opacity(0.08)),
+                                    isOfficialFocused ? TVColors.white : (selectedMode == .officialQR ? TVTheme.primary.opacity(0.6) : TVColors.white.opacity(0.08)),
                                     lineWidth: isOfficialFocused ? 2.5 : 1.0
                                 )
                         )
                         .scaleEffect(isOfficialFocused ? 1.04 : 1.0)
                         .shadow(
-                            color: isOfficialFocused ? TVColors.focusedShadowStrong : Color.clear,
+                            color: isOfficialFocused ? TVColors.focusedShadowStrong : TVColors.clear,
                             radius: isOfficialFocused ? 14 : 0,
                             x: 0,
                             y: isOfficialFocused ? 4 : 0
@@ -138,22 +138,22 @@ public struct TVLoginOptionsView: View {
                         HStack(spacing: 16) {
                             Image(systemName: "iphone.and.arrow.forward")
                                 .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(isHawFocused ? .white : (selectedMode == .hawQR ? TVColors.primary : Color.white.opacity(0.8)))
+                                .foregroundColor(isHawFocused ? TVColors.white : (selectedMode == .hawQR ? TVColors.primary : TVColors.white.opacity(0.8)))
                                 .frame(width: 36)
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("手机糖葫芦 Haw 扫码")
                                     .font(.system(size: 22, weight: isHawFocused || selectedMode == .hawQR ? .bold : .semibold))
-                                    .foregroundColor(isHawFocused ? .white : TVColors.textPrimary)
+                                    .foregroundColor(isHawFocused ? TVColors.white : TVColors.textPrimary)
                                 Text("同一局域网内手机 Haw 快速授权")
                                     .font(.system(size: 14, weight: .regular))
-                                    .foregroundColor(isHawFocused ? Color.white.opacity(0.85) : TVColors.textSecondary)
+                                    .foregroundColor(isHawFocused ? TVColors.white.opacity(0.85) : TVColors.textSecondary)
                             }
                             Spacer()
                             if selectedMode == .hawQR {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 22, weight: .bold))
-                                    .foregroundColor(isHawFocused ? .white : TVColors.primaryHover)
+                                    .foregroundColor(isHawFocused ? TVColors.white : TVColors.primaryHover)
                             }
                         }
                         .padding(.horizontal, 22)
@@ -169,19 +169,19 @@ public struct TVLoginOptionsView: View {
                                                 endPoint: .bottomTrailing
                                             )
                                         )
-                                        : (selectedMode == .hawQR ? AnyShapeStyle(Color.white.opacity(0.10)) : AnyShapeStyle(Color.white.opacity(0.04)))
+                                        : (selectedMode == .hawQR ? AnyShapeStyle(TVColors.white.opacity(0.10)) : AnyShapeStyle(TVColors.white.opacity(0.04)))
                                 )
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
                                 .stroke(
-                                    isHawFocused ? Color.white : (selectedMode == .hawQR ? TVTheme.primary.opacity(0.6) : Color.white.opacity(0.08)),
+                                    isHawFocused ? TVColors.white : (selectedMode == .hawQR ? TVTheme.primary.opacity(0.6) : TVColors.white.opacity(0.08)),
                                     lineWidth: isHawFocused ? 2.5 : 1.0
                                 )
                         )
                         .scaleEffect(isHawFocused ? 1.04 : 1.0)
                         .shadow(
-                            color: isHawFocused ? TVColors.focusedShadowStrong : Color.clear,
+                            color: isHawFocused ? TVColors.focusedShadowStrong : TVColors.clear,
                             radius: isHawFocused ? 14 : 0,
                             x: 0,
                             y: isHawFocused ? 4 : 0
@@ -198,7 +198,7 @@ public struct TVLoginOptionsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("操作指引")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.white.opacity(0.5))
+                        .foregroundColor(TVColors.white.opacity(0.5))
 
                     if selectedMode == .officialQR {
                         stepRow(number: "1", title: "打开手机【红果短剧】App")
@@ -212,7 +212,7 @@ public struct TVLoginOptionsView: View {
                 }
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.04))
+                .background(TVColors.white.opacity(0.04))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 Spacer()
@@ -229,7 +229,7 @@ public struct TVLoginOptionsView: View {
                             Text(selectedMode == .officialQR && model.remaining > 0 ? "刷新 (\(model.remaining)s)" : "刷新二维码")
                                 .font(.system(size: 18, weight: .bold))
                         }
-                        .foregroundColor(isRefreshFocused ? .white : TVColors.textPrimary)
+                        .foregroundColor(isRefreshFocused ? TVColors.white : TVColors.textPrimary)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 14)
                         .background(
@@ -237,19 +237,19 @@ public struct TVLoginOptionsView: View {
                                 .fill(
                                     isRefreshFocused
                                         ? AnyShapeStyle(LinearGradient(colors: [TVColors.buttonFocusedGradStart, TVColors.buttonFocusedGradEnd], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                        : AnyShapeStyle(Color.white.opacity(0.08))
+                                        : AnyShapeStyle(TVColors.white.opacity(0.08))
                                 )
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(
-                                    isRefreshFocused ? Color.white : Color.white.opacity(0.14),
+                                    isRefreshFocused ? TVColors.white : TVColors.white.opacity(0.14),
                                     lineWidth: isRefreshFocused ? 2.5 : 1.0
                                 )
                         )
                         .scaleEffect(isRefreshFocused ? 1.06 : 1.0)
                         .shadow(
-                            color: isRefreshFocused ? TVColors.focusedShadowStrong : Color.clear,
+                            color: isRefreshFocused ? TVColors.focusedShadowStrong : TVColors.clear,
                             radius: isRefreshFocused ? 12 : 0,
                             x: 0,
                             y: isRefreshFocused ? 3 : 0
@@ -271,7 +271,7 @@ public struct TVLoginOptionsView: View {
                             Text("返回")
                                 .font(.system(size: 18, weight: .bold))
                         }
-                        .foregroundColor(isDismissFocused ? .white : TVColors.textPrimary)
+                        .foregroundColor(isDismissFocused ? TVColors.white : TVColors.textPrimary)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 14)
                         .background(
@@ -279,19 +279,19 @@ public struct TVLoginOptionsView: View {
                                 .fill(
                                     isDismissFocused
                                         ? AnyShapeStyle(LinearGradient(colors: [TVColors.buttonFocusedGradStart, TVColors.buttonFocusedGradEnd], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                        : AnyShapeStyle(Color.white.opacity(0.08))
+                                        : AnyShapeStyle(TVColors.white.opacity(0.08))
                                 )
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(
-                                    isDismissFocused ? Color.white : Color.white.opacity(0.14),
+                                    isDismissFocused ? TVColors.white : TVColors.white.opacity(0.14),
                                     lineWidth: isDismissFocused ? 2.5 : 1.0
                                 )
                         )
                         .scaleEffect(isDismissFocused ? 1.06 : 1.0)
                         .shadow(
-                            color: isDismissFocused ? TVColors.focusedShadowStrong : Color.clear,
+                            color: isDismissFocused ? TVColors.focusedShadowStrong : TVColors.clear,
                             radius: isDismissFocused ? 12 : 0,
                             x: 0,
                             y: isDismissFocused ? 3 : 0
@@ -392,7 +392,7 @@ public struct TVLoginOptionsView: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color.white.opacity(0.1))
+                    .fill(TVColors.white.opacity(0.1))
                     .frame(width: 24, height: 24)
                 Text(number)
                     .font(.system(size: 13, weight: .bold))

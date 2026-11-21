@@ -23,7 +23,7 @@ struct SourceDiagnosticsQRSheet: View {
             if let image {
                 Image(uiImage: image).interpolation(.none).resizable()
                     .scaledToFit().frame(width: 420, height: 420)
-                    .padding(24).background(.white)
+                    .padding(24).background(TVColors.white)
             } else if server.message.hasPrefix("正在") { ProgressView().frame(height: 260) }
             else { Image(systemName: "wifi.exclamationmark").font(.system(size: 90)).frame(height: 200) }
             Text(server.message).font(.system(size: 27)).multilineTextAlignment(.center)
@@ -32,7 +32,7 @@ struct SourceDiagnosticsQRSheet: View {
                     .accessibilityIdentifier("sourceDiagnostics.shareURL")
             }
             Text("打开后可复制或下载报告并手动发送。关闭此页即失效，最长有效 10 分钟，不会自动上传。")
-                .font(.system(size: 23)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .font(.system(size: 23)).foregroundStyle(TVColors.secondary).multilineTextAlignment(.center)
             TVButton(title: "返回诊断", icon: "arrow.backward", isProminent: true) { onClose() }
                 .accessibilityIdentifier("sourceDiagnostics.qrBack")
         }
@@ -41,4 +41,12 @@ struct SourceDiagnosticsQRSheet: View {
         .onDisappear { server.stop() }
         .onExitCommand { onClose() }
     }
+}
+
+#Preview {
+    SourceDiagnosticsQRSheet(
+        report: "测试报告文本",
+        onClose: {}
+    )
+    .background(TVColors.background)
 }

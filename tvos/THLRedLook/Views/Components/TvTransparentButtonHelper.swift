@@ -14,9 +14,16 @@ struct TvTransparentButtonHelper: View {
 
     var body: some View {
         configuration.label
-            .background(Color.clear)
+            .background(TVColors.clear)
             .cornerRadius(cornerRadius)
             .scaleEffect(isFocused ? focusedScale : 1.0)
             .animation(TVTheme.focusSpringAnimation, value: isFocused)
     }
+}
+
+#Preview {
+    Button("透明按钮") {}
+        .buttonStyle(TvTransparentButtonStyle())
+        .padding(40)
+        .background(TVColors.background)
 }

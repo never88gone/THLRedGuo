@@ -32,7 +32,7 @@ struct TVPlayerWakeAreaView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Button(action: onSelect) {
-                Color.black.opacity(0.001)
+                TVColors.black.opacity(0.001)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
             }
@@ -50,4 +50,19 @@ struct TVPlayerWakeAreaView: View {
         .ignoresSafeArea()
         .defaultFocus($activeWakeFocus, .centerWake)
     }
+}
+
+#Preview {
+    TVPlayerWakeAreaView(
+        playbackAccessibilityValue: "00:00 / 02:00",
+        onQuickSeek: { _ in },
+        onPanBegan: {},
+        onPanChanged: { _ in },
+        onPanEnded: {},
+        onUpCommand: {},
+        onDownCommand: {},
+        onSelect: {},
+        onMenu: {},
+        onMoveCommand: { _ in }
+    )
 }

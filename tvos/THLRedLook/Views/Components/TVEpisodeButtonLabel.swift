@@ -17,7 +17,7 @@ struct TVEpisodeButtonLabel: View {
                 if isCurrent {
                     Image(systemName: "play.fill")
                         .font(.system(size: isFocused ? 13 : 11, weight: .bold))
-                        .foregroundColor(isFocused ? .white : TVColors.playIconRed)
+                        .foregroundColor(isFocused ? TVColors.white : TVColors.playIconRed)
                 }
 
                 Text("\(episode.number)")
@@ -38,7 +38,7 @@ struct TVEpisodeButtonLabel: View {
 
             if isCurrent && !isFocused {
                 Circle()
-                    .fill(Color.red)
+                    .fill(TVColors.red)
                     .frame(width: 8, height: 8)
                     .padding(8)
             }
@@ -58,17 +58,17 @@ struct TVEpisodeButtonLabel: View {
 
     private var textColor: Color {
         if isFocused {
-            return isCurrent ? .white : .black
+            return isCurrent ? TVColors.white : TVColors.black
         }
         if isCurrent {
             return TVColors.playIconRed
         }
-        return Color.white.opacity(0.85)
+        return TVColors.white.opacity(0.85)
     }
 
     private var vipTextColor: Color {
         if isFocused {
-            return isCurrent ? .yellow : TVColors.vipTextFocused
+            return isCurrent ? TVColors.yellow : TVColors.vipTextFocused
         }
         return TVColors.vipAccent
     }
@@ -82,10 +82,10 @@ struct TVEpisodeButtonLabel: View {
 
     private var borderStrokeColor: Color {
         if isFocused {
-            return isCurrent ? Color.white : TVColors.focusedBorderColor
+            return isCurrent ? TVColors.white : TVColors.focusedBorderColor
         }
         if isCurrent {
-            return Color.red
+            return TVColors.red
         }
         return TVColors.borderSubtle
     }
@@ -105,9 +105,9 @@ struct TVEpisodeButtonLabel: View {
             return isCurrent ? TVColors.focusedShadowStrong : TVColors.focusedShadowColor
         }
         if isCurrent {
-            return Color.red.opacity(0.45)
+            return TVColors.red.opacity(0.45)
         }
-        return Color.clear
+        return TVColors.clear
     }
 
     private var shadowRadius: CGFloat {
@@ -136,4 +136,14 @@ struct TVEpisodeButtonLabel: View {
             }
         }
     }
+}
+
+#Preview {
+    TVEpisodeButtonLabel(
+        episode: Episode(id: "ep1", title: "第 1 集", number: 1, vip: true),
+        isCurrent: true,
+        externalFocused: false
+    )
+    .frame(width: 90, height: 75)
+    .background(TVColors.background)
 }

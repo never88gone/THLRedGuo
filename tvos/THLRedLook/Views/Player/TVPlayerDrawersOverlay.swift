@@ -37,3 +37,13 @@ struct TVPlayerDrawersOverlay: View {
         }
     }
 }
+
+#Preview {
+    TVPlayerDrawersOverlay(
+        viewModel: PlayerViewModel(
+            drama: Drama(id: "1", title: "测试短剧", cover: "", episodes: 20, tags: []),
+            allEpisodes: [],
+            initialEpisodeIndex: 1
+        )
+    )
+}

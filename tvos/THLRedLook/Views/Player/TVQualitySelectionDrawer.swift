@@ -7,13 +7,13 @@ public struct TVQualitySelectionDrawer: View {
 
     public var body: some View {
         ZStack(alignment: .trailing) {
-            Color.black.opacity(0.65).ignoresSafeArea()
+            TVColors.black.opacity(0.65).ignoresSafeArea()
             VStack(alignment: .leading, spacing: 24) {
                 Text("播放清晰度").font(.system(size: 42, weight: .bold))
                 Text("当前播放：" + PlaybackPlan.qualityLabel(viewModel.selectedQuality))
-                    .font(.system(size: 27)).foregroundStyle(.secondary)
+                    .font(.system(size: 27)).foregroundStyle(TVColors.secondary)
                     .accessibilityIdentifier("player.quality.current")
-                Text("按 Menu 返回").font(.system(size: 25)).foregroundStyle(.secondary)
+                Text("按 Menu 返回").font(.system(size: 25)).foregroundStyle(TVColors.secondary)
                 Divider()
                 ScrollView {
                     VStack(spacing: 14) {
@@ -58,4 +58,15 @@ public struct TVQualitySelectionDrawer: View {
             focusedQuality = viewModel.qualityOptions.contains(viewModel.requestedQuality) ? viewModel.requestedQuality : 0
         }
     }
+}
+
+#Preview {
+    TVQualitySelectionDrawer(
+        viewModel: PlayerViewModel(
+            drama: Drama(id: "1", title: "测试短剧", cover: "", episodes: 20, tags: []),
+            allEpisodes: [],
+            initialEpisodeIndex: 1
+        ),
+        isPresented: .constant(true)
+    )
 }

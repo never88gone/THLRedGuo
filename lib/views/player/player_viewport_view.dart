@@ -178,7 +178,7 @@ class PlayerViewportView extends StatelessWidget {
                         key: const ValueKey('player-pip-viewport-back'),
                         icon: const Icon(
                           Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
+                          color: AppColors.white,
                           size: 20,
                         ),
                         tooltip: '退出播放',
@@ -199,7 +199,7 @@ class PlayerViewportView extends StatelessWidget {
                     color: AppColors.blackWithAlpha(0.78),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: AppColors.white.withValues(alpha: 0.15),
                       width: 1,
                     ),
                   ),
@@ -223,7 +223,7 @@ class PlayerViewportView extends StatelessWidget {
                       Text(
                         title,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppColors.white,
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                         ),
@@ -235,7 +235,7 @@ class PlayerViewportView extends StatelessWidget {
                       Text(
                         '正在画中画窗口中播放',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: AppColors.white.withValues(alpha: 0.7),
                           fontSize: 13,
                         ),
                       ),
@@ -252,7 +252,7 @@ class PlayerViewportView extends StatelessWidget {
                             label: const Text('恢复应用内播放'),
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.hongguoRed,
-                              foregroundColor: Colors.white,
+                              foregroundColor: AppColors.white,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 10,
@@ -265,9 +265,9 @@ class PlayerViewportView extends StatelessWidget {
                             icon: const Icon(Icons.close_rounded, size: 18),
                             label: const Text('退出播放'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
+                              foregroundColor: AppColors.white,
                               side: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.4),
+                                color: AppColors.white.withValues(alpha: 0.4),
                               ),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -428,7 +428,7 @@ class PlayerViewportView extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(14),
                                       boxShadow: const [
                                         BoxShadow(
-                                          color: Color(0x77000000),
+                                          color: AppColors.black46,
                                           blurRadius: 24,
                                           offset: Offset(0, 10),
                                         ),

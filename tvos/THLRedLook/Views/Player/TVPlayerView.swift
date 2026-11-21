@@ -128,7 +128,7 @@ public struct TVPlayerView: View {
             TVPlayerDrawersOverlay(viewModel: viewModel)
 
             if viewModel.isControlsVisible, let error = accountLibrary.libraryWriteError {
-                VStack { Text(error).font(.system(size: 29)).foregroundStyle(.orange).padding(24).background(.black.opacity(0.8)); Spacer() }.padding(.top, 50)
+                VStack { Text(error).font(.system(size: 29)).foregroundStyle(TVColors.orange).padding(24).background(TVColors.black.opacity(0.8)); Spacer() }.padding(.top, 50)
             }
         }
         .focusSection()
@@ -214,9 +214,9 @@ public struct TVPlayerView: View {
             .ignoresSafeArea()
         } else if !viewModel.isLoading && viewModel.errorMessage == nil {
             ZStack {
-                Color.black.ignoresSafeArea()
+                TVColors.black.ignoresSafeArea()
                 LinearGradient(
-                    colors: [TVColors.playerTopGradient, Color.black],
+                    colors: [TVColors.playerTopGradient, TVColors.black],
                     startPoint: .top,
                     endPoint: .bottom
                 ).ignoresSafeArea()
@@ -244,17 +244,17 @@ public struct TVPlayerView: View {
             VStack {
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
-                        .foregroundColor(.yellow)
+                        .foregroundColor(TVColors.yellow)
                         .font(.system(size: 20))
                     Text(toast)
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                 }
                 .padding(.horizontal, 28)
                 .padding(.vertical, 14)
-                .background(Capsule().fill(Color.black.opacity(0.88)))
-                .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                .shadow(color: .black.opacity(0.6), radius: 12, y: 6)
+                .background(Capsule().fill(TVColors.black.opacity(0.88)))
+                .overlay(Capsule().stroke(TVColors.white.opacity(0.2), lineWidth: 1))
+                .shadow(color: TVColors.black.opacity(0.6), radius: 12, y: 6)
                 .padding(.top, 48)
 
                 Spacer()
@@ -470,4 +470,12 @@ public struct TVPlayerView: View {
         quickSeekHideWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.8, execute: workItem)
     }
+}
+
+#Preview {
+    TVPlayerView(
+        drama: Drama(id: "1", title: "测试短剧", cover: "", episodes: 20, tags: []),
+        episodes: [Episode(id: "1", title: "第 1 集", number: 1)]
+    )
+    .background(TVColors.background)
 }

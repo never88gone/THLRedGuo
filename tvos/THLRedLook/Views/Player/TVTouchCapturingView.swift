@@ -23,7 +23,7 @@ public class TVTouchCapturingView: UIView, UIGestureRecognizerDelegate {
     override init(frame: CGRect) {
         super.init(frame: frame)
         isUserInteractionEnabled = true
-        backgroundColor = .clear
+        backgroundColor = TVColors.uiClear
         isAccessibilityElement = false
 
         // 1. Siri Remote 触控表面滑动手势

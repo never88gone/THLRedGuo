@@ -18,20 +18,20 @@ public struct StorageInfoCard: View {
             HStack(spacing: 20) {
                 ZStack {
                     Circle()
-                        .fill(isFocused ? TVTheme.primary.opacity(0.3) : Color.white.opacity(0.08))
+                        .fill(isFocused ? TVTheme.primary.opacity(0.3) : TVColors.white.opacity(0.08))
                         .frame(width: 52, height: 52)
                     Image(systemName: icon)
                         .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(isFocused ? .white : TVTheme.primary)
+                        .foregroundColor(isFocused ? TVColors.white : TVTheme.primary)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(title)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(TVColors.white.opacity(0.6))
                     Text(value)
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                         .lineLimit(2)
                 }
                 Spacer()
@@ -45,13 +45,13 @@ public struct StorageInfoCard: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
                     .stroke(
-                        isFocused ? Color.white : Color.white.opacity(0.08),
+                        isFocused ? TVColors.white : TVColors.white.opacity(0.08),
                         lineWidth: isFocused ? 3.0 : 1.0
                     )
             )
             .scaleEffect(isFocused ? 1.02 : 1.0)
             .shadow(
-                color: isFocused ? TVTheme.primary.opacity(0.4) : Color.clear,
+                color: isFocused ? TVTheme.primary.opacity(0.4) : TVColors.clear,
                 radius: isFocused ? 14 : 0,
                 x: 0,
                 y: isFocused ? 4 : 0
@@ -64,4 +64,10 @@ public struct StorageInfoCard: View {
         .focused($isFocused)
         .focusEffectDisabled()
     }
+}
+
+#Preview {
+    StorageInfoCard(title: "缓存大小", value: "128 MB", icon: "internaldrive")
+        .padding()
+        .background(TVColors.background)
 }

@@ -58,3 +58,20 @@ public struct DramaCardView: View {
         }
     }
 }
+
+#Preview {
+    DramaCardView(
+        drama: Drama(
+            id: "preview_1",
+            title: "都市之战神归来",
+            cover: "https://example.com/cover.jpg",
+            episodes: 80,
+            tags: ["热血", "都市"]
+        ),
+        watchProgress: 0.45,
+        progressText: "看至第 36 集",
+        onSelect: {}
+    )
+    .padding(40)
+    .background(TVColors.background)
+}

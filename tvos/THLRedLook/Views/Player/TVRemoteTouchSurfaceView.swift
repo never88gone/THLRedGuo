@@ -64,3 +64,13 @@ public struct TVRemoteTouchSurfaceView: UIViewRepresentable {
         view.onMenu = onMenu
     }
 }
+
+#Preview {
+    TVRemoteTouchSurfaceView(
+        onPanBegan: {},
+        onPanChanged: { _ in },
+        onPanEnded: {}
+    )
+    .frame(width: 400, height: 300)
+    .background(TVColors.background)
+}

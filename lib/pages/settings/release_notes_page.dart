@@ -241,7 +241,7 @@ class _ReleaseNotesPageState extends State<ReleaseNotesPage> {
               child: Text(
                 '— 已展示全部更新历程 —',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: isDark ? Colors.white38 : Colors.black38,
+                  color: isDark ? AppColors.white38 : AppColors.black38,
                 ),
               ),
             ),
@@ -281,14 +281,14 @@ class _ReleaseNotesPageState extends State<ReleaseNotesPage> {
                           color: isLatest
                               ? AppColors.hongguoRed
                               : (isDark
-                                  ? Colors.white12
-                                  : Colors.black.withValues(alpha: 0.08)),
+                                  ? AppColors.white12
+                                  : AppColors.black.withValues(alpha: 0.08)),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           'v${note.version}',
                           style: TextStyle(
-                            color: isLatest ? Colors.white : null,
+                            color: isLatest ? AppColors.white : null,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                           ),
@@ -348,7 +348,7 @@ class _ReleaseNotesPageState extends State<ReleaseNotesPage> {
                             decoration: BoxDecoration(
                               color: isLatest
                                   ? AppColors.hongguoRed
-                                  : (isDark ? Colors.white54 : Colors.black45),
+                                  : (isDark ? AppColors.white54 : AppColors.black45),
                               shape: BoxShape.circle,
                             ),
                           ),

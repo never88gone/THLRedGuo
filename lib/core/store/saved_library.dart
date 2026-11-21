@@ -213,7 +213,7 @@ class _SavedLibraryState extends State<SavedLibrary> {
                   '${widget.history ? '最近观看' : '我的追剧'} · ${items.length}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.white,
                   ),
                 ),
               ),
@@ -234,7 +234,7 @@ class _SavedLibraryState extends State<SavedLibrary> {
                   icon: const Icon(
                     Icons.delete_outline_rounded,
                     size: 20,
-                    color: Colors.white70,
+                    color: AppColors.white70,
                   ),
                 ),
             ],
@@ -249,17 +249,17 @@ class _SavedLibraryState extends State<SavedLibrary> {
             controller: _search,
             onChanged: (_) => setState(() {}),
             textInputAction: TextInputAction.search,
-            style: const TextStyle(fontSize: 14, color: Colors.white),
+            style: const TextStyle(fontSize: 14, color: AppColors.white),
             decoration: InputDecoration(
               hintText: widget.history ? '搜索观看记录' : '搜索追剧',
               hintStyle: const TextStyle(
                 fontSize: 14,
-                color: Color(0x66FFFFFF),
+                color: AppColors.white40,
               ),
               prefixIcon: const Icon(
                 Icons.search_rounded,
                 size: 20,
-                color: Color(0x80FFFFFF),
+                color: AppColors.white50,
               ),
               suffixIcon: _search.text.isEmpty
                   ? null
@@ -269,11 +269,11 @@ class _SavedLibraryState extends State<SavedLibrary> {
                       icon: const Icon(
                         Icons.close_rounded,
                         size: 18,
-                        color: Color(0x80FFFFFF),
+                        color: AppColors.white50,
                       ),
                     ),
               filled: true,
-              fillColor: const Color(0x14FFFFFF),
+              fillColor: AppColors.white08,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
@@ -290,7 +290,7 @@ class _SavedLibraryState extends State<SavedLibrary> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(
-                  color: Color(0x33FFFFFF),
+                  color: AppColors.white20,
                   width: 1,
                 ),
               ),

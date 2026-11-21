@@ -14,3 +14,9 @@ public struct TVAccountSocialButton: View {
         EmptyView()
     }
 }
+
+#Preview {
+    TVAccountSocialButton(
+        drama: Drama(id: "1", title: "测试", cover: "", episodes: 10, tags: [])
+    )
+}

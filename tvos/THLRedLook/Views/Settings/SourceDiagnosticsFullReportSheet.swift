@@ -13,10 +13,10 @@ struct SourceDiagnosticsFullReportSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("完整技术诊断报告")
                         .font(.system(size: 40, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(TVColors.white)
                     Text("包含环境指纹、各链路分段耗时与详细错误堆栈，可供技术排查与社区求助")
                         .font(.system(size: 20))
-                        .foregroundColor(.white.opacity(0.65))
+                        .foregroundColor(TVColors.white.opacity(0.65))
                 }
                 Spacer()
                 TVButton(
@@ -38,16 +38,16 @@ struct SourceDiagnosticsFullReportSheet: View {
                     Text(reportText)
                         .font(.system(size: 22, weight: .medium, design: .monospaced))
                         .lineSpacing(6)
-                        .foregroundColor(.white.opacity(0.95))
+                        .foregroundColor(TVColors.white.opacity(0.95))
                         .padding(24)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.black.opacity(0.6))
+                        .background(TVColors.black.opacity(0.6))
                         .cornerRadius(16)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
-                                .stroke(focusedField == "content" ? Color.white : Color.white.opacity(0.12), lineWidth: focusedField == "content" ? 3.5 : 1)
+                                .stroke(focusedField == "content" ? TVColors.white : TVColors.white.opacity(0.12), lineWidth: focusedField == "content" ? 3.5 : 1)
                         )
-                        .shadow(color: focusedField == "content" ? Color.white.opacity(0.3) : Color.clear, radius: 8)
+                        .shadow(color: focusedField == "content" ? TVColors.white.opacity(0.3) : TVColors.clear, radius: 8)
                         .focusable()
                         .focused($focusedField, equals: "content")
                         .accessibilityIdentifier("sourceDiagnostics.reportContent")
@@ -65,4 +65,12 @@ struct SourceDiagnosticsFullReportSheet: View {
         .defaultFocus($focusedField, "close")
         .onExitCommand { onClose() }
     }
+}
+
+#Preview {
+    SourceDiagnosticsFullReportSheet(
+        reportText: "=== 诊断报告 ===\n系统: tvOS\n状态: 正常",
+        onClose: {}
+    )
+    .background(TVColors.background)
 }

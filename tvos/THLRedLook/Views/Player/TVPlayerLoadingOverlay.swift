@@ -18,11 +18,22 @@ struct TVPlayerLoadingOverlay: View {
                     .scaleEffect(1.8)
                 Text(shouldShowSwitching ? "正在切换推荐…" : shouldShowLoading ? "正在准备视频流..." : "正在缓冲...")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(TVColors.white)
             }
             .padding(32)
-            .background(Color.black.opacity(0.6))
+            .background(TVColors.black.opacity(0.6))
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
     }
+}
+
+#Preview {
+    TVPlayerLoadingOverlay(
+        isLoading: true,
+        isBuffering: false,
+        isSwitchingFeed: false,
+        isActuallyPlaying: false,
+        isSeamlessTransitioning: false
+    )
+    .background(TVColors.black)
 }

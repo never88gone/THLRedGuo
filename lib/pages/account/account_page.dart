@@ -255,13 +255,13 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
                 child: CircleAvatar(
                   radius: 18,
-                  backgroundColor: isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHigh,
+                  backgroundColor: isDark ? AppColors.white12 : scheme.surfaceContainerHigh,
                   foregroundImage: avatar,
                   onForegroundImageError: avatar == null ? null : (_, _) {},
                   child: Icon(
                     Icons.person,
                     size: 20,
-                    color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                    color: isDark ? AppColors.white70 : scheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -296,7 +296,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             height: 4.5,
                             decoration: const BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Color(0xFF4CAF50),
+                              color: AppColors.green,
                             ),
                           ),
                           const SizedBox(width: 3.5),
@@ -319,7 +319,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 tooltip: '更多',
                 icon: Icon(
                   Icons.more_horiz_rounded,
-                  color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                  color: isDark ? AppColors.white70 : scheme.onSurfaceVariant,
                 ),
                 onSelected: (action) {
                   if (action == 'scan') {
@@ -382,7 +382,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 onPressed: _login,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.hongguoRed,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   minimumSize: const Size(0, 36),
                   shape: const StadiumBorder(),
@@ -417,16 +417,16 @@ class _AccountScreenState extends State<AccountScreen> {
                     height: 38,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHigh,
+                      color: isDark ? AppColors.white12 : scheme.surfaceContainerHigh,
                       border: Border.all(
-                        color: isDark ? const Color(0x26FFFFFF) : scheme.outlineVariant,
+                        color: isDark ? AppColors.white15 : scheme.outlineVariant,
                         width: 1,
                       ),
                     ),
                     child: Icon(
                       Icons.person_outline_rounded,
                       size: 20,
-                      color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                      color: isDark ? AppColors.white70 : scheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -455,7 +455,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: isDark ? Colors.white38 : scheme.outline,
+                    color: isDark ? AppColors.white38 : scheme.outline,
                     size: 18,
                   ),
                 ],
@@ -516,10 +516,10 @@ class _AccountScreenState extends State<AccountScreen> {
                         margin: const EdgeInsets.fromLTRB(16, 2, 16, 8),
                         padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0x0FFFFFFF) : scheme.surfaceContainerHighest,
+                          color: isDark ? AppColors.white06 : scheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isDark ? const Color(0x14FFFFFF) : scheme.outlineVariant,
+                            color: isDark ? AppColors.white08 : scheme.outlineVariant,
                             width: 0.8,
                           ),
                         ),
@@ -552,14 +552,14 @@ class _AccountScreenState extends State<AccountScreen> {
                                         ? AppColors.hongguoRed.withValues(
                                             alpha: isDark ? 0.20 : 0.12,
                                           )
-                                        : Colors.transparent,
+                                        : AppColors.transparent,
                                     borderRadius: BorderRadius.circular(19),
                                     border: Border.all(
                                       color: selected
                                           ? AppColors.hongguoRed.withValues(
                                               alpha: isDark ? 0.55 : 0.40,
                                             )
-                                        : Colors.transparent,
+                                        : AppColors.transparent,
                                       width: 0.8,
                                     ),
                                   ),
@@ -573,9 +573,9 @@ class _AccountScreenState extends State<AccountScreen> {
                                           ? FontWeight.bold
                                           : FontWeight.normal,
                                       color: selected
-                                          ? (isDark ? Colors.white : AppColors.hongguoRed)
+                                          ? (isDark ? AppColors.white : AppColors.hongguoRed)
                                           : (isDark
-                                              ? const Color(0x99FFFFFF)
+                                              ? AppColors.white60
                                               : scheme.onSurfaceVariant),
                                     ),
                                   ),
@@ -629,14 +629,14 @@ class _AccountScreenState extends State<AccountScreen> {
                                       ? AppColors.hongguoRed.withValues(
                                           alpha: isDark ? 0.18 : 0.12,
                                         )
-                                      : Colors.transparent,
+                                      : AppColors.transparent,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: selected
                                         ? AppColors.hongguoRed.withValues(
                                             alpha: isDark ? 0.45 : 0.40,
                                           )
-                                        : Colors.transparent,
+                                        : AppColors.transparent,
                                     width: 0.8,
                                   ),
                                 ),
@@ -648,7 +648,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                       decoration: BoxDecoration(
                                         color: selected
                                             ? AppColors.hongguoRed
-                                            : Colors.transparent,
+                                            : AppColors.transparent,
                                         borderRadius: BorderRadius.circular(
                                           1.5,
                                         ),
@@ -663,9 +663,9 @@ class _AccountScreenState extends State<AccountScreen> {
                                             ? FontWeight.bold
                                             : FontWeight.normal,
                                         color: selected
-                                            ? (isDark ? Colors.white : AppColors.hongguoRed)
+                                            ? (isDark ? AppColors.white : AppColors.hongguoRed)
                                             : (isDark
-                                                ? const Color(0x8AFFFFFF)
+                                                ? AppColors.white54
                                                 : scheme.onSurfaceVariant),
                                       ),
                                     ),
@@ -804,7 +804,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   trailing: Icon(
                     Icons.chevron_right_rounded,
                     size: 18,
-                    color: isDark ? Colors.white38 : scheme.outline,
+                    color: isDark ? AppColors.white38 : scheme.outline,
                   ),
                   onTap: () async {
                     var changed = false;
@@ -867,7 +867,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 icon: Icon(
                   Icons.refresh,
                   size: 18,
-                  color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                  color: isDark ? AppColors.white70 : scheme.onSurfaceVariant,
                 ),
               ),
             ],

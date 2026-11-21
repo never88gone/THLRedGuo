@@ -187,13 +187,13 @@ class _ICloudSyncPageState extends State<ICloudSyncPage> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
                               )
                             : const Icon(Icons.sync_rounded),
                         label: Text(_service.isSyncing ? '正在同步...' : '立即与云端同步'),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.hongguoRed,
-                          foregroundColor: Colors.white,
+                          foregroundColor: AppColors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),

@@ -304,7 +304,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                           side: BorderSide(
-                            color: isCur ? AppColors.hongguoRed : Colors.transparent,
+                            color: isCur ? AppColors.hongguoRed : AppColors.transparent,
                           ),
                         ),
                         clipBehavior: Clip.antiAlias,

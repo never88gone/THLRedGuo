@@ -38,7 +38,7 @@ struct DramaDetailEpisodeGrid: View {
                     }
                     if episodes.count < 8 {
                         ForEach(episodes.count..<8, id: \.self) { _ in
-                            Color.clear.frame(maxWidth: .infinity)
+                            TVColors.clear.frame(maxWidth: .infinity)
                         }
                     }
                 }
@@ -47,4 +47,27 @@ struct DramaDetailEpisodeGrid: View {
         .padding(.top, 12)
         .padding(.horizontal, 8)
     }
+}
+
+#Preview {
+    struct PreviewWrapper: View {
+        @FocusState var focus: DetailFocus?
+        var body: some View {
+            DramaDetailEpisodeGrid(
+                currentChunk: EpisodeChunk(
+                    title: "1-10",
+                    range: 0..<10,
+                    episodes: (1...10).map { Episode(id: "\($0)", title: "第 \($0) 集", number: $0) }
+                ),
+                selectedEpisodeNumber: 1,
+                lastWatchEpisode: 1,
+                focusedTarget: $focus,
+                onUpFallback: { _ in },
+                onSelectEpisode: { _ in }
+            )
+            .padding(40)
+            .background(TVColors.background)
+        }
+    }
+    return PreviewWrapper()
 }

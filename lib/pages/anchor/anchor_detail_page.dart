@@ -240,7 +240,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(value?.name ?? '主播详情'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.transparent,
         elevation: 0,
         actions: [
           IconButton(
@@ -288,10 +288,10 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                 return Container(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0x14FFFFFF) : scheme.surfaceContainerHighest,
+                    color: isDark ? AppColors.white08 : scheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDark ? const Color(0x1AFFFFFF) : scheme.outlineVariant,
+                      color: isDark ? AppColors.white10 : scheme.outlineVariant,
                       width: 0.8,
                     ),
                   ),
@@ -308,7 +308,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                         ),
                         child: CircleAvatar(
                           radius: 28,
-                          backgroundColor: isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHigh,
+                          backgroundColor: isDark ? AppColors.white12 : scheme.surfaceContainerHigh,
                           foregroundImage: avatarImage,
                           onForegroundImageError: avatarImage == null
                               ? null
@@ -316,7 +316,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                           child: Icon(
                             Icons.person_outline_rounded,
                             size: 30,
-                            color: isDark ? Colors.white70 : scheme.onSurfaceVariant,
+                            color: isDark ? AppColors.white70 : scheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -338,7 +338,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                           vertical: 2.5,
                         ),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0x0FFFFFFF) : scheme.surfaceContainer,
+                          color: isDark ? AppColors.white06 : scheme.surfaceContainer,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
@@ -360,7 +360,7 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                                 child: Text(
                                   '·',
                                   style: TextStyle(
-                                    color: isDark ? Colors.white38 : scheme.outline,
+                                    color: isDark ? AppColors.white38 : scheme.outline,
                                   ),
                                 ),
                               ),
@@ -400,11 +400,11 @@ class _AnchorDetailPageState extends State<AnchorDetailPage> {
                           onPressed: canChangeFollowing ? _follow : null,
                           style: FilledButton.styleFrom(
                             backgroundColor: following
-                                ? (isDark ? const Color(0x1FFFFFFF) : scheme.surfaceContainerHighest)
+                                ? (isDark ? AppColors.white12 : scheme.surfaceContainerHighest)
                                 : AppColors.hongguoRed,
                             foregroundColor: following
-                                ? (isDark ? Colors.white70 : scheme.onSurfaceVariant)
-                                : Colors.white,
+                                ? (isDark ? AppColors.white70 : scheme.onSurfaceVariant)
+                                : AppColors.white,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 22,
                               vertical: 6,

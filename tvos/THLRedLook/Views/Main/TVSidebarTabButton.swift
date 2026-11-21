@@ -24,16 +24,16 @@ public struct TVSidebarTabButton: View {
 
     private var contentColor: Color {
         if isFocused || isSelected {
-            return .white
+            return TVColors.white
         }
-        return Color.white.opacity(0.75)
+        return TVColors.white.opacity(0.75)
     }
 
     private var iconColor: Color {
         if isFocused || isSelected {
-            return .white
+            return TVColors.white
         }
-        return Color.white.opacity(0.6)
+        return TVColors.white.opacity(0.6)
     }
 
     private var buttonBackgroundStyle: AnyShapeStyle {
@@ -46,9 +46,9 @@ public struct TVSidebarTabButton: View {
                 )
             )
         } else if isSelected {
-            return AnyShapeStyle(Color.white.opacity(0.14))
+            return AnyShapeStyle(TVColors.white.opacity(0.14))
         } else {
-            return AnyShapeStyle(Color.white.opacity(0.04))
+            return AnyShapeStyle(TVColors.white.opacity(0.04))
         }
     }
 
@@ -56,9 +56,9 @@ public struct TVSidebarTabButton: View {
         if isFocused {
             return TVTheme.focusedBorderColor
         } else if isSelected {
-            return Color.white.opacity(0.2)
+            return TVColors.white.opacity(0.2)
         } else {
-            return Color.white.opacity(0.06)
+            return TVColors.white.opacity(0.06)
         }
     }
 
@@ -67,7 +67,7 @@ public struct TVSidebarTabButton: View {
     }
 
     private var shadowColor: Color {
-        isFocused ? TVTheme.focusedShadowColor : Color.clear
+        isFocused ? TVTheme.focusedShadowColor : TVColors.clear
     }
 
     public var body: some View {
@@ -113,4 +113,10 @@ public struct TVSidebarTabButton: View {
             }
         }
     }
+}
+
+#Preview {
+    TVSidebarTabButton(tab: .catalog, isSelected: true, isFocused: true, action: {}, onMoveRight: {})
+        .padding()
+        .background(TVColors.background)
 }
