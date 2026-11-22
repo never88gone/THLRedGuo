@@ -16,6 +16,7 @@ import 'package:THLRedLook/views/downloads/download_batch_bar.dart';
 import 'package:THLRedLook/views/downloads/download_collection_card.dart';
 import 'package:THLRedLook/views/downloads/download_filter_dialog.dart';
 import 'package:THLRedLook/views/downloads/download_job_card.dart';
+import 'package:THLRedLook/views/downloads/download_search_filter_header.dart';
 
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({
@@ -374,82 +375,20 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             elevation: 0,
             scrolledUnderElevation: 0,
           ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: SingleChildScrollView(
-            key: const ValueKey('download-filters'),
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final (k, label) in [
-                  ('all', '全部'),
-                  ('downloading', '下载中'),
-                  ('completed', '已下载'),
-                  ('archived', '已保留视频'),
-                ]) ...[
-                  ChoiceChip(
-                    key: ValueKey('download-filter-$k'),
-                    label: Text(label),
-                    selected: _filter == k,
-                    onSelected: (selected) {
-                      if (selected) setState(() => _filter = k);
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ],
-            ),
-          ),
+        DownloadSearchFilterHeader(
+          currentFilter: _filter,
+          onFilterSelected: (k) => setState(() => _filter = k),
+          searchController: _search,
+          onSearchChanged: (_) => setState(() {}),
+          collectionsCount: collections.length,
+          totalEpisodesCount: collections.fold<int>(0, (sum, c) => sum + c.jobs.length),
+          isArchivedFilter: _filter == 'archived',
+          isProgressBusy: _updater.busy || _busy,
+          progressText: _busy ? _operation : _updater.status,
+          canCancelUpdater: _updater.busy,
+          onCancelUpdater: _updater.cancel,
+          errorMessage: (_error != null && _jobs.isNotEmpty) ? _error : null,
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: TextField(
-            controller: _search,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: '搜索剧名、站源或分类',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: _search.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: '清空搜索',
-                      onPressed: () => setState(_search.clear),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-          child: Text(
-            '${collections.length} 部 · ${collections.fold<int>(0, (sum, c) => sum + c.jobs.length)} 集'
-            '${_filter == 'archived' ? ' · 已清理任务，视频仍保留' : ''}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-        if (_updater.busy || _busy) LinearProgressIndicator(minHeight: 2),
-        if (_updater.busy || _busy)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _busy ? _operation : _updater.status,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (_updater.busy)
-                  TextButton(
-                    onPressed: _updater.cancel,
-                    child: const Text('停止'),
-                  ),
-              ],
-            ),
-          ),
-        if (_error != null && _jobs.isNotEmpty)
-          Padding(padding: const EdgeInsets.all(12), child: Text(_error!)),
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())

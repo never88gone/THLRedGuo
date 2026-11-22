@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:media_kit/media_kit.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_mpv.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_policy.dart';
@@ -27,6 +29,79 @@ class VideoEnhancementMonitor {
         ).hasMatch(description),
         _ => false,
       };
+
+  bool checkSizeMatches({
+    required VideoEnhancementMpv mpv,
+    required Size? actual,
+    required Size? target,
+  }) {
+    if (actual == null || target == null) return false;
+    final surface = mpv.read('osd-dimensions');
+    final surfaceWidth = surface is Map ? surface['w'] : null;
+    final surfaceHeight = surface is Map ? surface['h'] : null;
+    return (actual.width - target.width).abs() <= 2 &&
+        (actual.height - target.height).abs() <= 2 &&
+        surfaceWidth is num &&
+        surfaceHeight is num &&
+        (surfaceWidth - target.width).abs() <= 2 &&
+        (surfaceHeight - target.height).abs() <= 2;
+  }
+
+  bool checkEffectFound({
+    required VideoEnhancementMpv mpv,
+    required VideoEnhancementDecision selected,
+    required List fresh,
+    required bool luma,
+    required bool gpu,
+  }) {
+    final descriptions = fresh
+        .whereType<Map>()
+        .map((item) => item['desc']?.toString() ?? '')
+        .join('\n');
+    return switch (selected.backend) {
+      VideoEnhancementBackend.ravu => descriptions.contains(
+        luma ? 'RAVU-Lite-AR (step2' : 'RAVU (step4',
+      ),
+      VideoEnhancementBackend.anime =>
+        descriptions.contains('Anime4K') &&
+            descriptions.contains('Depth-to-Space'),
+      VideoEnhancementBackend.fsrcnnx =>
+        descriptions.contains('feature map') &&
+            descriptions.contains('aggregation'),
+      VideoEnhancementBackend.hardware => hardwareFramesChanged(
+        mpv: mpv,
+        selected: selected,
+      ),
+      _ => gpu,
+    };
+  }
+
+  ({bool confirmed, int misses, VideoEnhancementFailure? failure})
+  verifyConfirmation({
+    required bool sizeMatches,
+    required bool effectFound,
+    required bool isPlaying,
+    required bool isBuffering,
+    required int currentMisses,
+  }) {
+    if (sizeMatches && effectFound) {
+      return (confirmed: true, misses: 0, failure: null);
+    }
+    if (isPlaying && !isBuffering) {
+      final nextMisses = currentMisses + 1;
+      if (nextMisses >= 5) {
+        return (
+          confirmed: false,
+          misses: nextMisses,
+          failure: VideoEnhancementFailure(
+            sizeMatches ? 'render-pass' : 'output-size',
+          ),
+        );
+      }
+      return (confirmed: false, misses: nextMisses, failure: null);
+    }
+    return (confirmed: false, misses: currentMisses, failure: null);
+  }
 
   bool hardwareFramesChanged({
     required VideoEnhancementMpv mpv,

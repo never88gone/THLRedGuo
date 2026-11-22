@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:THLRedLook/core/enhancement/video_enhancement_assets.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_mpv.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_policy.dart';
 
@@ -59,6 +60,31 @@ class VideoEnhancementPipeline {
         }
       }
     }
+  }
+
+  Future<void> prepareAndApply({
+    required VideoEnhancementDecision selected,
+    required bool luma,
+    required String vendor,
+    required double? videoW,
+    required double? videoH,
+  }) async {
+    final shader = switch (selected.backend) {
+      VideoEnhancementBackend.ravu =>
+        luma ? VideoEnhancementAssets.ravuLuma : VideoEnhancementAssets.ravuRgb,
+      VideoEnhancementBackend.fsrcnnx => VideoEnhancementAssets.fsrcnnx,
+      VideoEnhancementBackend.anime => VideoEnhancementAssets.anime,
+      _ => null,
+    };
+    final shaderPath =
+        shader == null ? null : await VideoEnhancementAssets.prepare(shader);
+    await applyEffects(
+      selected: selected,
+      shaderPath: shaderPath,
+      vendor: vendor,
+      videoW: videoW,
+      videoH: videoH,
+    );
   }
 
   void clearEffects() {

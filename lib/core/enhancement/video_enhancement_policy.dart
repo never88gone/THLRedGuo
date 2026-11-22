@@ -273,3 +273,41 @@ VideoEnhancementDecision chooseVideoEnhancement({
   }
   return scaling;
 }
+
+String formatEnhancementStatus({
+  required VideoEnhancementDecision? decision,
+  required bool comparing,
+  required bool confirmed,
+  required String lastFailure,
+  required VideoEnhancementMode mode,
+}) {
+  if (decision == null) return '';
+  if (comparing) return '原画对比中';
+  if (decision.backend == VideoEnhancementBackend.original) {
+    return lastFailure.isNotEmpty && mode != VideoEnhancementMode.off
+        ? '增强不可用，已恢复原画'
+        : decision.reason;
+  }
+  if (!confirmed) return '正在确认${decision.backend.label}';
+  if (decision.backend == VideoEnhancementBackend.hardware) {
+    return '硬件增强已接入，驱动效果以对比为准';
+  }
+  return [
+    decision.backend.label,
+    decision.reason,
+  ].where((item) => item.isNotEmpty).join(' · ');
+}
+
+String formatEnhancementDetail({
+  required Size? source,
+  required Size? output,
+  required String downgradeReason,
+}) {
+  final dimensions = source != null && output != null
+      ? '${source.width.round()}×${source.height.round()} → ${output.width.round()}×${output.height.round()}'
+      : '';
+  return [
+    dimensions,
+    if (downgradeReason.isNotEmpty) downgradeReason,
+  ].where((item) => item.isNotEmpty).join(' · ');
+}
