@@ -57,7 +57,6 @@ public final class PlayerViewModel: ObservableObject {
     private let observerManager = PlayerObserverManager()
     private let progressTracker: PlayerProgressTracker
     private let pipCoordinator = PlayerPiPCoordinator()
-    private let relatedCoordinator = PlayerRelatedDramasCoordinator()
 
     public var isPictureInPictureSupported: Bool { pipCoordinator.isSupported }
     public var pipController: AVPictureInPictureController? { get { pipCoordinator.pipController } set { pipCoordinator.pipController = newValue } }
@@ -155,15 +154,11 @@ public final class PlayerViewModel: ObservableObject {
         }
         Task { [weak self] in
             guard let self else { return }
-            self.relatedCoordinator.loadRelatedDramas(for: self.drama) { [weak self] list in
-                self?.relatedSeasons = list
-            }
             await self.preparePlayback(episodeIndex: self.currentEpisodeIndex, seekTo: self.currentTime)
         }
     }
 
     public func onDisappear() {
-        relatedCoordinator.cancel()
         if pipCoordinator.isPiPActive || pipCoordinator.isStartingPiP {
             isVisible = false; saveCurrentProgress(force: true)
             progressTracker.stopTimer(); visibilityCoordinator.invalidate()
@@ -193,10 +188,6 @@ public final class PlayerViewModel: ObservableObject {
 
     private func beginPlayback(episodeIndex: Int, seekTo: Double, recovering: Bool, preserveIntent: Bool = false) async {
         guard !closed, episodeIndex > 0, seekTo.isFinite else { return }
-        if drama.id.hasPrefix("test_") {
-            isLoading = false; errorMessage = nil; duration = 180; currentTime = 45; isPlaying = true; wantsPlayback = true
-            plan = PlaybackPlan(url: "https://example.com/test.mp4", quality: 1080, qualities: [0, 1080, 720]); selectedQuality = 1080; currentEpisodeIndex = episodeIndex; return
-        }
         saveCurrentProgress(force: true)
         playbackGeneration += 1
         let generation = playbackGeneration

@@ -152,21 +152,6 @@ public enum TVColors {
     public static let cardOverlayBg = Color(red: 0.16, green: 0.14, blue: 0.18)
     public static let downloadsCardBg = Color(red: 0.10, green: 0.10, blue: 0.14)
 
-    // MARK: - 原生 AVPlayer 风格控制浮层与液体玻璃质感 (Liquid Glass & Transport Bar)
-    public static let liquidGlassBackground = Color(white: 0.12).opacity(0.85)
-    public static let liquidGlassBorder = Color.white.opacity(0.18)
-    public static let liquidGlassActiveBorder = Color.white.opacity(0.95)
-    public static let transportBarBg = Color(red: 0.08, green: 0.08, blue: 0.10).opacity(0.88)
-    public static let transportBarScrubberBg = Color.white.opacity(0.22)
-    public static let transportBarScrubberBuffer = Color.white.opacity(0.40)
-    public static let panelCardBg = Color(white: 0.15).opacity(0.75)
-    public static let panelCardFocusedBg = Color(white: 0.28).opacity(0.95)
-    public static let panelCardActiveGradStart = Color(red: 0.95, green: 0.2, blue: 0.25)
-    public static let panelCardActiveGradEnd = Color(red: 0.75, green: 0.1, blue: 0.15)
-    public static let tabInactiveText = Color.white.opacity(0.65)
-    public static let tabActiveText = Color.white
-    public static let tabIndicatorColor = Color.red
-
     // MARK: - 封面海报缺省 6 套艺术渐变 (按 id 散列选取)
     public static let coverGradients: [[Color]] = [
         [Color(red: 0.6, green: 0.1, blue: 0.15), Color(red: 0.15, green: 0.05, blue: 0.08)], // 绯红暗夜
