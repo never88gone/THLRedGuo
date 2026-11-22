@@ -480,6 +480,12 @@ public struct MainTabView: View {
 
 #Preview {
     MainTabView()
+        .environmentObject(AppEnvironment.shared)
+        .environmentObject(LocalStore.shared)
+        .environmentObject(LanSyncService.shared)
+        .environmentObject(DownloadService.shared)
         .environmentObject(JSSourceService.shared)
+        .environmentObject(ICloudSyncService.shared)
+        .environmentObject(AppEnvironment.shared.deepLinkCoordinator)
         .background(TVColors.background)
 }

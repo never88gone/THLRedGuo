@@ -208,5 +208,6 @@ public struct DownloadsView: View {
 
 #Preview {
     DownloadsView()
+        .environmentObject(JSSourceService.shared)
         .background(TVColors.background)
 }
