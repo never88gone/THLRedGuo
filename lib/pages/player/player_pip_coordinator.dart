@@ -82,9 +82,7 @@ class PlayerPipCoordinator {
   bool supported = false;
   bool active = false;
   bool requested = false;
-  bool handlerInstalled = false;
-
-  bool _lastNativeAutoEnter = false;
+  bool handlerInstalled = false, _lastNativeAutoEnter = false;
   int _lastNativeWidth = 0, _lastNativeHeight = 0;
   Timer? _exitTimer;
   int? _originalIndex;
