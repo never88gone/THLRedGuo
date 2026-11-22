@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4CA4AB70D7948E9A3AEAEBE9 /* TVPlayerView+Gestures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D31A487FAACDD6DE2577839 /* TVPlayerView+Gestures.swift */; };
+		20D0F0AEA981ACAE4E36F24B /* TVSystemPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FAB17443950A82CB8695832 /* TVSystemPlayerView.swift */; };
+		C9BEF724B74E00DCF99E00CA /* TVSystemPlayerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24980E7F6CD4D2AF1EE83FF /* TVSystemPlayerViewController.swift */; };
+		D76B113320E15407B553B552 /* TVSystemActionInfoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D44D19A2401678279E513728 /* TVSystemActionInfoViewController.swift */; };
+		50BE3B98D1C6EC2B183164FE /* TVSystemRelatedInfoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D3213B70E3442123DDFA5E9 /* TVSystemRelatedInfoViewController.swift */; };
+		C3BCEFA9B0288A276E1B900D /* TVSystemEpisodeInfoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA3306FA57DB375C327B940F /* TVSystemEpisodeInfoViewController.swift */; };
+		591BD6123DF00370D921FDFE /* TVSystemPlayerMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6DD91D8E22C0B5AD1482CA0 /* TVSystemPlayerMenuBuilder.swift */; };
+		6C212EB63DF63C5B51DF4B42 /* TVSystemPlayerMetaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B0AF09F0E91BCC45B5639 /* TVSystemPlayerMetaUtils.swift */; };
 		00F6DAC96490A839B6FC75EA /* HongguoApkProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E4F0775CA2B5213DAF9E20 /* HongguoApkProfile.swift */; };
 		016124C241F556959056C4D0 /* TVTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED44574606B1D5DD94E8063 /* TVTheme.swift */; };
 		0290FEC26CF774B652C4CDE6 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5345ECE118A89DDCAEC54B0 /* AppEnvironment.swift */; };
@@ -308,6 +316,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5D31A487FAACDD6DE2577839 /* TVPlayerView+Gestures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TVPlayerView+Gestures.swift"; sourceTree = "<group>"; };
+		8FAB17443950A82CB8695832 /* TVSystemPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSystemPlayerView.swift; sourceTree = "<group>"; };
+		E24980E7F6CD4D2AF1EE83FF /* TVSystemPlayerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSystemPlayerViewController.swift; sourceTree = "<group>"; };
+		D44D19A2401678279E513728 /* TVSystemActionInfoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSystemActionInfoViewController.swift; sourceTree = "<group>"; };
+		8D3213B70E3442123DDFA5E9 /* TVSystemRelatedInfoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSystemRelatedInfoViewController.swift; sourceTree = "<group>"; };
+		EA3306FA57DB375C327B940F /* TVSystemEpisodeInfoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSystemEpisodeInfoViewController.swift; sourceTree = "<group>"; };
+		E6DD91D8E22C0B5AD1482CA0 /* TVSystemPlayerMenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSystemPlayerMenuBuilder.swift; sourceTree = "<group>"; };
+		CE7B0AF09F0E91BCC45B5639 /* TVSystemPlayerMetaUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVSystemPlayerMetaUtils.swift; sourceTree = "<group>"; };
 		0011909910661258E58132E3 /* DiagnosticCategory.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiagnosticCategory.swift; sourceTree = "<group>"; };
 		00E03A33266F35FDA40FDB1E /* TVVideoFeedActions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TVVideoFeedActions.swift; sourceTree = "<group>"; };
 		01DB64FE6C3D29D4BBBA91B4 /* HongguoCreator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HongguoCreator.swift; sourceTree = "<group>"; };
@@ -629,6 +645,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		17CE2F5E868ED0D4B7D89240 /* System */ = {
+			isa = PBXGroup;
+			children = (
+				CE7B0AF09F0E91BCC45B5639 /* TVSystemPlayerMetaUtils.swift */,
+				E6DD91D8E22C0B5AD1482CA0 /* TVSystemPlayerMenuBuilder.swift */,
+				EA3306FA57DB375C327B940F /* TVSystemEpisodeInfoViewController.swift */,
+				8D3213B70E3442123DDFA5E9 /* TVSystemRelatedInfoViewController.swift */,
+				D44D19A2401678279E513728 /* TVSystemActionInfoViewController.swift */,
+				E24980E7F6CD4D2AF1EE83FF /* TVSystemPlayerViewController.swift */,
+				8FAB17443950A82CB8695832 /* TVSystemPlayerView.swift */,
+			);
+			name = System;
+			path = System;
+			sourceTree = "<group>";
+		};
 		01CA24A216122D4E63A4785F /* Diagnostics */ = {
 			isa = PBXGroup;
 			children = (
@@ -1030,6 +1061,7 @@
 		7C2C4B38BC10FB44606DABE4 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				5D31A487FAACDD6DE2577839 /* TVPlayerView+Gestures.swift */,
 				EB69BA51CB119501CF9B6E36 /* AVPlayerContainerView.swift */,
 				4BD28FED825F59452B71D4DA /* AVPlayerView.swift */,
 				E1851223B4A4C320CED38AED /* PlayerOverlayFocusTarget.swift */,
@@ -1389,6 +1421,7 @@
 		D8E643AF654402679984BF20 /* Player */ = {
 			isa = PBXGroup;
 			children = (
+				17CE2F5E868ED0D4B7D89240 /* System */,
 				77C8FA979113721A8A408463 /* TVPlayerView.swift */,
 				08A79F9B93D7E7BE32E74006 /* Controls */,
 				7C2C4B38BC10FB44606DABE4 /* Core */,
@@ -1687,6 +1720,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+
+
+
+
+
+
+
 				55F90BCBA7AE4B06BC28DD40 /* UserLikeAndAnchorTests.swift in Sources */,
 				BC5B31CB27136862380FB32F /* PlaybackTests.swift in Sources */,
 				C1A3B602F4D3468399B31104 /* AccountPairingTests.swift in Sources */,
@@ -1715,6 +1755,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4CA4AB70D7948E9A3AEAEBE9 /* TVPlayerView+Gestures.swift in Sources */,
+				20D0F0AEA981ACAE4E36F24B /* TVSystemPlayerView.swift in Sources */,
+				C9BEF724B74E00DCF99E00CA /* TVSystemPlayerViewController.swift in Sources */,
+				D76B113320E15407B553B552 /* TVSystemActionInfoViewController.swift in Sources */,
+				50BE3B98D1C6EC2B183164FE /* TVSystemRelatedInfoViewController.swift in Sources */,
+				C3BCEFA9B0288A276E1B900D /* TVSystemEpisodeInfoViewController.swift in Sources */,
+				591BD6123DF00370D921FDFE /* TVSystemPlayerMenuBuilder.swift in Sources */,
+				6C212EB63DF63C5B51DF4B42 /* TVSystemPlayerMetaUtils.swift in Sources */,
+
 				00F6DAC96490A839B6FC75EA /* HongguoApkProfile.swift in Sources */,
 				6E79A4B5895BFF20763CC4EF /* HongguoPlaybackProfileVault.swift in Sources */,
 				0290FEC26CF774B652C4CDE6 /* AppEnvironment.swift in Sources */,

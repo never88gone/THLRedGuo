@@ -1,196 +1,208 @@
 import SwiftUI
 
-/// 播放器 Transport Bar 主控条（对齐 Apple TV 原生 AVPlayer 控制风格）
+/// tvOS 系统原生风格 Transport Bar（对齐 Apple TV 原生 AVPlayer 与 ATV-Bilibili-demo 质感）
 public struct TVPlayerTransportBar: View {
     @ObservedObject public var viewModel: PlayerViewModel
-    @FocusState private var focusedButton: PlayerOverlayFocusTarget?
+    @Binding public var selectedTab: TVPlayerBottomTab
+    @Binding public var isPanelExpanded: Bool
+    public var onDismiss: () -> Void
 
-    public init(viewModel: PlayerViewModel) {
+    @FocusState private var focusedCapsule: TVPlayerBottomTab?
+
+    public init(
+        viewModel: PlayerViewModel,
+        selectedTab: Binding<TVPlayerBottomTab>,
+        isPanelExpanded: Binding<Bool>,
+        onDismiss: @escaping () -> Void
+    ) {
         self.viewModel = viewModel
+        self._selectedTab = selectedTab
+        self._isPanelExpanded = isPanelExpanded
+        self.onDismiss = onDismiss
     }
 
     public var body: some View {
-        VStack(spacing: 20) {
-            // MARK: - 原生风格进度条 (Scrubber Bar)
+        VStack(alignment: .leading, spacing: 14) {
+            // MARK: - 1. 顶部视频元数据（剧名、集数、清晰度）
+            HStack(alignment: .lastTextBaseline, spacing: 14) {
+                Text(viewModel.drama.title)
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundColor(TVColors.white)
+                    .lineLimit(1)
+
+                Text("第 \(viewModel.currentEpisodeIndex) 集 · \(PlaybackPlan.qualityLabel(viewModel.selectedQuality))")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(TVColors.textSecondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 54)
+
+            // MARK: - 2. 系统原生细长高光进度条
             HStack(spacing: 16) {
                 Text(formatTime(viewModel.currentTime))
-                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
                     .foregroundColor(TVColors.white)
-                    .frame(width: 80, alignment: .trailing)
+                    .frame(width: 76, alignment: .trailing)
 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        // 背景底槽
+                        // 底槽轨道
                         Capsule()
                             .fill(TVColors.transportBarScrubberBg)
-                            .frame(height: 8)
+                            .frame(height: 6)
 
-                        // 缓冲进度条
+                        // 缓冲进度
                         Capsule()
                             .fill(TVColors.transportBarScrubberBuffer)
                             .frame(
                                 width: viewModel.duration > 0
-                                    ? geo.size.width * CGFloat(min(1.0, max(0, (viewModel.currentTime + 8) / viewModel.duration)))
+                                    ? geo.size.width * CGFloat(min(1.0, max(0, (viewModel.currentTime + 10) / viewModel.duration)))
                                     : 0,
-                                height: 8
+                                height: 6
                             )
 
-                        // 实际已播放进度条
+                        // 已播放高亮条
                         Capsule()
                             .fill(TVColors.activeRed)
                             .frame(
                                 width: viewModel.duration > 0
                                     ? geo.size.width * CGFloat(min(1.0, max(0, viewModel.currentTime / viewModel.duration)))
                                     : 0,
-                                height: 8
+                                height: 6
                             )
+
+                        // 游标小白点
+                        if viewModel.duration > 0 {
+                            Circle()
+                                .fill(TVColors.white)
+                                .frame(width: 12, height: 12)
+                                .shadow(color: TVColors.black.opacity(0.6), radius: 3)
+                                .offset(x: max(0, min(geo.size.width - 12, geo.size.width * CGFloat(viewModel.currentTime / viewModel.duration) - 6)))
+                        }
                     }
                 }
-                .frame(height: 8)
+                .frame(height: 6)
 
-                Text(formatTime(viewModel.duration))
-                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                // 剩余倒计时时间（如 -02:15）
+                Text(formatRemainingTime(current: viewModel.currentTime, total: viewModel.duration))
+                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
                     .foregroundColor(TVColors.textSecondary)
-                    .frame(width: 80, alignment: .leading)
+                    .frame(width: 86, alignment: .leading)
             }
-            .padding(.horizontal, 48)
+            .padding(.horizontal, 54)
 
-            // MARK: - 核心播放按键组 (居中对称排列，贴合系统 AVPlayer 质感)
-            HStack(spacing: 28) {
-                // 1. 上一集
-                transportButton(
-                    id: .prevEpisode,
-                    icon: "backward.end.fill",
-                    label: "上一集",
-                    disabled: viewModel.currentEpisodeIndex <= 1
-                ) {
-                    Task { await viewModel.previousEpisode() }
+            // MARK: - 3. 系统原生菜单胶囊按钮栏（对应 transportBarCustomMenuItems 与面板入口）
+            HStack(spacing: 16) {
+                ForEach(TVPlayerBottomTab.allCases) { tab in
+                    tabCapsuleButton(tab: tab)
                 }
 
-                // 2. 快退 10 秒
-                transportButton(
-                    id: .seekBackward,
-                    icon: "gobackward.10",
-                    label: "快退10秒"
-                ) {
-                    viewModel.seekBy(seconds: -10)
-                }
+                Spacer()
 
-                // 3. 核心大播放/暂停主键
+                // 播放/暂停状态指示快捷键
                 Button(action: {
                     viewModel.togglePlayPause()
                 }) {
-                    ZStack {
-                        Circle()
-                            .fill(TVColors.prominentGradient)
-                            .frame(width: 72, height: 72)
-                            .shadow(color: TVColors.focusedShadowColor, radius: 10, y: 4)
-
+                    HStack(spacing: 8) {
                         Image(systemName: viewModel.wantsPlayback ? "pause.fill" : "play.fill")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(TVColors.white)
+                            .font(.system(size: 16, weight: .bold))
+                        Text(viewModel.wantsPlayback ? "暂停" : "播放")
+                            .font(.system(size: 18, weight: .semibold))
                     }
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                focusedButton == .playPause
-                                    ? TVColors.liquidGlassActiveBorder
-                                    : TVColors.clear,
-                                lineWidth: 3.5
-                            )
-                    )
-                    .scaleEffect(focusedButton == .playPause ? 1.15 : 1.0)
-                    .animation(.easeOut(duration: 0.15), value: focusedButton)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(TVColors.surfaceCard)
+                    .cornerRadius(20)
                 }
-                .buttonStyle(.card)
-                .focused($focusedButton, equals: .playPause)
-                .accessibilityLabel(viewModel.wantsPlayback ? "暂停" : "播放")
-
-                // 4. 快进 10 秒
-                transportButton(
-                    id: .seekForward,
-                    icon: "goforward.10",
-                    label: "快进10秒"
-                ) {
-                    viewModel.seekBy(seconds: 10)
-                }
-
-                // 5. 下一集
-                transportButton(
-                    id: .nextEpisode,
-                    icon: "forward.end.fill",
-                    label: "下一集",
-                    disabled: viewModel.currentEpisodeIndex >= viewModel.allEpisodes.count
-                ) {
-                    Task { await viewModel.nextEpisode() }
-                }
-
-                // 6. 画中画
-                transportButton(
-                    id: .pip,
-                    icon: "pip.enter",
-                    label: "画中画"
-                ) {
-                    viewModel.startPictureInPicture()
-                }
+                .buttonStyle(TvCardButtonStyle())
             }
+            .padding(.horizontal, 54)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 16)
     }
 
-    private func transportButton(
-        id: PlayerOverlayFocusTarget,
-        icon: String,
-        label: String,
-        disabled: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundColor(disabled ? TVColors.textMuted : TVColors.white)
-                .frame(width: 54, height: 54)
-                .background(TVColors.panelCardBg)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(
-                            focusedButton == id
-                                ? TVColors.liquidGlassActiveBorder
-                                : TVColors.liquidGlassBorder,
-                            lineWidth: focusedButton == id ? 2.5 : 1
-                        )
-                )
-                .scaleEffect(focusedButton == id ? 1.12 : 1.0)
-                .animation(.easeOut(duration: 0.15), value: focusedButton)
+    // MARK: - 胶囊按钮组件
+    @ViewBuilder
+    private func tabCapsuleButton(tab: TVPlayerBottomTab) -> some View {
+        Button(action: {
+            if selectedTab == tab && isPanelExpanded {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isPanelExpanded = false
+                }
+            } else {
+                selectedTab = tab
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isPanelExpanded = true
+                }
+            }
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: tab.iconName)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(selectedTab == tab && isPanelExpanded ? TVColors.red : TVColors.white)
+
+                Text(tab.title)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundColor(TVColors.white)
+
+                if selectedTab == tab && isPanelExpanded {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(TVColors.red)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(selectedTab == tab && isPanelExpanded ? TVColors.surfaceFocused : TVColors.surfaceCard)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        focusedCapsule == tab ? TVColors.liquidGlassActiveBorder : (selectedTab == tab && isPanelExpanded ? TVColors.red.opacity(0.8) : TVColors.liquidGlassBorder),
+                        lineWidth: focusedCapsule == tab ? 2.5 : 1.0
+                    )
+            )
         }
-        .buttonStyle(.card)
-        .disabled(disabled)
-        .opacity(disabled ? 0.45 : 1.0)
-        .focused($focusedButton, equals: id)
-        .accessibilityLabel(label)
+        .buttonStyle(TvCardButtonStyle())
+        .focused($focusedCapsule, equals: tab)
     }
 
     private func formatTime(_ seconds: Double) -> String {
-        guard seconds.isFinite && !seconds.isNaN && seconds >= 0 else { return "00:00" }
-        let total = Int(seconds.rounded(.down))
-        let m = total / 60
-        let s = total % 60
-        return String(format: "%02d:%02d", m, s)
+        guard seconds.isFinite && seconds >= 0 else { return "00:00" }
+        let s = Int(seconds.rounded(.down))
+        let m = s / 60
+        let sec = s % 60
+        return String(format: "%02d:%02d", m, sec)
+    }
+
+    private func formatRemainingTime(current: Double, total: Double) -> String {
+        guard current.isFinite && total.isFinite && total >= current else { return "-00:00" }
+        let remaining = Int((total - current).rounded(.down))
+        let m = remaining / 60
+        let sec = remaining % 60
+        return String(format: "-%02d:%02d", m, sec)
     }
 }
 
 // MARK: - 预览
-#Preview("TVPlayerTransportBar") {
+#Preview("TVPlayerTransportBar Preview") {
     struct PreviewContainer: View {
+        @State var tab: TVPlayerBottomTab = .episodes
+        @State var expanded: Bool = false
         var body: some View {
-            let drama = Drama(id: "preview_1", title: "逆天龙皇", cover: "", episodes: 80)
-            let vm = PlayerViewModel(drama: drama, allEpisodes: [])
-            vm.duration = 120
-            vm.currentTime = 45
-            return TVPlayerTransportBar(viewModel: vm)
-                .padding(40)
-                .background(TVColors.transportBarBg)
+            let drama = Drama(id: "1", title: "都市逆袭之王者归来", cover: "", episodes: 80)
+            let eps = (1...20).map { Episode(id: "\($0)", title: "第 \($0) 集", number: $0) }
+            let vm = PlayerViewModel(drama: drama, allEpisodes: eps, initialEpisodeIndex: 1)
+            TVPlayerTransportBar(
+                viewModel: vm,
+                selectedTab: $tab,
+                isPanelExpanded: $expanded,
+                onDismiss: {}
+            )
+            .background(TVColors.black)
         }
     }
     return PreviewContainer()
