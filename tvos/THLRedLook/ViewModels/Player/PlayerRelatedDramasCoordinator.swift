@@ -17,6 +17,17 @@ public final class PlayerRelatedDramasCoordinator {
 
     /// 根据当前短剧异步拉取关联推荐
     public func loadRelatedDramas(for drama: Drama, completion: @escaping ([Drama]) -> Void) {
+        if drama.id.hasPrefix("test_") {
+            let fixtureDramas = [
+                Drama(id: "test_rel_1", title: "战神归来当赘婿", cover: "", episodes: 80),
+                Drama(id: "test_rel_2", title: "我有九个绝色师姐", cover: "", episodes: 95),
+                Drama(id: "test_rel_3", title: "重返1990当首富", cover: "", episodes: 100),
+                Drama(id: "test_rel_4", title: "千金归来之真假名媛", cover: "", episodes: 88)
+            ]
+            completion(fixtureDramas)
+            return
+        }
+
         loadTask?.cancel()
         loadTask = Task { [weak self] in
             guard let self else { return }

@@ -13,6 +13,7 @@ public struct TVPlayerControlsOverlay: View {
     public init(
         viewModel: PlayerViewModel,
         forceFocusPlayButton: Bool = false,
+        initialTab: TVPlayerBottomTab = .episodes,
         feedActions: TVVideoFeedActions? = nil,
         onDismiss: @escaping () -> Void
     ) {
@@ -20,6 +21,18 @@ public struct TVPlayerControlsOverlay: View {
         self.forceFocusPlayButton = forceFocusPlayButton
         self.feedActions = feedActions
         self.onDismiss = onDismiss
+
+        let args = CommandLine.arguments
+        if let idx = args.firstIndex(of: "-testPlayerTab"), idx + 1 < args.count {
+            let tabArg = args[idx + 1]
+            if let matched = TVPlayerBottomTab.allCases.first(where: { $0.id == tabArg || $0.rawValue == tabArg }) {
+                _selectedTab = State(initialValue: matched)
+            } else {
+                _selectedTab = State(initialValue: initialTab)
+            }
+        } else {
+            _selectedTab = State(initialValue: initialTab)
+        }
     }
 
     public var body: some View {
@@ -106,6 +119,14 @@ public struct TVPlayerControlsOverlay: View {
             if forceFocusPlayButton {
                 focusedControl = .playPause
             }
+            let args = CommandLine.arguments
+            if let idx = args.firstIndex(of: "-testPlayerTab"), idx + 1 < args.count {
+                let tabArg = args[idx + 1]
+                if let matched = TVPlayerBottomTab.allCases.first(where: { "\($0)" == tabArg || $0.rawValue == tabArg || $0.id == tabArg }) {
+                    selectedTab = matched
+                }
+            }
+            NSLog("🎬 [Overlay] onAppear selectedTab: %@", selectedTab.rawValue)
         }
     }
 }
