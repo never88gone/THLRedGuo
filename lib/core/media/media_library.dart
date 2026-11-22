@@ -10,116 +10,15 @@ import 'package:THLRedLook/core/download/background_downloads.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/core/media/media_pipeline.dart';
+import 'package:THLRedLook/core/media/media_nfo_generator.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
+
+export 'package:THLRedLook/models/media/local_media_item.dart';
+export 'package:THLRedLook/core/media/media_nfo_generator.dart';
 
 part 'media_merge_queue.dart';
 part 'media_merge.dart';
 part 'media_exports.dart';
-
-class LocalMediaItem {
-  LocalMediaItem({
-    required this.id,
-    required this.drama,
-    required this.file,
-    required this.kind,
-    required this.episodes,
-    required this.duration,
-    required this.bytes,
-    required this.created,
-    this.videoTranscodes = 0,
-    this.audioTranscodes = 0,
-    this.jobId = '',
-    this.sourceVersion = '',
-    this.decodeVerified = false,
-    this.specialNumber = 0,
-  });
-  final String id, file, kind, jobId, sourceVersion;
-  final bool decodeVerified;
-  final int specialNumber;
-  bool get special => kind == 'special';
-  final Drama drama;
-  final List<int> episodes;
-  final double duration;
-  final int bytes, videoTranscodes, audioTranscodes;
-  final DateTime created;
-  bool get merged => kind == 'merged';
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'drama': drama.toJson(),
-    'file': file,
-    'kind': kind,
-    'episodes': episodes,
-    'duration': duration,
-    'bytes': bytes,
-    'created': created.toIso8601String(),
-    'videoTranscodes': videoTranscodes,
-    'audioTranscodes': audioTranscodes,
-    'jobId': jobId,
-    'sourceVersion': sourceVersion,
-    'decodeVerified': decodeVerified,
-    'specialNumber': specialNumber,
-  };
-  factory LocalMediaItem.fromJson(Map<String, dynamic> value) {
-    final file = value['file'] as String;
-    if (path.isAbsolute(file) || file.split(RegExp(r'[/\\]')).contains('..')) {
-      throw const FormatException('媒体路径无效');
-    }
-    return LocalMediaItem(
-      id: value['id'] as String,
-      drama: Drama.fromJson(Map<String, dynamic>.from(value['drama'] as Map)),
-      file: file,
-      kind: value['kind'] as String,
-      episodes: (value['episodes'] as List).map(intValue).toList(),
-      duration: (value['duration'] as num).toDouble(),
-      bytes: intValue(value['bytes']),
-      created: DateTime.parse(value['created'] as String),
-      videoTranscodes: intValue(value['videoTranscodes']),
-      audioTranscodes: intValue(value['audioTranscodes']),
-      jobId: value['jobId'] as String? ?? '',
-      sourceVersion: value['sourceVersion'] as String? ?? '',
-      decodeVerified: value['decodeVerified'] == true,
-      specialNumber: intValue(value['specialNumber']),
-    );
-  }
-}
-
-String xmlText(String value) => value
-    .replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]'), '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
-
-String embyShowNfo(Drama drama, {bool localPoster = false}) {
-  final uri = Uri.tryParse(drama.cover);
-  final cover = localPoster
-      ? 'poster.jpg'
-      : uri != null && {'https', 'http'}.contains(uri.scheme)
-      ? drama.cover
-      : '';
-  return '<?xml version="1.0" encoding="utf-8"?>\n<tvshow>'
-      '<title>${xmlText(drama.title)}</title><plot>${xmlText(drama.description)}</plot>'
-      '<uniqueid type="zhenguojian" default="true">${xmlText(drama.id)}</uniqueid>'
-      '${cover.isEmpty ? '' : '<thumb aspect="poster">${xmlText(cover)}</thumb>'}'
-      '<season>1</season><episode>${drama.episodes}</episode></tvshow>\n';
-}
-
-String embyEpisodeNfo(DownloadJob job) =>
-    '<?xml version="1.0" encoding="utf-8"?>\n'
-    '<episodedetails><title>${xmlText(job.episode.title)}</title>'
-    '<showtitle>${xmlText(job.drama.title)}</showtitle><season>1</season><episode>${job.episode.number}</episode>'
-    '<plot>${xmlText(job.drama.description)}</plot>'
-    '<uniqueid type="zhenguojian" default="true">${xmlText(job.id)}</uniqueid></episodedetails>\n';
-
-String _safeName(String name) {
-  var result = name
-      .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_')
-      .trim()
-      .replaceAll(RegExp(r'[. ]+$'), '');
-  if (result.isEmpty) result = '短剧';
-  return String.fromCharCodes(result.runes.take(60));
-}
 
 class MediaLibrary extends ChangeNotifier {
   MediaLibrary(

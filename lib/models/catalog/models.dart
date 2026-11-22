@@ -8,5 +8,6 @@ export 'package:THLRedLook/models/drama/drama.dart';
 export 'package:THLRedLook/models/drama/drama_detail.dart';
 export 'package:THLRedLook/models/drama/episode.dart';
 export 'package:THLRedLook/models/history/watch_entry.dart';
+export 'package:THLRedLook/models/media/local_media_item.dart';
 export 'package:THLRedLook/models/player/playback_plan.dart';
 export 'package:THLRedLook/models/source/source_site.dart';

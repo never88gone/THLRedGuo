@@ -12,6 +12,7 @@ import 'package:THLRedLook/core/player/luna_exo_player.dart';
 import 'package:THLRedLook/core/player/pip_manager.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
+import 'package:THLRedLook/pages/player/player_pip_bounds.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
 
 /// 画中画（Picture in Picture）状态与通道协调器
@@ -84,8 +85,7 @@ class PlayerPipCoordinator {
   bool handlerInstalled = false;
 
   bool _lastNativeAutoEnter = false;
-  int _lastNativeWidth = 0;
-  int _lastNativeHeight = 0;
+  int _lastNativeWidth = 0, _lastNativeHeight = 0;
   Timer? _exitTimer;
   int? _originalIndex;
 
@@ -163,7 +163,9 @@ class PlayerPipCoordinator {
             onDismissOverlays();
           }
           if (error != null && error.isNotEmpty) {
-            onNotice('画中画提示: ${_localizePipError(error)}');
+            onNotice(
+              '画中画提示: ${PlayerPipBoundsCalculator.localizeError(error)}',
+            );
           }
           if (nextActive) {
             _originalIndex = getCurrentIndex();
@@ -265,15 +267,8 @@ class PlayerPipCoordinator {
     }
   }
 
-  (int, int) aspectDimensions() {
-    final rawRatio = getAspectRatio().isFinite && getAspectRatio() > 0
-        ? getAspectRatio()
-        : 16 / 9;
-    final ratio = rawRatio.clamp(1 / 2.39, 2.39).toDouble();
-    final width = ratio >= 1 ? (1000 * ratio).round() : 1000;
-    final height = ratio >= 1 ? 1000 : (1000 / ratio).round();
-    return (width, height);
-  }
+  (int, int) aspectDimensions() =>
+      PlayerPipBoundsCalculator.aspectDimensions(getAspectRatio());
 
   void syncNativeConfig({bool force = false}) {
     if (defaultTargetPlatform != TargetPlatform.android || isFeed) {
@@ -306,53 +301,11 @@ class PlayerPipCoordinator {
     );
   }
 
-  Map<String, int>? calculateSourceRect() {
-    final paneContext = getVideoPaneKey().currentContext;
-    final renderObject = paneContext?.findRenderObject();
-    if (paneContext == null ||
-        renderObject is! RenderBox ||
-        !renderObject.hasSize) {
-      return null;
-    }
-    final topLeft = renderObject.localToGlobal(Offset.zero);
-    final size = renderObject.size;
-    if (size.width <= 0 || size.height <= 0) return null;
-    final rawRatio = getAspectRatio().isFinite && getAspectRatio() > 0
-        ? getAspectRatio()
-        : size.width / size.height;
-    final targetRatio = rawRatio.clamp(1 / 2.39, 2.39).toDouble();
-    final containerRatio = size.width / size.height;
-    late final double dx;
-    late final double dy;
-    late final double videoWidth;
-    late final double videoHeight;
-    if (containerRatio > targetRatio) {
-      videoHeight = size.height;
-      videoWidth = size.height * targetRatio;
-      dx = (size.width - videoWidth) / 2;
-      dy = 0;
-    } else {
-      videoWidth = size.width;
-      videoHeight = size.width / targetRatio;
-      dx = 0;
-      dy = (size.height - videoHeight) / 2;
-    }
-    final ratio =
-        MediaQuery.maybeOf(paneContext)?.devicePixelRatio ??
-        View.of(paneContext).devicePixelRatio;
-    final left = ((topLeft.dx + dx) * ratio).round().clamp(0, 100000);
-    final top = ((topLeft.dy + dy) * ratio).round().clamp(0, 100000);
-    final right = ((topLeft.dx + dx + videoWidth) * ratio).round().clamp(
-      0,
-      100000,
-    );
-    final bottom = ((topLeft.dy + dy + videoHeight) * ratio).round().clamp(
-      0,
-      100000,
-    );
-    if (right <= left || bottom <= top) return null;
-    return {'left': left, 'top': top, 'right': right, 'bottom': bottom};
-  }
+  Map<String, int>? calculateSourceRect() =>
+      PlayerPipBoundsCalculator.calculateSourceRect(
+        videoPaneKey: getVideoPaneKey(),
+        aspectRatio: getAspectRatio(),
+      );
 
   Future<void> enterPictureInPicture() async {
     if (isClosed()) return;
@@ -484,7 +437,7 @@ class PlayerPipCoordinator {
         }
       } else if (!isActive && !isRequested) {
         _exitTimer?.cancel();
-        onNotice(_localizePipError(error));
+        onNotice(PlayerPipBoundsCalculator.localizeError(error));
         if (Platform.isIOS && wasPlaying && !isClosed()) {
           unawaited(getPlayer().play());
         }
@@ -492,7 +445,7 @@ class PlayerPipCoordinator {
     } on PlatformException catch (e) {
       _exitTimer?.cancel();
       setStatus(requested: false);
-      onNotice(_localizePipError(e.message));
+      onNotice(PlayerPipBoundsCalculator.localizeError(e.message));
       if (Platform.isIOS && wasPlaying && !isClosed()) {
         unawaited(getPlayer().play());
       }
@@ -544,18 +497,5 @@ class PlayerPipCoordinator {
       PipManager.instance.notifyPlayerDisposed();
       handlerInstalled = false;
     }
-  }
-
-  String _localizePipError(String? error) {
-    if (error == null || error.trim().isEmpty) {
-      return '无法启动画中画，请检查系统画中画设置或稍后重试';
-    }
-    final lower = error.toLowerCase();
-    if (lower.contains('cannot be completed') ||
-        lower.contains('could not be completed') ||
-        lower.contains('couldn’t be completed')) {
-      return '系统画中画启动未就绪，请稍后重试';
-    }
-    return error;
   }
 }
