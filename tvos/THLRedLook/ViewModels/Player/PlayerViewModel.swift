@@ -57,6 +57,7 @@ public final class PlayerViewModel: ObservableObject {
     private let observerManager = PlayerObserverManager()
     private let progressTracker: PlayerProgressTracker
     private let pipCoordinator = PlayerPiPCoordinator()
+    private let relatedCoordinator = PlayerRelatedDramasCoordinator()
 
     public var isPictureInPictureSupported: Bool { pipCoordinator.isSupported }
     public var pipController: AVPictureInPictureController? { get { pipCoordinator.pipController } set { pipCoordinator.pipController = newValue } }
@@ -154,11 +155,15 @@ public final class PlayerViewModel: ObservableObject {
         }
         Task { [weak self] in
             guard let self else { return }
+            self.relatedCoordinator.loadRelatedDramas(for: self.drama) { [weak self] list in
+                self?.relatedSeasons = list
+            }
             await self.preparePlayback(episodeIndex: self.currentEpisodeIndex, seekTo: self.currentTime)
         }
     }
 
     public func onDisappear() {
+        relatedCoordinator.cancel()
         if pipCoordinator.isPiPActive || pipCoordinator.isStartingPiP {
             isVisible = false; saveCurrentProgress(force: true)
             progressTracker.stopTimer(); visibilityCoordinator.invalidate()
