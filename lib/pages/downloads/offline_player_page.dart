@@ -10,6 +10,9 @@ import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/downloads/offline_episodes_sheet.dart';
+import 'package:THLRedLook/views/downloads/offline_player_bottom_bar.dart';
+import 'package:THLRedLook/views/downloads/offline_player_top_bar.dart';
 
 class OfflinePlayerPage extends StatefulWidget {
   const OfflinePlayerPage({
@@ -135,11 +138,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
         }
       });
 
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _loading = false);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -152,9 +151,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
 
   void _switchEpisode(int index) {
     if (index < 0 || index >= widget.completedJobs.length) return;
-    setState(() {
-      _currentIndex = index;
-    });
+    setState(() => _currentIndex = index);
     _initPlayback();
   }
 
@@ -168,9 +165,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
   }
 
   void _toggleControls() {
-    setState(() {
-      _controlsVisible = !_controlsVisible;
-    });
+    setState(() => _controlsVisible = !_controlsVisible);
     if (_controlsVisible) {
       _startHideControlsTimer();
     } else {
@@ -179,9 +174,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
   }
 
   void _toggleFullScreen() {
-    setState(() {
-      _isFullScreen = !_isFullScreen;
-    });
+    setState(() => _isFullScreen = !_isFullScreen);
     if (_isFullScreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
@@ -189,92 +182,14 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
     }
   }
 
-  void _showOfflineEpisodesSheet() {
+  void _showOfflineEpisodes() {
     _startHideControlsTimer();
-    showModalBottomSheet<void>(
+    OfflineEpisodesSheet.show(
       context: context,
-      backgroundColor: AppColors.darkSurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '离线已下载集数',
-                    style: TextStyle(
-                      color: AppColors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: AppColors.white70),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 180,
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 1.4,
-                  ),
-                  itemCount: widget.completedJobs.length,
-                  itemBuilder: (context, index) {
-                    final isCurrent = index == _currentIndex;
-                    final job = widget.completedJobs[index];
-                    return InkWell(
-                      onTap: () {
-                        Navigator.pop(context);
-                        _switchEpisode(index);
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isCurrent
-                              ? AppColors.hongguoRed
-                              : AppColors.offlinePlayerPanel,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '${job.episode.number}',
-                          style: TextStyle(
-                            color: AppColors.white,
-                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      completedJobs: widget.completedJobs,
+      currentIndex: _currentIndex,
+      onSelectEpisode: _switchEpisode,
     );
-  }
-
-  String _formatDuration(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    if (d.inHours > 0) {
-      return '${d.inHours}:$minutes:$seconds';
-    }
-    return '$minutes:$seconds';
   }
 
   @override
@@ -289,87 +204,32 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
     super.dispose();
   }
 
-  Widget _buildTopBar(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.black80, AppColors.transparent],
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              children: [
-                IconButton(
-                  key: const ValueKey('offline-player-back'),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.white),
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        widget.drama.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        '第 ${_currentJob.episode.number} 集 · 本地离线播放',
-                        style: const TextStyle(
-                          color: AppColors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.white20,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    '离线无网络',
-                    style: TextStyle(
-                      color: AppColors.white70,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildBottomBar(BuildContext context) {
     final player = _player;
     if (player == null) {
-      return _buildBottomBarContent(
-        context,
+      return OfflinePlayerBottomBar(
         currentPos: Duration.zero,
         totalDur: Duration.zero,
         isPlaying: false,
+        isSeeking: _isSeeking,
+        seekPositionMs: _seekPositionMs,
+        isFullScreen: _isFullScreen,
+        episodeCount: widget.completedJobs.length,
+        onSeekStart: () {
+          _isSeeking = true;
+          _hideControlsTimer?.cancel();
+        },
+        onSeekChanged: (val) => setState(() => _seekPositionMs = val),
+        onSeekEnd: (val) {
+          player?.seek(Duration(milliseconds: val.toInt()));
+          _isSeeking = false;
+          _startHideControlsTimer();
+        },
+        onPlayPause: () {},
+        onReplay10: () {},
+        onForward10: () {},
+        onShowEpisodes: _showOfflineEpisodes,
+        onToggleFullScreen: _toggleFullScreen,
       );
     }
 
@@ -385,167 +245,46 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
               stream: player.stream.playing,
               builder: (context, playingSnap) {
                 final isPlaying = playingSnap.data ?? player.state.playing;
-                return _buildBottomBarContent(
-                  context,
+                return OfflinePlayerBottomBar(
                   currentPos: currentPos,
                   totalDur: totalDur,
                   isPlaying: isPlaying,
+                  isSeeking: _isSeeking,
+                  seekPositionMs: _seekPositionMs,
+                  isFullScreen: _isFullScreen,
+                  episodeCount: widget.completedJobs.length,
+                  onSeekStart: () {
+                    _isSeeking = true;
+                    _hideControlsTimer?.cancel();
+                  },
+                  onSeekChanged: (val) => setState(() => _seekPositionMs = val),
+                  onSeekEnd: (val) {
+                    player.seek(Duration(milliseconds: val.toInt()));
+                    _isSeeking = false;
+                    _startHideControlsTimer();
+                  },
+                  onPlayPause: () {
+                    player.playOrPause();
+                    _startHideControlsTimer();
+                  },
+                  onReplay10: () {
+                    final target = player.state.position - const Duration(seconds: 10);
+                    player.seek(target < Duration.zero ? Duration.zero : target);
+                    _startHideControlsTimer();
+                  },
+                  onForward10: () {
+                    final target = player.state.position + const Duration(seconds: 10);
+                    player.seek(target > player.state.duration ? player.state.duration : target);
+                    _startHideControlsTimer();
+                  },
+                  onShowEpisodes: _showOfflineEpisodes,
+                  onToggleFullScreen: _toggleFullScreen,
                 );
               },
             );
           },
         );
       },
-    );
-  }
-
-  Widget _buildBottomBarContent(
-    BuildContext context, {
-    required Duration currentPos,
-    required Duration totalDur,
-    required bool isPlaying,
-  }) {
-    final player = _player;
-    final totalMs = totalDur.inMilliseconds.toDouble();
-    final currentMs = _isSeeking
-        ? _seekPositionMs
-        : currentPos.inMilliseconds.toDouble().clamp(0.0, totalMs > 0 ? totalMs : 0.0);
-
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [AppColors.black80, AppColors.transparent],
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Text(
-                      _formatDuration(Duration(milliseconds: currentMs.toInt())),
-                      style: const TextStyle(color: AppColors.white70, fontSize: 12),
-                    ),
-                    Expanded(
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          activeTrackColor: AppColors.hongguoRed,
-                          inactiveTrackColor: AppColors.white24,
-                          thumbColor: AppColors.hongguoRed,
-                          trackHeight: 2.5,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                        ),
-                        child: Slider(
-                          value: totalMs > 0 ? currentMs.clamp(0.0, totalMs) : 0.0,
-                          min: 0.0,
-                          max: totalMs > 0 ? totalMs : 1.0,
-                          onChangeStart: (_) {
-                            _isSeeking = true;
-                            _hideControlsTimer?.cancel();
-                          },
-                          onChanged: (val) {
-                            setState(() {
-                              _seekPositionMs = val;
-                            });
-                          },
-                          onChangeEnd: (val) {
-                            player?.seek(Duration(milliseconds: val.toInt()));
-                            _isSeeking = false;
-                            _startHideControlsTimer();
-                          },
-                        ),
-                      ),
-                    ),
-                    Text(
-                      _formatDuration(totalDur),
-                      style: const TextStyle(color: AppColors.white70, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            color: AppColors.white,
-                            size: 32,
-                          ),
-                          onPressed: () {
-                            player?.playOrPause();
-                            _startHideControlsTimer();
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.replay_10_rounded, color: AppColors.white),
-                          tooltip: '后退 10 秒',
-                          onPressed: () {
-                            if (player == null) return;
-                            final target = player.state.position - const Duration(seconds: 10);
-                            player.seek(target < Duration.zero ? Duration.zero : target);
-                            _startHideControlsTimer();
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.forward_10_rounded, color: AppColors.white),
-                          tooltip: '快进 10 秒',
-                          onPressed: () {
-                            if (player == null) return;
-                            final target = player.state.position + const Duration(seconds: 10);
-                            player.seek(target > player.state.duration ? player.state.duration : target);
-                            _startHideControlsTimer();
-                          },
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        if (widget.completedJobs.length > 1)
-                          TextButton.icon(
-                            key: const ValueKey('offline-episodes-btn'),
-                            onPressed: _showOfflineEpisodesSheet,
-                            icon: const Icon(Icons.video_library_outlined, color: AppColors.white, size: 18),
-                            label: Text(
-                              '选集 (${widget.completedJobs.length})',
-                              style: const TextStyle(color: AppColors.white),
-                            ),
-                          ),
-                        IconButton(
-                          icon: Icon(
-                            _isFullScreen
-                                ? Icons.fullscreen_exit_rounded
-                                : Icons.fullscreen_rounded,
-                            color: AppColors.white,
-                          ),
-                          tooltip: _isFullScreen ? '退出全屏' : '全屏',
-                          onPressed: _toggleFullScreen,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -558,7 +297,11 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            _buildTopBar(context),
+            OfflinePlayerTopBar(
+              drama: widget.drama,
+              episodeNumber: _currentJob.episode.number,
+              onBack: () => Navigator.of(context).maybePop(),
+            ),
             _buildBottomBar(context),
           ],
         ),

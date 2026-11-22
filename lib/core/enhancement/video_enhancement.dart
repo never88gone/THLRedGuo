@@ -8,7 +8,9 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:THLRedLook/core/enhancement/video_enhancement_assets.dart';
+import 'package:THLRedLook/core/enhancement/video_enhancement_monitor.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_mpv.dart';
+import 'package:THLRedLook/core/enhancement/video_enhancement_pipeline.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_policy.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_preferences.dart';
 import 'package:THLRedLook/utils/media/video_output_size.dart';
@@ -31,6 +33,8 @@ class VideoEnhancementController extends ChangeNotifier {
       return;
     }
     _mpv = VideoEnhancementMpv(native as NativePlayer);
+    _pipeline = VideoEnhancementPipeline(_mpv!, _filterLabel);
+    _monitor = VideoEnhancementMonitor(_filterLabel);
     _output = VideoOutputSizeAdapter(video!, onFailure: _outputFailed);
     _subscriptions.add(player.stream.log.listen(_onLog));
     _subscriptions.add(player.stream.videoParams.listen((_) => _schedule()));
@@ -58,17 +62,15 @@ class VideoEnhancementController extends ChangeNotifier {
   final bool _animationHint;
   VideoEnhancementPreferences _preferences;
   VideoEnhancementMpv? _mpv;
+  VideoEnhancementPipeline? _pipeline;
+  late final VideoEnhancementMonitor _monitor;
   VideoOutputSizeAdapter? _output;
   Future<void>? _initialization;
   Future<void>? _monitoring;
   Future<void>? _closing;
   Future<void> _tail = Future<void>.value();
   final _subscriptions = <StreamSubscription<dynamic>>[];
-  final _ownedShaders = <String>{};
-  final _originalOptions = <String, String>{};
-  final _appliedOptions = <String, String>{};
   final _rejected = <VideoEnhancementBackend>{};
-  final _renderSamples = <double>[];
   final _recentEnhancementErrors = <String>{};
   Timer? _timer;
   Timer? _debounce;
@@ -76,9 +78,6 @@ class VideoEnhancementController extends ChangeNotifier {
   int _costLimit = 4;
   int _confirmationMisses = 0;
   int _failureCount = 0;
-  int? _previousDrops;
-  DateTime? _previousSample;
-  DateTime? _overloadedSince;
   DateTime _ignorePerformanceUntil = DateTime.fromMillisecondsSinceEpoch(0);
   VideoEnhancementPower _power = const VideoEnhancementPower();
   VideoEnhancementDecision? _applied;
@@ -193,17 +192,15 @@ class VideoEnhancementController extends ChangeNotifier {
     _costLimit = 4;
     _downgradeReason = '';
     _lastFailure = '';
-    _previousDrops = null;
-    _previousSample = null;
-    _renderSamples.clear();
     _recentEnhancementErrors.clear();
     _failureCount = 0;
     _circuitOpen = false;
+    _monitor.reset();
     ignorePerformance();
     await _enqueue(() async {
       await _initialization;
       if (_closed || !_initialized) return;
-      _clearEffects();
+      _pipeline?.clearEffects();
       await _output!.setTarget(null);
       _applied = null;
       _confirmed = false;
@@ -219,10 +216,7 @@ class VideoEnhancementController extends ChangeNotifier {
 
   void ignorePerformance() {
     _ignorePerformanceUntil = DateTime.now().add(const Duration(seconds: 6));
-    _overloadedSince = null;
-    _renderSamples.clear();
-    _previousDrops = null;
-    _previousSample = null;
+    _monitor.reset();
   }
 
   Future<void> toggleCompare() async {
@@ -308,34 +302,19 @@ class VideoEnhancementController extends ChangeNotifier {
           : await VideoEnhancementAssets.prepare(shader);
       if (_closed || revision != _revision) return;
       _applied = null;
-      _clearEffects();
+      _pipeline?.clearEffects();
       await _output!.setTarget(selected.output);
       if (_closed || revision != _revision) return;
-      if (selected.backend != VideoEnhancementBackend.original) {
-        _setOption('scale', 'spline36');
-        _setOption('dscale', 'mitchell');
-        _setOption('cscale', 'bilinear');
-        _setOption('correct-downscaling', 'yes');
-        if (shaderPath != null) {
-          _setOption('fbo-format', 'rgba16f');
-          final current = _shaderList();
-          _ownedShaders.add(shaderPath);
-          _mpv!.setStrings('glsl-shaders', [...current, shaderPath]);
-        } else if (selected.backend == VideoEnhancementBackend.hardware) {
-          final parameters = player.state.videoParams;
-          final factor = math
-              .min(
-                selected.output!.width / parameters.w!,
-                selected.output!.height / parameters.h!,
-              )
-              .clamp(1.0, 2.0);
-          _mpv!.command([
-            'vf',
-            'add',
-            '@$_filterLabel:d3d11vpp=scale=${factor.toStringAsFixed(6)}:scaling-mode=$_vendor:format=nv12:deint=no',
-          ]);
-        }
-      }
+
+      final parameters = player.state.videoParams;
+      await _pipeline?.applyEffects(
+        selected: selected,
+        shaderPath: shaderPath,
+        vendor: _vendor,
+        videoW: parameters.w?.toDouble(),
+        videoH: parameters.h?.toDouble(),
+      );
+
       _applied = selected;
       _confirmationMisses = 0;
       _confirmed = selected.backend == VideoEnhancementBackend.original;
@@ -347,58 +326,6 @@ class VideoEnhancementController extends ChangeNotifier {
     } finally {
       _applyingBackend = null;
     }
-  }
-
-  void _setOption(String key, String value) {
-    final original = _mpv!.readString(key);
-    if (original == null) throw VideoEnhancementFailure(key);
-    _originalOptions.putIfAbsent(key, () => original);
-    _mpv!.set(key, value);
-    _appliedOptions[key] = value;
-  }
-
-  List<String> _shaderList() {
-    final value = _mpv!.read('glsl-shaders');
-    if (value is! List) throw const VideoEnhancementFailure('shader-list');
-    return value.whereType<String>().toList();
-  }
-
-  void _clearEffects() {
-    if (_mpv == null || !_initialized) return;
-    Object? failure;
-    try {
-      if (_ownedShaders.isNotEmpty) {
-        final current = _shaderList();
-        final remaining = current
-            .where((item) => !_ownedShaders.contains(item))
-            .toList();
-        if (current.length != remaining.length) {
-          _mpv!.setStrings('glsl-shaders', remaining);
-        }
-      }
-    } catch (error) {
-      failure = error;
-    }
-    try {
-      final filters = _mpv!.read('vf');
-      if (filters is List &&
-          filters.any((item) => item is Map && item['label'] == _filterLabel)) {
-        _mpv!.command(['vf', 'remove', '@$_filterLabel']);
-      }
-    } catch (error) {
-      failure ??= error;
-    }
-    for (final entry in _appliedOptions.entries.toList().reversed) {
-      try {
-        if (_mpv!.readString(entry.key) == entry.value) {
-          _mpv!.set(entry.key, _originalOptions[entry.key]!);
-        }
-        _appliedOptions.remove(entry.key);
-      } catch (error) {
-        failure ??= error;
-      }
-    }
-    if (failure != null) throw failure;
   }
 
   void _readCapabilities() {
@@ -554,7 +481,7 @@ class VideoEnhancementController extends ChangeNotifier {
       unawaited(
         _enqueue(() async {
           try {
-            _clearEffects();
+            _pipeline?.clearEffects();
             await _output?.setTarget(null);
             if (_closed) return;
             _applied = const VideoEnhancementDecision(
@@ -583,7 +510,7 @@ class VideoEnhancementController extends ChangeNotifier {
         _preferences.mode == VideoEnhancementMode.off) {
       return;
     }
-    final future = _monitor();
+    final future = _monitorCheck();
     _monitoring = future;
     unawaited(
       future.whenComplete(() {
@@ -603,7 +530,7 @@ class VideoEnhancementController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> _monitor() async {
+  Future<void> _monitorCheck() async {
     try {
       await _readPower();
       if (_closed ||
@@ -679,7 +606,10 @@ class VideoEnhancementController extends ChangeNotifier {
         VideoEnhancementBackend.fsrcnnx =>
           descriptions.contains('feature map') &&
               descriptions.contains('aggregation'),
-        VideoEnhancementBackend.hardware => _hardwareFramesChanged(selected),
+        VideoEnhancementBackend.hardware => _monitor.hardwareFramesChanged(
+          mpv: _mpv!,
+          selected: selected,
+        ),
         _ => _gpu,
       };
       final wasConfirmed = _confirmed;
@@ -700,115 +630,30 @@ class VideoEnhancementController extends ChangeNotifier {
       }
       _publishStatus();
       if (wasConfirmed != _confirmed && !_closed) notifyListeners();
-      _watchPerformance(selected, fresh);
+
+      final overloaded = _monitor.checkOverloaded(
+        player: player,
+        mpv: _mpv!,
+        selected: selected,
+        fresh: fresh,
+        confirmed: _confirmed,
+        comparing: _comparing,
+        ignorePerformanceUntil: _ignorePerformanceUntil,
+      );
+      if (overloaded) {
+        _costLimit = math.min(
+          _costLimit,
+          selected.backend == VideoEnhancementBackend.hardware
+              ? 2
+              : selected.backend.cost - 1,
+        );
+        _downgradeReason = '本集已为保持流畅降低增强';
+        ignorePerformance();
+        _schedule(immediate: true);
+      }
     } catch (_) {
-      if (!_closed) {
-        _previousDrops = null;
-        _previousSample = null;
-      }
+      if (!_closed) _monitor.reset();
     }
-  }
-
-  bool _hardwareFramesChanged(VideoEnhancementDecision selected) {
-    final output = _mpv!.read('video-out-params');
-    final filters = _mpv!.read('vf');
-    if (output is! Map || filters is! List || selected.output == null) {
-      return false;
-    }
-    final width = (output['w'] as num?)?.toDouble() ?? 0;
-    final height = (output['h'] as num?)?.toDouble() ?? 0;
-    return filters.any(
-          (item) =>
-              item is Map &&
-              item['label'] == _filterLabel &&
-              item['enabled'] != false,
-        ) &&
-        (width - selected.output!.width).abs() <= 4 &&
-        (height - selected.output!.height).abs() <= 4;
-  }
-
-  bool _isOwnPass(
-    String description,
-    VideoEnhancementBackend backend,
-  ) => switch (backend) {
-    VideoEnhancementBackend.ravu => description.contains('RAVU'),
-    VideoEnhancementBackend.anime => description.contains('Anime4K'),
-    VideoEnhancementBackend.fsrcnnx => RegExp(
-      r'feature map [12]|mapping [1-4]_[12]|sub-band residuals [12]|sub-pixel convolution 1|aggregation',
-    ).hasMatch(description),
-    _ => false,
-  };
-
-  void _watchPerformance(VideoEnhancementDecision selected, List fresh) {
-    final now = DateTime.now();
-    final state = player.state;
-    if (!_confirmed ||
-        !state.playing ||
-        state.buffering ||
-        _comparing ||
-        state.rate > 1.01 ||
-        now.isBefore(_ignorePerformanceUntil)) {
-      _previousSample = null;
-      _previousDrops = null;
-      _overloadedSince = null;
-      return;
-    }
-    var fpsValue = _mpv!.read('container-fps');
-    if (fpsValue is! num || fpsValue <= 0) {
-      fpsValue = _mpv!.read('estimated-vf-fps');
-    }
-    final fps = fpsValue is num ? fpsValue.toDouble() : 0.0;
-    if (!fps.isFinite || fps <= 0 || fps > 240) return;
-    var ownMs = 0.0;
-    var timed = false;
-    for (final pass in fresh.whereType<Map>()) {
-      if (!_isOwnPass(pass['desc']?.toString() ?? '', selected.backend)) {
-        continue;
-      }
-      final last = pass['last'];
-      if (last is num && last >= 0) {
-        ownMs += last / 1000000;
-        timed = true;
-      }
-    }
-    if (timed && ownMs.isFinite) {
-      _renderSamples.add(ownMs);
-      if (_renderSamples.length > 20) _renderSamples.removeAt(0);
-    }
-    final samples = [..._renderSamples]..sort();
-    final p95 = samples.isEmpty
-        ? 0.0
-        : samples[((samples.length - 1) * .95).ceil()];
-    var overloaded = samples.length >= 5 && p95 > 1000 / fps / state.rate * .25;
-    final rawDrops = _mpv!.read('frame-drop-count');
-    if (rawDrops is num) {
-      final drops = rawDrops.toInt();
-      final previous = _previousDrops;
-      final previousTime = _previousSample;
-      if (previous != null && previousTime != null && drops >= previous) {
-        final seconds = now.difference(previousTime).inMilliseconds / 1000;
-        if (seconds >= 1 && seconds <= 5) {
-          overloaded = overloaded || (drops - previous) / (fps * seconds) > .01;
-        }
-      }
-      _previousDrops = drops;
-      _previousSample = now;
-    }
-    if (!overloaded) {
-      _overloadedSince = null;
-      return;
-    }
-    _overloadedSince ??= now;
-    if (now.difference(_overloadedSince!) < const Duration(seconds: 10)) return;
-    _costLimit = math.min(
-      _costLimit,
-      selected.backend == VideoEnhancementBackend.hardware
-          ? 2
-          : selected.backend.cost - 1,
-    );
-    _downgradeReason = '本集已为保持流畅降低增强';
-    ignorePerformance();
-    _schedule(immediate: true);
   }
 
   void _publishStatus() {

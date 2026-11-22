@@ -4,16 +4,18 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/download/download_collections.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/pages/downloads/offline_player_page.dart';
-import 'package:THLRedLook/views/remote/remote_widgets.dart';
-import 'package:THLRedLook/pages/settings/settings_page.dart';
-import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/views/downloads/download_batch_bar.dart';
+import 'package:THLRedLook/views/downloads/download_collection_card.dart';
+import 'package:THLRedLook/views/downloads/download_filter_dialog.dart';
+import 'package:THLRedLook/views/downloads/download_job_card.dart';
 
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({
@@ -122,26 +124,20 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   void _message(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
   Future<void> _batch(String command, Iterable<DownloadJob> source) async {
     if (_busy || !_allowed) return;
-    final jobs = source
-        .where(
-          (job) => switch (command) {
-            'pause' => job.active,
-            'resume' => job.resumable,
-            'archive' => job.completed && !job.archived,
-            'restore' => job.completed && job.archived,
-            'remove' => true,
-            _ => false,
-          },
-        )
-        .toList();
+    final jobs = source.where((job) => switch (command) {
+      'pause' => job.active,
+      'resume' => job.resumable,
+      'archive' => job.completed && !job.archived,
+      'restore' => job.completed && job.archived,
+      'remove' => true,
+      _ => false,
+    }).toList();
     if (jobs.isEmpty) {
       _message('没有适合此操作的任务');
       return;
@@ -180,19 +176,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     try {
       for (var offset = 0; offset < jobs.length; offset += 500) {
         if (!mounted || !_allowed || _stopBatch) break;
-        setState(
-          () => _operation =
-              '正在处理 ${math.min(offset + 500, jobs.length)}/${jobs.length} 项',
-        );
-        final ids = jobs
-            .sublist(offset, math.min(offset + 500, jobs.length))
-            .map((job) => job.id)
-            .toList();
+        final end = math.min(offset + 500, jobs.length);
+        setState(() => _operation = '正在处理 $end/${jobs.length} 项');
+        final ids = jobs.sublist(offset, end).map((job) => job.id).toList();
         try {
-          final result = await widget.repository.controlDownloadBatch(
-            command,
-            ids,
-          );
+          final result = await widget.repository.controlDownloadBatch(command, ids);
           if (!mounted || !_allowed) return;
           completed += result.completed.length;
           _selected.removeAll(result.completed);
@@ -206,26 +194,17 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         _selected.addAll(failures.keys);
         _selecting = true;
         _retryCommand = command;
-        _message(
-          '已处理 $completed 项，${failures.length} 项失败：${failures.values.first}',
-        );
+        _message('已处理 $completed 项，${failures.length} 项失败：${failures.values.first}');
       } else {
-        _message(
-          _stopBatch
-              ? '已停止，已处理 $completed 项'
-              : command == 'archive'
-              ? '已清理 $completed 项任务，视频仍可本地播放'
-              : '已处理 $completed 项',
-        );
+        _message(_stopBatch
+            ? '已停止，已处理 $completed 项'
+            : command == 'archive'
+            ? '已清理 $completed 项任务，视频仍可本地播放'
+            : '已处理 $completed 项');
       }
       await _refresh();
     } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _operation = '';
-        });
-      }
+      if (mounted) setState(() { _busy = false; _operation = ''; });
     }
   }
 
@@ -240,11 +219,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   Future<void> _play(DownloadJob job) async {
     if (_opening || !_allowed) return;
     _opening = true;
-    final completed =
-        _jobs
-            .where((entry) => entry.completed && entry.drama.id == job.drama.id)
-            .toList()
-          ..sort((a, b) => a.episode.number.compareTo(b.episode.number));
+    final completed = _jobs
+        .where((entry) => entry.completed && entry.drama.id == job.drama.id)
+        .toList()
+      ..sort((a, b) => a.episode.number.compareTo(b.episode.number));
     final index = completed.indexWhere((entry) => entry.id == job.id);
     if (index < 0) {
       _opening = false;
@@ -291,81 +269,15 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   }
 
   Future<void> _filters() async {
-    var state = _filter, release = _release;
-    final result = await showDialog<bool>(
+    final result = await showDownloadFilterDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, change) => AlertDialog(
-          title: const Text('筛选下载合集'),
-          content: SizedBox(
-            width: 420,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('任务状态'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final entry in const {
-                        'all': '全部任务',
-                        'pending': '未完成',
-                        'active': '进行中',
-                        'paused': '已暂停',
-                        'failed': '失败',
-                        'completed': '已下载',
-                        'archived': '已保留视频',
-                      }.entries)
-                        ChoiceChip(
-                          label: Text(entry.value),
-                          selected: state == entry.key,
-                          onSelected: (_) => change(() => state = entry.key),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('剧集状态'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final entry in const {
-                        '': '全部',
-                        'ongoing': '连载中',
-                        'finished': '已完结',
-                      }.entries)
-                        ChoiceChip(
-                          label: Text(entry.value),
-                          selected: release == entry.key,
-                          onSelected: (_) => change(() => release = entry.key),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('应用'),
-            ),
-          ],
-        ),
-      ),
+      currentFilter: _filter,
+      currentRelease: _release,
     );
-    if (result == true && mounted) {
+    if (result != null && mounted) {
       setState(() {
-        _filter = state;
-        _release = release;
+        _filter = result['filter']!;
+        _release = result['release']!;
       });
     }
   }
@@ -374,20 +286,16 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     if (_selecting) ...[
       IconButton(
         tooltip: '全选当前',
-        onPressed: _busy
-            ? null
-            : () => _select(collections.expand((c) => c.jobs)),
+        onPressed: _busy ? null : () => _select(collections.expand((c) => c.jobs)),
         icon: const Icon(Icons.select_all_rounded),
       ),
       IconButton(
         tooltip: '退出多选',
-        onPressed: _busy
-            ? null
-            : () => setState(() {
-                _selecting = false;
-                _selected.clear();
-                _retryCommand = null;
-              }),
+        onPressed: _busy ? null : () => setState(() {
+          _selecting = false;
+          _selected.clear();
+          _retryCommand = null;
+        }),
         icon: const Icon(Icons.close_rounded),
       ),
     ] else ...[
@@ -431,305 +339,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     ),
   ];
 
-  Widget _collection(DownloadCollection collection) {
-    final count = collection.jobs
-        .where((job) => _selected.contains(job.id))
-        .length;
-    final expanded = _expanded.contains(collection.drama.id);
-    return Card(
-      child: ListTile(
-        leading: _selecting
-            ? Checkbox(
-                tristate: true,
-                value: count == 0
-                    ? false
-                    : count == collection.jobs.length
-                    ? true
-                    : null,
-                onChanged: _busy ? null : (_) => _select(collection.jobs),
-              )
-            : Icon(expanded ? Icons.folder_open_rounded : Icons.folder_rounded),
-        title: Text(
-          collection.drama.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          '${collection.completed}/${collection.jobs.length} 集已下载 · ${storageSize(collection.bytes)}'
-          '${collection.active > 0 ? ' · ${collection.active} 项进行中' : ''}${collection.failed > 0 ? ' · ${collection.failed} 项失败' : ''}',
-        ),
-        onTap: () => setState(() {
-          if (!_expanded.remove(collection.drama.id)) {
-            _expanded.add(collection.drama.id);
-          }
-        }),
-        trailing: PopupMenuButton<String>(
-          tooltip: '${collection.drama.title} · 合集操作',
-          enabled: !_busy,
-          onSelected: (value) {
-            if (value == 'update') {
-              _update(collection.drama);
-            } else if (value == 'select') {
-              _select(collection.jobs);
-            } else {
-              _batch(value, collection.jobs);
-            }
-          },
-          itemBuilder: (_) => [
-            PopupMenuItem(
-              value: 'update',
-              enabled: !_updater.busy,
-              child: const Text('更新本剧 · 补充新增与缺失'),
-            ),
-            const PopupMenuItem(value: 'select', child: Text('选择本合集')),
-            const PopupMenuItem(value: 'pause', child: Text('暂停本合集')),
-            const PopupMenuItem(value: 'resume', child: Text('继续 / 重试本合集')),
-            const PopupMenuItem(value: 'archive', child: Text('清理已完成任务，保留视频')),
-            if (_filter == 'archived')
-              const PopupMenuItem(value: 'restore', child: Text('恢复到任务列表')),
-            const PopupMenuItem(value: 'remove', child: Text('取消任务并删除视频')),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showTvJobMenu(DownloadJob job) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${job.drama.title} · 第 ${job.episode.number} 集'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (job.resumable)
-              FilledButton(
-                autofocus: true,
-                onPressed: () {
-                  Navigator.pop(context);
-                  _batch('resume', [job]);
-                },
-                child: const Text('继续下载'),
-              ),
-            if (job.active)
-              FilledButton(
-                autofocus: true,
-                onPressed: () {
-                  Navigator.pop(context);
-                  _batch('pause', [job]);
-                },
-                child: const Text('暂停下载'),
-              ),
-            if (job.completed)
-              FilledButton(
-                autofocus: true,
-                onPressed: () {
-                  Navigator.pop(context);
-                  _play(job);
-                },
-                child: const Text('本地播放'),
-              ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _batch('remove', [job]);
-              },
-              child: Text(job.completed ? '删除视频' : '取消下载'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _episode(DownloadJob job) {
-    final tv = AppLayout.isTelevision(context);
-    final card = Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListTile(
-            leading: _selecting
-                ? Checkbox(
-                    value: _selected.contains(job.id),
-                    onChanged: _busy ? null : (_) => _select([job]),
-                  )
-                : Icon(
-                    job.completed
-                        ? Icons.offline_pin_outlined
-                        : job.state == 'failed'
-                        ? Icons.error_outline
-                        : Icons.downloading_rounded,
-                  ),
-            title: Text(
-              '第 ${job.episode.number} 集${job.episode.vip ? ' · VIP' : ''}',
-            ),
-            subtitle: Text(
-              '${job.archived ? '已保留视频' : job.stateLabel} · ${storageSize(job.bytes)}'
-              '${job.actualQuality > 0 ? ' · ${job.actualQuality}P' : ''}${job.error.isNotEmpty ? '\n${job.error}' : ''}',
-            ),
-            onTap: _busy
-                ? null
-                : _selecting
-                ? () => _select([job])
-                : job.completed
-                ? () => _play(job)
-                : null,
-            trailing: _selecting
-                ? null
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (job.completed)
-                        IconButton(
-                          key: ValueKey('local-play-${job.id}'),
-                          tooltip: '本地播放',
-                          icon: const Icon(Icons.play_circle_outline_rounded),
-                          onPressed: _busy ? null : () => _play(job),
-                        ),
-                      if (job.active)
-                        IconButton(
-                          key: ValueKey('pause-${job.id}'),
-                          tooltip: '暂停',
-                          icon: const Icon(Icons.pause_circle_outline_rounded),
-                          onPressed: _busy
-                              ? null
-                              : () => _batch('pause', [job]),
-                        ),
-                      if (job.resumable)
-                        IconButton(
-                          key: ValueKey('resume-${job.id}'),
-                          tooltip: '继续 / 重试',
-                          icon: const Icon(Icons.play_circle_outline_rounded),
-                          onPressed: _busy
-                              ? null
-                              : () => _batch('resume', [job]),
-                        ),
-                      IconButton(
-                        key: ValueKey('remove-${job.id}'),
-                        tooltip: job.completed ? '删除视频' : '取消下载',
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        onPressed: _busy ? null : () => _batch('remove', [job]),
-                      ),
-                      PopupMenuButton<String>(
-                        enabled: !_busy,
-                        tooltip: '分集操作',
-                        onSelected: (value) {
-                          if (value == 'play') {
-                            _play(job);
-                          } else {
-                            _batch(value, [job]);
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          if (job.completed)
-                            const PopupMenuItem(
-                              value: 'play',
-                              child: Text('本地播放'),
-                            ),
-                          if (job.active)
-                            const PopupMenuItem(
-                              value: 'pause',
-                              child: Text('暂停'),
-                            ),
-                          if (job.resumable)
-                            const PopupMenuItem(
-                              value: 'resume',
-                              child: Text('继续 / 重试'),
-                            ),
-                          if (job.completed)
-                            PopupMenuItem(
-                              value: job.archived ? 'restore' : 'archive',
-                              child: Text(job.archived ? '恢复任务' : '清理任务，保留视频'),
-                            ),
-                          PopupMenuItem(
-                            value: 'remove',
-                            child: Text(job.completed ? '删除视频' : '取消下载'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-          ),
-          if (!job.completed)
-            LinearProgressIndicator(
-              value: job.progress > 0 || !job.active ? job.progress : null,
-              minHeight: 2,
-            ),
-        ],
-      ),
-    );
-
-    if (tv) {
-      return Padding(
-        padding: const EdgeInsets.only(left: 12),
-        child: RemoteTarget(
-          key: ValueKey('download-task-${job.id}'),
-          onPressed: () => _showTvJobMenu(job),
-          child: card,
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(left: 12),
-      child: KeyedSubtree(
-        key: ValueKey('download-task-${job.id}'),
-        child: card,
-      ),
-    );
-  }
-
-  Widget _batchBar() => Material(
-    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    child: SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          alignment: WrapAlignment.center,
-          children: [
-            if (_busy)
-              TextButton(
-                onPressed: () => setState(() => _stopBatch = true),
-                child: const Text('停止批量操作'),
-              )
-            else ...[
-              for (final entry in const {
-                'pause': '暂停',
-                'resume': '继续 / 重试',
-                'archive': '保留视频',
-                'remove': '删除',
-              }.entries)
-                TextButton(
-                  onPressed: _selected.isEmpty
-                      ? null
-                      : () => _batch(
-                          entry.key,
-                          _jobs.where((job) => _selected.contains(job.id)),
-                        ),
-                  child: Text(entry.value),
-                ),
-              if (_retryCommand != null)
-                FilledButton(
-                  onPressed: () => _batch(
-                    _retryCommand!,
-                    _jobs.where((job) => _selected.contains(job.id)),
-                  ),
-                  child: const Text('重试失败项'),
-                ),
-            ],
-          ],
-        ),
-      ),
-    ),
-  );
-
   @override
   Widget build(BuildContext context) {
     if (!widget.repository.supportsDownloads) {
@@ -746,9 +355,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final rows = <Object>[
       for (final collection in collections) ...[
         collection,
-        if (_expanded.contains(collection.drama.id) ||
-            collections.length == 1 ||
-            tv)
+        if (_expanded.contains(collection.drama.id) || collections.length == 1 || tv)
           ...collection.jobs,
       ],
     ];
@@ -774,41 +381,22 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                ChoiceChip(
-                  key: const ValueKey('download-filter-all'),
-                  label: const Text('全部'),
-                  selected: _filter == 'all',
-                  onSelected: (selected) {
-                    if (selected) setState(() => _filter = 'all');
-                  },
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  key: const ValueKey('download-filter-downloading'),
-                  label: const Text('下载中'),
-                  selected: _filter == 'downloading',
-                  onSelected: (selected) {
-                    if (selected) setState(() => _filter = 'downloading');
-                  },
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  key: const ValueKey('download-filter-completed'),
-                  label: const Text('已下载'),
-                  selected: _filter == 'completed',
-                  onSelected: (selected) {
-                    if (selected) setState(() => _filter = 'completed');
-                  },
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  key: const ValueKey('download-filter-archived'),
-                  label: const Text('已保留视频'),
-                  selected: _filter == 'archived',
-                  onSelected: (selected) {
-                    if (selected) setState(() => _filter = 'archived');
-                  },
-                ),
+                for (final (k, label) in [
+                  ('all', '全部'),
+                  ('downloading', '下载中'),
+                  ('completed', '已下载'),
+                  ('archived', '已保留视频'),
+                ]) ...[
+                  ChoiceChip(
+                    key: ValueKey('download-filter-$k'),
+                    label: Text(label),
+                    selected: _filter == k,
+                    onSelected: (selected) {
+                      if (selected) setState(() => _filter = k);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                ],
               ],
             ),
           ),
@@ -881,21 +469,54 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
                   itemCount: rows.length,
                   itemBuilder: (_, index) => switch (rows[index]) {
-                    DownloadCollection collection => _collection(collection),
-                    DownloadJob job => _episode(job),
+                    DownloadCollection collection => DownloadCollectionCard(
+                      collection: collection,
+                      selectedCount: collection.jobs.where((job) => _selected.contains(job.id)).length,
+                      expanded: _expanded.contains(collection.drama.id),
+                      selecting: _selecting,
+                      busy: _busy,
+                      filter: _filter,
+                      updaterBusy: _updater.busy,
+                      onToggleExpand: () => setState(() {
+                        if (!_expanded.remove(collection.drama.id)) {
+                          _expanded.add(collection.drama.id);
+                        }
+                      }),
+                      onSelect: () => _select(collection.jobs),
+                      onCommand: (cmd) => switch (cmd) {
+                        'update' => _update(collection.drama),
+                        'select' => _select(collection.jobs),
+                        _ => _batch(cmd, collection.jobs),
+                      },
+                    ),
+                    DownloadJob job => DownloadJobCard(
+                      job: job,
+                      selected: _selected.contains(job.id),
+                      selecting: _selecting,
+                      busy: _busy,
+                      onSelect: () => _select([job]),
+                      onPlay: () => _play(job),
+                      onCommand: (cmd) => _batch(cmd, [job]),
+                    ),
                     _ => const SizedBox.shrink(),
                   },
                 ),
         ),
-        if (_selecting) _batchBar(),
+        if (_selecting)
+          DownloadBatchBar(
+            busy: _busy,
+            hasSelected: _selected.isNotEmpty,
+            retryCommand: _retryCommand,
+            onStopBatch: () => setState(() => _stopBatch = true),
+            onBatchCommand: (cmd) => _batch(
+              cmd,
+              _jobs.where((job) => _selected.contains(job.id)),
+            ),
+          ),
       ],
     );
     if (widget.embedded) {
-      return SafeArea(
-        top: true,
-        bottom: false,
-        child: body,
-      );
+      return SafeArea(top: true, bottom: false, child: body);
     }
     return CallbackShortcuts(
       bindings: {
