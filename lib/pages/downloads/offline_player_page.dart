@@ -314,7 +314,11 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
     if (widget.videoBuilder != null) {
       return Scaffold(
         backgroundColor: AppColors.black,
-        body: widget.videoBuilder!(context, _buildControls(context)),
+        body: GestureDetector(
+          onTap: _toggleControls,
+          behavior: HitTestBehavior.opaque,
+          child: widget.videoBuilder!(context, _buildControls(context)),
+        ),
       );
     }
 

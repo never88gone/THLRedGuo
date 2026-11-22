@@ -34,7 +34,6 @@ class VideoEnhancementController extends ChangeNotifier {
     }
     _mpv = VideoEnhancementMpv(native as NativePlayer);
     _pipeline = VideoEnhancementPipeline(_mpv!, _filterLabel);
-    _monitor = VideoEnhancementMonitor(_filterLabel);
     _output = VideoOutputSizeAdapter(video!, onFailure: _outputFailed);
     _subscriptions.add(player.stream.log.listen(_onLog));
     _subscriptions.add(player.stream.videoParams.listen((_) => _schedule()));
@@ -63,7 +62,7 @@ class VideoEnhancementController extends ChangeNotifier {
   VideoEnhancementPreferences _preferences;
   VideoEnhancementMpv? _mpv;
   VideoEnhancementPipeline? _pipeline;
-  late final VideoEnhancementMonitor _monitor;
+  final VideoEnhancementMonitor _monitor = VideoEnhancementMonitor(_filterLabel);
   VideoOutputSizeAdapter? _output;
   Future<void>? _initialization;
   Future<void>? _monitoring;
