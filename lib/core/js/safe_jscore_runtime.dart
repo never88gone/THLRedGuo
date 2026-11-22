@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter_js/javascript_runtime.dart';
@@ -11,6 +10,8 @@ import 'package:flutter_js/javascriptcore/binding/js_object_ref.dart'
 import 'package:flutter_js/javascriptcore/flutter_jscore.dart';
 import 'package:flutter_js/javascriptcore/jscore_bindings.dart';
 import 'package:flutter_js/js_eval_result.dart';
+
+import 'package:THLRedLook/core/js/safe_jscore_helper.dart';
 
 class SafeJavascriptCoreRuntime extends JavascriptRuntime {
   static final Map<int, SafeJavascriptCoreRuntime> _instances = {};
@@ -451,62 +452,12 @@ class SafeJavascriptCoreRuntime extends JavascriptRuntime {
     }
   }
 
-  String _readObjectStringProperty(Pointer objPtr, String name) {
-    if (objPtr == nullptr) return '';
-    final nameC = name.toNativeUtf8();
-    final nameJs = jSStringCreateWithUTF8CString(nameC);
-    try {
-      final propPtr =
-          jSObjectGetProperty(_globalContext, objPtr, nameJs, nullptr);
-      return _getJsValue(propPtr);
-    } finally {
-      jSStringRelease(nameJs);
-      calloc.free(nameC);
-    }
-  }
+  String _readObjectStringProperty(Pointer objPtr, String name) =>
+      SafeJscoreHelper.readObjectStringProperty(_globalContext, objPtr, name);
 
-  String? _toJsonString(Pointer valueRef) {
-    if (valueRef == nullptr) return null;
-    final jsonJs = jSValueCreateJSONString(_globalContext, valueRef, 0, nullptr);
-    if (jsonJs == nullptr) return null;
-    try {
-      return _jsStringRefToDart(jsonJs);
-    } finally {
-      jSStringRelease(jsonJs);
-    }
-  }
+  String? _toJsonString(Pointer valueRef) =>
+      SafeJscoreHelper.toJsonString(_globalContext, valueRef);
 
-  String _getJsValue(Pointer jsValueRef) {
-    if (jsValueRef == nullptr ||
-        jSValueIsNull(_globalContext, jsValueRef) == 1) {
-      return 'null';
-    }
-    if (jSValueIsUndefined(_globalContext, jsValueRef) == 1) {
-      return 'undefined';
-    }
-    final resultJsString =
-        jSValueToStringCopy(_globalContext, jsValueRef, nullptr);
-    if (resultJsString == nullptr) {
-      return 'null';
-    }
-    try {
-      return _jsStringRefToDart(resultJsString) ?? 'null';
-    } finally {
-      jSStringRelease(resultJsString);
-    }
-  }
-
-  String? _jsStringRefToDart(Pointer jsStringRef) {
-    final cStr = jSStringGetCharactersPtr(jsStringRef);
-    final length = jSStringGetLength(jsStringRef);
-    if (cStr == nullptr) return null;
-    if (length <= 0) return '';
-    return String.fromCharCodes(
-      Uint16List.view(
-        cStr.cast<Uint16>().asTypedList(length).buffer,
-        0,
-        length,
-      ),
-    );
-  }
+  String _getJsValue(Pointer jsValueRef) =>
+      SafeJscoreHelper.getJsValue(_globalContext, jsValueRef);
 }

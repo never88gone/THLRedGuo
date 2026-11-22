@@ -2,15 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/views/catalog/catalog_filters.dart';
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
-import 'package:THLRedLook/pages/detail/detail_page.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/models/ranking/ranking_models.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
-import 'package:THLRedLook/utils/theme/app_gradients.dart';
+import 'package:THLRedLook/views/rankings/ranking_list_tile.dart';
+import 'package:THLRedLook/views/rankings/ranking_waterfall_card.dart';
 
 class RankingsScreen extends StatefulWidget {
   const RankingsScreen({
@@ -32,12 +31,8 @@ class _RankingsScreenState extends State<RankingsScreen> {
   List<RankingBoard> _boards = [];
   RankingBoard? _board;
   List<RankingItem> _items = [];
-  bool _loading = true;
-  bool _more = false;
-  bool _hasMore = false;
-  bool _failedMore = false;
-  int _page = 1;
-  int _generation = 0;
+  bool _loading = true, _more = false, _hasMore = false, _failedMore = false;
+  int _page = 1, _generation = 0;
   String? _error;
   String _updated = '';
   bool? _waterfallMode;
@@ -139,27 +134,14 @@ class _RankingsScreenState extends State<RankingsScreen> {
       );
       if (!mounted || generation != _generation) return;
       setState(() {
-        if (!more) {
-          final seen = <String>{};
-          final list = <RankingItem>[];
-          for (final item in result.items) {
-            if (seen.add(item.drama.id)) {
-              final rank = list.length + 1;
-              list.add(RankingItem(rank, item.drama, metric: item.metric));
-            }
+        final base = more ? List<RankingItem>.from(_items) : <RankingItem>[];
+        final seen = base.map((e) => e.drama.id).toSet();
+        for (final item in result.items) {
+          if (seen.add(item.drama.id)) {
+            base.add(RankingItem(base.length + 1, item.drama, metric: item.metric));
           }
-          _items = list;
-        } else {
-          final existing = List<RankingItem>.from(_items);
-          final seen = existing.map((e) => e.drama.id).toSet();
-          for (final item in result.items) {
-            if (seen.add(item.drama.id)) {
-              final rank = existing.length + 1;
-              existing.add(RankingItem(rank, item.drama, metric: item.metric));
-            }
-          }
-          _items = existing;
         }
+        _items = base;
         _page = result.page;
         _hasMore = result.hasMore;
         _updated = result.updatedText;
@@ -222,6 +204,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
               !(widget.store.hideVip && item.drama.vip),
         )
         .toList();
+    final isWide = MediaQuery.sizeOf(context).width >= 600;
+    final isWaterfall = _waterfallMode ?? isWide;
+
     return Scaffold(
       appBar: AppBar(
         title: PopupMenuButton<SourceGroup>(
@@ -248,19 +233,11 @@ class _RankingsScreenState extends State<RankingsScreen> {
         actions: [
           IconButton(
             key: const ValueKey('toggle-ranking-view-mode'),
-            tooltip: (_waterfallMode ?? (MediaQuery.sizeOf(context).width >= 600))
-                ? '切换为列表视图'
-                : '切换为瀑布流视图',
+            tooltip: isWaterfall ? '切换为列表视图' : '切换为瀑布流视图',
             icon: Icon(
-              (_waterfallMode ?? (MediaQuery.sizeOf(context).width >= 600))
-                  ? Icons.view_list_rounded
-                  : Icons.grid_view_rounded,
+              isWaterfall ? Icons.view_list_rounded : Icons.grid_view_rounded,
             ),
-            onPressed: () {
-              final current =
-                  _waterfallMode ?? (MediaQuery.sizeOf(context).width >= 600);
-              setState(() => _waterfallMode = !current);
-            },
+            onPressed: () => setState(() => _waterfallMode = !isWaterfall),
           ),
           RefreshAction(
             loading: _loading || _more,
@@ -430,11 +407,12 @@ class _RankingsScreenState extends State<RankingsScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final item = items[index];
-                  return _buildRankingWaterfallCard(
-                    context,
-                    item,
-                    itemWidth,
-                    coverHeight,
+                  return RankingWaterfallCard(
+                    item: item,
+                    itemWidth: itemWidth,
+                    coverHeight: coverHeight,
+                    repository: widget.repository,
+                    store: widget.store,
                   );
                 },
                 childCount: items.length,
@@ -463,171 +441,6 @@ class _RankingsScreenState extends State<RankingsScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRankingWaterfallCard(
-    BuildContext context,
-    RankingItem item,
-    double itemWidth,
-    double coverHeight,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final (badgeBg, badgeTextColor, badgeLabel) = switch (item.rank) {
-      1 => (
-        AppGradients.rankingRank1,
-        AppColors.white,
-        'TOP 1',
-      ),
-      2 => (
-        AppGradients.rankingRank2,
-        AppColors.white,
-        'TOP 2',
-      ),
-      3 => (
-        AppGradients.rankingRank3,
-        AppColors.white,
-        'TOP 3',
-      ),
-      _ => (
-        LinearGradient(
-          colors: [
-            AppColors.black.withValues(alpha: 0.72),
-            AppColors.black.withValues(alpha: 0.85),
-          ],
-        ),
-        AppColors.white.withValues(alpha: 0.95),
-        '#${item.rank}',
-      ),
-    };
-
-    return Card(
-      key: ValueKey('rank-${item.rank}-${item.drama.id}'),
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: AppColors.transparent,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onFocusChange: (focused) {
-          if (focused) {
-            Scrollable.ensureVisible(context, alignment: 0.4);
-          }
-        },
-        onTap: () => Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => DetailScreen(
-              drama: item.drama,
-              repository: widget.repository,
-              store: widget.store,
-            ),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: itemWidth,
-              height: coverHeight,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned.fill(
-                    child: DramaCover(
-                      drama: item.drama,
-                      repository: widget.repository,
-                      radius: 8,
-                    ),
-                  ),
-                  Positioned(
-                    top: 6,
-                    left: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: badgeBg,
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.black.withValues(alpha: 0.35),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        badgeLabel,
-                        style: TextStyle(
-                          color: badgeTextColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              item.drama.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                height: 1.25,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Row(
-              children: [
-                if (item.metric.isNotEmpty) ...[
-                  const Icon(
-                    Icons.local_fire_department_rounded,
-                    size: 13,
-                    color: AppColors.hongguoRed,
-                  ),
-                  const SizedBox(width: 2),
-                  Expanded(
-                    child: Text(
-                      item.metric,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.hongguoRed,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ] else if (item.drama.category.isNotEmpty) ...[
-                  Expanded(
-                    child: Text(
-                      item.drama.category,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark
-                            ? AppColors.whiteWithAlpha(0.6)
-                            : AppColors.greyDark,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -668,109 +481,10 @@ class _RankingsScreenState extends State<RankingsScreen> {
                 );
               }
               final item = items[index];
-              return Card(
-                key: ValueKey('rank-${item.rank}-${item.drama.id}'),
-                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                child: InkWell(
-                  key: ValueKey('rank-${item.rank}-${item.drama.id}-tap'),
-                  borderRadius: BorderRadius.circular(12),
-                  onFocusChange: (focused) {
-                    if (focused) {
-                      Scrollable.ensureVisible(context, alignment: .4);
-                    }
-                  },
-                  onTap: () => Navigator.push<void>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => DetailScreen(
-                        drama: item.drama,
-                        repository: widget.repository,
-                        store: widget.store,
-                      ),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 40,
-                          child: Text(
-                            '${item.rank}',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: item.rank <= 3
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 72,
-                          height: 108,
-                          child: DramaCover(
-                            drama: item.drama,
-                            repository: widget.repository,
-                            radius: 8,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.drama.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              if (item.drama.category.isNotEmpty)
-                                Text(
-                                  item.drama.category,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              if (item.metric.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.local_fire_department_rounded,
-                                        size: 14,
-                                        color: AppColors.hongguoRed,
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        item.metric,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.hongguoRed,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.chevron_right_rounded),
-                      ],
-                    ),
-                  ),
-                ),
+              return RankingListTile(
+                item: item,
+                repository: widget.repository,
+                store: widget.store,
               );
             },
           ),

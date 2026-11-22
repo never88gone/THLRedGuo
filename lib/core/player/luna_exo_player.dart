@@ -395,9 +395,10 @@ class LunaExoPlayer implements Player {
         if (hwdec &&
             (logText.contains('hardware decoding failed') ||
                 logText.contains('mediacodec error') ||
-                logText.contains('mediacodec failed'))) {
+                logText.contains('mediacodec failed') ||
+                PlaybackRecovery.videoOutputFailed(log.text))) {
           DiaryService.add(
-            '[MediaKit] 捕获硬件解码异常: ${log.text}，自动回退到兼容软解引擎...',
+            '[MediaKit] 捕获硬件解码/输出异常: ${log.text}，自动回退到兼容软解引擎...',
           );
           final startPos = native.state.position;
           final recoveryMedia = Media(
@@ -414,8 +415,12 @@ class LunaExoPlayer implements Player {
               sourceGeneration: generation,
             ).catchError((Object e) {
               DiaryService.add('[MediaKit] 软解回退自愈失败: $e');
+              if (!_disposed && generation == _openGeneration) {
+                _safeAdd(stream.errorController, log.text);
+              }
             }),
           );
+          return;
         }
         if (PlaybackRecovery.videoOutputFailed(log.text)) {
           _safeAdd(stream.errorController, log.text);

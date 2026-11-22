@@ -5,22 +5,10 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
+import 'package:THLRedLook/core/download/download_active_task.dart';
+import 'package:THLRedLook/core/download/download_job_executor.dart';
+import 'package:THLRedLook/core/download/download_storage_migrator.dart';
 import 'package:THLRedLook/core/storage/app_storage.dart';
-
-class _ActiveTask {
-  _ActiveTask(this.client);
-  final http.Client client;
-  bool isCancelled = false;
-  IOSink? sink;
-
-  void cancel() {
-    isCancelled = true;
-    try {
-      sink?.close();
-    } catch (_) {}
-    client.close();
-  }
-}
 
 class DownloadManager {
   DownloadManager._();
@@ -31,7 +19,7 @@ class DownloadManager {
   File get _jobsFile => File(p.join(_directory, 'jobs.json'));
 
   final Map<String, Map<String, dynamic>> _jobs = {};
-  final Map<String, _ActiveTask> _activeTasks = {};
+  final Map<String, DownloadActiveTask> _activeTasks = {};
   final Set<String> _runningJobIds = {};
 
   Future<Map<String, dynamic>> Function(Map<String, dynamic> input)?
@@ -226,153 +214,19 @@ class DownloadManager {
     job['revision'] = ((job['revision'] as num?)?.toInt() ?? 0) + 1;
     await _saveJobs();
 
-    final drama = Map<String, dynamic>.from(job['drama'] as Map? ?? {});
-    final dramaId = drama['id']?.toString() ?? 'drama';
-    final cleanId = _cleanDramaDir(dramaId);
-    final dramaDir = Directory(p.join(_directory, cleanId));
-    await dramaDir.create(recursive: true);
-
-    final index = (job['index'] as num?)?.toInt() ?? 1;
-    final mp4File = File(p.join(dramaDir.path, 'ep_$index.mp4'));
-    final partFile = File(p.join(dramaDir.path, 'ep_$index.mp4.part'));
-
     final httpClient = http.Client();
-    final activeTask = _ActiveTask(httpClient);
+    final activeTask = DownloadActiveTask(httpClient);
     _activeTasks[jobId] = activeTask;
 
     try {
-      if (await mp4File.exists() && await mp4File.length() > 0) {
-        final length = await mp4File.length();
-        job['state'] = 'completed';
-        job['bytes'] = length;
-        job['total'] = length;
-        job['progress'] = 1.0;
-        job['revision'] = ((job['revision'] as num?)?.toInt() ?? 0) + 1;
-        await _saveJobs();
-        return;
-      }
-
-      if (_resolvePlayback == null) {
-        throw StateError('流媒体解析引擎未就绪');
-      }
-
-      final resolved = await _resolvePlayback!({
-        'action': 'resolve',
-        'drama': drama,
-        'chapter': job['chapter'],
-        'index': index,
-        'quality': job['quality'] ?? 0,
-      });
-
-      if (activeTask.isCancelled) return;
-
-      final url = resolved['url']?.toString() ?? '';
-      if (url.isEmpty) {
-        throw StateError('解析下载直链失败');
-      }
-
-      final headers = resolved['headers'] as Map? ?? {};
-      final decryptionKey = resolved['decryptionKey']?.toString() ?? '';
-      if (decryptionKey.isNotEmpty) {
-        job['decryptionKey'] = decryptionKey;
-      }
-      final resolvedQuality = (resolved['quality'] as num?)?.toInt() ?? 0;
-      if (resolvedQuality > 0) {
-        job['actualQuality'] = resolvedQuality;
-      }
-
-      var downloadedBytes = 0;
-      if (await partFile.exists()) {
-        downloadedBytes = await partFile.length();
-      }
-
-      final uri = Uri.parse(url);
-      final request = http.Request('GET', uri);
-      headers.forEach((k, v) {
-        if (k != null && v != null) {
-          request.headers[k.toString()] = v.toString();
-        }
-      });
-
-      if (downloadedBytes > 0) {
-        request.headers['Range'] = 'bytes=$downloadedBytes-';
-      }
-
-      final streamedResponse = await httpClient.send(request);
-      if (activeTask.isCancelled) return;
-
-      var totalBytes = job['total'] as int? ?? 0;
-      FileMode mode;
-
-      if (streamedResponse.statusCode == 206) {
-        final contentLen = streamedResponse.contentLength ?? 0;
-        totalBytes = downloadedBytes + contentLen;
-        mode = FileMode.append;
-      } else if (streamedResponse.statusCode == 200) {
-        downloadedBytes = 0;
-        totalBytes = streamedResponse.contentLength ?? 0;
-        mode = FileMode.write;
-      } else if (streamedResponse.statusCode == 416) {
-        if (downloadedBytes > 0) {
-          totalBytes = downloadedBytes;
-          mode = FileMode.append;
-        } else {
-          throw StateError('服务器返回 HTTP 416 Range Not Satisfiable');
-        }
-      } else {
-        throw StateError('下载请求失败: HTTP ${streamedResponse.statusCode}');
-      }
-
-      job['total'] = totalBytes;
-      job['bytes'] = downloadedBytes;
-      if (totalBytes > 0) {
-        job['progress'] = (downloadedBytes / totalBytes).clamp(0.0, 1.0);
-      }
-
-      final sink = partFile.openWrite(mode: mode);
-      activeTask.sink = sink;
-
-      var lastUpdate = DateTime.now();
-
-      await for (final chunk in streamedResponse.stream) {
-        if (activeTask.isCancelled) break;
-        sink.add(chunk);
-        downloadedBytes += chunk.length;
-        job['bytes'] = downloadedBytes;
-        if (totalBytes > 0) {
-          job['progress'] = (downloadedBytes / totalBytes).clamp(0.0, 1.0);
-        }
-
-        final now = DateTime.now();
-        if (now.difference(lastUpdate).inMilliseconds >= 500) {
-          lastUpdate = now;
-          _saveJobs();
-        }
-      }
-
-      await sink.flush();
-      await sink.close();
-      activeTask.sink = null;
-
-      if (activeTask.isCancelled) {
-        return;
-      }
-
-      if (await partFile.exists()) {
-        if (await mp4File.exists()) {
-          await mp4File.delete();
-        }
-        await partFile.rename(mp4File.path);
-      }
-
-      final finalLength = await mp4File.length();
-      job['state'] = 'completed';
-      job['bytes'] = finalLength;
-      job['total'] = finalLength;
-      job['progress'] = 1.0;
-      job['error'] = '';
-      job['revision'] = ((job['revision'] as num?)?.toInt() ?? 0) + 1;
-      await _saveJobs();
+      await DownloadJobExecutor.execute(
+        jobId: jobId,
+        job: job,
+        directory: _directory,
+        activeTask: activeTask,
+        resolvePlayback: _resolvePlayback,
+        onSave: _saveJobs,
+      );
     } catch (e) {
       if (!activeTask.isCancelled) {
         job['state'] = 'failed';
@@ -550,31 +404,7 @@ class DownloadManager {
     if (targetDir.trim().isEmpty || targetDir == _directory) return;
     await control('pauseAll');
 
-    final newDir = Directory(targetDir);
-    await newDir.create(recursive: true);
-
-    final currentDir = Directory(_directory);
-    if (await currentDir.exists()) {
-      await for (final entity in currentDir.list(recursive: false)) {
-        final dest = p.join(targetDir, p.basename(entity.path));
-        if (entity is File) {
-          await entity.copy(dest);
-          await entity.delete();
-        } else if (entity is Directory) {
-          final targetSubDir = Directory(dest);
-          await targetSubDir.create(recursive: true);
-          await for (final subEntity in entity.list(recursive: false)) {
-            if (subEntity is File) {
-              await subEntity.copy(
-                p.join(targetSubDir.path, p.basename(subEntity.path)),
-              );
-              await subEntity.delete();
-            }
-          }
-          await entity.delete(recursive: true);
-        }
-      }
-    }
+    await DownloadStorageMigrator.moveDirectoryContents(_directory, targetDir);
 
     _directory = targetDir;
     await _loadJobs();

@@ -343,6 +343,9 @@ class PlayerScreenState extends State<PlayerScreen>
           final videoOutputFailed = PlaybackRecovery.videoOutputFailed(error);
           if (Platform.isAndroid && videoOutputFailed) {
             _encryptedVideoOutputFailed = true;
+            if (_player is LunaExoPlayer) {
+              _player.setDecoderMode(PlaybackDecoderMode.compatible);
+            }
           }
           _queueRecovery(
             force:
@@ -989,6 +992,7 @@ class PlayerScreenState extends State<PlayerScreen>
             current,
             decryptedStream: _encryptedPlayback.isStreamPlan(current),
             allowCache:
+                !_encryptedVideoOutputFailed &&
                 _player is LunaExoPlayer &&
                 (Platform.isAndroid || Platform.isIOS),
           );
@@ -1168,7 +1172,7 @@ class PlayerScreenState extends State<PlayerScreen>
     }
     if (index != _index) _forceOnline = false;
     final forceEncryptedCache =
-        _encryptedVideoOutputFailed ||
+        !_encryptedVideoOutputFailed &&
         (recoveryAction != null &&
             (_recovery.cacheAttempted ||
                 (_plan?.decryptionKey.isNotEmpty ?? false)));
