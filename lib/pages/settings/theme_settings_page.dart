@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/views/settings/settings_radio_tile.dart';
+import 'package:THLRedLook/views/settings/settings_tile.dart';
 
 class ThemeSettingsPage extends StatelessWidget {
   const ThemeSettingsPage({
@@ -37,6 +40,7 @@ class ThemeSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isTv = AppLayout.isTelevision(context);
 
     return ListenableBuilder(
       listenable: store,
@@ -59,59 +63,36 @@ class ThemeSettingsPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-
               ..._themes.map((item) {
                 final isSelected = currentTheme == item.key;
-                return Card(
-                  elevation: 0,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  color: isSelected
-                      ? (isDark ? AppColors.darkSurfaceHighest : AppColors.accentSubtle12)
-                      : (isDark ? AppColors.darkCard : AppColors.greyLight),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: isSelected
-                        ? const BorderSide(color: AppColors.hongguoRed, width: 1.5)
-                        : BorderSide.none,
+                return SettingsRadioTile(
+                  autofocus: isTv && isSelected,
+                  selected: isSelected,
+                  leading: CircleAvatar(
+                    backgroundColor: isSelected
+                        ? AppColors.hongguoRed
+                        : (isDark
+                            ? AppColors.darkSurfaceHighest
+                            : AppColors.greyLight),
+                    child: Icon(
+                      item.icon,
+                      color:
+                          isSelected ? AppColors.white : theme.iconTheme.color,
+                      size: 22,
+                    ),
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: CircleAvatar(
-                      backgroundColor: isSelected
-                          ? AppColors.hongguoRed
-                          : (isDark ? AppColors.darkSurfaceHighest : AppColors.greyLight),
-                      child: Icon(
-                        item.icon,
-                        color: isSelected ? AppColors.white : theme.iconTheme.color,
-                        size: 22,
-                      ),
-                    ),
-                    title: Text(
-                      item.title,
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? AppColors.hongguoRed : null,
-                      ),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        item.subtitle,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check_circle_rounded, color: AppColors.hongguoRed)
-                        : null,
-                    onTap: () async {
-                      if (!isSelected) {
-                        await saveUserChange(context, () => store.setThemeMode(item.key));
-                      }
-                    },
-                  ),
+                  title: Text(item.title),
+                  subtitle: Text(item.subtitle),
+                  onTap: () async {
+                    if (!isSelected) {
+                      await saveUserChange(
+                        context,
+                        () => store.setThemeMode(item.key),
+                      );
+                    }
+                  },
                 );
               }),
-
               const SizedBox(height: 16),
               Text(
                 '品牌色彩',
@@ -121,25 +102,30 @@ class ThemeSettingsPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-
               Card(
                 elevation: 0,
                 color: isDark ? AppColors.darkCard : AppColors.greyLight,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: ListTile(
-                  leading: Container(
-                    width: 26,
-                    height: 26,
-                    decoration: const BoxDecoration(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: SettingsTile(
+                    leading: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: const BoxDecoration(
+                        color: AppColors.hongguoRed,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    title: const Text('品牌视觉色'),
+                    subtitle: const Text('经典活力红 · 专为短剧打造的沉浸式主题色'),
+                    trailing: const Icon(
+                      Icons.done_all_rounded,
                       color: AppColors.hongguoRed,
-                      shape: BoxShape.circle,
                     ),
                   ),
-                  title: const Text('品牌视觉色'),
-                  subtitle: const Text('经典活力红 · 专为短剧打造的沉浸式主题色'),
-                  trailing: const Icon(Icons.done_all_rounded, color: AppColors.hongguoRed),
                 ),
               ),
             ],

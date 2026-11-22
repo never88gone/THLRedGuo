@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/views/settings/settings_radio_tile.dart';
+import 'package:THLRedLook/views/settings/settings_switch_tile.dart';
 
 class DisplayModePage extends StatelessWidget {
   const DisplayModePage({
@@ -37,6 +40,7 @@ class DisplayModePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isTv = AppLayout.isTelevision(context);
 
     return ListenableBuilder(
       listenable: store,
@@ -88,7 +92,8 @@ class DisplayModePage extends StatelessWidget {
                             Text(
                               '根据不同使用场景随时切换，支持在大屏电视遥控、桌面电脑与移动手机间无缝流转。',
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+                                color: theme.textTheme.bodySmall?.color
+                                    ?.withValues(alpha: 0.8),
                               ),
                             ),
                           ],
@@ -99,7 +104,6 @@ class DisplayModePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
               Text(
                 '选择界面呈现模式',
                 style: theme.textTheme.labelLarge?.copyWith(
@@ -108,59 +112,36 @@ class DisplayModePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-
               ..._modes.map((mode) {
                 final isSelected = currentMode == mode.key;
-                return Card(
-                  elevation: 0,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  color: isSelected
-                      ? (isDark ? AppColors.darkSurfaceHighest : AppColors.accentSubtle12)
-                      : (isDark ? AppColors.darkCard : AppColors.greyLight),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: isSelected
-                        ? const BorderSide(color: AppColors.hongguoRed, width: 1.5)
-                        : BorderSide.none,
+                return SettingsRadioTile(
+                  autofocus: isTv && isSelected,
+                  selected: isSelected,
+                  leading: CircleAvatar(
+                    backgroundColor: isSelected
+                        ? AppColors.hongguoRed
+                        : (isDark
+                            ? AppColors.darkSurfaceHighest
+                            : AppColors.greyLight),
+                    child: Icon(
+                      mode.icon,
+                      color:
+                          isSelected ? AppColors.white : theme.iconTheme.color,
+                      size: 22,
+                    ),
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: CircleAvatar(
-                      backgroundColor: isSelected
-                          ? AppColors.hongguoRed
-                          : (isDark ? AppColors.darkSurfaceHighest : AppColors.greyLight),
-                      child: Icon(
-                        mode.icon,
-                        color: isSelected ? AppColors.white : theme.iconTheme.color,
-                        size: 22,
-                      ),
-                    ),
-                    title: Text(
-                      mode.title,
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? AppColors.hongguoRed : null,
-                      ),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        mode.subtitle,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check_circle_rounded, color: AppColors.hongguoRed)
-                        : null,
-                    onTap: () async {
-                      if (!isSelected) {
-                        await saveUserChange(context, () => store.setDisplayMode(mode.key));
-                      }
-                    },
-                  ),
+                  title: Text(mode.title),
+                  subtitle: Text(mode.subtitle),
+                  onTap: () async {
+                    if (!isSelected) {
+                      await saveUserChange(
+                        context,
+                        () => store.setDisplayMode(mode.key),
+                      );
+                    }
+                  },
                 );
               }),
-
               const SizedBox(height: 16),
               Text(
                 '显示与常亮设置',
@@ -170,26 +151,26 @@ class DisplayModePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-
               Card(
                 elevation: 0,
                 color: isDark ? AppColors.darkCard : AppColors.greyLight,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: SwitchListTile.adaptive(
-                  secondary: const Icon(Icons.screen_lock_portrait_rounded),
-                  title: const Text('禁止自动锁屏'),
-                  subtitle: const Text('保持屏幕常亮，防止离线下载与挂机播放时设备自动息屏休眠'),
-                  value: store.keepScreenOn,
-                  activeThumbColor: AppColors.white,
-                  activeTrackColor: AppColors.hongguoRed,
-                  onChanged: (val) async {
-                    await saveUserChange(
-                      context,
-                      () => store.setKeepScreenOn(val),
-                    );
-                  },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: SettingsSwitchTile(
+                    leading: const Icon(Icons.screen_lock_portrait_rounded),
+                    title: const Text('禁止自动锁屏'),
+                    subtitle: const Text('保持屏幕常亮，防止离线下载与挂机播放时设备自动息屏休眠'),
+                    value: store.keepScreenOn,
+                    onChanged: (val) async {
+                      await saveUserChange(
+                        context,
+                        () => store.setKeepScreenOn(val),
+                      );
+                    },
+                  ),
                 ),
               ),
             ],

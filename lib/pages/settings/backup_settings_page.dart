@@ -5,8 +5,10 @@ import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/core/sync/icloud_sync_service.dart';
 import 'package:THLRedLook/pages/settings/icloud_sync_page.dart';
 import 'package:THLRedLook/pages/settings/resource_settings_page.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/utils/settings/settings_backup_helper.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/settings/settings_tile.dart';
 
 class BackupSettingsPage extends StatefulWidget {
   const BackupSettingsPage({
@@ -38,7 +40,8 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
           setState(() => _message = '配置备份已成功导出保存');
         }
       } else {
-        final success = await SettingsBackupHelper.restoreBackup(context, widget.store);
+        final success =
+            await SettingsBackupHelper.restoreBackup(context, widget.store);
         if (success && mounted) {
           setState(() => _message = '配置备份恢复成功');
         }
@@ -54,6 +57,7 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isTv = AppLayout.isTelevision(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -100,7 +104,8 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
                         Text(
                           '追剧记录、自定义偏好及用户档案完整存储于设备端，支持跨设备导入迁移。',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+                            color: theme.textTheme.bodySmall?.color
+                                ?.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -127,25 +132,31 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: ListTile(
-                key: const ValueKey('backup-icloud-sync-entry'),
-                leading: const Icon(Icons.cloud_sync_rounded, color: AppColors.hongguoRed),
-                title: const Text('iCloud 云端多端同步'),
-                subtitle: Text(
-                  ICloudSyncService.instance.isSyncEnabled(widget.store.preferences)
-                      ? '已开启 · 自动在 iOS、macOS 与 Apple TV 间同步'
-                      : '已停用 · 轻触进入设置开启云端同步',
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: SettingsTile(
+                  key: const ValueKey('backup-icloud-sync-entry'),
+                  leading: const Icon(
+                    Icons.cloud_sync_rounded,
+                    color: AppColors.hongguoRed,
+                  ),
+                  title: const Text('iCloud 云端多端同步'),
+                  subtitle: Text(
+                    ICloudSyncService.instance
+                            .isSyncEnabled(widget.store.preferences)
+                        ? '已开启 · 自动在 iOS、macOS 与 Apple TV 间同步'
+                        : '已停用 · 轻触进入设置开启云端同步',
+                  ),
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => ICloudSyncPage(store: widget.store),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
                 ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => ICloudSyncPage(store: widget.store),
-                    ),
-                  );
-                  if (mounted) setState(() {});
-                },
               ),
             ),
             const SizedBox(height: 16),
@@ -166,24 +177,26 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.backup_outlined),
-                  title: const Text('导出完整配置备份'),
-                  subtitle: const Text('将当前设备追剧历史与设置导出为 JSON 备份文件'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: _busy ? null : () => _backup(false),
-                ),
-                const Divider(height: 1, indent: 56),
-                ListTile(
-                  leading: const Icon(Icons.restore_rounded),
-                  title: const Text('从备份文件恢复配置'),
-                  subtitle: const Text('读取并恢复先前导出的 JSON 备份数据'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: _busy ? null : () => _backup(true),
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                children: [
+                  SettingsTile(
+                    autofocus: isTv,
+                    leading: const Icon(Icons.backup_outlined),
+                    title: const Text('导出完整配置备份'),
+                    subtitle: const Text('将当前设备追剧历史与设置导出为 JSON 备份文件'),
+                    onTap: _busy ? null : () => _backup(false),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  SettingsTile(
+                    leading: const Icon(Icons.restore_rounded),
+                    title: const Text('从备份文件恢复配置'),
+                    subtitle: const Text('读取并恢复先前导出的 JSON 备份数据'),
+                    onTap: _busy ? null : () => _backup(true),
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -203,17 +216,19 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: ListTile(
-                leading: const Icon(Icons.settings_ethernet_rounded),
-                title: const Text('网络请求与资源调度'),
-                subtitle: const Text('代理服务器、请求频次间隔与下载并发数配置'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => ResourceSettingsScreen(
-                      repository: widget.repository,
-                      store: widget.store,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: SettingsTile(
+                  leading: const Icon(Icons.settings_ethernet_rounded),
+                  title: const Text('网络请求与资源调度'),
+                  subtitle: const Text('代理服务器、请求频次间隔与下载并发数配置'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => ResourceSettingsScreen(
+                        repository: widget.repository,
+                        store: widget.store,
+                      ),
                     ),
                   ),
                 ),
@@ -231,14 +246,19 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppColors.accentSubtle12,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded, color: AppColors.hongguoRed, size: 20),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.hongguoRed,
+                      size: 20,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(

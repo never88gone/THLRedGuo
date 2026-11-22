@@ -52,21 +52,24 @@ class SettingsGroupCard extends StatelessWidget {
                 width: 0.6,
               ),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                for (var i = 0; i < children.length; i++) ...[
-                  children[i],
-                  if (i < children.length - 1)
-                    Divider(
-                      height: 0.8,
-                      thickness: 0.8,
-                      indent: 52,
-                      endIndent: 16,
-                      color: colorScheme.outlineVariant,
-                    ),
+            clipBehavior: Clip.none,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                children: [
+                  for (var i = 0; i < children.length; i++) ...[
+                    children[i],
+                    if (i < children.length - 1)
+                      Divider(
+                        height: 0.8,
+                        thickness: 0.8,
+                        indent: 52,
+                        endIndent: 16,
+                        color: colorScheme.outlineVariant,
+                      ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ],

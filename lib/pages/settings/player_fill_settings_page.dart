@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/core/player/playback_preferences.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 import 'package:THLRedLook/utils/theme/app_gradients.dart';
+import 'package:THLRedLook/views/settings/settings_radio_tile.dart';
 
 /// 播放器视口默认填充样式设置子页面
 class PlayerFillSettingsPage extends StatelessWidget {
@@ -29,6 +31,7 @@ class PlayerFillSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isTv = AppLayout.isTelevision(context);
 
     return ListenableBuilder(
       listenable: store,
@@ -80,61 +83,30 @@ class PlayerFillSettingsPage extends StatelessWidget {
                   ),
                 };
 
-                return Card(
+                return SettingsRadioTile(
                   key: ValueKey('fill-style-option-${style.name}'),
-                  elevation: 0,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  color: isSelected
-                      ? (isDark ? AppColors.darkSurfaceHighest : AppColors.accentSubtle12)
-                      : (isDark ? AppColors.darkCard : AppColors.greyLight),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: isSelected
-                        ? const BorderSide(color: AppColors.hongguoRed, width: 1.5)
-                        : BorderSide.none,
+                  autofocus: isTv && isSelected,
+                  selected: isSelected,
+                  leading: CircleAvatar(
+                    backgroundColor: isSelected
+                        ? AppColors.hongguoRed
+                        : (isDark ? AppColors.darkSurfaceHighest : AppColors.greyLight),
+                    child: Icon(
+                      icon,
+                      color: isSelected ? AppColors.white : theme.iconTheme.color,
+                      size: 22,
+                    ),
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: CircleAvatar(
-                      backgroundColor: isSelected
-                          ? AppColors.hongguoRed
-                          : (isDark ? AppColors.darkSurfaceHighest : AppColors.greyLight),
-                      child: Icon(
-                        icon,
-                        color: isSelected ? AppColors.white : theme.iconTheme.color,
-                        size: 22,
-                      ),
-                    ),
-                    title: Text(
-                      style.label,
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                        color: isSelected ? AppColors.hongguoRed : null,
-                      ),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        subtitle,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? const Icon(
-                            Icons.check_circle_rounded,
-                            color: AppColors.hongguoRed,
-                            size: 22,
-                          )
-                        : null,
-                    onTap: () async {
-                      if (currentStyle == style) return;
-                      final updated = store.playbackPreferences.copyWith(fillStyle: style);
-                      await saveUserChange(
-                        context,
-                        () => store.setPlaybackPreferences(updated),
-                      );
-                    },
-                  ),
+                  title: Text(style.label),
+                  subtitle: Text(subtitle),
+                  onTap: () async {
+                    if (currentStyle == style) return;
+                    final updated = store.playbackPreferences.copyWith(fillStyle: style);
+                    await saveUserChange(
+                      context,
+                      () => store.setPlaybackPreferences(updated),
+                    );
+                  },
                 );
               }),
             ],
