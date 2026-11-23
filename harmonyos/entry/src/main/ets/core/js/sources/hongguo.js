@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 官方免费短剧 CatPawOpen Spider (hongguo.js)
  * 适配 CatPawOpen / CatVodOpen 标准规范 v1.0.4
  * 支持官方 App API 与 Web 路由双轨容错解析
@@ -7,7 +7,7 @@
 const meta = {
   id: "hongguo",
   name: "官方免费短剧",
-  version: "1.1.0-dev.22",
+  version: "1.1.0-dev.23",
   description: "官方首发短剧源，包含海量都市爽文、战神回归、现代甜宠等优质短剧",
   author: "社区开发者",
   type: "video",
@@ -1118,7 +1118,7 @@ function ln(model, videoId, downloadQuality) {
   const r = model, e = videoId, t = downloadQuality, n = entries;
 let i,o=[],a=new Set;for(let c of n)try{let s=c.item.spade_a||c.item.encrypt_info?.spade_a,u=s?no(s):null;for(let f of[c.item.main_url,c.item.backup_url,c.item.backup_url_1,c.item.backup_url_2,c.item.backup_url_3,...Array.isArray(c.item.backup_url_list)?c.item.backup_url_list:[]])if(!(typeof f!="string"||!f))try{let h=r.key_seed?io(f,S.from(r.key_seed,"base64")):/^https:\/\//i.test(cn(f))?cn(f):S.from(f,"base64").toString("utf8"),d=lt(h,["qznovelvod.com","fqnovelvod.com","douyinvod.com"]),x=u?u.toString("hex"):null,y=`${d}:${x||""}`;if(a.has(y))continue;a.add(y),o.push({url:d,contentKey:x,codec:c.codec==="bytevc1"?"hevc":c.codec||"auto",source:"app",vid:e,expiresAt:appModelExpiry(r),userAgent:dt,referer:"https://novelquickapp.com/",mediaBytes:Math.max(0,Number(c.item.size||c.item.video_meta?.size||0)),quality:c.quality,width:c.width,height:c.height})}catch(h){i=h}}catch(s){i=s}if(o.length)return o;throw i?.code==="SECURITY_BLOCKED"?i:Object.assign(new Error("\u672C\u96C6\u7247\u6E90\u5730\u5740\u6216\u5BC6\u94A5\u65E0\u6CD5\u89E3\u6790"),{code:"INVALID_RESPONSE"})}
 var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code:"73932",update_version_code:"73932",pv_player:"73932"},Ae;function ao(){let r=K.randomBytes(16);r[6]=r[6]&15|64,r[8]=r[8]&63|128;let e=r.toString("hex");return[e.slice(0,8),e.slice(8,12),e.slice(12,16),e.slice(16,20),e.slice(20)].join("-")}async function Ot(r=1/0){if(globalThis.__hongguoCachedDevice&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.iid))&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.device_id))){globalThis.__hongguoCachedDevice={...globalThis.__hongguoCachedDevice,...he,iid:fe(globalThis.__hongguoCachedDevice.iid),device_id:fe(globalThis.__hongguoCachedDevice.device_id),cdid:fe(globalThis.__hongguoCachedDevice.cdid)||ao()};return globalThis.__hongguoCachedDevice;}return Ae||(Ae=(async()=>{let e=ao(),t={aid:8662,app_name:"novelread",package:"com.phoenix.read",app_version:he.version_name,version_code:73932,update_version_code:73932,manifest_version_code:73932,sdk_version:"6.18.0",device_platform:"android",os:"Android",os_version:he.os_version,os_api:Number(he.os_api),device_model:he.device_type,device_brand:he.device_brand,device_manufacturer:"Xiaomi",density_dpi:Number(he.dpi),display_density:"mdpi",resolution:he.resolution.replace("*","x"),language:"zh",timezone:8,access:"wifi",channel:he.channel,cdid:e,openudid:K.randomBytes(8).toString("hex")},n=await Pe("https://log.snssdk.com/service/2/device_register/?aid=8662&app_name=novelread",{method:"POST",headers:{"Content-Type":"application/json; charset=utf-8","User-Agent":dt},data:JSON.stringify({magic_tag:"ss_app_log",header:t,_gen_time:Date.now()})},Math.min(Date.now()+12e3,r)),i=fe(n.install_id_str),o=fe(n.device_id_str);if(!/^\d{10,24}$/.test(i)||!/^\d{10,24}$/.test(o))throw Object.assign(new Error("\u65E0\u6CD5\u521D\u59CB\u5316\u5B98\u65B9\u4F1A\u8BDD"),{code:"GUEST_REGISTRATION_FAILED"});let dev={...he,iid:i,device_id:o,cdid:e};globalThis.__hongguoCachedDevice=dev;if(typeof __native_save_device==="function"){try{__native_save_device(JSON.stringify(dev));}catch(_){}}return dev;})().catch(e=>{throw Ae=null,e})),Ae}async function co(r,e={},t=!1){t&&!globalThis.__hongguoAccountActive&&(Ae=null,delete globalThis.__hongguoCachedDevice);let deadline=Math.min(Date.now()+12e3,e.deadline||1/0),n=await Ot(deadline),i={query:r,count:0,offset:e.offset||0,tab_type:e.fallbackToGeneral?11:29,tab_name:e.fallbackToGeneral?"":"feed",search_source:1,use_correct:!1,use_lynx:!1,user_is_login:globalThis.__hongguoAccountActive?1:0,bookshelf_search_plan:4,bookstore_tab:16,is_first_enter_search:!e.offset};e.passback&&(i.passback=e.passback),e.searchId&&(i.search_id=e.searchId);let o=Ht(null,"https://reading.snssdk.com/reading/bookapi/search/tab/v",i,n),a=await Pe(o.url,{headers:{...o.headers,lc:"101"}},deadline);if(Number(a.code)!==0||!Array.isArray(a.search_tabs))throw Object.assign(new Error("\u5B98\u65B9\u641C\u7D22\u672A\u8FD4\u56DE\u6709\u6548\u7ED3\u679C"),{code:"SEARCH_REJECTED",category:"business_reject"});return a}async function so({seriesId:r,videoId:e,startMs:t=0,durationMs:n,cursor:i=""}){if(!/^\d{10,30}$/.test(String(r))||!/^\d{10,30}$/.test(String(e)))throw new Error("\u5F39\u5E55\u5206\u96C6\u7F16\u53F7\u65E0\u6548");let o={comment_source:601,server_channel:1e3,group_id:String(e),group_type:30,comment_type:20,sort:1,business_param:{book_id:String(r),start_offset_time:t,playlet_item_duration:n},count:90,cursor:String(i),aid:8662,compliance_status:0},a=await Ot(),c=Ht(JSON.stringify(o),"https://reading.snssdk.com/novel/commentapi/comment/list/"+e+"/v1/",{},a);return Pe(c.url,{method:"POST",headers:{...c.headers,lc:"101"},data:c.body},Date.now()+5e3)}mn.exports={buildAccountRequest:async function(action="profile",payload={}) {
-  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/"};
+  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",creatorWorks:"/novel/commentapi/user/profile/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v",commentList:"/novel/commentapi/comment/list/",commentReplyList:"/novel/commentapi/reply/list/"};
   if(!Object.prototype.hasOwnProperty.call(routes,action))throw new Error("不支持的账号操作");
   const identity=value=>{const id=String(value||"");if(!/^[1-9]\d{0,29}$/.test(id))throw new Error("账号剧集编号无效");return id;};
   const integer=value=>{const n=Number(value);if(!Number.isSafeInteger(n)||n<0)throw new Error("账号进度参数无效");return n;};
@@ -1143,8 +1143,32 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     if(!duration||!episode||count&&episode>count)throw new Error("账号进度参数无效");
     body={books:[{book_id:identity(payload.id),item_id:identity(payload.itemId),vid_index:episode,current_play_time:position,current_total_time:duration,episode_count:count,read_timestamp_ms:integer(payload.updatedAt),book_type:2,progress_rate:String(position/duration)}],write_mode:1};
   }
-  if(action==="socialDetail")body={series_id:identity(payload.id)};
+  if(action==="socialDetail"||action==="libraryDetail")body={series_id:identity(payload.id)};
   if(action==="creatorList")Object.assign(params,{series_id:identity(payload.id),list_type:3,count:50,offset:0});
+  if(action==="followingCreators") {
+    const count=integer(payload.count===undefined?20:payload.count);
+    if(count<1||count>50)throw new Error("账号列表分页大小无效");
+    const offset=integer(payload.offset===undefined?0:payload.offset);
+    const uid=identity(payload.userId);
+    const cursor=payload.cursor!==undefined&&payload.cursor!==null&&String(payload.cursor)!==""?String(payload.cursor):(offset>0?String(offset):"");
+    body={aid:integer(he.aid),comment_source:1507,count,cursor,target_user_id:uid};
+  }
+  if(action==="creatorWorks") {
+    const count=integer(payload.count===undefined?20:payload.count);
+    if(count<1||count>50)throw new Error("账号列表分页大小无效");
+    const offset=integer(payload.offset===undefined?0:payload.offset);
+    const uid=identity(payload.userId);
+    const cursor=payload.cursor!==undefined&&payload.cursor!==null&&String(payload.cursor)!==""?String(payload.cursor):(offset>0?String(offset):"");
+    const commentSource=payload.commentSource!==undefined&&payload.commentSource!==null&&String(payload.commentSource)!==""?integer(payload.commentSource):1506;
+    const tabType=payload.tabType!==undefined&&payload.tabType!==null&&String(payload.tabType)!==""?integer(payload.tabType):23;
+    body={aid:integer(he.aid),comment_source:commentSource,tab_type:tabType,count,cursor,target_user_id:uid};
+  }
+  if(action==="likedVideos") {
+    const count=integer(payload.count===undefined?20:payload.count);
+    if(count<1||count>50)throw new Error("账号列表分页大小无效");
+    Object.assign(params,{count,offset:integer(payload.offset===undefined?0:payload.offset),object_type_list:"6,15,10",action_type:3});
+  }
+  if(action==="creatorProfile")params.user_id=identity(payload.userId);
   if(action==="likeUpdate") {
     if(!["0","1"].includes(String(payload.like)))throw new Error("点赞状态无效");
     body={object_id:identity(payload.itemId),object_type:6,action_type:String(payload.like)==="1"?3:4,action_category:1};
@@ -1154,6 +1178,24 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     if(![2,3].includes(type)||!["0","1"].includes(String(payload.follow)))throw new Error("关注参数无效");
     body={object_id:identity(payload.userId),object_type:1,action_type:String(payload.follow)==="1"?25:26,aid:integer(he.aid),business_param:{shark_param:{}}};
   }
+  if(action==="commentList") {
+    const count=integer(payload.count===undefined?20:payload.count);
+    if(count<1||count>50)throw new Error("账号列表分页大小无效");
+    const bookId=identity(payload.bookId||payload.id);
+    const cursor=payload.cursor!==undefined&&payload.cursor!==null&&String(payload.cursor)!==""?String(payload.cursor):"";
+    const sort=integer(payload.sort===undefined?1:payload.sort);
+    body={aid:integer(he.aid),comment_source:1,server_channel:34,group_id:bookId,group_type:1,comment_type:2,sort,count,cursor,compliance_status:0,business_param:{book_id:bookId}};
+  }
+  if(action==="commentReplyList") {
+    const count=integer(payload.count===undefined?20:payload.count);
+    if(count<1||count>50)throw new Error("账号列表分页大小无效");
+    const commentId=identity(payload.commentId);
+    const bookId=payload.bookId||payload.id?identity(payload.bookId||payload.id):"";
+    const cursor=payload.cursor!==undefined&&payload.cursor!==null&&String(payload.cursor)!==""?String(payload.cursor):"";
+    const commentSource=payload.commentSource!==undefined?integer(payload.commentSource):1011;
+    const serverChannel=payload.serverChannel!==undefined?integer(payload.serverChannel):34;
+    body={aid:integer(he.aid),comment_id:commentId,comment_source:commentSource,server_channel:serverChannel,group_id:bookId,group_type:1,comment_type:2,count,cursor,compliance_status:0,business_param:{book_id:bookId,real_level:2}};
+  }
   let dev;
   if(action==="profile"&&payload.device) {
     let bound;try{bound=JSON.parse(payload.device);}catch(_){throw new Error("账号设备上下文无效");}
@@ -1161,7 +1203,9 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     dev={...he,iid:String(bound.iid),device_id:String(bound.device_id),cdid:bound.cdid};
   } else dev=await Ot();
   const wireBody=body===null?null:action==="progressGet"?'{"book_ids":{"2":['+identity(payload.id)+']}}':JSON.stringify(body);
-  const signed=Ht(wireBody,"https://api5-normal-sinfonlinea.fqnovel.com"+routes[action],params,dev);
+  const origin=["followingCreators","creatorWorks","likedVideos","creatorProfile","commentList","commentReplyList"].includes(action)?"https://reading.snssdk.com":"https://api5-normal-sinfonlinea.fqnovel.com";
+  const path=action==="followingCreators"||action==="creatorWorks"?routes[action]+identity(payload.userId)+"/v1/":action==="commentList"?routes[action]+identity(payload.bookId||payload.id)+"/v1/":action==="commentReplyList"?routes[action]+identity(payload.commentId)+"/v1/":routes[action];
+  const signed=Ht(wireBody,origin+path,params,dev);
   return {url:signed.url,method:body===null?"GET":"POST",headers:signed.headers,...(body===null?{}:{body:wireBody})};
 },resetGuestSession:function(){Ae=null;appVideoModels.clear();delete globalThis.__hongguoCachedDevice;},fetchAppDetailRaw:async function(id){const dev=await Ot();const signed=Ht(JSON.stringify({series_id:String(id)}),"https://reading.snssdk.com/novel/player/video_detail/v1/",{},dev);const result=await Pe(signed.url,{method:"POST",headers:{...signed.headers,lc:"101"},data:signed.body},Date.now()+12000);if(Number(result.code||0)!==0)throw Object.assign(new Error("官方详情接口暂不可用，请重试"),{code:"DETAIL_REJECTED"});return result.data?.video_data},fetchAppPlayUrl:oo,fetchAppSearchRaw:co,fetchAppDanmakuRaw:so,fetchAppDiscoveryRaw:async function(path,params){if(!["/reading/bookapi/search/cue/v","/reading/bookapi/search/suggest/v","/reading/bookapi/plan/v","/reading/bookapi/bookmall/tab/v","/reading/bookapi/bookmall/cell/change/v"].includes(path))throw Object.assign(new Error("不支持的官方接口"),{code:"SECURITY_BLOCKED"});const device=await Ot();const signed=Ht(null,"https://reading.snssdk.com"+path,params,device);const result=await Pe(signed.url,{headers:{...signed.headers,lc:"101"}},Date.now()+12000);if(!result||String(result.code??result.status_code)!=="0")throw Object.assign(new Error("官方发现接口暂不可用，请重试"),{code:"DISCOVERY_REJECTED"});return result}}});var wn=z((Do,vn)=>{var{fetchAppSearchRaw:bn}=pt();function fo(r){let e=[],t=new Set;let tabs=Array.isArray(r)?r:(r?[r]:[]);for(let m of tabs){for(let n of m.data||[]){let i=Array.isArray(n.video_data)?n.video_data:[];for(let o of i){let a=o.video_detail||{},c=String(a.series_id_str||o.series_id||a.series_id||"");if(!/^\d{10,30}$/.test(c)||t.has(c))continue;let s=String(a.series_title||o.title||"").trim();if(!s)continue;t.add(c);let u=Number(a.episode_cnt||o.episode_cnt||0);e.push({vod_id:c,vod_name:s,vod_pic:cleanCoverUrl(String(a.series_cover||o.cover||"")),vod_remarks:u>0?"全"+u+"集":"",vod_content:String(a.series_intro||""),vod_total:u,content_type:Number(a.content_type||o.content_type||0)})}}}return e}function pickTab(response, general) {
   const tabs = response.search_tabs || [];
@@ -2732,7 +2776,7 @@ spider.danmaku = function (id, startMs, durationMs) {
 
 spider.accountRequest = async function (action, payload) {
   payload = payload || {};
-  if (['profile', 'favorites', 'history', 'libraryDetails', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
+  if (['profile', 'favorites', 'history', 'libraryDetails', 'libraryDetail', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow', 'followingCreators', 'creatorWorks', 'likedVideos', 'creatorProfile', 'commentList', 'commentReplyList'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
   const paths = { qr: '/passport/web/get_qrcode/', poll: '/passport/web/check_qrconnect/', webInfo: '/passport/account/info/v2/', phoneCode: '/passport/web/send_code/', phoneSms: '/passport/web/sms_login_only/' };
   if (!Object.prototype.hasOwnProperty.call(paths, action)) throw new Error('不支持的账号操作');
   const params = { aid: '513755', passport_jssdk_version: '3.4.10', passport_jssdk_type: 'normal',
@@ -2773,15 +2817,194 @@ spider.accountParse = function (action, text) {
   if (!response || typeof response !== 'object') throw new Error('账号接口返回无效数据');
   const data = response.data;
   if (action === 'profile') {
-    const id = String(data && data.biz_user_id || '');
-    if (Number(response.code) !== 0) throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    const user = (data && (data.user_info || data.base_info || data.user_data || data.user || data.profile)) || data || {};
+    const code = Number(response.code ?? response.status_code ?? response.err_no ?? 0);
+    if (code !== 0) throw new Error('ACCOUNT_BUSINESS_' + code);
+    const pickNumericId = (...vals) => {
+      for (const v of vals) {
+        const s = String(v ?? '').trim();
+        if (/^[1-9]\d{0,29}$/.test(s)) return s;
+      }
+      return '';
+    };
+    const id = pickNumericId(
+      user.biz_user_id,
+      data && data.biz_user_id,
+      user.user_id,
+      user.id,
+      user.uid,
+      user.req_id,
+      data && data.user_id,
+      data && data.id,
+      data && data.uid,
+      data && data.req_id
+    );
     if (!/^\d{1,30}$/.test(id)) throw new Error('账号资料验证失败，请重新扫码');
-    return { id, nickname: String(data.user_name || '红果用户').slice(0, 80),
-      avatar: typeof data.avatar_url === 'string' && /^https:\/\//.test(data.avatar_url) ? data.avatar_url : '' };
+    const rawUserId = String(user.user_id || (data && data.user_id) || '');
+    const encodeUserId = rawUserId && !/^\d+$/.test(rawUserId) ? rawUserId : '';
+    const rawAvatar = user.avatar_url || user.avatar || (data && data.avatar_url) || '';
+    const avatar = typeof rawAvatar === 'string' && /^https?:\/\//.test(rawAvatar) ? rawAvatar.replace(/^http:\/\//, 'https://') : '';
+    return {
+      id,
+      bizUserId: pickNumericId(user.biz_user_id, data && data.biz_user_id) || id,
+      encodeUserId,
+      nickname: String(user.user_name || user.nickname || user.name || (data && (data.user_name || data.nickname)) || '红果用户').slice(0, 80),
+      avatar
+    };
+  }
+  if (action === 'webInfo') {
+    if (response.message !== 'success' || !data) throw new Error('官方登录请求失败');
+    const user = (data && (data.user_info || data.base_info || data.user_data || data.user)) || data || {};
+    const id = String(user.user_id_str || user.user_id || user.biz_user_id || user.id || '');
+    return {
+      id: /^\d{1,30}$/.test(id) ? id : '',
+      nickname: String(user.name || user.user_name || user.screen_name || '红果用户').slice(0, 80),
+      avatar: typeof (user.avatar_url || user.avatar) === 'string' && /^https:\/\//.test(user.avatar_url || user.avatar) ? (user.avatar_url || user.avatar) : '',
+      valid: true
+    };
   }
   if (['favoriteUpdate', 'progressUpdate', 'likeUpdate', 'creatorFollow'].includes(action)) {
     if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
     return { valid: true };
+  }
+  if (action === 'creatorWorks') {
+    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('账号列表返回无效数据');
+    const identity = value => /^[1-9]\d{0,29}$/.test(String(value || '')) ? String(value) : '';
+    const integer = value => value !== null && value !== undefined && value !== '' && Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? Number(value) : null;
+    const plain = value => typeof value === 'string' ? value.trim() : '';
+    const rawList = Array.isArray(data.data_list) ? data.data_list : [];
+    const items = [];
+    const seen = new Set();
+    const pushVideo = v => {
+      if (!v || typeof v !== 'object') return;
+      const detail = v.video_detail_info || v.video_detail || v.series_info || v;
+      const id = identity(detail.series_id_str || detail.series_id || v.series_id_str || v.series_id || detail.book_id || v.book_id);
+      if (!id || seen.has(id)) return;
+      const title = plain(detail.series_title || detail.title || v.series_title || v.title || detail.book_name || v.book_name);
+      if (!title) return;
+      seen.add(id);
+      const rawCover = plain(detail.series_cover || detail.cover || v.series_cover || v.cover || detail.thumb_url || v.thumb_url);
+      const cover = cleanCoverUrl(rawCover).replace(/^http:\/\//, 'https://');
+      const description = plain(detail.series_intro || detail.intro || v.series_intro || v.intro || detail.abstract || detail.video_desc || v.video_desc);
+      const episodes = integer(detail.episode_cnt || v.episode_cnt || detail.serial_count || v.serial_count) ?? 0;
+      const subList = Array.isArray(detail.sub_title_list) ? detail.sub_title_list : (Array.isArray(v.sub_title_list) ? v.sub_title_list : []);
+      const tags = subList.map(t => plain(t && t.text)).filter(Boolean).slice(0, 6);
+      items.push({ id, title: title.slice(0, 120), cover, description: description.slice(0, 500), episodes, tags });
+    };
+    for (const row of rawList) {
+      if (!row || typeof row !== 'object') continue;
+      const containers = [
+        row.video && row.video.expand,
+        row.post && row.post.expand,
+        row.expand,
+        row
+      ];
+      for (const container of containers) {
+        if (!container || typeof container !== 'object') continue;
+        if (Array.isArray(container.videos)) {
+          for (const v of container.videos) pushVideo(v);
+        }
+        if (Array.isArray(container.video_data)) {
+          for (const v of container.video_data) pushVideo(v);
+        }
+        if (container.video_detail || container.series_info || container.series_id || container.series_id_str) {
+          pushVideo(container);
+        }
+      }
+    }
+    const common = data.common_list_info && typeof data.common_list_info === 'object' ? data.common_list_info : {};
+    const hasMore = Boolean(common.has_more === true || data.has_more === true);
+    const rawCursorVal = common.cursor !== undefined && common.cursor !== null ? common.cursor : data.next_offset;
+    const nextCursor = rawCursorVal !== undefined && rawCursorVal !== null ? String(rawCursorVal).trim() : '';
+    const nextOffset = integer(nextCursor);
+    const tabs = Array.isArray(data.tabs) ? data.tabs.map(t => integer(t && t.tab_type)).filter(v => v !== null) : [];
+    return { items, hasMore, nextCursor, nextOffset, tabs };
+  }
+  if (['followingCreators', 'likedVideos', 'creatorProfile'].includes(action)) {
+    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('账号列表返回无效数据');
+    const identity = value => /^[1-9]\d{0,29}$/.test(String(value || '')) ? String(value) : '';
+    const integer = value => value !== null && value !== undefined && value !== '' && Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? Number(value) : null;
+    const plain = value => typeof value === 'string' ? value.trim() : '';
+    const creator = (row, relationType) => {
+      if (!row || typeof row !== 'object') throw new Error('主播资料格式已变化');
+      const base = row.base_info || row, relation = row.user_relation || {};
+      const id = identity(row.user_id) || identity(base.user_id) || identity(row.author_id) || identity(base.author_id) || identity(row.celebrity_id) || identity(base.celebrity_id);
+      if (!id) throw new Error('主播编号无效');
+      const rawState = relationType !== undefined && relationType !== null ? relationType : (relation.relation_type !== undefined ? relation.relation_type : (row.relation_type !== undefined ? row.relation_type : base.relation_type));
+      const state = rawState !== undefined && rawState !== null ? Number(rawState) : null;
+      const canFollowVal = row.can_follow !== undefined ? row.can_follow : (base.can_follow !== undefined ? base.can_follow : relation.can_follow);
+      const worksCount = integer(row.user_stat && row.user_stat.celebrity_work_cnt) ?? integer(row.author_book_num) ?? integer(row.creation_num) ?? integer(base.author_book_num);
+      const relType = integer(row.relative_type) ?? integer(base.relative_type) ?? ((row.is_author || row.author_type || base.is_author) ? 3 : 2);
+      return {
+        id,
+        businessId: identity(base.biz_user_id),
+        name: plain(base.user_name || base.author_name || base.celebrity_name || base.name).slice(0, 80),
+        avatar: cleanCoverUrl(plain(base.user_avatar || base.expand_user_avatar || base.author_avatar || base.avatar)).replace(/^http:\/\//, 'https://'),
+        description: plain(base.description || base.author_desc || base.desc),
+        following: state !== null && [1, 2, 3, 4].includes(state) ? (state === 2 || state === 4) : null,
+        canFollow: canFollowVal === true && base.is_cancelled !== true,
+        worksCount,
+        relativeType: relType
+      };
+    };
+    if (action === 'creatorProfile') return { creator: creator(data.ugc_user) };
+    const hasMore = typeof data.has_more === 'boolean' ? data.has_more : (data.common_list_info && typeof data.common_list_info.has_more === 'boolean' ? data.common_list_info.has_more : null);
+    if (hasMore === null) throw new Error('账号列表分页格式已变化');
+    const rawCursorVal = data.common_list_info && data.common_list_info.cursor;
+    const rawCursor = rawCursorVal !== undefined && rawCursorVal !== null ? String(rawCursorVal).trim() : '';
+    const nextOffset = integer(data.next_offset) ?? integer(rawCursor);
+    if (hasMore && nextOffset === null && !rawCursor) throw new Error('账号列表缺少下一页游标');
+    const paging = { hasMore, nextOffset, ...(rawCursor ? { nextCursor: rawCursor } : {}), total: integer(data.total) };
+    const list = (key, countKey) => {
+      if (Array.isArray(data[key])) return data[key];
+      const countVal = integer(data[countKey]);
+      if ((data[key] == null || !Object.prototype.hasOwnProperty.call(data, key)) && hasMore === false && (countVal === 0 || countVal === null)) return [];
+      throw new Error('账号列表格式已变化');
+    };
+    if (action === 'followingCreators') {
+      const seen = new Set();
+      const rawList = Array.isArray(data.ugc_user_list) ? data.ugc_user_list :
+                     (Array.isArray(data.relation_user_list) ? data.relation_user_list :
+                     (Array.isArray(data.user_list) ? data.user_list :
+                     (Array.isArray(data.author_list) ? data.author_list :
+                     (Array.isArray(data.relationUserList) ? data.relationUserList :
+                     (Object.prototype.hasOwnProperty.call(data, 'relation_user_list') ? list('relation_user_list', 'total') : list('ugc_user_list', 'total'))))));
+      const creators = [];
+      for (const raw of rawList) {
+        try {
+          const userObj = raw && (raw.user_info ? { ...raw.user_info, relative_type: raw.relative_type ?? raw.user_info.relative_type } : raw);
+          const item = creator(userObj, raw && (raw.user_relation_type !== undefined ? raw.user_relation_type : raw.relation_type));
+          if (item && item.id && !seen.has(item.id)) {
+            seen.add(item.id);
+            creators.push(item);
+          }
+        } catch (_) {}
+      }
+      return { creators, ...paging, followingDouyinNextOffset: integer(data.following_douyin_user_next_offset) };
+    }
+    const items = [], seen = new Set();
+    let unsupportedCount = 0;
+    for (const row of list('mixed_data_list','count')) {
+      if (!row || ![30,35].includes(Number(row.data_type))) { unsupportedCount++; continue; }
+      const series = Number(row.data_type) === 35;
+      const wrapper = series && row.video_detail_info;
+      const video = series ? wrapper && wrapper.video_detail_info : row.video_data;
+      if (!video || typeof video !== 'object') throw new Error('点赞视频格式已变化');
+      const seriesId = identity(video.series_id_str || video.series_id), itemId = series ? '' : identity(video.vid);
+      if (series ? !seriesId : !itemId) throw new Error('点赞视频编号无效');
+      const key = (series ? 'series:' : 'episode:') + (series ? seriesId : itemId);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({ kind: series ? 'series' : 'episode', id: series ? seriesId : itemId, seriesId, itemId,
+        title: plain(series ? video.series_title : video.title),
+        cover: cleanCoverUrl(plain(series ? video.series_cover : video.cover)),
+        description: plain(series ? video.series_intro : video.video_desc),
+        episode: series ? null : integer(video.vid_index), episodes: integer(video.episode_total_cnt || video.episode_cnt),
+        likedAt: integer(series ? wrapper.user_digg_timestamp_ms : video.user_digg_timestamp_ms) });
+    }
+    return { items, ...paging, unsupportedCount };
   }
   if (action === 'socialDetail' || action === 'creatorList') {
     if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
@@ -2813,19 +3036,38 @@ spider.accountParse = function (action, text) {
         canFollow: relation.can_follow === true && base.is_cancelled !== true }];
     }) };
   }
-  if (['favorites', 'history', 'progressGet', 'libraryDetails'].includes(action)) {
+  if (['favorites', 'history', 'progressGet', 'libraryDetails', 'libraryDetail'].includes(action)) {
     if (Number(response.code) !== 0) throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
     const integer = value => Math.max(0, Math.floor(Number(value) || 0));
     const stamp = value => { const n = integer(value); return n < 10000000000 ? n * 1000 : n; };
+    const validDigits = value => { const s = String(value || '').trim(); return /^\d{1,30}$/.test(s) ? s : ''; };
+    const pickStr = list => {
+      for (const value of list) {
+        if (typeof value === 'string' && value.trim()) return value.trim();
+      }
+      return '';
+    };
     const series = row => {
       const video = row.video_data && typeof row.video_data === 'object' ? row.video_data : row;
-      const id = String(video.series_id || row.series_id || row.book_id || '');
-      if (!/^\d{1,30}$/.test(id)) return null;
-      return { id, title: String(row.series_title || video.title || row.book_name || ''),
-        cover: cleanCoverUrl(String(row.series_cover_url || video.cover || video.cover_url || video.thumb_url || row.thumb_url || '')),
-        description: String(row.series_intro || video.video_desc || row.abstract || ''),
-        episodes: integer(video.episode_cnt || video.episode_count || row.episode_cnt),
-        updatedAt: stamp(row.collect_time) };
+      const detail = row.video_detail && typeof row.video_detail === 'object'
+        ? row.video_detail
+        : (video.video_detail && typeof video.video_detail === 'object' ? video.video_detail : {});
+      const bookInfo = row.book_info && typeof row.book_info === 'object' ? row.book_info : {};
+      const bookId = validDigits(row.book_id_str) || validDigits(row.book_id) || validDigits(video.book_id_str) || validDigits(video.book_id) || validDigits(bookInfo.book_id_str) || validDigits(bookInfo.book_id) || validDigits(detail.book_id_str) || validDigits(detail.book_id);
+      const seriesId = validDigits(video.series_id_str) || validDigits(video.series_id) || validDigits(detail.series_id_str) || validDigits(detail.series_id) || validDigits(bookInfo.series_id_str) || validDigits(bookInfo.series_id) || validDigits(row.series_id_str) || validDigits(row.series_id);
+      const id = bookId || seriesId;
+      if (!id) return null;
+      const epListCount = Array.isArray(video.video_list) ? video.video_list.length : (Array.isArray(row.video_list) ? row.video_list.length : 0);
+      return {
+        id,
+        book_id: bookId || undefined,
+        series_id: seriesId || undefined,
+        title: pickStr([row.series_title, video.series_title, video.series_name, detail.series_title, detail.series_name, bookInfo.series_title, bookInfo.book_name, bookInfo.title, video.title, row.title, row.book_name, detail.title, row.name]),
+        cover: cleanCoverUrl(pickStr([row.series_cover_url, row.series_cover, video.series_cover_url, video.series_cover, detail.series_cover_url, detail.series_cover, bookInfo.series_cover, bookInfo.cover_url, bookInfo.thumb_url, bookInfo.cover, video.cover, video.cover_url, video.thumb_url, detail.cover, detail.cover_url, row.thumb_url, row.cover, row.cover_url])),
+        description: pickStr([row.series_intro, video.series_intro, detail.series_intro, bookInfo.series_intro, video.video_desc, row.abstract, bookInfo.abstract, detail.intro]),
+        episodes: integer(video.episode_cnt || video.episode_count || video.episode_total_cnt || detail.episode_cnt || detail.episode_count || bookInfo.episode_cnt || bookInfo.episode_count || row.episode_cnt || row.episode_count || row.episode_total_cnt || epListCount),
+        updatedAt: stamp(row.collect_time)
+      };
     };
     let rows;
     if (action === 'favorites') {
@@ -2833,7 +3075,26 @@ spider.accountParse = function (action, text) {
       rows = data.video_shelf_info === null ? [] : data.video_shelf_info;
     } else if (action === 'history' || action === 'progressGet') {
       rows = response.video_data || data && (data.video_data || data.data && data.data.video_data);
-    } else rows = data;
+    } else if (action === 'libraryDetail') {
+      const single = data && typeof data === 'object' ? (data.video_data || data.series_detail || data) : null;
+      rows = single && typeof single === 'object' ? [single] : [];
+    } else {
+      if (data === null || data === undefined) {
+        rows = [];
+      } else if (Array.isArray(data)) {
+        rows = data;
+      } else if (typeof data === 'object') {
+        const wrapped = data.detail_list || data.book_list || data.video_data || data.items || data.list;
+        if (Array.isArray(wrapped)) {
+          rows = wrapped;
+        } else if (data.book_info && typeof data.book_info === 'object') {
+          rows = Array.isArray(data.book_info) ? data.book_info : Object.values(data.book_info);
+        } else {
+          const values = Object.values(data).filter(v => v && typeof v === 'object');
+          rows = values.length && values.every(v => !Array.isArray(v)) ? values : [];
+        }
+      }
+    }
     if (!Array.isArray(rows)) throw new Error('账号列表格式已变化');
     const seen = new Set();
     const items = rows.filter(row => row && typeof row === 'object').map(row => {
@@ -2843,13 +3104,84 @@ spider.accountParse = function (action, text) {
         if (!/^\d{1,30}$/.test(String(row.vid || ''))) return null;
         Object.assign(item, { episode: Math.max(1, integer(row.vid_index)),
           positionMs: integer(row.current_play_time), durationMs: integer(row.current_total_time),
-          episodes: integer(row.episode_count), updatedAt: stamp(row.last_watch_time) });
+          episodes: integer(row.episode_count || row.episode_cnt || row.episode_total_cnt) || item.episodes,
+          updatedAt: stamp(row.last_watch_time) });
       }
       return item;
     }).filter(item => item && !seen.has(item.id) && seen.add(item.id));
-    if (rows.length && !items.length) throw new Error('账号列表条目格式已变化');
-    if (action !== 'libraryDetails') items.sort((a, b) => b.updatedAt - a.updatedAt);
+    if (rows.length && !items.length && action !== 'libraryDetail') throw new Error('账号列表条目格式已变化');
+    if (action !== 'libraryDetails' && action !== 'libraryDetail') items.sort((a, b) => b.updatedAt - a.updatedAt);
     return { items };
+  }
+  if (action === 'commentList') {
+    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    if (!data || typeof data !== 'object') throw new Error('评论列表返回无效数据');
+    const common = data.common_list_info && typeof data.common_list_info === 'object' ? data.common_list_info : {};
+    const rawList = Array.isArray(data.data_list) ? data.data_list : [];
+    const list = [];
+    for (const item of rawList) {
+      const c = item && item.comment;
+      if (!c) continue;
+      const cid = String(c.comment_id || '');
+      if (!cid) continue;
+      const userInfo = c.common && c.common.user_info && c.common.user_info.base_info || {};
+      const content = c.common && c.common.content || {};
+      const stat = c.stat || {};
+      const rawAvatar = userInfo.user_avatar || userInfo.avatar_url || '';
+      const avatar = typeof rawAvatar === 'string' && /^https?:\/\//.test(rawAvatar) ? rawAvatar.replace(/^http:\/\//, 'https://') : '';
+      list.push({
+        id: cid,
+        text: String(content.text || '').trim(),
+        userName: String(userInfo.user_name || userInfo.name || '红果用户').slice(0, 80),
+        userAvatar: avatar,
+        userId: String(userInfo.user_id || ''),
+        createTime: Number(c.common && c.common.create_timestamp || 0),
+        diggCount: Number(stat.digg_count || 0),
+        replyCount: Number(stat.reply_count || 0)
+      });
+    }
+    return {
+      total: Number(common.total || 0),
+      hasMore: Boolean(common.has_more),
+      cursor: String(common.cursor || ''),
+      list
+    };
+  }
+  if (action === 'commentReplyList') {
+    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    if (!data || typeof data !== 'object') throw new Error('回复列表返回无效数据');
+    const common = (data.comment_list_info && typeof data.comment_list_info === 'object' ? data.comment_list_info : (data.common_list_info && typeof data.common_list_info === 'object' ? data.common_list_info : {}));
+    const rawList = Array.isArray(data.reply_list) ? data.reply_list : [];
+    const list = [];
+    for (const item of rawList) {
+      const r = item && (item.reply || item);
+      if (!r) continue;
+      const rid = String(r.reply_id || r.comment_id || '');
+      if (!rid) continue;
+      const rCommon = r.Common || r.common || {};
+      const userInfo = rCommon.user_info && rCommon.user_info.base_info || {};
+      const replyToUser = r.reply_to_user_info && r.reply_to_user_info.base_info || {};
+      const content = rCommon.content || {};
+      const stat = r.stat || {};
+      const rawAvatar = userInfo.user_avatar || userInfo.avatar_url || userInfo.expand_user_avatar || '';
+      const avatar = typeof rawAvatar === 'string' && /^https?:\/\//.test(rawAvatar) ? rawAvatar.replace(/^http:\/\//, 'https://') : '';
+      list.push({
+        id: rid,
+        text: String(content.text || r.text || '').trim(),
+        userName: String(userInfo.user_name || userInfo.name || '红果用户').slice(0, 80),
+        userAvatar: avatar,
+        userId: String(userInfo.user_id || ''),
+        replyToUserName: String(replyToUser.user_name || replyToUser.name || '').slice(0, 80),
+        createTime: Number(rCommon.create_timestamp || 0),
+        diggCount: Number(stat.digg_count || 0)
+      });
+    }
+    return {
+      total: Number(common.total || 0),
+      hasMore: Boolean(common.has_more),
+      cursor: String(common.cursor || ''),
+      list
+    };
   }
   if (response.message === 'error' && data && data.verify_center_secondary_decision_conf) throw new Error('ACCOUNT_SECONDARY_VERIFICATION_REQUIRED');
   if (response.message === 'error' && data && data.verify_center_decision_conf) {
@@ -2878,3 +3210,4 @@ spider.accountParse = function (action, text) {
 
 export { spider };
 export default spider;
+

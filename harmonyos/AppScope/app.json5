@@ -2,7 +2,7 @@
   "app": {
     "bundleName": "com.never88gone.airdrop",
     "vendor": "never88gone",
-    "versionCode": 263190956,
+    "versionCode": 263272125,
     "versionName": "1.0.0",
     "icon": "$media:layered_image",
     "label": "$string:app_name"

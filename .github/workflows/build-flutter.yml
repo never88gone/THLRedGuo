@@ -487,6 +487,14 @@ jobs:
                 done
               fi
             done
+
+            # 额外校验清理非标准或历史残留的冗余 HAP 包，确保 Release 中只保留最新的单个官方 HAP
+            for old_asset in $existing_assets; do
+              if [[ "$old_asset" == *.hap ]] && [ "$old_asset" != "THLRedLook-1.0.0-harmonyos-signed.hap" ]; then
+                echo "清理过期历史 HAP 包: $old_asset"
+                gh release delete-asset "$tag" "$old_asset" -y || true
+              fi
+            done
           fi
 
           # 动态生成包含直接下载直链与精准北京时间戳的 Release Notes

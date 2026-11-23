@@ -121,6 +121,14 @@ jobs:
 
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "更新已有 Release: $tag 资产"
+            # 清理 Release 中残留的历史旧 HAP 包，确保 Release 中只保留最新的单个 HAP 包
+            existing_haps=$(gh release view "$tag" --json assets --jq '.assets[] | select(.name | endswith(".hap")) | .name' || true)
+            for old_hap in $existing_haps; do
+              if [ "$old_hap" != "THLRedLook-1.0.0-harmonyos-signed.hap" ]; then
+                echo "清理旧 HAP 包: $old_hap"
+                gh release delete-asset "$tag" "$old_hap" -y || true
+              fi
+            done
             gh release upload "$tag" release/* --clobber
           else
             echo "创建新 Release: $tag (Target: ${{ github.sha }})"
