@@ -3,8 +3,8 @@
  */
 export class Constants {
   static readonly APP_NAME: string = '糖葫芦Haw';
-  static readonly APP_VERSION: string = '1.1.0';
-  static readonly APP_BUILD_NUMBER: string = '263191024';
+  static readonly APP_VERSION: string = '1.0.0';
+  static readonly APP_BUILD_NUMBER: string = '263272125';
   static readonly OFFICIAL_SOURCE_ID: string = 'hongguo';
   static readonly OFFICIAL_SOURCE_NAME: string = '官方免费短剧';
   static readonly HONGGUO_SOURCE_PATH: string = 'sources/hongguo.js';

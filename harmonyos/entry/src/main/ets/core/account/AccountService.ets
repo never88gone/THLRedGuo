@@ -1,7 +1,6 @@
 import http from '@ohos.net.http';
 import hilog from '@ohos.hilog';
-import { UserProfile, QRLoginState, QrApiResponse, LikedVideoPage, FollowingCreatorsPage, CloudWatchEntry, AnchorItem } from '../../models/Account';
-import { CoreEngine } from '../engine/CoreEngine';
+import { UserProfile, QRLoginState, QrApiResponse } from '../../models/Account';
 
 const TAG = 'AccountService';
 const DOMAIN = 0x0000;
@@ -113,10 +112,8 @@ export class AccountService {
         if (json && json.data) {
           const st = String(json.data.status || '');
           if (st === 'confirmed' || st === '3') {
-            const rawTokenDigits = token.replace(/\D/g, '');
-            const userId = (rawTokenDigits && rawTokenDigits.length >= 8 ? rawTokenDigits.slice(0, 16) : String(Date.now()));
             this.currentUser = {
-              userId: userId,
+              userId: 'hg_' + token.slice(0, 8),
               nickname: '红果剧友',
               avatarUrl: '',
               isLoggedIn: true
@@ -144,10 +141,8 @@ export class AccountService {
    */
   public async loginWithPhone(phone: string, code: string): Promise<boolean> {
     if (phone && code) {
-      const cleanDigits = phone.replace(/\D/g, '');
-      const userId = '86' + (cleanDigits.length >= 11 ? cleanDigits.slice(-11) : cleanDigits.padStart(11, '1'));
       this.currentUser = {
-        userId: userId,
+        userId: 'u_' + phone.slice(-4),
         nickname: '剧友' + phone.slice(-4),
         avatarUrl: '',
         isLoggedIn: true,
@@ -168,42 +163,5 @@ export class AccountService {
       avatarUrl: '',
       isLoggedIn: false
     };
-  }
-
-  /**
-   * 获取云端追剧或历史记录 (对齐 Flutter service.library)
-   */
-  public async getCloudLibrary(history: boolean): Promise<CloudWatchEntry[]> {
-    const uid = this.currentUser.userId && /^\d+$/.test(this.currentUser.userId) ? this.currentUser.userId : '108829482910';
-    return await CoreEngine.getInstance().fetchCloudLibrary(history, uid);
-  }
-
-  /**
-   * 获取已点赞视频列表 (对齐 Flutter service.likedVideos)
-   */
-  public async getLikedVideos(offset: number = 0, count: number = 20): Promise<LikedVideoPage> {
-    return await CoreEngine.getInstance().fetchLikedVideos(offset, count);
-  }
-
-  /**
-   * 获取关注的主播列表 (对齐 Flutter service.followingCreators)
-   */
-  public async getFollowingCreators(offset: number = 0, count: number = 20): Promise<FollowingCreatorsPage> {
-    const uid = this.currentUser.userId && /^\d+$/.test(this.currentUser.userId) ? this.currentUser.userId : '108829482910';
-    return await CoreEngine.getInstance().fetchFollowingCreators(uid, offset, count);
-  }
-
-  /**
-   * 获取主播详情 (对齐 Flutter creatorProfile)
-   */
-  public async getCreatorProfile(userId: string): Promise<AnchorItem | null> {
-    return await CoreEngine.getInstance().fetchCreatorProfile(userId);
-  }
-
-  /**
-   * 关注或取消关注主播 (对齐 Flutter setProfileFollowing)
-   */
-  public async setCreatorFollowing(userId: string, relativeType: number, follow: boolean): Promise<boolean> {
-    return await CoreEngine.getInstance().setCreatorFollowing(userId, relativeType, follow);
   }
 }

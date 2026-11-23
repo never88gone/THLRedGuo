@@ -21,7 +21,6 @@
     "pages/settings/JsSourcesPage",
     "pages/settings/BackupSettingsPage",
     "pages/settings/SourceSwitcherPage",
-    "pages/privacy/PrivacySettingsPage",
-    "pages/anchor/AnchorDetailPage"
+    "pages/privacy/PrivacySettingsPage"
   ]
 }

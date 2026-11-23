@@ -168,7 +168,7 @@ def main():
     print(f"[EXEC] {' '.join(build_args)}", flush=True)
     subprocess.run(build_args, cwd=harmony_dir, env=env, check=True)
 
-    # 5. 提取 HAP 产物并打包归档
+    # 5. 提取 HAP 产物并打包归档（仅保留唯一的官方签名 HAP，避免在 Release 中堆积多份包）
     output_dir = root / 'dist' / 'harmonyos'
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -191,26 +191,15 @@ def main():
     if not target_hap:
         raise SystemExit("错误：未在构建输出目录找到生成的 .hap 文件！")
 
-    dest_hap = output_dir / f'{variant.slug}-1.0.0-{beijing_build}.hap'
-    shutil.copy2(target_hap, dest_hap)
-    print(f"[SUCCESS] HAP 产物已导出至: {dest_hap}", flush=True)
-
     dest_fixed_hap = output_dir / f'{variant.slug}-1.0.0-harmonyos-signed.hap'
     shutil.copy2(target_hap, dest_fixed_hap)
-    print(f"[SUCCESS] HAP 固定命名产物已导出至: {dest_fixed_hap}", flush=True)
-
-    dest_generic_hap = output_dir / f'{variant.slug}-1.0.0-harmonyos.hap'
-    shutil.copy2(target_hap, dest_generic_hap)
-    print(f"[SUCCESS] HAP 通用命名产物已导出至: {dest_generic_hap}", flush=True)
+    print(f"[SUCCESS] HAP 官方安装包产物已导出至: {dest_fixed_hap}", flush=True)
 
     # 计算 SHA256 校验和
     checksum_file = output_dir / 'SHA256SUMS.txt'
-    lines = []
-    for f in [dest_hap, dest_fixed_hap, dest_generic_hap]:
-        digest = hashlib.sha256(f.read_bytes()).hexdigest()
-        lines.append(f"{digest}  {f.name}\n")
-        print(f"[SHA256] {digest}  {f.name}", flush=True)
-    checksum_file.write_text(''.join(lines), encoding='ascii')
+    digest = hashlib.sha256(dest_fixed_hap.read_bytes()).hexdigest()
+    print(f"[SHA256] {digest}  {dest_fixed_hap.name}", flush=True)
+    checksum_file.write_text(f"{digest}  {dest_fixed_hap.name}\n", encoding='ascii')
 
 
 if __name__ == '__main__':

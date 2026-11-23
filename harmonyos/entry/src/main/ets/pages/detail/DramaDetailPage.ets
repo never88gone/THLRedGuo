@@ -1,5 +1,4 @@
 import router from '@ohos.router';
-import promptAction from '@ohos.promptAction';
 import hilog from '@ohos.hilog';
 import { AppColors } from '../../common/AppColors';
 import { AppDimensions } from '../../common/AppDimensions';
@@ -38,9 +37,6 @@ struct DramaDetailPage {
   async toggleFavorite(): Promise<void> {
     if (this.detail) {
       this.isFavorited = await LocalStore.getInstance().toggleFavorite(this.detail);
-      promptAction.showToast({
-        message: this.isFavorited ? '已加入追剧列表' : '已取消追剧'
-      });
     }
   }
 

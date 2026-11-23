@@ -14,23 +14,9 @@ interface VersionItem {
 struct ReleaseNotesPage {
   private readonly releaseHistory: VersionItem[] = [
     {
-      version: 'v1.1.0',
-      date: '2026-11-19',
-      badge: '当前最新',
-      highlights: [
-        '同步接入红果短剧官方逆向评论接口，播放器支持短剧评论与多级回复互动体系',
-        '重构播放器居中暂停控制区，采用现代化毛玻璃质感悬浮圆钮，优化图标视觉重心',
-        '“我的”页面追剧与历史记录全新升级为紧凑多列自适应网格，单屏展现更多剧目',
-        '修复初次切换至历史记录标签页时未自动拉取数据的显示时序问题',
-        '联系方式页面重构为单屏全览紧凑布局，更新官方反馈渠道并消除冗余商务文案',
-        '深色模式全局背景底色升级融入暖橙质感炭黑，全方位优化浅色与深色对比度',
-        '同步更新官方最新 hongguo.js 数据源引擎与创作者主播作品接口'
-      ]
-    },
-    {
       version: 'v1.0.0',
       date: '2026-11-15',
-      badge: '正式版本',
+      badge: '当前最新',
       highlights: [
         '采用纯血鸿蒙 HarmonyOS NEXT (API 12+) 原生 ArkTS / Stage 模型全新重构',
         '接入官方短剧规范数据源 hongguo.js，端侧独立沙箱执行',

@@ -10,7 +10,7 @@ struct ContactPage {
   private static readonly EMAIL_ADDRESS: string = 'support@thltv.com';
   private static readonly GITHUB_URL: string = 'https://github.com/never88gone/THLRedGuo';
   private static readonly TELEGRAM_URL: string = 'https://t.me/tanghulutvos';
-  private static readonly TELEGRAM_CHANNEL: string = '@tanghulutvos';
+  private static readonly TELEGRAM_GROUP: string = '@tanghulutvos';
 
   private copyText(text: string, label: string): void {
     try {
@@ -23,83 +23,43 @@ struct ContactPage {
   }
 
   @Builder
-  CompactChannelTile(icon: string, title: string, value: string, hint: string, copyLabel: string, copyValue: string) {
-    Row({ space: 12 }) {
-      // 左侧图标容器
-      Column() {
-        Text(icon)
-          .fontSize(20)
-      }
-      .width(40)
-      .height(40)
-      .borderRadius(10)
-      .backgroundColor(AppColors.redAlpha12)
-      .justifyContent(FlexAlign.Center)
-
-      // 中间文本区
-      Column({ space: 3 }) {
-        Row({ space: 6 }) {
-          Text(title)
-            .fontSize(14)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.textPrimary)
-        }
-
-        Text(value)
-          .fontSize(12.5)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(AppColors.hongguoRed)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-        Text(hint)
-          .fontSize(11)
-          .fontColor(AppColors.textSecondary)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
-
-      // 右侧复制操作按钮
-      Button('复制')
-        .fontSize(11.5)
-        .fontColor(AppColors.white)
-        .backgroundColor(AppColors.hongguoRed)
-        .borderRadius(13)
-        .height(26)
-        .padding({ left: 12, right: 12 })
-        .onClick(() => {
-          this.copyText(copyValue, copyLabel);
-        })
-    }
-    .width('100%')
-    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-    .backgroundColor(AppColors.bgCard)
-    .borderRadius(AppDimensions.radiusMd)
-  }
-
-  @Builder
-  CompactInfoRow(title: string, detail: string) {
-    Row({ space: 8 }) {
-      Text('•')
-        .fontSize(13)
-        .fontColor(AppColors.hongguoRed)
-        .margin({ top: -1 })
-
-      Text(`${title}：`)
-        .fontSize(11.5)
+  ContactCard(title: string, value: string, hint: string, copyLabel: string, copyValue: string) {
+    Column({ space: 10 }) {
+      Text(title)
+        .fontSize(16)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.textPrimary)
 
-      Text(detail)
-        .fontSize(11.5)
+      Text(value)
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(AppColors.hongguoRed)
+
+      Text(hint)
+        .fontSize(12)
         .fontColor(AppColors.textSecondary)
-        .layoutWeight(1)
-        .lineHeight(16)
+        .lineHeight(18)
+
+      Row() {
+        Blank()
+
+        Button(`复制${copyLabel}`)
+          .fontSize(12)
+          .fontColor(AppColors.white)
+          .backgroundColor(AppColors.hongguoRed)
+          .borderRadius(14)
+          .height(28)
+          .padding({ left: 14, right: 14 })
+          .onClick(() => {
+            this.copyText(copyValue, copyLabel);
+          })
+      }
+      .width('100%')
     }
     .width('100%')
-    .alignItems(VerticalAlign.Top)
+    .padding(AppDimensions.paddingMd)
+    .backgroundColor(AppColors.bgCard)
+    .borderRadius(AppDimensions.radiusMd)
   }
 
   build() {
@@ -128,64 +88,59 @@ struct ContactPage {
         Blank()
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 38, bottom: 8 })
+      .padding({ left: 16, right: 16, top: 38, bottom: 12 })
 
-      // 单屏紧凑内容区域
+      // 内容区域
       Scroll() {
-        Column({ space: 10 }) {
-          // 1. 官方支持邮箱
-          this.CompactChannelTile(
-            '✉️',
+        Column({ space: 16 }) {
+          // 1. 官方支持与反馈邮箱
+          this.ContactCard(
             '官方支持与反馈邮箱',
             ContactPage.EMAIL_ADDRESS,
-            '使用咨询、版权与技术反馈',
+            '商务合作、使用咨询、版权与技术反馈，欢迎来信沟通。',
             '邮箱地址',
             ContactPage.EMAIL_ADDRESS
           )
 
           // 2. GitHub 官方开源代码仓库
-          this.CompactChannelTile(
-            '🐙',
+          this.ContactCard(
             'GitHub 官方开源代码仓库',
             ContactPage.GITHUB_URL,
-            '源码开源、Issue 反馈与技术探讨',
+            '欢迎提交 Issue、参与开源共建或 Star 关注支持项目开发。',
             '仓库链接',
             ContactPage.GITHUB_URL
           )
 
-          // 3. Telegram 官方交流频道
-          this.CompactChannelTile(
-            '✈️',
-            'Telegram 官方交流频道',
-            `${ContactPage.TELEGRAM_CHANNEL} (${ContactPage.TELEGRAM_URL})`,
-            '版本发布、功能预告与日常交流',
-            '频道链接',
+          // 3. Telegram 官方交流群组
+          this.ContactCard(
+            'Telegram 官方交流群组',
+            `${ContactPage.TELEGRAM_GROUP} (${ContactPage.TELEGRAM_URL})`,
+            '加入官方讨论组，参与新功能体验、测试反馈与交流。',
+            '群组链接',
             ContactPage.TELEGRAM_URL
           )
 
-          // 4. 交流与反馈说明卡片
+          // 4. 反馈须知与说明
           Column({ space: 8 }) {
-            Row({ space: 6 }) {
-              Text('ℹ️')
-                .fontSize(14)
-              Text('交流与反馈说明')
-                .fontSize(13)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppColors.textPrimary)
-            }
-            .width('100%')
+            Text('反馈须知与说明')
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColors.textPrimary)
 
-            this.CompactInfoRow('功能体验与建议', '欢迎分享您的观看体验与改进设想，共同完善软件功能。')
-            this.CompactInfoRow('异常与排查诊断', '若遇播放失败，可在【设置 - 数据源诊断】中复制脱敏报告协助排查。')
-            this.CompactInfoRow('开源社区与共建', '遵循开源规范透明维护，技术探讨与反馈欢迎通过邮件与 GitHub 交流。')
+            Text('1. 问题反馈请尽可能附带设备型号（如 HarmonyOS NEXT）、系统版本及具体复现步骤；\n' +
+                 '2. 短剧版权归各原版权方所有，如涉及版权事宜请直接通过官方邮箱联系；\n' +
+                 '3. 开发者会在工作日尽快查收并跟进所有有效信件。')
+              .fontSize(12)
+              .fontColor(AppColors.textSecondary)
+              .lineHeight(18)
           }
           .width('100%')
-          .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+          .padding(AppDimensions.paddingMd)
           .backgroundColor(AppColors.bgCard)
           .borderRadius(AppDimensions.radiusMd)
           .alignItems(HorizontalAlign.Start)
         }
-        .padding({ left: 16, right: 16, top: 6, bottom: 24 })
+        .padding({ left: 16, right: 16, top: 12, bottom: 40 })
       }
       .layoutWeight(1)
       .width('100%')
