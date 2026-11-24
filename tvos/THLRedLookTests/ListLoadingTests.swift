@@ -10,6 +10,7 @@ private final class ListLoadingProvider: DramaSourceProviderProtocol {
     var holdPage = false
     var failCategories = false
     var requests: [Int] = []
+    var customCatalog: Page?
     let categories = [CatalogCategory(id: "app:discover:all", name: "全部")]
 
     func loadCategories(source: String) async throws -> [CatalogCategory] {
@@ -23,7 +24,8 @@ private final class ListLoadingProvider: DramaSourceProviderProtocol {
         return response(page)
     }
     func response(_ page: Int) -> Page {
-        ([Drama(id: "hongguo:synthetic-\(page)", source: "hongguo", title: "合成短剧\(page)")], page < 3, page)
+        if let customCatalog { return customCatalog }
+        return ([Drama(id: "hongguo:synthetic-\(page)", source: "hongguo", title: "合成短剧\(page)")], page < 3, page)
     }
     func loadSuggestions(query: String) async throws -> [String] { [] }
     func loadDetail(drama: Drama) async throws -> DramaDetail { throw SourceAPIError.coreUninitialized }
@@ -219,5 +221,39 @@ final class ListLoadingTests: XCTestCase {
         XCTAssertEqual(provider.requests, [1])
         await model.loadNextPage()
         XCTAssertEqual(provider.requests, [1, 2])
+    }
+
+    func testSelectCategoryClearsItemsAndShowsLoading() async {
+        let provider = ListLoadingProvider()
+        let storage = store()
+        let model = HomeViewModel(repository: provider, store: storage)
+        await model.reloadAll()
+        XCTAssertFalse(model.items.isEmpty)
+        XCTAssertFalse(model.isLoading)
+
+        let newCategory = CatalogCategory(id: "app:discover:motion_comic", name: "漫剧")
+        model.selectCategory(newCategory, immediate: true)
+
+        XCTAssertTrue(model.items.isEmpty, "切换分类后必须立即清空旧列表，以便视图呈现加载进度条")
+        XCTAssertTrue(model.isLoading, "切换分类后必须立即置为 isLoading")
+        XCTAssertEqual(model.selectedCategory.id, newCategory.id)
+
+        await eventually { !model.isLoading && !model.items.isEmpty }
+        XCTAssertEqual(model.selectedCategory.id, newCategory.id)
+        XCTAssertFalse(model.isLoading)
+        XCTAssertFalse(model.items.isEmpty)
+    }
+
+    func testHomeCatalogPassesThroughDramasFromSource() async {
+        let provider = ListLoadingProvider()
+        let drama1 = Drama(id: "hongguo:f1", source: "hongguo", title: "短剧一", releaseStatus: "全80集")
+        let drama2 = Drama(id: "hongguo:o1", source: "hongguo", title: "短剧二", releaseStatus: "更新至10集")
+        provider.customCatalog = ([drama1, drama2], false, 1)
+
+        let storage = store()
+        let model = HomeViewModel(repository: provider, store: storage)
+        await model.reloadAll()
+        XCTAssertEqual(model.items.count, 2)
+        XCTAssertEqual(model.items.map(\.id), ["hongguo:f1", "hongguo:o1"])
     }
 }

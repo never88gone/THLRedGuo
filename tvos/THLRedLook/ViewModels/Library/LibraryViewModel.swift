@@ -37,6 +37,7 @@ public final class LibraryViewModel: ObservableObject {
 
     func loadAccount(_ tab: LibraryTab, refresh: Bool = false, more: Bool = false) async {
         syncAccountOwner()
+        let effectiveRefresh = refresh || failedRefresh.contains(tab)
         let isCurrentTabEmpty: Bool = {
             switch tab {
             case .anchors: return officialAnchors.isEmpty
@@ -44,31 +45,31 @@ public final class LibraryViewModel: ObservableObject {
             default: return (accountLists[tab] ?? []).isEmpty
             }
         }()
-        let shouldRefresh = refresh || failedRefresh.contains(tab) || (!more && isCurrentTabEmpty)
+        let shouldRefresh = effectiveRefresh || (!more && isCurrentTabEmpty && !loadedTabs.contains(tab))
         let revision = accountRevision!
         guard officialAccount, !loadingTabs.contains(tab),
               shouldRefresh || (more ? moreTabs.contains(tab) : !loadedTabs.contains(tab)) else { return }
         loadingTabs.insert(tab); accountErrors[tab] = nil
         defer { if accountRevision == revision { loadingTabs.remove(tab) } }
-        let offset = refresh ? 0 : offsets[tab] ?? 0
-        let douyin = refresh ? 0 : douyinOffset
+        let offset = effectiveRefresh ? 0 : offsets[tab] ?? 0
+        let douyin = effectiveRefresh ? 0 : douyinOffset
         do {
             switch tab {
             case .anchors:
                 let page = try await followingRequest(offset, douyin)
                 guard accountRevision == revision, ownerRevision() == revision else { return }
                 try validateCursor(page, offset: offset, douyin: douyin)
-                let previousCount = refresh ? 0 : officialAnchors.count
-                officialAnchors = merge(refresh ? [] : officialAnchors, page.items, key: { $0.id })
-                acceptPage(tab, page: page, offset: offset, refresh: refresh, added: officialAnchors.count - previousCount)
+                let previousCount = effectiveRefresh ? 0 : officialAnchors.count
+                officialAnchors = merge(effectiveRefresh ? [] : officialAnchors, page.items, key: { $0.id })
+                acceptPage(tab, page: page, offset: offset, refresh: effectiveRefresh, added: officialAnchors.count - previousCount)
                 douyinOffset = page.douyinOffset
             case .liked:
                 let page = try await likesRequest(offset)
                 guard accountRevision == revision, ownerRevision() == revision else { return }
                 try validateCursor(page, offset: offset, douyin: 0)
-                let previousCount = refresh ? 0 : officialLikes.count
-                officialLikes = merge(refresh ? [] : officialLikes, page.items, key: { $0.id })
-                acceptPage(tab, page: page, offset: offset, refresh: refresh, added: officialLikes.count - previousCount)
+                let previousCount = effectiveRefresh ? 0 : officialLikes.count
+                officialLikes = merge(effectiveRefresh ? [] : officialLikes, page.items, key: { $0.id })
+                acceptPage(tab, page: page, offset: offset, refresh: effectiveRefresh, added: officialLikes.count - previousCount)
             default:
                 let entries = try await HongguoAccountModel.shared.library(history: tab == .history)
                 guard accountRevision == revision, ownerRevision() == revision else { return }

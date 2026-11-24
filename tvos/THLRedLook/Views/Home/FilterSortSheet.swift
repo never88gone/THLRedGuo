@@ -28,6 +28,7 @@ public struct FilterSortSheet: View {
                     }
                 }
             }
+            .focusSection()
 
             VStack(alignment: .leading, spacing: 14) {
                 Text("连载状态")
@@ -47,16 +48,21 @@ public struct FilterSortSheet: View {
                     }
                 }
             }
+            .focusSection()
 
             Spacer()
 
             TVButton(title: "完成", isProminent: true) {
                 isPresented = false
             }
+            .focusSection()
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(TVColors.black.opacity(0.85))
+        .onExitCommand {
+            isPresented = false
+        }
     }
 }
 

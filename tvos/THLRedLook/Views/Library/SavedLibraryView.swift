@@ -166,11 +166,6 @@ public struct SavedLibraryView: View {
                                         }.focused($focusedTarget, equals: .emptyAction).accessibilityIdentifier("library.emptyAction").id(LibraryFocusTarget.emptyAction)
                                     }
                                     .frame(maxWidth: .infinity, minHeight: 300)
-                                    .onAppear {
-                                        if viewModel.officialAccount && !viewModel.loadingTabs.contains(.anchors) {
-                                            Task { await viewModel.loadAccount(.anchors, refresh: true) }
-                                        }
-                                    }
                                 } else {
                                     LazyVGrid(columns: columns, spacing: 36) {
                                         ForEach(Array(viewModel.followedAnchorsList.enumerated()), id: \.element.id) { index, anchor in
@@ -209,11 +204,6 @@ public struct SavedLibraryView: View {
                                     }.focused($focusedTarget, equals: .emptyAction).accessibilityIdentifier("library.emptyAction").id(LibraryFocusTarget.emptyAction)
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 300)
-                                .onAppear {
-                                    if viewModel.officialAccount && !viewModel.loadingTabs.contains(viewModel.selectedTab) {
-                                        Task { await viewModel.loadAccount(viewModel.selectedTab, refresh: true) }
-                                    }
-                                }
                             } else {
                                 LazyVGrid(columns: columns, spacing: 36) {
                                     ForEach(Array(videoRows.enumerated()), id: \.element.id) { index, row in

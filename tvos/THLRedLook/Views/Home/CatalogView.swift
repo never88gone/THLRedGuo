@@ -4,7 +4,6 @@ public struct CatalogView: View {
     @StateObject private var viewModel = HomeViewModel()
     @ObservedObject var store: LocalStore
     @EnvironmentObject private var jsService: JSSourceService
-    @State private var showingFilterSheet = false
     @State private var selectedDrama: Drama?
     @State private var pendingNextRow: String?
     @State private var pendingCategoryFocus = false
@@ -13,7 +12,6 @@ public struct CatalogView: View {
 
     public enum FocusTarget: Hashable {
         case category(String)
-        case filter
         case refresh
         case reloadButton
         case card(String)
@@ -50,7 +48,15 @@ public struct CatalogView: View {
                 categoryHeader
                 if viewModel.isLoading && viewModel.items.isEmpty {
                     Spacer()
-                    ProgressView("正在载入精彩短剧...").font(.headline)
+                    VStack(spacing: 24) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: TVColors.primary))
+                            .scaleEffect(1.5)
+                        Text("正在载入【\(viewModel.selectedCategory.name)】短剧...")
+                            .font(.headline)
+                            .foregroundColor(TVColors.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     Spacer()
                 } else if viewModel.items.isEmpty {
                     Spacer()
@@ -61,9 +67,6 @@ public struct CatalogView: View {
                     catalogGrid
                 }
             }
-        }
-        .sheet(isPresented: $showingFilterSheet) {
-            FilterSortSheet(viewModel: viewModel, isPresented: $showingFilterSheet)
         }
         .fullScreenCover(item: $selectedDrama) { drama in
             DramaDetailView(drama: drama)
@@ -95,7 +98,7 @@ public struct CatalogView: View {
             await viewModel.reloadAll(initialCategory: initialCategory)
         }
         .onExitCommand {
-            if !showingFilterSheet && selectedDrama == nil {
+            if selectedDrama == nil {
                 cancelAutoSelectCategory()
                 focusedTarget = nil
                 onRequestFocusTopNav?()
@@ -148,45 +151,26 @@ public struct CatalogView: View {
                 }
             }
             Spacer()
-            HStack(spacing: 16) {
-                TVButton(
-                    title: viewModel.selectedSort.label,
-                    icon: "line.3.horizontal.decrease.circle",
-                    isFocused: focusedTarget == .filter,
-                    onUpCommand: {
-                        cancelAutoSelectCategory()
-                        focusedTarget = nil
-                        onRequestFocusTopNav?()
-                    },
-                    onDownCommand: {
-                        cancelAutoSelectCategory()
-                        focusFirstCard()
-                    }
-                ) { showingFilterSheet = true }
-                .focused($focusedTarget, equals: .filter)
-                .accessibilityIdentifier("catalog.filter")
-
-                TVButton(
-                    title: "",
-                    icon: "arrow.clockwise",
-                    isFocused: focusedTarget == .refresh,
-                    onUpCommand: {
-                        cancelAutoSelectCategory()
-                        focusedTarget = nil
-                        onRequestFocusTopNav?()
-                    },
-                    onDownCommand: {
-                        cancelAutoSelectCategory()
-                        focusFirstCard()
-                    }
-                ) {
-                    pendingNextRow = nil
+            TVButton(
+                title: "",
+                icon: "arrow.clockwise",
+                isFocused: focusedTarget == .refresh,
+                onUpCommand: {
                     cancelAutoSelectCategory()
-                    Task { await viewModel.reloadAll() }
+                    focusedTarget = nil
+                    onRequestFocusTopNav?()
+                },
+                onDownCommand: {
+                    cancelAutoSelectCategory()
+                    focusFirstCard()
                 }
-                .focused($focusedTarget, equals: .refresh)
-                .accessibilityIdentifier("catalog.refresh")
+            ) {
+                pendingNextRow = nil
+                cancelAutoSelectCategory()
+                Task { await viewModel.reloadAll() }
             }
+            .focused($focusedTarget, equals: .refresh)
+            .accessibilityIdentifier("catalog.refresh")
             .padding(.top, 8)
             .padding(.trailing, 8)
         }
@@ -287,7 +271,7 @@ public struct CatalogView: View {
         let next = index + offset
         if next >= viewModel.categories.count {
             cancelAutoSelectCategory()
-            focusedTarget = .filter
+            focusedTarget = .refresh
             return
         }
         if next < 0 {

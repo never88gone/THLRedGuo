@@ -117,13 +117,13 @@ public final class HomeViewModel: ObservableObject {
 
     public func selectCategory(_ category: CatalogCategory, immediate: Bool = false) {
         guard selectedCategory.id != category.id else { return }
-        resetRequest(clearItems: false)
+        resetRequest(clearItems: true)
         selectedCategory = category
         isLoading = true
         selectCategoryTask = Task {
-            if !immediate { try? await Task.sleep(nanoseconds: 180_000_000) }
+            if !immediate { try? await Task.sleep(nanoseconds: 30_000_000) }
             guard !Task.isCancelled else { return }
-            await loadFirstPage(clearOnStart: false)
+            await loadFirstPage(clearOnStart: true)
         }
     }
 
@@ -201,17 +201,6 @@ public final class HomeViewModel: ObservableObject {
 
     private func filterAndSort(dramas: [Drama]) -> [Drama] {
         let target = activeSourceId.lowercased()
-        var result = dramas.filter { $0.source.isEmpty || $0.source.lowercased() == target }
-        if selectedRelease != .all {
-            result = result.filter { $0.releaseStatus.lowercased() == selectedRelease.rawValue }
-        }
-        switch selectedSort {
-        case .source: break
-        case .latest: result.sort { $0.onlineDate > $1.onlineDate }
-        case .heat: result.sort { (Int($0.heat) ?? 0) > (Int($1.heat) ?? 0) }
-        case .views: result.sort { $0.views > $1.views }
-        case .title: result.sort { $0.title < $1.title }
-        }
-        return result
+        return dramas.filter { $0.source.isEmpty || $0.source.lowercased() == target }
     }
 }
