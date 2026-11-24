@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-feature android:name="android.software.leanback" android:required="false"/>
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
@@ -43,7 +44,7 @@
             </intent-filter>
         </activity>
         <service android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
-            android:foregroundServiceType="dataSync" android:exported="false" android:stopWithTask="false"/>
+            android:foregroundServiceType="dataSync|mediaPlayback" android:exported="false" android:stopWithTask="false"/>
         <meta-data android:name="flutterEmbedding" android:value="2"/>
         <!-- 强制使用成熟稳定的 Skia 渲染引擎，彻底解决 Android TV 芯片在 Vulkan 下视频 Surface 纹理色彩矩阵映射失真与发灰问题 -->
         <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false"/>

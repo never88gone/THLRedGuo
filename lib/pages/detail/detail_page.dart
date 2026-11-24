@@ -419,20 +419,64 @@ class _DetailScreenState extends State<DetailScreen> {
             releaseStatus: drama.releaseStatus,
           )
         : drama;
-    final currentEntries =
-        (_seriesEntries != null && _seriesEntries!.isNotEmpty)
-        ? _seriesEntries
-        : hongguoSeriesEntries(anchor, widget.store.seriesDramasFor(anchor));
-    await Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => DetailScreen(
-          drama: safeDrama,
-          repository: widget.repository,
-          store: widget.store,
-          initialSeriesEntries: currentEntries,
-        ),
-      ),
-    );
+    // 原地无缝切换季：不触发路由跳转，直接在当前页面刷新短剧数据
+    final generation = ++_generation;
+    setState(() {
+      _detail = DramaDetail(safeDrama, const <Episode>[]);
+      _loading = true;
+      _error = null;
+      _expandedDescription = false;
+    });
+
+    try {
+      final detail = await widget.repository.detail(safeDrama);
+      await widget.store.prepareAccountDrama(detail.drama);
+      if (!mounted ||
+          generation != _generation ||
+          _profileEpoch != widget.store.profileEpoch) {
+        return;
+      }
+      final merged = widget.repository.catalogUpdates
+          .current(safeDrama)
+          .merge(detail.drama);
+      final finalEpisodes = detail.episodes.isNotEmpty
+          ? detail.episodes
+          : (merged.episodes > 0
+                ? List.generate(
+                    merged.episodes,
+                    (index) => Episode({
+                      'id': '${merged.cleanSourceId}_${index + 1}',
+                      'title': '第 ${index + 1} 集',
+                      'currentEpisode': index + 1,
+                    }, index + 1),
+                  )
+                : <Episode>[]);
+
+      setState(() {
+        _detail = DramaDetail(merged, finalEpisodes, warning: detail.warning);
+        _seriesEntries = hongguoSeriesEntries(merged, [
+          ...?_seriesEntries?.map((entry) => entry.drama),
+          ...widget.store.seriesDramasFor(merged),
+        ], lockedEntries: _seriesEntries);
+        _loading = false;
+        _episodePage =
+            resumeEpisodeIndex(
+              finalEpisodes,
+              widget.store.watched(merged.id),
+            ) ~/
+            episodePageSize;
+      });
+      widget.repository.catalogUpdates.publish(merged, retryCover: true);
+      unawaited(_supplement(merged, generation));
+      unawaited(_discoverSeasons(merged, generation));
+      await saveUserChange(context, () => widget.store.refreshDrama(merged));
+    } catch (error) {
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
   }
 
   @override

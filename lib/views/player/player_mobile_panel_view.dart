@@ -8,7 +8,7 @@ import 'package:THLRedLook/core/store/follow_state.dart';
 import 'package:THLRedLook/core/series/hongguo_series.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
-import 'package:THLRedLook/views/player/player_menu.dart';
+import 'package:THLRedLook/views/player/player_episode_grid.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
 
 /// 移动端半屏沉浸模式下的底部信息与交互面板（选集、简介、下载）

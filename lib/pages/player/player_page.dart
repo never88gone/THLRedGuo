@@ -192,8 +192,6 @@ class PlayerScreenState extends State<PlayerScreen>
     fillStyle: widget.store.playbackPreferences.fillStyle,
     backgroundAudio: widget.store.playbackPreferences.backgroundAudio,
   );
-  BoxFit _videoFit = BoxFit.contain;
-  bool _landscapeLocked = false;
   String get _qualityLabel {
     if (_plan?.offline == true) return '本地原画';
     final q = _plan?.quality ?? 0;
@@ -784,34 +782,23 @@ class PlayerScreenState extends State<PlayerScreen>
     }
   }
 
-  void _toggleVideoFit() {
-    setState(() {
-      _videoFit = _videoFit == BoxFit.contain ? BoxFit.cover : BoxFit.contain;
-    });
-    _interactions.hint(_videoFit == BoxFit.cover ? '已切换为全屏铺满' : '已切换为原画适应');
-  }
-
-  Future<void> _toggleLandscapeLock() async {
-    final nextLocked = !_landscapeLocked;
-    setState(() {
-      _landscapeLocked = nextLocked;
-    });
-    _interactions.hint(nextLocked ? '已锁定横屏' : '已解除方向锁定');
-    final controller = _orientationController;
-    if (controller != null) {
-      await controller.setPlayback(
-        this,
-        fullscreen: _showFullscreen,
-        aspectRatio: _aspectRatio,
-        forceLandscape: nextLocked,
-      );
-    } else {
-      await SystemChrome.setPreferredOrientations(
-        AppOrientationController.orientations(
-          television: false,
-          fullscreen: _showFullscreen,
-          aspectRatio: _aspectRatio,
-          forceLandscape: nextLocked,
+  Future<void> _toggleBackgroundAudio() async {
+    final prefs = widget.store.playbackPreferences;
+    final next = !prefs.backgroundAudio;
+    await saveUserChange(
+      context,
+      () => widget.store.setPlaybackPreferences(prefs.copyWith(backgroundAudio: next)),
+    );
+    if (mounted) setState(() {});
+    _interactions.hint(next ? '已开启后台听剧模式' : '已关闭后台听剧模式');
+    if (!next) {
+      unawaited(BackgroundAudioService.instance.stop());
+    } else if (!_foreground && _player.state.playing) {
+      unawaited(
+        BackgroundAudioService.instance.start(
+          title: _detail.drama.title,
+          episode: '第 ${_detail.episodes[_index].number} 集',
+          isPlaying: true,
         ),
       );
     }
@@ -1635,14 +1622,12 @@ class PlayerScreenState extends State<PlayerScreen>
                 this,
                 fullscreen: fullscreen,
                 aspectRatio: _aspectRatio,
-                forceLandscape: _landscapeLocked,
               ) ??
               SystemChrome.setPreferredOrientations(
                 AppOrientationController.orientations(
                   television: _television,
                   fullscreen: fullscreen,
                   aspectRatio: _aspectRatio,
-                  forceLandscape: _landscapeLocked,
                 ),
               ));
         }
@@ -2468,10 +2453,8 @@ class PlayerScreenState extends State<PlayerScreen>
       pictureInPictureRequested: _pictureInPictureRequested,
       playerFocus: _playerFocus,
       videoPaneKey: _videoPaneKey,
-      videoFit: _videoFit,
-      onToggleFit: _toggleVideoFit,
-      landscapeLocked: _landscapeLocked,
-      onToggleLandscapeLock: _toggleLandscapeLock,
+      backgroundAudio: widget.store.playbackPreferences.backgroundAudio,
+      onToggleBackgroundAudio: _toggleBackgroundAudio,
       allowOnlineFallback: widget.allowOnlineFallback,
       localOnly: widget.localOnly,
       isMediaIdNull: widget.mediaId == null,

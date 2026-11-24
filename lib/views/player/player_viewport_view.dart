@@ -91,17 +91,15 @@ class PlayerViewportView extends StatelessWidget {
     this.fillStyle,
     this.topPadding = 0.0,
     this.videoFit = BoxFit.contain,
-    this.onToggleFit,
-    this.landscapeLocked = false,
-    this.onToggleLandscapeLock,
+    this.backgroundAudio = false,
+    this.onToggleBackgroundAudio,
   });
 
   final double topPadding;
   final PlayerFillStyle? fillStyle;
   final BoxFit videoFit;
-  final VoidCallback? onToggleFit;
-  final bool landscapeLocked;
-  final VoidCallback? onToggleLandscapeLock;
+  final bool backgroundAudio;
+  final VoidCallback? onToggleBackgroundAudio;
   final VoidCallback? onComments;
   final Future<PlaybackTechnicalDiagnostics?> Function()? onFetchDiagnostics;
   final bool television;
@@ -240,10 +238,8 @@ class PlayerViewportView extends StatelessWidget {
             onNext: index + 1 < detail.episodes.length
                 ? () => onPlay(index + 1)
                 : null,
-            isCover: videoFit == BoxFit.cover,
-            onToggleFit: onToggleFit,
-            landscapeLocked: landscapeLocked,
-            onToggleLandscapeLock: onToggleLandscapeLock,
+            backgroundAudio: backgroundAudio,
+            onToggleBackgroundAudio: onToggleBackgroundAudio,
           );
 
     final layeredControls = Stack(

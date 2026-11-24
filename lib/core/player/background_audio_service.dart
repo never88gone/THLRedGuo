@@ -117,21 +117,39 @@ class BackgroundAudioService {
 
     try {
       await FlutterForegroundTask.requestNotificationPermission();
-      await FlutterForegroundTask.startService(
-        serviceId: 2408,
-        serviceTypes: [ForegroundServiceTypes.mediaPlayback],
-        notificationTitle: title,
-        notificationText: '$episode · 后台听剧模式',
-        notificationButtons: [
-          const NotificationButton(id: 'prev', text: '上一集'),
-          NotificationButton(
-            id: 'toggle',
-            text: isPlaying ? '暂停' : '播放',
-          ),
-          const NotificationButton(id: 'next', text: '下一集'),
-        ],
-        callback: backgroundAudioTaskEntry,
-      );
+      try {
+        await FlutterForegroundTask.startService(
+          serviceId: 2408,
+          serviceTypes: [ForegroundServiceTypes.mediaPlayback],
+          notificationTitle: title,
+          notificationText: '$episode · 后台听剧模式',
+          notificationButtons: [
+            const NotificationButton(id: 'prev', text: '上一集'),
+            NotificationButton(
+              id: 'toggle',
+              text: isPlaying ? '暂停' : '播放',
+            ),
+            const NotificationButton(id: 'next', text: '下一集'),
+          ],
+          callback: backgroundAudioTaskEntry,
+        );
+      } catch (_) {
+        await FlutterForegroundTask.startService(
+          serviceId: 2408,
+          serviceTypes: [ForegroundServiceTypes.dataSync],
+          notificationTitle: title,
+          notificationText: '$episode · 后台听剧模式',
+          notificationButtons: [
+            const NotificationButton(id: 'prev', text: '上一集'),
+            NotificationButton(
+              id: 'toggle',
+              text: isPlaying ? '暂停' : '播放',
+            ),
+            const NotificationButton(id: 'next', text: '下一集'),
+          ],
+          callback: backgroundAudioTaskEntry,
+        );
+      }
       _running = await FlutterForegroundTask.isRunningService;
     } catch (e) {
       debugPrint('BackgroundAudioService start failed: $e');

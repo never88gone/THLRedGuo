@@ -49,10 +49,8 @@ class PlayerControls extends StatefulWidget {
     this.pictureInPictureRequested = false,
     this.playbackRequested,
     this.enhancement,
-    this.isCover = false,
-    this.onToggleFit,
-    this.landscapeLocked = false,
-    this.onToggleLandscapeLock,
+    this.backgroundAudio = false,
+    this.onToggleBackgroundAudio,
   });
 
   final Player player;
@@ -87,10 +85,8 @@ class PlayerControls extends StatefulWidget {
   final Future<void> Function()? onPictureInPicture;
   final bool pictureInPictureRequested;
   final VideoEnhancementController? enhancement;
-  final bool isCover;
-  final VoidCallback? onToggleFit;
-  final bool landscapeLocked;
-  final VoidCallback? onToggleLandscapeLock;
+  final bool backgroundAudio;
+  final VoidCallback? onToggleBackgroundAudio;
 
   @override
   State<PlayerControls> createState() => _PlayerControlsState();
@@ -369,10 +365,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                           buffered: buffered,
                           seekValue: _seekValue,
                           volume: state.volume,
-                          isCover: widget.isCover,
-                          onToggleFit: widget.onToggleFit,
-                          landscapeLocked: widget.landscapeLocked,
-                          onToggleLandscapeLock: widget.onToggleLandscapeLock,
+                          backgroundAudio: widget.backgroundAudio,
+                          onToggleBackgroundAudio: widget.onToggleBackgroundAudio,
                           onDismiss: _hide,
                           onVolumeChange: widget.enabled
                               ? (val) {

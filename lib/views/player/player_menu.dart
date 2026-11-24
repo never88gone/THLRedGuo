@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
-import 'package:THLRedLook/views/browser/episode_browser.dart';
 import 'package:THLRedLook/core/player/playback_preferences.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement_settings.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
+import 'package:THLRedLook/views/player/player_episode_grid.dart';
 
 enum PlayerMenuSection { episodes, speed, quality, settings }
 
@@ -439,6 +439,22 @@ class _PlayerMenuState extends State<PlayerMenu> {
                   },
           ),
           const SizedBox(height: 8),
+          SwitchListTile.adaptive(
+            key: const ValueKey('player-background-audio-enabled'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('后台收听（听剧模式）'),
+            subtitle: const Text('退至后台或锁屏时保持声音连续播放，接管锁屏控制'),
+            value: preferences.backgroundAudio,
+            onChanged: _busy
+                ? null
+                : (value) {
+                    setState(() {
+                      _preferences = _preferences.copyWith(backgroundAudio: value);
+                    });
+                    _run(() => widget.onPreferences(_preferences));
+                  },
+          ),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
             key: const ValueKey('player-favorite'),
             onPressed: _busy ? null : () => _run(widget.onFavorite),
@@ -468,33 +484,4 @@ class _PlayerMenuState extends State<PlayerMenu> {
       ],
     );
   }
-}
-
-class PlayerEpisodeGrid extends StatelessWidget {
-  const PlayerEpisodeGrid({
-    super.key,
-    required this.episodes,
-    required this.currentIndex,
-    required this.onSelected,
-    this.keyPrefix = 'play-episode',
-    this.compact = false,
-    this.title = '选集',
-  });
-  final List<Episode> episodes;
-  final int currentIndex;
-  final ValueChanged<int> onSelected;
-  final String keyPrefix;
-  final bool compact;
-  final String title;
-  @override
-  Widget build(BuildContext context) => EpisodeBrowser(
-    episodes: episodes,
-    currentNumber: episodes.isEmpty
-        ? null
-        : episodes[currentIndex.clamp(0, episodes.length - 1)].number,
-    onSelected: onSelected,
-    keyPrefix: keyPrefix,
-    compact: compact,
-    title: title,
-  );
 }

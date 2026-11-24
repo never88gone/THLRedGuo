@@ -22,7 +22,7 @@ class PlayerBottomBarView extends StatelessWidget {
     required this.seekValue,
     required this.onSpeed,
     required this.onQuality,
-    required this.onFullscreen,
+    this.onFullscreen,
     required this.onSeekStart,
     required this.onSeekChange,
     required this.onSeekEnd,
@@ -35,10 +35,8 @@ class PlayerBottomBarView extends StatelessWidget {
     this.onPush,
     this.onPictureInPicture,
     this.pictureInPictureRequested = false,
-    this.isCover = false,
-    this.onToggleFit,
-    this.landscapeLocked = false,
-    this.onToggleLandscapeLock,
+    this.backgroundAudio = false,
+    this.onToggleBackgroundAudio,
     this.onDismiss,
   });
 
@@ -47,10 +45,9 @@ class PlayerBottomBarView extends StatelessWidget {
   final bool swipeEnabled;
   final bool enabled;
   final bool pictureInPictureRequested;
-  final bool isCover;
-  final VoidCallback? onToggleFit;
-  final bool landscapeLocked;
-  final VoidCallback? onToggleLandscapeLock;
+  final bool backgroundAudio;
+  final VoidCallback? onToggleBackgroundAudio;
+  final VoidCallback? onFullscreen;
   final VoidCallback? onDismiss;
   final double speed;
   final String qualityLabel;
@@ -64,7 +61,6 @@ class PlayerBottomBarView extends StatelessWidget {
   final bool? showVolumeControl;
   final VoidCallback onSpeed;
   final VoidCallback onQuality;
-  final VoidCallback onFullscreen;
   final ValueChanged<double> onSeekStart;
   final ValueChanged<double> onSeekChange;
   final ValueChanged<double> onSeekEnd;
@@ -369,41 +365,19 @@ class PlayerBottomBarView extends StatelessWidget {
           onPressed: enabled ? onEpisodes : null,
           child: const Text('选集'),
         ),
-      if (onToggleFit != null)
+      if (onToggleBackgroundAudio != null)
         _toolButton(
           context: context,
-          key: const ValueKey('player-fit-toggle'),
-          tooltip: isCover ? '原画适应' : '全屏铺满',
-          onPressed: enabled ? onToggleFit : null,
+          key: const ValueKey('player-background-audio'),
+          tooltip: backgroundAudio ? '关闭后台听剧' : '开启后台听剧',
+          onPressed: enabled ? onToggleBackgroundAudio : null,
           child: Icon(
-            isCover ? Icons.fit_screen_outlined : Icons.crop_free_rounded,
+            backgroundAudio
+                ? Icons.headphones_rounded
+                : Icons.headphones_outlined,
+            color: backgroundAudio ? AppColors.hongguoRed : null,
           ),
         ),
-      if (onToggleLandscapeLock != null)
-        _toolButton(
-          context: context,
-          key: const ValueKey('player-landscape-lock'),
-          tooltip: landscapeLocked ? '解锁方向' : '锁定横屏',
-          onPressed: enabled ? onToggleLandscapeLock : null,
-          child: Icon(
-            landscapeLocked
-                ? Icons.screen_lock_rotation_rounded
-                : Icons.screen_rotation_rounded,
-            color: landscapeLocked ? AppColors.hongguoRed : null,
-          ),
-        ),
-
-      _toolButton(
-        context: context,
-        key: const ValueKey('player-fullscreen'),
-        tooltip: fullscreen ? '退出全屏' : '全屏播放',
-        onPressed: onFullscreen,
-        child: Icon(
-          fullscreen
-              ? Icons.fullscreen_exit_rounded
-              : Icons.fullscreen_rounded,
-        ),
-      ),
     ];
 
     Widget content = Column(

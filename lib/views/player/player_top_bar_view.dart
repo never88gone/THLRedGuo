@@ -50,7 +50,7 @@ class PlayerTopBarView extends StatelessWidget {
     return Align(
       alignment: Alignment.topCenter,
       child: Padding(
-        padding: EdgeInsets.only(top: extraTop),
+        padding: EdgeInsets.only(top: extraTop, left: 8, right: 8),
         child: Row(
           children: [
             _iconButton(
@@ -60,34 +60,33 @@ class PlayerTopBarView extends StatelessWidget {
                   ? Icons.arrow_back_rounded
                   : Icons.arrow_back_ios_new_rounded,
             ),
-            if (!compact) ...[
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.white,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 6,
-                        color: AppColors.black,
-                      ),
-                    ],
-                  ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.white,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 6,
+                      color: AppColors.black,
+                    ),
+                  ],
                 ),
               ),
-            ] else
-              const Spacer(),
-            if (compact)
-              _iconButton(
-                tooltip: '旋转与全屏',
-                onPressed: onFullscreen,
-                icon: Icons.screen_rotation_alt_rounded,
-              ),
+            ),
+            const SizedBox(width: 8),
+            _iconButton(
+              tooltip: fullscreen ? '退出全屏' : '全屏播放',
+              onPressed: onFullscreen,
+              icon: fullscreen
+                  ? Icons.fullscreen_exit_rounded
+                  : Icons.fullscreen_rounded,
+            ),
           ],
         ),
       ),
