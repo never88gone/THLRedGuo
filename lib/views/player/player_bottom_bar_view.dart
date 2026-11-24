@@ -35,6 +35,11 @@ class PlayerBottomBarView extends StatelessWidget {
     this.onPush,
     this.onPictureInPicture,
     this.pictureInPictureRequested = false,
+    this.isCover = false,
+    this.onToggleFit,
+    this.landscapeLocked = false,
+    this.onToggleLandscapeLock,
+    this.onDismiss,
   });
 
   final BoxConstraints constraints;
@@ -42,6 +47,11 @@ class PlayerBottomBarView extends StatelessWidget {
   final bool swipeEnabled;
   final bool enabled;
   final bool pictureInPictureRequested;
+  final bool isCover;
+  final VoidCallback? onToggleFit;
+  final bool landscapeLocked;
+  final VoidCallback? onToggleLandscapeLock;
+  final VoidCallback? onDismiss;
   final double speed;
   final String qualityLabel;
   final double duration;
@@ -359,20 +369,70 @@ class PlayerBottomBarView extends StatelessWidget {
           onPressed: enabled ? onEpisodes : null,
           child: const Text('选集'),
         ),
-
-      if (!swipeEnabled)
+      if (onToggleFit != null)
         _toolButton(
           context: context,
-          key: const ValueKey('player-fullscreen'),
-          tooltip: fullscreen ? '退出全屏' : '全屏播放',
-          onPressed: onFullscreen,
+          key: const ValueKey('player-fit-toggle'),
+          tooltip: isCover ? '原画适应' : '全屏铺满',
+          onPressed: enabled ? onToggleFit : null,
           child: Icon(
-            fullscreen
-                ? Icons.fullscreen_exit_rounded
-                : Icons.fullscreen_rounded,
+            isCover ? Icons.fit_screen_outlined : Icons.crop_free_rounded,
           ),
         ),
+      if (onToggleLandscapeLock != null)
+        _toolButton(
+          context: context,
+          key: const ValueKey('player-landscape-lock'),
+          tooltip: landscapeLocked ? '解锁方向' : '锁定横屏',
+          onPressed: enabled ? onToggleLandscapeLock : null,
+          child: Icon(
+            landscapeLocked
+                ? Icons.screen_lock_rotation_rounded
+                : Icons.screen_rotation_rounded,
+            color: landscapeLocked ? AppColors.hongguoRed : null,
+          ),
+        ),
+
+      _toolButton(
+        context: context,
+        key: const ValueKey('player-fullscreen'),
+        tooltip: fullscreen ? '退出全屏' : '全屏播放',
+        onPressed: onFullscreen,
+        child: Icon(
+          fullscreen
+              ? Icons.fullscreen_exit_rounded
+              : Icons.fullscreen_rounded,
+        ),
+      ),
     ];
+
+    Widget content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+          child: _clusteredToolRow(tools, desktop: isDesktop),
+        ),
+        _progressRow(context),
+      ],
+    );
+
+    if (onDismiss != null) {
+      content = GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onVerticalDragEnd: (details) {
+          if ((details.primaryVelocity ?? 0) > 120) {
+            onDismiss!();
+          }
+        },
+        onVerticalDragUpdate: (details) {
+          if (details.delta.dy > 8) {
+            onDismiss!();
+          }
+        },
+        child: content,
+      );
+    }
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -382,16 +442,7 @@ class PlayerBottomBarView extends StatelessWidget {
         right: false,
         bottom: true,
         minimum: EdgeInsets.only(bottom: fullscreen ? 14.0 : 4.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
-              child: _clusteredToolRow(tools, desktop: isDesktop),
-            ),
-            _progressRow(context),
-          ],
-        ),
+        child: content,
       ),
     );
   }

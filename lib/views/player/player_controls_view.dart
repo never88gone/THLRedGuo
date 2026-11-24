@@ -49,6 +49,10 @@ class PlayerControls extends StatefulWidget {
     this.pictureInPictureRequested = false,
     this.playbackRequested,
     this.enhancement,
+    this.isCover = false,
+    this.onToggleFit,
+    this.landscapeLocked = false,
+    this.onToggleLandscapeLock,
   });
 
   final Player player;
@@ -83,6 +87,10 @@ class PlayerControls extends StatefulWidget {
   final Future<void> Function()? onPictureInPicture;
   final bool pictureInPictureRequested;
   final VideoEnhancementController? enhancement;
+  final bool isCover;
+  final VoidCallback? onToggleFit;
+  final bool landscapeLocked;
+  final VoidCallback? onToggleLandscapeLock;
 
   @override
   State<PlayerControls> createState() => _PlayerControlsState();
@@ -345,57 +353,67 @@ class _PlayerControlsState extends State<PlayerControls> {
                         ),
 
                       // 底部控制与进度条
-                      PlayerBottomBarView(
-                        constraints: constraints,
-                        fullscreen: widget.fullscreen,
-                        swipeEnabled: widget.swipeEnabled,
-                        enabled: widget.enabled,
-                        speed: widget.speed,
-                        qualityLabel: widget.qualityLabel,
-                        duration: duration,
-                        position: position,
-                        buffered: buffered,
-                        seekValue: _seekValue,
-                        volume: state.volume,
-                        onVolumeChange: widget.enabled
-                            ? (val) {
-                                widget.interactions.setVolumeDirect(val);
-                                _show();
-                              }
-                            : null,
-                        onToggleMute: widget.enabled
-                            ? () {
-                                widget.interactions.toggleMute();
-                                _show();
-                              }
-                            : null,
-                        onSpeed: () => _panel(widget.onSpeed),
-                        onQuality: () => _panel(widget.onQuality),
-                        onFullscreen: widget.onFullscreen,
-                        onEpisodes: () => _panel(widget.onEpisodes),
-                        onComments: widget.onComments != null
-                            ? () => _panel(widget.onComments!)
-                            : null,
-                        onPush: widget.onPush != null
-                            ? () => _panel(widget.onPush!)
-                            : null,
-                        onPictureInPicture: widget.onPictureInPicture != null
-                            ? () => _panel(widget.onPictureInPicture!)
-                            : null,
-                        pictureInPictureRequested:
-                            widget.pictureInPictureRequested,
-                        onSeekStart: (_) {
-                          _hideTimer?.cancel();
-                        },
-                        onSeekChange: (val) {
-                          _hideTimer?.cancel();
-                          setState(() => _seekValue = val);
-                        },
-                        onSeekEnd: (val) {
-                          _seekTo(Duration(milliseconds: (val * 1000).toInt()));
-                          setState(() => _seekValue = null);
-                          _scheduleHide();
-                        },
+                      AnimatedSlide(
+                        offset: _visible ? Offset.zero : const Offset(0, 0.4),
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        child: PlayerBottomBarView(
+                          constraints: constraints,
+                          fullscreen: widget.fullscreen,
+                          swipeEnabled: widget.swipeEnabled,
+                          enabled: widget.enabled,
+                          speed: widget.speed,
+                          qualityLabel: widget.qualityLabel,
+                          duration: duration,
+                          position: position,
+                          buffered: buffered,
+                          seekValue: _seekValue,
+                          volume: state.volume,
+                          isCover: widget.isCover,
+                          onToggleFit: widget.onToggleFit,
+                          landscapeLocked: widget.landscapeLocked,
+                          onToggleLandscapeLock: widget.onToggleLandscapeLock,
+                          onDismiss: _hide,
+                          onVolumeChange: widget.enabled
+                              ? (val) {
+                                  widget.interactions.setVolumeDirect(val);
+                                  _show();
+                                }
+                              : null,
+                          onToggleMute: widget.enabled
+                              ? () {
+                                  widget.interactions.toggleMute();
+                                  _show();
+                                }
+                              : null,
+                          onSpeed: () => _panel(widget.onSpeed),
+                          onQuality: () => _panel(widget.onQuality),
+                          onFullscreen: widget.onFullscreen,
+                          onEpisodes: () => _panel(widget.onEpisodes),
+                          onComments: widget.onComments != null
+                              ? () => _panel(widget.onComments!)
+                              : null,
+                          onPush: widget.onPush != null
+                              ? () => _panel(widget.onPush!)
+                              : null,
+                          onPictureInPicture: widget.onPictureInPicture != null
+                              ? () => _panel(widget.onPictureInPicture!)
+                              : null,
+                          pictureInPictureRequested:
+                              widget.pictureInPictureRequested,
+                          onSeekStart: (_) {
+                            _hideTimer?.cancel();
+                          },
+                          onSeekChange: (val) {
+                            _hideTimer?.cancel();
+                            setState(() => _seekValue = val);
+                          },
+                          onSeekEnd: (val) {
+                            _seekTo(Duration(milliseconds: (val * 1000).toInt()));
+                            setState(() => _seekValue = null);
+                            _scheduleHide();
+                          },
+                        ),
                       ),
                     ],
                   ),

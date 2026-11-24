@@ -196,6 +196,25 @@ class PlaybackSettingsPage extends StatelessWidget {
                             );
                           },
                         ),
+                        const Divider(height: 1, indent: 56),
+                        SettingsSwitchTile(
+                          key: const ValueKey('settings-background-audio-switch'),
+                          leading: const Icon(Icons.headphones_rounded),
+                          title: const Text('后台收听（听剧模式）'),
+                          subtitle: Text(
+                            prefs.backgroundAudio
+                                ? '退至后台或锁屏时保持声音连续播放，接管锁屏控制'
+                                : '退至后台或锁屏时自动暂停播放',
+                          ),
+                          value: prefs.backgroundAudio,
+                          onChanged: (val) async {
+                            final updated = prefs.copyWith(backgroundAudio: val);
+                            await saveUserChange(
+                              context,
+                              () => store.setPlaybackPreferences(updated),
+                            );
+                          },
+                        ),
                       ],
                     ],
                   ),

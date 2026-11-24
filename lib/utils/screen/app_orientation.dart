@@ -22,7 +22,14 @@ class AppOrientationController {
     bool fullscreen = false,
     double aspectRatio = 1,
     bool isPad = false,
+    bool forceLandscape = false,
   }) {
+    if (forceLandscape) {
+      return const [
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ];
+    }
     if (isPad || AppDevice.isPadDevice) {
       return DeviceOrientation.values;
     }
@@ -54,6 +61,7 @@ class AppOrientationController {
     Object owner, {
     required bool fullscreen,
     required double aspectRatio,
+    bool forceLandscape = false,
   }) async {
     final previousOwner = _playbackOwner;
     final previousOrientations = _playbackOrientations;
@@ -63,6 +71,7 @@ class AppOrientationController {
         television: false,
         fullscreen: fullscreen,
         aspectRatio: aspectRatio,
+        forceLandscape: forceLandscape,
       );
     }
     final requested = _playbackOrientations;

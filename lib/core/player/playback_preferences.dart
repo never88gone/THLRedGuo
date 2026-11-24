@@ -35,6 +35,7 @@ class PlaybackPreferences {
     this.decoderMode = PlaybackDecoderMode.hardware,
     this.volume = 100.0,
     this.fillStyle = PlayerFillStyle.black,
+    this.backgroundAudio = true,
   });
 
   final double speed;
@@ -48,6 +49,7 @@ class PlaybackPreferences {
   final PlaybackDecoderMode decoderMode;
   final double volume;
   final PlayerFillStyle fillStyle;
+  final bool backgroundAudio;
 
   PlaybackPreferences copyWith({
     double? speed,
@@ -61,6 +63,7 @@ class PlaybackPreferences {
     PlaybackDecoderMode? decoderMode,
     double? volume,
     PlayerFillStyle? fillStyle,
+    bool? backgroundAudio,
   }) => PlaybackPreferences(
     speed: speed ?? this.speed,
     quality: quality ?? this.quality,
@@ -73,6 +76,7 @@ class PlaybackPreferences {
     decoderMode: decoderMode ?? this.decoderMode,
     volume: volume ?? this.volume,
     fillStyle: fillStyle ?? this.fillStyle,
+    backgroundAudio: backgroundAudio ?? this.backgroundAudio,
   );
 
   Map<String, dynamic> toJson() => {
@@ -87,6 +91,7 @@ class PlaybackPreferences {
     'decoderMode': decoderMode.name,
     'volume': volume,
     'fillStyle': fillStyle.name,
+    'backgroundAudio': backgroundAudio,
   };
 
   factory PlaybackPreferences.fromJson(Map<String, dynamic> value) {
@@ -110,6 +115,7 @@ class PlaybackPreferences {
       (e) => e.name == fillStyleStr,
       orElse: () => PlayerFillStyle.black,
     );
+    final backgroundAudio = value['backgroundAudio'] as bool? ?? true;
     if (!playbackSpeeds.contains(speed) || quality < 0 || quality > 4320) {
       throw const FormatException('播放偏好无效');
     }
@@ -125,6 +131,7 @@ class PlaybackPreferences {
       decoderMode: decoderMode,
       volume: volume,
       fillStyle: fillStyle,
+      backgroundAudio: backgroundAudio,
     );
   }
 }

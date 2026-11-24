@@ -21,6 +21,7 @@ class FeedPlayerOverlay extends StatelessWidget {
     required this.onDetail,
     required this.onDanmaku,
     required this.onSettings,
+    this.onFullscreen,
     this.onSocial,
     this.isLiked = false,
     this.likeCount = 0,
@@ -47,6 +48,7 @@ class FeedPlayerOverlay extends StatelessWidget {
   final VoidCallback onDetail;
   final VoidCallback onDanmaku;
   final VoidCallback onSettings;
+  final VoidCallback? onFullscreen;
   final VoidCallback? onSocial;
 
   final bool isLiked;
@@ -124,6 +126,14 @@ class FeedPlayerOverlay extends StatelessWidget {
           subText: following ? '已追剧' : '追剧',
         ),
         _action('episodes', Icons.video_library_outlined, '选集', onEpisodes, subText: '选集'),
+        if (onFullscreen != null)
+          _action(
+            'fullscreen',
+            Icons.fullscreen_rounded,
+            '全屏播放',
+            onFullscreen!,
+            subText: '全屏',
+          ),
         _action(
           'danmaku',
           danmakuEnabled ? Icons.subtitles : Icons.subtitles_off,

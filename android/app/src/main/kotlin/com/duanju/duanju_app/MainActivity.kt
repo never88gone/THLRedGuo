@@ -376,8 +376,14 @@ class MainActivity : FlutterActivity() {
     ): PictureInPictureParams {
         val safeWidth = width.coerceIn(1, 10000)
         val safeHeight = height.coerceIn(1, 10000)
+        val rawRatio = safeWidth.toFloat() / safeHeight.toFloat()
+        val (finalWidth, finalHeight) = when {
+            rawRatio < 0.4185f -> Pair((10000f * 0.4185f).toInt(), 10000)
+            rawRatio > 2.385f -> Pair((10000f * 2.385f).toInt(), 10000)
+            else -> Pair(safeWidth, safeHeight)
+        }
         val builder = PictureInPictureParams.Builder()
-        builder.setAspectRatio(Rational(safeWidth, safeHeight))
+        builder.setAspectRatio(Rational(finalWidth, finalHeight))
         if (sourceRect != null && sourceRect.width() > 0 && sourceRect.height() > 0) {
             builder.setSourceRectHint(sourceRect)
         }
@@ -449,8 +455,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S &&
-            pipAutoEnterEnabled &&
+        if (pipAutoEnterEnabled &&
             !isTelevisionDevice() &&
             pictureInPictureSupported() &&
             !isInPictureInPictureMode

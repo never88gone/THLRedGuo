@@ -43,6 +43,7 @@ import 'package:THLRedLook/pages/lan/lan_page.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
 import 'package:THLRedLook/utils/media/video_output_size.dart';
 import 'package:THLRedLook/views/player/player_mobile_panel_view.dart';
+import 'package:THLRedLook/core/player/background_audio_service.dart';
 import 'package:THLRedLook/views/player/player_desktop_panel_view.dart';
 import 'package:THLRedLook/views/player/player_viewport_view.dart';
 import 'package:THLRedLook/views/player/player_quality_sheet_view.dart';
@@ -189,7 +190,10 @@ class PlayerScreenState extends State<PlayerScreen>
     enhancement: _enhancement.preferences,
     volume: _player.state.volume,
     fillStyle: widget.store.playbackPreferences.fillStyle,
+    backgroundAudio: widget.store.playbackPreferences.backgroundAudio,
   );
+  BoxFit _videoFit = BoxFit.contain;
+  bool _landscapeLocked = false;
   String get _qualityLabel {
     if (_plan?.offline == true) return '本地原画';
     final q = _plan?.quality ?? 0;
@@ -417,6 +421,15 @@ class PlayerScreenState extends State<PlayerScreen>
           });
           _scheduleSystemUi();
           _syncNativePictureInPictureConfig();
+          if (BackgroundAudioService.instance.isRunning) {
+            unawaited(
+              BackgroundAudioService.instance.update(
+                title: _detail.drama.title,
+                episode: '第 ${_detail.episodes[_index].number} 集',
+                isPlaying: true,
+              ),
+            );
+          }
         }
       }),
     );
@@ -446,6 +459,17 @@ class PlayerScreenState extends State<PlayerScreen>
         if (_handoffOwned && !_closed) await _stopForLan();
       };
     }
+    BackgroundAudioService.instance.registerCallbacks(
+      onTogglePlayback: _togglePlayback,
+      onPrevious: () {
+        if (_index > 0) unawaited(_play(_index - 1));
+      },
+      onNext: () {
+        if (_index + 1 < _detail.episodes.length) {
+          unawaited(_play(_index + 1));
+        }
+      },
+    );
     if (_profileEpoch != widget.store.profileEpoch ||
         handoff?.cancelled == true) {
       handoff?.fail('接收用户已变更，推送已取消');
@@ -704,29 +728,92 @@ class PlayerScreenState extends State<PlayerScreen>
     _syncPreload();
     _health.reset();
     if (!visible) _interactions.cancel();
-    if (pauseWhenHidden &&
-        !visible &&
+    final bgAudio = widget.store.playbackPreferences.backgroundAudio;
+    final autoPip = _pipCoordinator.shouldAutoEnter;
+
+    if (!visible &&
         (_lifecycleState == AppLifecycleState.paused ||
             _lifecycleState == AppLifecycleState.hidden)) {
-      if (!_lifecyclePaused) {
-        _resumeAfterInterruption = _playIntent;
-        _lifecyclePaused = true;
+      if (bgAudio && _playIntent && !_closed) {
+        unawaited(
+          BackgroundAudioService.instance.start(
+            title: _detail.drama.title,
+            episode: '第 ${_detail.episodes[_index].number} 集',
+            isPlaying: _player.state.playing,
+          ),
+        );
+      } else if (autoPip) {
+        Future.delayed(const Duration(milliseconds: 650), () {
+          if (!mounted || _closed) return;
+          if (!_pictureInPictureVisible &&
+              (_lifecycleState == AppLifecycleState.paused ||
+                  _lifecycleState == AppLifecycleState.hidden)) {
+            if (!_lifecyclePaused) {
+              _resumeAfterInterruption = _playIntent;
+              _lifecyclePaused = true;
+            }
+            setState(() => _playIntent = false);
+            unawaited(_player.pause());
+            unawaited(_saveProgress(flush: true));
+          }
+        });
+      } else if (pauseWhenHidden) {
+        if (!_lifecyclePaused) {
+          _resumeAfterInterruption = _playIntent;
+          _lifecyclePaused = true;
+        }
+        setState(() => _playIntent = false);
+        unawaited(_player.pause());
+        unawaited(_saveProgress(flush: true));
       }
-      setState(() => _playIntent = false);
-      unawaited(_player.pause());
-      unawaited(_saveProgress(flush: true));
     }
-    if (visible && _lifecyclePaused) {
-      _lifecyclePaused = false;
-      final resume = _resumeAfterInterruption;
-      _resumeAfterInterruption = false;
-      setState(() => _playIntent = resume);
-      if (resume && !_loading && _error == null && _openedIndex == _index) {
-        unawaited(_player.play());
+    if (visible) {
+      unawaited(BackgroundAudioService.instance.stop());
+      if (_lifecyclePaused) {
+        _lifecyclePaused = false;
+        final resume = _resumeAfterInterruption;
+        _resumeAfterInterruption = false;
+        setState(() => _playIntent = resume);
+        if (resume && !_loading && _error == null && _openedIndex == _index) {
+          unawaited(_player.play());
+        }
       }
     }
     if (visible && _pendingError) {
       _queueRecovery();
+    }
+  }
+
+  void _toggleVideoFit() {
+    setState(() {
+      _videoFit = _videoFit == BoxFit.contain ? BoxFit.cover : BoxFit.contain;
+    });
+    _interactions.hint(_videoFit == BoxFit.cover ? '已切换为全屏铺满' : '已切换为原画适应');
+  }
+
+  Future<void> _toggleLandscapeLock() async {
+    final nextLocked = !_landscapeLocked;
+    setState(() {
+      _landscapeLocked = nextLocked;
+    });
+    _interactions.hint(nextLocked ? '已锁定横屏' : '已解除方向锁定');
+    final controller = _orientationController;
+    if (controller != null) {
+      await controller.setPlayback(
+        this,
+        fullscreen: _showFullscreen,
+        aspectRatio: _aspectRatio,
+        forceLandscape: nextLocked,
+      );
+    } else {
+      await SystemChrome.setPreferredOrientations(
+        AppOrientationController.orientations(
+          television: false,
+          fullscreen: _showFullscreen,
+          aspectRatio: _aspectRatio,
+          forceLandscape: nextLocked,
+        ),
+      );
     }
   }
 
@@ -1414,6 +1501,15 @@ class PlayerScreenState extends State<PlayerScreen>
           _acknowledgeHandoff();
           _menuRevision.value++;
           _syncNativePictureInPictureConfig();
+          if (BackgroundAudioService.instance.isRunning) {
+            unawaited(
+              BackgroundAudioService.instance.update(
+                title: _detail.drama.title,
+                episode: '第 ${_detail.episodes[_index].number} 集',
+                isPlaying: true,
+              ),
+            );
+          }
           if (_pictureInPictureActive) {
             _syncPictureInPictureSession();
           }
@@ -1466,6 +1562,15 @@ class PlayerScreenState extends State<PlayerScreen>
               widget.handoff?.fail(_error!);
             });
             _syncNativePictureInPictureConfig();
+          if (BackgroundAudioService.instance.isRunning) {
+            unawaited(
+              BackgroundAudioService.instance.update(
+                title: _detail.drama.title,
+                episode: '第 ${_detail.episodes[_index].number} 集',
+                isPlaying: true,
+              ),
+            );
+          }
           }
         }
       } else if (prepared != null && !installed) {
@@ -1530,12 +1635,14 @@ class PlayerScreenState extends State<PlayerScreen>
                 this,
                 fullscreen: fullscreen,
                 aspectRatio: _aspectRatio,
+                forceLandscape: _landscapeLocked,
               ) ??
               SystemChrome.setPreferredOrientations(
                 AppOrientationController.orientations(
                   television: _television,
                   fullscreen: fullscreen,
                   aspectRatio: _aspectRatio,
+                  forceLandscape: _landscapeLocked,
                 ),
               ));
         }
@@ -1980,6 +2087,8 @@ class PlayerScreenState extends State<PlayerScreen>
     _danmaku.dispose();
     _preloader.dispose();
     _generation++;
+    BackgroundAudioService.instance.unregisterCallbacks();
+    unawaited(BackgroundAudioService.instance.stop());
     WidgetsBinding.instance.removeObserver(this);
     _saveTimer?.cancel();
     _healthTimer?.cancel();
@@ -2314,6 +2423,7 @@ class PlayerScreenState extends State<PlayerScreen>
               ),
               onEpisodes: () =>
                   unawaited(_openPanel(PlayerMenuSection.episodes)),
+              onFullscreen: _rotate,
               onDetail: widget.onOpenDetail ?? () {},
               onDanmaku: () => unawaited(_toggleDanmaku()),
               onSettings: () =>
@@ -2358,6 +2468,10 @@ class PlayerScreenState extends State<PlayerScreen>
       pictureInPictureRequested: _pictureInPictureRequested,
       playerFocus: _playerFocus,
       videoPaneKey: _videoPaneKey,
+      videoFit: _videoFit,
+      onToggleFit: _toggleVideoFit,
+      landscapeLocked: _landscapeLocked,
+      onToggleLandscapeLock: _toggleLandscapeLock,
       allowOnlineFallback: widget.allowOnlineFallback,
       localOnly: widget.localOnly,
       isMediaIdNull: widget.mediaId == null,
