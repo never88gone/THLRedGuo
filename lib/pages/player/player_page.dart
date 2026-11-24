@@ -165,6 +165,8 @@ class PlayerScreenState extends State<PlayerScreen>
   String _loadingMessage = '正在准备播放';
   String? _error;
   String? _saveWarning;
+  Timer? _saveWarningTimer;
+  bool _saveWarningDismissed = false;
   PlaybackPlan? _plan;
   double _speed = 1;
   double _aspectRatio = 9 / 16;
@@ -1196,16 +1198,36 @@ class PlayerScreenState extends State<PlayerScreen>
       }
       _savedProgressKey = progressKey;
       if (mounted && !_closed && _saveWarning != null) {
+        _saveWarningTimer?.cancel();
         setState(() => _saveWarning = null);
       }
     } catch (error) {
-      if (mounted && !_closed && _saveWarning == null) {
-        setState(
-          () => _saveWarning = error is HongguoAccountFailure
-              ? '账号观看进度尚未同步，请检查网络后重试。'
-              : '观看进度尚未保存，请检查存储空间后重试。',
-        );
+      if (mounted && !_closed) {
+        if (!flush) return;
+        if (!_saveWarningDismissed) {
+          _saveWarningTimer?.cancel();
+          setState(
+            () => _saveWarning = error is HongguoAccountFailure
+                ? '账号观看进度尚未同步，请检查网络后重试。'
+                : '观看进度尚未保存，请检查存储空间后重试。',
+          );
+          _saveWarningTimer = Timer(const Duration(seconds: 4), () {
+            if (mounted && !_closed && _saveWarning != null) {
+              setState(() => _saveWarning = null);
+            }
+          });
+        }
       }
+    }
+  }
+
+  void _dismissSaveWarning() {
+    _saveWarningTimer?.cancel();
+    if (mounted && !_closed) {
+      setState(() {
+        _saveWarning = null;
+        _saveWarningDismissed = true;
+      });
     }
   }
 
@@ -1238,6 +1260,9 @@ class PlayerScreenState extends State<PlayerScreen>
       if (_closed || previousGeneration != _generation) return;
     }
     _interactions.cancel();
+    _saveWarningTimer?.cancel();
+    _saveWarning = null;
+    _saveWarningDismissed = false;
     if (widget.handoff != null &&
         handoffPlan == null &&
         recoveryAction == null) {
@@ -2076,6 +2101,7 @@ class PlayerScreenState extends State<PlayerScreen>
     unawaited(BackgroundAudioService.instance.stop());
     WidgetsBinding.instance.removeObserver(this);
     _saveTimer?.cancel();
+    _saveWarningTimer?.cancel();
     _healthTimer?.cancel();
     _errorTimer?.cancel();
     _pipCoordinator.dispose();
@@ -2470,7 +2496,14 @@ class PlayerScreenState extends State<PlayerScreen>
       onBack: _back,
       onRetry: _retry,
       onSwitchOnline: _switchOnline,
-      onSaveProgress: _saveProgress,
+      onSaveProgress: () async {
+        _interactions.hint('正在同步账号进度...');
+        await _saveProgress(flush: true);
+        if (_saveWarning == null) {
+          _interactions.hint('账号进度已成功同步');
+        }
+      },
+      onDismissSaveWarning: _dismissSaveWarning,
       onOpenPanel: _openPanel,
       onComments: _openComments,
       onToggleDanmaku: _toggleDanmaku,

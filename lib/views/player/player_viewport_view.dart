@@ -23,6 +23,7 @@ import 'package:THLRedLook/views/common/widgets.dart';
 import 'package:THLRedLook/views/player/player_controls_view.dart';
 import 'package:THLRedLook/views/player/player_loading_overlay_view.dart';
 import 'package:THLRedLook/views/player/player_pip_placeholder_view.dart';
+import 'package:THLRedLook/views/player/player_save_warning_banner.dart';
 import 'package:THLRedLook/views/player/episode_transition_view.dart';
 import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
 import 'package:THLRedLook/core/player/playback_preferences.dart';
@@ -77,6 +78,7 @@ class PlayerViewportView extends StatelessWidget {
     required this.onRetry,
     required this.onSwitchOnline,
     required this.onSaveProgress,
+    this.onDismissSaveWarning,
     required this.onOpenPanel,
     required this.onToggleDanmaku,
     this.onDanmakuSettings,
@@ -149,6 +151,7 @@ class PlayerViewportView extends StatelessWidget {
   final Future<void> Function() onRetry;
   final Future<void> Function() onSwitchOnline;
   final Future<void> Function() onSaveProgress;
+  final VoidCallback? onDismissSaveWarning;
   final Future<void> Function(PlayerMenuSection) onOpenPanel;
   final Future<void> Function() onToggleDanmaku;
   final Future<void> Function()? onDanmakuSettings;
@@ -382,33 +385,10 @@ class PlayerViewportView extends StatelessWidget {
                   ),
                 ),
               if (saveWarning != null && !hideOverlayForPictureInPicture)
-                Positioned(
-                  top: 52,
-                  left: 12,
-                  right: 12,
-                  child: SafeArea(
-                    bottom: false,
-                    child: Material(
-                      color: AppColors.darkSurfaceHigh,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              saveWarning!,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            TextButton(
-                              onPressed: onSaveProgress,
-                              child: const Text('重试保存'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                PlayerSaveWarningBanner(
+                  message: saveWarning!,
+                  onRetry: onSaveProgress,
+                  onDismiss: onDismissSaveWarning,
                 ),
             ],
           );
