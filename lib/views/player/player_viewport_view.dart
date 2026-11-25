@@ -20,6 +20,7 @@ import 'package:THLRedLook/pages/sources/sources_page.dart';
 import 'package:THLRedLook/views/television/television_controls.dart';
 import 'package:THLRedLook/core/enhancement/video_enhancement.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/views/player/desktop_pip_overlay.dart';
 import 'package:THLRedLook/views/player/player_controls_view.dart';
 import 'package:THLRedLook/views/player/player_loading_overlay_view.dart';
 import 'package:THLRedLook/views/player/player_pip_placeholder_view.dart';
@@ -173,12 +174,25 @@ class PlayerViewportView extends StatelessWidget {
         '${detail.drama.title} · 第 ${detail.episodes[index].number} 集${plan?.offline == true ? ' · 本地' : ''}${isVipEp ? ' · VIP 试看' : ''}${(plan?.routeIndex ?? 0) > 0 ? ' · 线路 ${plan!.routeIndex + 1}' : ''}';
     final hideOverlayForPictureInPicture = pictureInPictureVisible;
     final isAndroid = defaultTargetPlatform == TargetPlatform.android;
-    final showPipPlaceholder = hideOverlayForPictureInPicture && !isAndroid;
+    final isDesktop = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux);
+    final showPipPlaceholder =
+        hideOverlayForPictureInPicture && !isAndroid && !isDesktop;
     final Widget controls = showPipPlaceholder
         ? PlayerPipPlaceholderView(
             title: title,
             onBack: onBack,
             onRestorePictureInPicture: onRestorePictureInPicture,
+          )
+        : (hideOverlayForPictureInPicture && isDesktop)
+        ? DesktopPipOverlay(
+            player: player,
+            title: title,
+            onRestore: onRestorePictureInPicture,
+            onBack: onBack,
+            onTogglePlayback: onTogglePlayback,
           )
         : hideOverlayForPictureInPicture
         ? const SizedBox.shrink()

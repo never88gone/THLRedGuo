@@ -147,7 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     leading: const Icon(Icons.tune_rounded),
                     title: const Text('播放设置'),
                     subtitle: Text(
-                      '默认 $qualityLabel · ${playPrefs.speed}x · 弹幕${playPrefs.danmaku ? "开启" : "关闭"}${playPrefs.pictureInPicture && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS) ? " · 画中画开启" : ""}',
+                      '默认 $qualityLabel · ${playPrefs.speed}x · 弹幕${playPrefs.danmaku ? "开启" : "关闭"}${playPrefs.pictureInPicture && !isTv ? " · 画中画开启" : ""}',
                     ),
                     onTap: () => Navigator.push(
                       context,
@@ -172,8 +172,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                  if (defaultTargetPlatform == TargetPlatform.android ||
-                      defaultTargetPlatform == TargetPlatform.iOS)
+                  if (!isTv)
                     SettingsSwitchTile(
                       key: const ValueKey('settings-main-pip-switch'),
                       leading: const Icon(
@@ -182,7 +181,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: const Text('画中画模式'),
                       subtitle: Text(
                         playPrefs.pictureInPicture
-                            ? '已开启画中画（切出应用或点击按钮悬浮播放）'
+                            ? (defaultTargetPlatform == TargetPlatform.macOS ||
+                                    defaultTargetPlatform ==
+                                        TargetPlatform.windows ||
+                                    defaultTargetPlatform ==
+                                        TargetPlatform.linux)
+                                ? '已开启画中画（支持置顶悬浮迷你小窗）'
+                                : '已开启画中画（切出应用或点击按钮悬浮播放）'
                             : '已关闭（开启后可在播放器使用画中画小窗）',
                       ),
                       value: playPrefs.pictureInPicture,

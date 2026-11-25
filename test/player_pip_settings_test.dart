@@ -18,6 +18,7 @@ import 'package:THLRedLook/pages/settings/playback_settings_page.dart';
 import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/views/player/player_bottom_bar_view.dart';
 import 'package:THLRedLook/views/player/player_viewport_view.dart';
+import 'package:THLRedLook/views/settings/settings_switch_tile.dart';
 
 class _MockRepo extends AppRepository {
   @override
@@ -181,14 +182,15 @@ void main() {
           expect(switchFinder, findsOneWidget);
           expect(find.text('画中画模式'), findsOneWidget);
 
-          SwitchListTile tile = tester.widget<SwitchListTile>(switchFinder);
+          SettingsSwitchTile tile =
+              tester.widget<SettingsSwitchTile>(switchFinder);
           expect(tile.value, isFalse);
 
           await tester.tap(switchFinder);
           await tester.pumpAndSettle();
 
           expect(store.playbackPreferences.pictureInPicture, isTrue);
-          tile = tester.widget<SwitchListTile>(switchFinder);
+          tile = tester.widget<SettingsSwitchTile>(switchFinder);
           expect(tile.value, isTrue);
         } finally {
           debugDefaultTargetPlatformOverride = null;
@@ -221,6 +223,38 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(store.playbackPreferences.pictureInPicture, isTrue);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('3.1 UI 验证：macOS / 桌面端同样正确渲染并支持切换画中画设置', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final store = LocalStore(prefs);
+        await store.setPlaybackPreferences(
+          store.playbackPreferences.copyWith(pictureInPicture: false),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.light(),
+            home: PlaybackSettingsPage(store: store),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final switchFinder = find.byKey(const ValueKey('settings-pip-switch'));
+        expect(switchFinder, findsOneWidget);
+        expect(find.text('画中画模式'), findsOneWidget);
+
+        await tester.tap(switchFinder);
+        await tester.pumpAndSettle();
+
+        expect(store.playbackPreferences.pictureInPicture, isTrue);
+        expect(find.textContaining('快捷键 P'), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

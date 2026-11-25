@@ -812,6 +812,15 @@ class PlayerScreenState extends State<PlayerScreen>
   Future<void> _restoreFromPictureInPicture() =>
       _pipCoordinator.restoreFromPictureInPicture();
 
+  Future<void> _togglePictureInPicture() async {
+    if (_television || !_canUsePictureInPicture) return;
+    if (_pictureInPictureVisible) {
+      await _restoreFromPictureInPicture();
+    } else {
+      await _enterPictureInPicture();
+    }
+  }
+
   void _attachLanPlayback() {
     LanController.current?.attachPlayback(
       LanPlaybackHost(
@@ -2198,8 +2207,17 @@ class PlayerScreenState extends State<PlayerScreen>
       },
       child: CallbackShortcuts(
         bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): _back,
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            if (_pictureInPictureVisible) {
+              unawaited(_restoreFromPictureInPicture());
+            } else {
+              _back();
+            }
+          },
           const SingleActivator(LogicalKeyboardKey.goBack): _back,
+          const SingleActivator(LogicalKeyboardKey.keyP): () {
+            unawaited(_togglePictureInPicture());
+          },
         },
         child: Focus(
           focusNode: _playerFocus,

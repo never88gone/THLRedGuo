@@ -3,11 +3,13 @@ package com.duanju.duanju_app
 import io.flutter.embedding.android.FlutterActivity
 import android.app.UiModeManager
 import android.app.ActivityManager
+import android.app.AppOpsManager
 import android.app.PictureInPictureParams
 import android.os.Build
 import android.os.Bundle
 import android.os.BatteryManager
 import android.os.PowerManager
+import android.os.Process
 import android.os.SystemClock
 import android.content.Context
 import android.content.Intent
@@ -346,33 +348,36 @@ class MainActivity : FlutterActivity() {
             packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
 
+    private fun pictureInPicturePermitted(): Boolean {
+        if (!pictureInPictureSupported()) return false
+        val appOps = getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager ?: return true
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_PICTURE_IN_PICTURE, Process.myUid(), packageName)
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.checkOpNoThrow(AppOpsManager.OPSTR_PICTURE_IN_PICTURE, Process.myUid(), packageName)
+        }
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
     private fun pictureInPictureStatus(): Map<String, Any> {
+        val supported = pictureInPictureSupported()
+        val permitted = supported && pictureInPicturePermitted()
         return mapOf(
-            "supported" to pictureInPictureSupported(),
+            "supported" to (supported && permitted),
+            "deviceSupported" to supported,
+            "permitted" to permitted,
             "active" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode)
         )
     }
 
-    private fun parsePipSourceRect(
-        left: Int?,
-        top: Int?,
-        right: Int?,
-        bottom: Int?
-    ): Rect? {
-        if (left == null || top == null || right == null || bottom == null) {
-            return null
-        }
-        if (right <= left || bottom <= top) {
-            return null
-        }
+    private fun parsePipSourceRect(left: Int?, top: Int?, right: Int?, bottom: Int?): Rect? {
+        if (left == null || top == null || right == null || bottom == null || right <= left || bottom <= top) return null
         return Rect(left, top, right, bottom)
     }
 
     private fun buildPictureInPictureParams(
-        width: Int,
-        height: Int,
-        sourceRect: Rect?,
-        autoEnter: Boolean
+        width: Int, height: Int, sourceRect: Rect?, autoEnter: Boolean
     ): PictureInPictureParams {
         val safeWidth = width.coerceIn(1, 10000)
         val safeHeight = height.coerceIn(1, 10000)
@@ -382,26 +387,19 @@ class MainActivity : FlutterActivity() {
             rawRatio > 2.385f -> Pair((10000f * 2.385f).toInt(), 10000)
             else -> Pair(safeWidth, safeHeight)
         }
-        val builder = PictureInPictureParams.Builder()
-        builder.setAspectRatio(Rational(finalWidth, finalHeight))
+        val builder = PictureInPictureParams.Builder().setAspectRatio(Rational(finalWidth, finalHeight))
         if (sourceRect != null && sourceRect.width() > 0 && sourceRect.height() > 0) {
             builder.setSourceRectHint(sourceRect)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            builder.setAutoEnterEnabled(autoEnter)
-            builder.setSeamlessResizeEnabled(true)
+            builder.setAutoEnterEnabled(autoEnter).setSeamlessResizeEnabled(true)
         }
         return builder.build()
     }
 
     private fun updatePictureInPictureConfig(
-        autoEnter: Boolean,
-        width: Int,
-        height: Int,
-        left: Int?,
-        top: Int?,
-        right: Int?,
-        bottom: Int?
+        autoEnter: Boolean, width: Int, height: Int,
+        left: Int?, top: Int?, right: Int?, bottom: Int?
     ): Map<String, Any> {
         pipAutoEnterEnabled = autoEnter
         pipAspectWidth = width.coerceIn(1, 10000)
@@ -413,12 +411,7 @@ class MainActivity : FlutterActivity() {
         runCatching {
             if (!isInPictureInPictureMode) {
                 setPictureInPictureParams(
-                    buildPictureInPictureParams(
-                        width = pipAspectWidth,
-                        height = pipAspectHeight,
-                        sourceRect = pipSourceRect,
-                        autoEnter = pipAutoEnterEnabled,
-                    )
+                    buildPictureInPictureParams(pipAspectWidth, pipAspectHeight, pipSourceRect, pipAutoEnterEnabled)
                 )
             }
         }
@@ -434,6 +427,9 @@ class MainActivity : FlutterActivity() {
         bottom: Int?
     ): Map<String, Any> {
         if (!pictureInPictureSupported()) return pictureInPictureStatus()
+        if (!pictureInPicturePermitted()) {
+            return pictureInPictureStatus() + mapOf("requested" to false, "error" to "permission_denied")
+        }
         pipAutoEnterEnabled = true
         pipAspectWidth = width.coerceIn(1, 10000)
         pipAspectHeight = height.coerceIn(1, 10000)

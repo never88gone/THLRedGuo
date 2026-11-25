@@ -175,8 +175,7 @@ class PlaybackSettingsPage extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (defaultTargetPlatform == TargetPlatform.android ||
-                          defaultTargetPlatform == TargetPlatform.iOS) ...[
+                      if (!isTv) ...[
                         const Divider(height: 1, indent: 56),
                         SettingsSwitchTile(
                           key: const ValueKey('settings-pip-switch'),
@@ -184,7 +183,11 @@ class PlaybackSettingsPage extends StatelessWidget {
                           title: const Text('画中画模式'),
                           subtitle: Text(
                             prefs.pictureInPicture
-                                ? '已开启画中画，播放时支持悬浮小窗播放'
+                                ? (defaultTargetPlatform == TargetPlatform.macOS ||
+                                        defaultTargetPlatform == TargetPlatform.windows ||
+                                        defaultTargetPlatform == TargetPlatform.linux)
+                                    ? '已开启画中画，支持置顶悬浮迷你小窗（快捷键 P）'
+                                    : '已开启画中画，播放时支持悬浮小窗播放'
                                 : '关闭后播放器隐藏画中画入口',
                           ),
                           value: prefs.pictureInPicture,
