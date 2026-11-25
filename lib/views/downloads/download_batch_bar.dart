@@ -36,12 +36,14 @@ class DownloadBatchBar extends StatelessWidget {
                 )
               else ...[
                 for (final entry in const {
+                  'export': '导出已选',
                   'pause': '暂停',
                   'resume': '继续 / 重试',
                   'archive': '保留视频',
                   'remove': '删除',
                 }.entries)
                   TextButton(
+                    key: ValueKey('batch-${entry.key}'),
                     onPressed: !hasSelected
                         ? null
                         : () => onBatchCommand(entry.key),

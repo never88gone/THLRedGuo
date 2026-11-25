@@ -52,7 +52,7 @@ class DownloadJobCard extends StatelessWidget {
                 },
                 child: const Text('暂停下载'),
               ),
-            if (job.completed)
+            if (job.completed) ...[
               FilledButton(
                 autofocus: true,
                 onPressed: () {
@@ -61,6 +61,14 @@ class DownloadJobCard extends StatelessWidget {
                 },
                 child: const Text('本地播放'),
               ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onCommand('export');
+                },
+                child: const Text('导出视频'),
+              ),
+            ],
             const SizedBox(height: 8),
             TextButton(
               onPressed: () {
@@ -152,11 +160,16 @@ class DownloadJobCard extends StatelessWidget {
                           }
                         },
                         itemBuilder: (_) => [
-                          if (job.completed)
+                          if (job.completed) ...[
                             const PopupMenuItem(
                               value: 'play',
                               child: Text('本地播放'),
                             ),
+                            const PopupMenuItem(
+                              value: 'export',
+                              child: Text('导出视频'),
+                            ),
+                          ],
                           if (job.active)
                             const PopupMenuItem(
                               value: 'pause',

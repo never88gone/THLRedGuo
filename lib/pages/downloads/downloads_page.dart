@@ -12,6 +12,8 @@ import 'package:THLRedLook/pages/downloads/offline_player_page.dart';
 import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
+import 'package:THLRedLook/core/download/download_exporter.dart';
+import 'package:THLRedLook/views/downloads/download_export_dialog.dart';
 import 'package:THLRedLook/views/downloads/download_batch_bar.dart';
 import 'package:THLRedLook/views/downloads/download_collection_card.dart';
 import 'package:THLRedLook/views/downloads/download_filter_dialog.dart';
@@ -129,8 +131,32 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
   }
 
+  Future<void> _export(Iterable<DownloadJob> source) async {
+    final completed = source.where((job) => job.completed).toList();
+    if (completed.isEmpty) return _message('请选择已下载完成的视频进行导出');
+    final targetDir = await DownloadExporter.pickExportDirectory();
+    if (targetDir == null || targetDir.isEmpty || !mounted || !_allowed) return;
+
+    final result = await DownloadExportDialog.show(
+      context: context,
+      exporter: DownloadExporter(repository: widget.repository),
+      jobs: completed,
+      targetDirectory: targetDir,
+    );
+    if (!mounted || !_allowed || result == null) return;
+    _message(result.cancelled
+        ? '已取消导出，部分已处理文件已保留'
+        : result.errorMessage != null
+        ? '导出遇到问题：${result.errorMessage}'
+        : '成功解密并导出 ${result.successCount} 集视频');
+  }
+
   Future<void> _batch(String command, Iterable<DownloadJob> source) async {
     if (_busy || !_allowed) return;
+    if (command == 'export') {
+      await _export(source);
+      return;
+    }
     final jobs = source.where((job) => switch (command) {
       'pause' => job.active,
       'resume' => job.resumable,
@@ -292,11 +318,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       ),
       IconButton(
         tooltip: '退出多选',
-        onPressed: _busy ? null : () => setState(() {
-          _selecting = false;
-          _selected.clear();
-          _retryCommand = null;
-        }),
+        onPressed: _busy ? null : () => setState(() { _selecting = false; _selected.clear(); _retryCommand = null; }),
         icon: const Icon(Icons.close_rounded),
       ),
     ] else ...[

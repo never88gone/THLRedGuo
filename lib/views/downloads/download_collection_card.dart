@@ -66,6 +66,8 @@ class DownloadCollectionCard extends StatelessWidget {
               child: const Text('更新本剧 · 补充新增与缺失'),
             ),
             const PopupMenuItem(value: 'select', child: Text('选择本合集')),
+            if (collection.completed > 0)
+              const PopupMenuItem(value: 'export', child: Text('导出本剧已下载视频')),
             const PopupMenuItem(value: 'pause', child: Text('暂停本合集')),
             const PopupMenuItem(value: 'resume', child: Text('继续 / 重试本合集')),
             const PopupMenuItem(value: 'archive', child: Text('清理已完成任务，保留视频')),
