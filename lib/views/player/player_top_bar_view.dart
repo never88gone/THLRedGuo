@@ -80,13 +80,6 @@ class PlayerTopBarView extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            _iconButton(
-              tooltip: fullscreen ? '退出全屏' : '全屏播放',
-              onPressed: onFullscreen,
-              icon: fullscreen
-                  ? Icons.fullscreen_exit_rounded
-                  : Icons.fullscreen_rounded,
-            ),
           ],
         ),
       ),
