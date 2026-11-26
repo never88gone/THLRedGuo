@@ -1724,3 +1724,94 @@ final class DanmakuRenderingTests: XCTestCase {
         print("THL_DANMAKU_RENDER pixels=\(first.1) movement=\(first.0-second.0) pauseDrift=\(abs(still.0-paused.0)) cleared=true")
     }
 }
+
+// MARK: - 视频控制默认播放速率测试类
+@MainActor
+final class PlaybackRateSettingsTests: XCTestCase {
+    // 1. 验证 LocalStore 默认播放速率的初始默认值、更新持久化与边界防御
+    func testDefaultPlaybackRatePersistenceAndValidation() {
+        let suiteName = "PlaybackRateSettingsTests_\(UUID().uuidString)"
+        let testDefaults = UserDefaults(suiteName: suiteName)!
+        defer { testDefaults.removePersistentDomain(forName: suiteName) }
+
+        let store = LocalStore(defaults: testDefaults, cloudUpload: { _ in })
+
+        // 默认应当为 1.0 标准速率
+        XCTAssertEqual(store.defaultPlaybackRate, 1.0, accuracy: 0.001)
+
+        // 设置为 1.5 倍速
+        store.setDefaultPlaybackRate(1.5)
+        XCTAssertEqual(store.defaultPlaybackRate, 1.5, accuracy: 0.001)
+
+        // 重新从存储中读取，验证持久化生效
+        let reloadedStore = LocalStore(defaults: testDefaults, cloudUpload: { _ in })
+        XCTAssertEqual(reloadedStore.defaultPlaybackRate, 1.5, accuracy: 0.001)
+
+        // 设置为 1.25 倍速
+        store.setDefaultPlaybackRate(1.25)
+        XCTAssertEqual(store.defaultPlaybackRate, 1.25, accuracy: 0.001)
+
+        // 越界值防护：小于 0.5 或大于 3.0 的非法值应当被拒绝，保持当前值不变
+        store.setDefaultPlaybackRate(-1.0)
+        XCTAssertEqual(store.defaultPlaybackRate, 1.25, accuracy: 0.001)
+
+        store.setDefaultPlaybackRate(5.0)
+        XCTAssertEqual(store.defaultPlaybackRate, 1.25, accuracy: 0.001)
+    }
+
+    // 2. 验证 PlayerViewModel 初始化时自动应用 LocalStore 中的默认播放速率
+    func testPlayerViewModelAppliesDefaultPlaybackRateOnInit() {
+        let suiteName = "PlaybackRateSettingsTests_\(UUID().uuidString)"
+        let testDefaults = UserDefaults(suiteName: suiteName)!
+        defer { testDefaults.removePersistentDomain(forName: suiteName) }
+
+        let drama = Drama(id: "rate_test_drama", source: "hongguo", title: "倍速测试剧", cover: "", episodes: 10)
+        let episodes = (1...10).map { Episode(id: "ep_\($0)", title: "第\($0)集", number: $0) }
+
+        let store = LocalStore(defaults: testDefaults, cloudUpload: { _ in })
+        store.setDefaultPlaybackRate(1.5)
+
+        // 实例化播放器，验证 playbackRate 自动使用 1.5
+        let vm = PlayerViewModel(
+            drama: drama,
+            allEpisodes: episodes,
+            initialEpisodeIndex: 1,
+            store: store
+        )
+        XCTAssertEqual(Double(vm.playbackRate), 1.5, accuracy: 0.001, "播放器初始化应自动继承设置中的默认倍速 1.5x")
+
+        // 播放中临时切换为 2.0x
+        vm.setRate(2.0)
+        XCTAssertEqual(Double(vm.playbackRate), 2.0, accuracy: 0.001, "播放中临时切倍速应生效")
+
+        // 全局默认倍速依然应当是 1.5x
+        XCTAssertEqual(store.defaultPlaybackRate, 1.5, accuracy: 0.001, "临时切倍速不应覆盖全局设置")
+
+        // 当用户将默认速率改为 1.25 时，新进入的播放器应为 1.25
+        store.setDefaultPlaybackRate(1.25)
+        let vm2 = PlayerViewModel(
+            drama: drama,
+            allEpisodes: episodes,
+            initialEpisodeIndex: 1,
+            store: store
+        )
+        XCTAssertEqual(Double(vm2.playbackRate), 1.25, accuracy: 0.001, "重新进入视频后应采用最新配置的 1.25x 速率")
+    }
+
+    // 3. 验证 SettingsCategory 包含「视频控制」且位置与信息完整
+    func testSettingsCategoryPlaybackConfiguration() {
+        let all = SettingsCategory.allCases
+        XCTAssertTrue(all.contains(.playback), "设置分类必须包含 .playback 视频控制")
+
+        let playbackCat = SettingsCategory.playback
+        XCTAssertEqual(playbackCat.title, "视频控制")
+        XCTAssertFalse(playbackCat.subtitle.isEmpty)
+        XCTAssertFalse(playbackCat.icon.isEmpty)
+
+        // 验证排在站源管理之后，为高频操作项
+        if let sourcesIndex = all.firstIndex(of: .sources),
+           let playbackIndex = all.firstIndex(of: .playback) {
+            XCTAssertEqual(playbackIndex, sourcesIndex + 1, "视频控制应紧随站源管理之后排列")
+        }
+    }
+}

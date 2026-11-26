@@ -133,6 +133,9 @@ public struct MainTabView: View {
             case "settings_sync":
                 initTab = .settings
                 initSettingsCategory = .sync
+            case "settings_playback":
+                initTab = .settings
+                initSettingsCategory = .playback
             case "settings_help":
                 initTab = .settings
                 initSettingsCategory = .help

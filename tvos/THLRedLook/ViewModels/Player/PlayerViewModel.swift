@@ -114,6 +114,11 @@ public final class PlayerViewModel: ObservableObject {
         self.playbackPreparer = PlayerPlaybackPreparer(repository: repository, store: store)
         self.progressTracker = PlayerProgressTracker(store: store)
 
+        let defaultRate = Float(store.defaultPlaybackRate)
+        if defaultRate >= 0.25 && defaultRate <= 3.0 {
+            self.playbackRate = defaultRate
+        }
+
         visibilityCoordinator.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         danmakuManager.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         progressTracker.startTimer { [weak self] in self?.saveCurrentProgress() }

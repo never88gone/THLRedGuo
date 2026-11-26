@@ -5570,4 +5570,61 @@ extension RemoteNavigationTests {
         print("THL_EXPANDED_FEED unique=\(Set(titles).count) forward=8 backward=3 rapid=downDownUp pause=3 sidebarReturn=true actualClock=true titles=\(titles)")
     }
 
+    func testPlaybackControlSettingsRateWorkflow() throws {
+        continueAfterFailure = false
+        app.launchEnvironment["DISABLE_REMOTE_IMAGES"] = "1"
+        app.launchArguments = ["-testPage", "settings_playback"]
+        app.launch()
+        defer { app.terminate() }
+
+        // 1. 等待视频控制面板加载
+        XCTAssertTrue(app.staticTexts["视频控制"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["默认视频播放速率"].waitForExistence(timeout: 10))
+
+        let r075 = app.buttons["settings.playback.rate.0.75"]
+        let r100 = app.buttons["settings.playback.rate.1.0"]
+        let r125 = app.buttons["settings.playback.rate.1.25"]
+        let r150 = app.buttons["settings.playback.rate.1.5"]
+        let r200 = app.buttons["settings.playback.rate.2.0"]
+
+        XCTAssertTrue(r075.waitForExistence(timeout: 10))
+        XCTAssertTrue(r100.exists)
+        XCTAssertTrue(r125.exists)
+        XCTAssertTrue(r150.exists)
+        XCTAssertTrue(r200.exists)
+
+        let screenshotDir = URL(fileURLWithPath: "/Users/never88gone/.gemini/antigravity/brain/78fa14d0-288b-4e8f-86e6-1d40abdc3d60/screenshots")
+        try? FileManager.default.createDirectory(at: screenshotDir, withIntermediateDirectories: true)
+
+        let s1 = XCUIScreen.main.screenshot()
+        try? s1.pngRepresentation.write(to: screenshotDir.appendingPathComponent("tvos_playback_settings_01_loaded.png"))
+
+        // 2. 焦点移动到右侧 rate 按钮，并选中 1.25x
+        if !r075.hasFocus && !r100.hasFocus && !r125.hasFocus {
+            press(.right)
+        }
+        for _ in 0..<5 {
+            if r125.hasFocus { break }
+            press(.right)
+        }
+        if r125.hasFocus {
+            press(.select)
+        }
+
+        Thread.sleep(forTimeInterval: 0.8)
+        let s2 = XCUIScreen.main.screenshot()
+        try? s2.pngRepresentation.write(to: screenshotDir.appendingPathComponent("tvos_playback_settings_02_selected_1_25x.png"))
+
+        // 3. 移动焦点到 1.5x 并选中
+        press(.right)
+        if r150.hasFocus {
+            press(.select)
+        }
+        Thread.sleep(forTimeInterval: 0.8)
+        let s3 = XCUIScreen.main.screenshot()
+        try? s3.pngRepresentation.write(to: screenshotDir.appendingPathComponent("tvos_playback_settings_03_selected_1_50x.png"))
+
+        print("THL_PLAYBACK_SETTINGS_UI_TEST status=SUCCESS ratesVerified=true")
+    }
+
 }

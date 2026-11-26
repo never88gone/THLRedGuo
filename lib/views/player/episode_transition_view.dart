@@ -7,10 +7,12 @@ class EpisodeTransitionView extends StatefulWidget {
     super.key,
     required this.episodeIndex,
     required this.child,
+    this.enabled = true,
   });
 
   final int episodeIndex;
   final Widget child;
+  final bool enabled;
 
   @override
   State<EpisodeTransitionView> createState() => _EpisodeTransitionViewState();
@@ -39,6 +41,9 @@ class _EpisodeTransitionViewState extends State<EpisodeTransitionView> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.enabled) {
+      return widget.child;
+    }
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
       switchInCurve: Curves.easeOutCubic,

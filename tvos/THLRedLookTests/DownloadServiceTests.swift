@@ -306,4 +306,130 @@ final class DownloadServiceTests: XCTestCase {
         XCTAssertNotNil(resolvedByNumber)
         XCTAssertEqual(resolvedByNumber?.path, resolvedLocalURL?.path)
     }
+
+    // 9. 验证 DramaDownloadGroup 聚合模型与统计计算
+    func testDramaDownloadGroupCalculation() {
+        let drama = makeFixtureDrama(id: "group_calc_drama")
+        let ep1 = Episode(id: "ep_1", title: "第 1 集", number: 1)
+        let ep2 = Episode(id: "ep_2", title: "第 2 集", number: 2)
+        let ep3 = Episode(id: "ep_3", title: "第 3 集", number: 3)
+
+        let job1 = DownloadJob(
+            id: "\(drama.id)_\(ep1.id)",
+            drama: drama,
+            episode: ep1,
+            state: "completed",
+            bytes: 10_000,
+            total: 10_000,
+            progress: 1.0,
+            created: 100
+        )
+        let job2 = DownloadJob(
+            id: "\(drama.id)_\(ep2.id)",
+            drama: drama,
+            episode: ep2,
+            state: "downloading",
+            bytes: 5_000,
+            total: 10_000,
+            progress: 0.5,
+            created: 200
+        )
+        let job3 = DownloadJob(
+            id: "\(drama.id)_\(ep3.id)",
+            drama: drama,
+            episode: ep3,
+            state: "paused",
+            bytes: 2_000,
+            total: 10_000,
+            progress: 0.2,
+            created: 300
+        )
+
+        // 故意乱序传入 jobs: [job3, job1, job2]
+        let group = DramaDownloadGroup(drama: drama, jobs: [job3, job1, job2])
+
+        // 验证内部自动按分集升序排列
+        XCTAssertEqual(group.jobs.map(\.episode.number), [1, 2, 3])
+        XCTAssertEqual(group.totalCount, 3)
+        XCTAssertEqual(group.completedCount, 1)
+        XCTAssertEqual(group.completedJobs.count, 1)
+        XCTAssertEqual(group.completedJobs.first?.episode.number, 1)
+        XCTAssertEqual(group.totalBytes, 17_000)
+        XCTAssertFalse(group.isAllCompleted)
+        XCTAssertTrue(group.hasActive)
+        XCTAssertTrue(group.hasResumable)
+        XCTAssertEqual(group.latestCreated, 300)
+        XCTAssertTrue(group.statusSummary.contains("已下载 1/3 集"))
+
+        // 验证全部完成状态
+        let allCompletedJobs = [
+            DownloadJob(id: "1", drama: drama, episode: ep1, state: "completed", bytes: 1000, total: 1000, progress: 1.0),
+            DownloadJob(id: "2", drama: drama, episode: ep2, state: "completed", bytes: 1000, total: 1000, progress: 1.0)
+        ]
+        let completedGroup = DramaDownloadGroup(drama: drama, jobs: allCompletedJobs)
+        XCTAssertTrue(completedGroup.isAllCompleted)
+        XCTAssertTrue(completedGroup.statusSummary.contains("全部 2 集已下载"))
+    }
+
+    // 10. 验证 ViewModel 分剧集聚合与排序
+    func testDownloadsViewModelDramaGroupsAggregationAndOrdering() {
+        let dramaA = Drama(id: "drama_a", source: "hongguo", title: "剧集A", cover: "", episodes: 2, category: "", heat: "")
+        let dramaB = Drama(id: "drama_b", source: "hongguo", title: "剧集B", cover: "", episodes: 2, category: "", heat: "")
+
+        let epA1 = Episode(id: "ea_1", title: "A1", number: 1)
+        let epA2 = Episode(id: "ea_2", title: "A2", number: 2)
+        let epB1 = Episode(id: "eb_1", title: "B1", number: 1)
+
+        // 先加入 dramaA，后加入 dramaB
+        service.enqueue(drama: dramaA, episodes: [epA1, epA2])
+        service.enqueue(drama: dramaB, episodes: [epB1])
+
+        let vm = DownloadsViewModel(downloadService: service)
+        let groups = vm.dramaGroups
+
+        XCTAssertEqual(groups.count, 2)
+        // 最新加入的排在前面（按 latestCreatedAt 降序）
+        XCTAssertEqual(groups.first?.id, "drama_b")
+        XCTAssertEqual(groups.last?.id, "drama_a")
+
+        // 验证剧集A的分集正序
+        let groupA = groups.first { $0.id == "drama_a" }
+        XCTAssertEqual(groupA?.jobs.count, 2)
+        XCTAssertEqual(groupA?.jobs.first?.episode.number, 1)
+        XCTAssertEqual(groupA?.jobs.last?.episode.number, 2)
+    }
+
+    // 11. 验证整剧批量暂停、恢复与删除
+    func testDramaBatchControlPauseResumeDelete() throws {
+        let dramaA = Drama(id: "drama_ctrl_a", source: "hongguo", title: "控制剧A", cover: "", episodes: 2, category: "", heat: "")
+        let dramaB = Drama(id: "drama_ctrl_b", source: "hongguo", title: "控制剧B", cover: "", episodes: 1, category: "", heat: "")
+
+        let epA1 = Episode(id: "ep_a1", title: "A1", number: 1)
+        let epA2 = Episode(id: "ep_a2", title: "A2", number: 2)
+        let epB1 = Episode(id: "ep_b1", title: "B1", number: 1)
+
+        service.enqueue(drama: dramaA, episodes: [epA1, epA2])
+        service.enqueue(drama: dramaB, episodes: [epB1])
+
+        let vm = DownloadsViewModel(downloadService: service)
+
+        // 批量暂停剧集A
+        vm.pauseDrama("drama_ctrl_a")
+        let jobsAAfterPause = service.jobs.filter { $0.drama.id == "drama_ctrl_a" }
+        XCTAssertTrue(jobsAAfterPause.allSatisfy { $0.state == "paused" })
+
+        // 剧集B应不受影响
+        let jobB = service.jobs.first { $0.drama.id == "drama_ctrl_b" }
+        XCTAssertNotEqual(jobB?.state, "paused")
+
+        // 批量恢复剧集A
+        vm.resumeDrama("drama_ctrl_a")
+        let jobsAAfterResume = service.jobs.filter { $0.drama.id == "drama_ctrl_a" }
+        XCTAssertTrue(jobsAAfterResume.allSatisfy { $0.state == "queued" || $0.state == "downloading" })
+
+        // 批量删除剧集A
+        vm.deleteDrama("drama_ctrl_a")
+        XCTAssertFalse(service.jobs.contains { $0.drama.id == "drama_ctrl_a" })
+        XCTAssertTrue(service.jobs.contains { $0.drama.id == "drama_ctrl_b" })
+    }
 }

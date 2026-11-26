@@ -32,7 +32,7 @@ void runICloudRegressionTests({String? fixtureJson}) {
     store = LocalStore(prefs);
     await prefs.setBool(ICloudSyncService.prefSyncEnabled, true);
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    service = ICloudSyncService.testing(channel);
+    service = ICloudSyncService(channel: channel);
     fixture =
         jsonDecode(
               fixtureJson ??

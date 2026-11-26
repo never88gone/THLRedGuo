@@ -279,6 +279,9 @@
 		PIP000042C00000100000001 /* TVPictureInPictureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PIP000032C00000100000001 /* TVPictureInPictureTests.swift */; };
 		REL000102C00000100000001 /* ReleaseNotesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = REL000092C00000100000001 /* ReleaseNotesTests.swift */; };
 		REL000122C00000100000001 /* release.md in Resources */ = {isa = PBXBuildFile; fileRef = REL000112C00000100000001 /* release.md */; };
+		DD9A00022C00000100000002 /* DramaDownloadGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD9A00012C00000100000001 /* DramaDownloadGroup.swift */; };
+		DD9A00042C00000100000004 /* TVDownloadEpisodeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD9A00032C00000100000003 /* TVDownloadEpisodeButton.swift */; };
+		DD9A00082C00000100000008 /* SettingsPlaybackControlPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD9A00072C00000100000007 /* SettingsPlaybackControlPanel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -580,6 +583,9 @@
 		PIP000032C00000100000001 /* TVPictureInPictureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVPictureInPictureTests.swift; sourceTree = "<group>"; };
 		REL000092C00000100000001 /* ReleaseNotesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotesTests.swift; sourceTree = "<group>"; };
 		REL000112C00000100000001 /* release.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = release.md; sourceTree = "<group>"; };
+		DD9A00012C00000100000001 /* DramaDownloadGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DramaDownloadGroup.swift; sourceTree = "<group>"; };
+		DD9A00032C00000100000003 /* TVDownloadEpisodeButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TVDownloadEpisodeButton.swift; sourceTree = "<group>"; };
+		DD9A00072C00000100000007 /* SettingsPlaybackControlPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsPlaybackControlPanel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -656,6 +662,7 @@
 		0996D160F876E67F9B576286 /* Download */ = {
 			isa = PBXGroup;
 			children = (
+				DD9A00012C00000100000001 /* DramaDownloadGroup.swift */,
 				C8AB3FBF92BEB315ACF5AA8C /* DownloadJob.swift */,
 			);
 			name = Download;
@@ -864,6 +871,7 @@
 			isa = PBXGroup;
 			children = (
 				2366AA4E01D949498A65A770 /* DownloadsView.swift */,
+				DD9A00032C00000100000003 /* TVDownloadEpisodeButton.swift */,
 			);
 			name = Downloads;
 			path = Downloads;
@@ -1148,6 +1156,7 @@
 				6FFA784C5232EFAB3BBBFE72 /* SettingsHelpPanel.swift */,
 				FD51D96635912A6ED62C819F /* SettingsReleaseNotesPanel.swift */,
 				B19AD37E2A83C88D172841EB /* SettingsSourcesPanel.swift */,
+				DD9A00072C00000100000007 /* SettingsPlaybackControlPanel.swift */,
 				F55A07CA8630F7886C326AF0 /* SettingsStoragePanel.swift */,
 				E94405951A1AB80C1865DB1F /* SettingsSyncPanel.swift */,
 			);
@@ -1746,6 +1755,8 @@
 				5FA9CAFF4DD5AB0371F53FCA /* NetworkEgressResult.swift in Sources */,
 				934FE4A807873F7BF935AFC8 /* SourceDiagnosticEntry.swift in Sources */,
 				27582EF9687C7EE40E02066D /* DownloadJob.swift in Sources */,
+				DD9A00022C00000100000002 /* DramaDownloadGroup.swift in Sources */,
+				DD9A00042C00000100000004 /* TVDownloadEpisodeButton.swift in Sources */,
 				A7885CF40C40E87FCE66CBCD /* TVAppTab.swift in Sources */,
 				1380E393DBA2AA4956A44F64 /* DanmakuItem.swift in Sources */,
 				1093782416BF841F1B819B25 /* PlaybackPlan.swift in Sources */,
@@ -1890,6 +1901,7 @@
 				ECDC8A9C9D0BD5DEC9B3DD88 /* SettingsHelpPanel.swift in Sources */,
 				855E2FD93107117A4E0AFA14 /* SettingsReleaseNotesPanel.swift in Sources */,
 				9B140AC37D2C7A30916C53D2 /* SettingsSourcesPanel.swift in Sources */,
+				DD9A00082C00000100000008 /* SettingsPlaybackControlPanel.swift in Sources */,
 				6F4F3D368247647A0740408C /* SettingsStoragePanel.swift in Sources */,
 				D8E3C815ACC387513CF2E372 /* SettingsSyncPanel.swift in Sources */,
 				DB667CB3BFBD560CDC33BAF2 /* SettingsCategory.swift in Sources */,

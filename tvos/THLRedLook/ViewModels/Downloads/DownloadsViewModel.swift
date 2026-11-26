@@ -27,6 +27,29 @@ public final class DownloadsViewModel: ObservableObject {
         }
     }
 
+    public var dramaGroups: [DramaDownloadGroup] {
+        let currentJobs = jobs
+        var grouped: [String: (drama: Drama, jobs: [DownloadJob], latestCreated: Int64)] = [:]
+        for job in currentJobs {
+            if let existing = grouped[job.drama.id] {
+                grouped[job.drama.id] = (
+                    drama: existing.drama,
+                    jobs: existing.jobs + [job],
+                    latestCreated: max(existing.latestCreated, job.created)
+                )
+            } else {
+                grouped[job.drama.id] = (
+                    drama: job.drama,
+                    jobs: [job],
+                    latestCreated: job.created
+                )
+            }
+        }
+        return grouped.values
+            .sorted { $0.latestCreated > $1.latestCreated }
+            .map { DramaDownloadGroup(drama: $0.drama, jobs: $0.jobs) }
+    }
+
     public func pauseJob(_ id: String) {
         downloadService.pauseJob(id: id)
     }
@@ -37,6 +60,27 @@ public final class DownloadsViewModel: ObservableObject {
 
     public func deleteJob(_ id: String) {
         downloadService.deleteJob(id: id)
+    }
+
+    public func pauseDrama(_ dramaId: String) {
+        let targets = jobs.filter { $0.drama.id == dramaId && $0.isActive }
+        for job in targets {
+            downloadService.pauseJob(id: job.id)
+        }
+    }
+
+    public func resumeDrama(_ dramaId: String) {
+        let targets = jobs.filter { $0.drama.id == dramaId && $0.isResumable }
+        for job in targets {
+            downloadService.startJob(id: job.id)
+        }
+    }
+
+    public func deleteDrama(_ dramaId: String) {
+        let targets = jobs.filter { $0.drama.id == dramaId }
+        for job in targets {
+            downloadService.deleteJob(id: job.id)
+        }
     }
 
     public func resumeAll() {

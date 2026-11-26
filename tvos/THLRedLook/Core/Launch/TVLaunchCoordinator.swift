@@ -48,7 +48,7 @@ final class TVLaunchCoordinator {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 focusedNavTab.wrappedValue = .settings
             }
-        case "settings_cache", "settings_about", "settings_help", "settings_contact", "settings_sync", "settings_release_notes":
+        case "settings_cache", "settings_about", "settings_help", "settings_contact", "settings_sync", "settings_playback", "settings_release_notes":
             selectedTab.wrappedValue = .settings
             if page == "settings_help" {
                 settingsInitialCategory.wrappedValue = .help
@@ -60,6 +60,8 @@ final class TVLaunchCoordinator {
                 settingsInitialCategory.wrappedValue = .cache
             } else if page == "settings_sync" {
                 settingsInitialCategory.wrappedValue = .sync
+            } else if page == "settings_playback" {
+                settingsInitialCategory.wrappedValue = .playback
             } else if page == "settings_release_notes" {
                 settingsInitialCategory.wrappedValue = .releaseNotes
             }

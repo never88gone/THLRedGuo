@@ -218,6 +218,25 @@ class PlaybackSettingsPage extends StatelessWidget {
                             );
                           },
                         ),
+                        const Divider(height: 1, indent: 56),
+                        SettingsSwitchTile(
+                          key: const ValueKey('settings-episode-transition-switch'),
+                          leading: const Icon(Icons.animation_rounded),
+                          title: const Text('切集过渡动画'),
+                          subtitle: Text(
+                            prefs.episodeTransition
+                                ? '上下滑或选集切换时展示平滑位移动画'
+                                : '已关闭动效，极速秒切下一集',
+                          ),
+                          value: prefs.episodeTransition,
+                          onChanged: (val) async {
+                            final updated = prefs.copyWith(episodeTransition: val);
+                            await saveUserChange(
+                              context,
+                              () => store.setPlaybackPreferences(updated),
+                            );
+                          },
+                        ),
                       ],
                     ],
                   ),

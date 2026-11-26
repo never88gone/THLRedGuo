@@ -378,6 +378,18 @@ class PlayerBottomBarView extends StatelessWidget {
             color: backgroundAudio ? AppColors.hongguoRed : null,
           ),
         ),
+      if (onFullscreen != null)
+        _toolButton(
+          context: context,
+          key: const ValueKey('player-fullscreen'),
+          tooltip: fullscreen ? '退出全屏' : '全屏播放',
+          onPressed: enabled ? onFullscreen : null,
+          child: Icon(
+            fullscreen
+                ? Icons.fullscreen_exit_rounded
+                : Icons.fullscreen_rounded,
+          ),
+        ),
     ];
 
     Widget content = Column(

@@ -6,6 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
+import 'package:THLRedLook/core/player/playback_preferences.dart';
+import 'package:THLRedLook/core/series/hongguo_series_entry.dart';
+import 'package:THLRedLook/views/player/episode_transition_view.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/pages/home/home_page.dart';
 import 'package:THLRedLook/views/home/home_catalog_view.dart';
@@ -431,6 +434,90 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('pip-restore')));
       await tester.pump();
       expect(restored, isTrue, reason: '恢复按钮应可正常点击');
+    });
+  });
+
+  group('issue — 切集过渡动画偏好与动效开关', () {
+    test('PlaybackPreferences 默认开启切集过渡动画并支持 JSON 序列化', () {
+      const prefs = PlaybackPreferences();
+      expect(prefs.episodeTransition, isTrue);
+
+      final disabled = prefs.copyWith(episodeTransition: false);
+      expect(disabled.episodeTransition, isFalse);
+      final json = disabled.toJson();
+      expect(json['episodeTransition'], isFalse);
+      final decoded = PlaybackPreferences.fromJson(json);
+      expect(decoded.episodeTransition, isFalse);
+    });
+
+    testWidgets('EpisodeTransitionView enabled=false 时直接展示内容不构建 AnimatedSwitcher', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: EpisodeTransitionView(
+              episodeIndex: 1,
+              enabled: false,
+              child: Text('当前剧集内容', key: ValueKey('ep-content')),
+            ),
+          ),
+        ),
+      );
+      expect(find.byType(AnimatedSwitcher), findsNothing);
+      expect(find.byKey(const ValueKey('ep-content')), findsOneWidget);
+    });
+
+    testWidgets('EpisodeTransitionView enabled=true 时构建 AnimatedSwitcher', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: EpisodeTransitionView(
+              episodeIndex: 1,
+              enabled: true,
+              child: Text('当前剧集内容', key: ValueKey('ep-content')),
+            ),
+          ),
+        ),
+      );
+      expect(find.byType(AnimatedSwitcher), findsOneWidget);
+      expect(find.byKey(const ValueKey('ep-content')), findsOneWidget);
+    });
+  });
+
+  group('issue — 多季剧集跨季连播下一季查找', () {
+    test('正确识别并匹配已上线的下一季剧集', () {
+      const season1 = Drama(id: 'hongguo:drama_s1', source: 'hongguo', title: '短剧第1季');
+      const season2 = Drama(id: 'hongguo:drama_s2', source: 'hongguo', title: '短剧第2季');
+      const season3 = Drama(id: 'hongguo:drama_s3', source: 'hongguo', title: '短剧第3季（待上线）');
+
+      final entries = [
+        const HongguoSeriesEntry(drama: season1, season: 1, unit: '季', playable: true),
+        const HongguoSeriesEntry(drama: season2, season: 2, unit: '季', playable: true),
+        const HongguoSeriesEntry(drama: season3, season: 3, unit: '季', playable: false),
+      ];
+
+      final currentIndex = entries.indexWhere((e) => e.drama.id == season1.id);
+      expect(currentIndex, 0);
+
+      HongguoSeriesEntry? nextPlayable;
+      for (var i = currentIndex + 1; i < entries.length; i++) {
+        if (entries[i].playable && entries[i].drama.id != season1.id) {
+          nextPlayable = entries[i];
+          break;
+        }
+      }
+
+      expect(nextPlayable, isNotNull);
+      expect(nextPlayable!.drama.id, 'hongguo:drama_s2');
+
+      final s2Index = entries.indexWhere((e) => e.drama.id == season2.id);
+      HongguoSeriesEntry? afterS2;
+      for (var i = s2Index + 1; i < entries.length; i++) {
+        if (entries[i].playable && entries[i].drama.id != season2.id) {
+          afterS2 = entries[i];
+          break;
+        }
+      }
+      expect(afterS2, isNull);
     });
   });
 }

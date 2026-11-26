@@ -36,6 +36,7 @@ class PlaybackPreferences {
     this.volume = 100.0,
     this.fillStyle = PlayerFillStyle.black,
     this.backgroundAudio = true,
+    this.episodeTransition = true,
   });
 
   final double speed;
@@ -50,6 +51,7 @@ class PlaybackPreferences {
   final double volume;
   final PlayerFillStyle fillStyle;
   final bool backgroundAudio;
+  final bool episodeTransition;
 
   PlaybackPreferences copyWith({
     double? speed,
@@ -64,6 +66,7 @@ class PlaybackPreferences {
     double? volume,
     PlayerFillStyle? fillStyle,
     bool? backgroundAudio,
+    bool? episodeTransition,
   }) => PlaybackPreferences(
     speed: speed ?? this.speed,
     quality: quality ?? this.quality,
@@ -77,6 +80,7 @@ class PlaybackPreferences {
     volume: volume ?? this.volume,
     fillStyle: fillStyle ?? this.fillStyle,
     backgroundAudio: backgroundAudio ?? this.backgroundAudio,
+    episodeTransition: episodeTransition ?? this.episodeTransition,
   );
 
   Map<String, dynamic> toJson() => {
@@ -92,6 +96,7 @@ class PlaybackPreferences {
     'volume': volume,
     'fillStyle': fillStyle.name,
     'backgroundAudio': backgroundAudio,
+    'episodeTransition': episodeTransition,
   };
 
   factory PlaybackPreferences.fromJson(Map<String, dynamic> value) {
@@ -116,6 +121,7 @@ class PlaybackPreferences {
       orElse: () => PlayerFillStyle.black,
     );
     final backgroundAudio = value['backgroundAudio'] as bool? ?? true;
+    final episodeTransition = value['episodeTransition'] as bool? ?? true;
     if (!playbackSpeeds.contains(speed) || quality < 0 || quality > 4320) {
       throw const FormatException('播放偏好无效');
     }
@@ -132,6 +138,7 @@ class PlaybackPreferences {
       volume: volume,
       fillStyle: fillStyle,
       backgroundAudio: backgroundAudio,
+      episodeTransition: episodeTransition,
     );
   }
 }

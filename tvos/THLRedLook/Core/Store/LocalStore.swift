@@ -24,6 +24,15 @@ public final class LocalStore: ObservableObject {
             }
         }
     }
+    @Published public var defaultPlaybackRate: Double = 1.0 {
+        didSet {
+            guard defaultPlaybackRate != oldValue else { return }
+            defaults.set(defaultPlaybackRate, forKey: defaultPlaybackRateKey)
+            if !applyingCloudData {
+                cloudUpload(self)
+            }
+        }
+    }
     @Published public var unlockedSources: Bool = false
     @Published public var resourceSettings: ResourceSettings = ResourceSettings()
     @Published public var currentSourceId: String = "hongguo"
@@ -38,6 +47,7 @@ public final class LocalStore: ObservableObject {
     private var applyingCloudData = false
     private let danmakuKey = "thl_tv_danmaku_enabled"
     private let danmakuStyleKey = "thl_tv_danmaku_style"
+    private let defaultPlaybackRateKey = "thl_tv_default_playback_rate"
     private let historyKey = "zgj_tv_history"
     private let followsKey = "zgj_tv_follows"
     private let followedDramasKey = "zgj_tv_followed_dramas"
@@ -109,6 +119,9 @@ public final class LocalStore: ObservableObject {
             danmakuStyle = style
         }
 
+        let savedRate = defaults.double(forKey: defaultPlaybackRateKey)
+        defaultPlaybackRate = (savedRate >= 0.5 && savedRate <= 3.0) ? savedRate : 1.0
+
         if let data = defaults.data(forKey: historyKey),
            let list = try? JSONDecoder().decode([WatchEntry].self, from: data) {
             history = list
@@ -136,6 +149,11 @@ public final class LocalStore: ObservableObject {
            let s = try? JSONDecoder().decode(ResourceSettings.self, from: data) {
             resourceSettings = s
         }
+    }
+
+    public func setDefaultPlaybackRate(_ rate: Double) {
+        guard rate.isFinite, rate >= 0.5, rate <= 3.0 else { return }
+        defaultPlaybackRate = rate
     }
 
     public func unlockSources(password: String) -> Bool {

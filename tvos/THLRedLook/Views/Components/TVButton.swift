@@ -6,6 +6,7 @@ public struct TVButton: View {
     public var icon: String? = nil
     public var isProminent: Bool = false
     public var isFocused: Bool = false
+    public var accessibilityID: String? = nil
     public var onUpCommand: (() -> Void)? = nil
     public var onDownCommand: (() -> Void)? = nil
     public let action: () -> Void
@@ -19,6 +20,7 @@ public struct TVButton: View {
         isProminent: Bool = false,
         isFocused: Bool = false,
         isExternalFocused: Bool? = nil,
+        accessibilityID: String? = nil,
         onUpCommand: (() -> Void)? = nil,
         onDownCommand: (() -> Void)? = nil,
         action: @escaping () -> Void
@@ -27,9 +29,16 @@ public struct TVButton: View {
         self.icon = icon
         self.isProminent = isProminent
         self.isFocused = isExternalFocused ?? isFocused
+        self.accessibilityID = accessibilityID
         self.onUpCommand = onUpCommand
         self.onDownCommand = onDownCommand
         self.action = action
+    }
+
+    public func accessibilityIdentifier(_ id: String) -> TVButton {
+        var copy = self
+        copy.accessibilityID = id
+        return copy
     }
 
     public var body: some View {
@@ -47,6 +56,7 @@ public struct TVButton: View {
         .buttonStyle(TVZeroHighlightButtonStyle())
         .focused($internalIsFocused)
         .focusEffectDisabled()
+        .accessibilityIdentifier(accessibilityID ?? title)
         .onMoveCommand { direction in
             if direction == .up {
                 onUpCommand?()

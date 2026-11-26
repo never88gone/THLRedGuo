@@ -76,6 +76,8 @@ public struct SettingsView: View {
                             showingSourceDiagnostics: $showingSourceDiagnostics,
                             saveNotice: $saveNotice
                         )
+                    case .playback:
+                        SettingsPlaybackControlPanel()
                     case .sync:
                         SettingsSyncPanel(
                             onRequestFocusCategory: {
@@ -155,6 +157,8 @@ public struct SettingsView: View {
                     targetCat = .contact
                 } else if testPage == "settings_sync" {
                     targetCat = .sync
+                } else if testPage == "settings_playback" {
+                    targetCat = .playback
                 } else if testPage == "settings_sources" || testPage == "settings" {
                     targetCat = .sources
                 }

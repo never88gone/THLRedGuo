@@ -193,6 +193,7 @@ class PlayerScreenState extends State<PlayerScreen>
     volume: _player.state.volume,
     fillStyle: widget.store.playbackPreferences.fillStyle,
     backgroundAudio: widget.store.playbackPreferences.backgroundAudio,
+    episodeTransition: widget.store.playbackPreferences.episodeTransition,
   );
   String get _qualityLabel {
     if (_plan?.offline == true) return '本地原画';
@@ -373,10 +374,18 @@ class PlayerScreenState extends State<PlayerScreen>
               currentPosition < duration - const Duration(seconds: 2)) {
             _queueRecovery();
           } else if (_autoAdvance &&
-              _foreground &&
+              (_foreground || BackgroundAudioService.instance.isRunning) &&
               !_panelOpen &&
               _index + 1 < _detail.episodes.length) {
             _play(_index + 1, showControlsOnReady: false);
+          } else if (_autoAdvance &&
+              (_foreground || BackgroundAudioService.instance.isRunning) &&
+              !_panelOpen &&
+              _index + 1 >= _detail.episodes.length &&
+              _nextPlayableSeason != null) {
+            final nextSeason = _nextPlayableSeason!;
+            _notice('本季已完结，正在自动播放下一季：${nextSeason.drama.title}');
+            unawaited(_switchSeason(nextSeason.drama));
           } else {
             setState(() => _playIntent = false);
             _interactions.cancel();
@@ -507,6 +516,19 @@ class PlayerScreenState extends State<PlayerScreen>
       _detail.drama,
       widget.store.seriesDramasFor(_detail.drama),
     );
+  }
+
+  HongguoSeriesEntry? get _nextPlayableSeason {
+    final entries = _currentSeriesEntries;
+    if (entries.isEmpty) return null;
+    final currentIndex = entries.indexWhere((e) => e.drama.id == _detail.drama.id);
+    if (currentIndex < 0 || currentIndex + 1 >= entries.length) return null;
+    for (var i = currentIndex + 1; i < entries.length; i++) {
+      if (entries[i].playable && entries[i].drama.id != _detail.drama.id) {
+        return entries[i];
+      }
+    }
+    return null;
   }
 
   Future<void> _discoverSeasons() async {
@@ -929,8 +951,13 @@ class PlayerScreenState extends State<PlayerScreen>
     }
   }
 
+  DateTime _lastPreloadCheck = DateTime.fromMillisecondsSinceEpoch(0);
+
   void _syncPreload() {
     if (_closed) return;
+    final now = DateTime.now();
+    if (now.difference(_lastPreloadCheck).inMilliseconds < 800) return;
+    _lastPreloadCheck = now;
     if (!_preloadEnabled ||
         !_foreground ||
         widget.localOnly ||
@@ -2499,6 +2526,7 @@ class PlayerScreenState extends State<PlayerScreen>
       videoPaneKey: _videoPaneKey,
       backgroundAudio: widget.store.playbackPreferences.backgroundAudio,
       onToggleBackgroundAudio: _toggleBackgroundAudio,
+      episodeTransition: widget.store.playbackPreferences.episodeTransition,
       allowOnlineFallback: widget.allowOnlineFallback,
       localOnly: widget.localOnly,
       isMediaIdNull: widget.mediaId == null,

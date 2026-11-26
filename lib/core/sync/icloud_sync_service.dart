@@ -13,10 +13,9 @@ import 'package:THLRedLook/core/player/playback_preferences.dart';
 
 /// 跨苹果生态 (iOS / macOS / tvOS) 原生 iCloud 键值同步服务
 class ICloudSyncService extends ChangeNotifier with WidgetsBindingObserver {
-  ICloudSyncService._() : _channel = const MethodChannel('duanju/icloud');
-  @visibleForTesting
-  ICloudSyncService.testing(this._channel);
-  static final ICloudSyncService instance = ICloudSyncService._();
+  ICloudSyncService({MethodChannel? channel})
+      : _channel = channel ?? const MethodChannel('duanju/icloud');
+  static final ICloudSyncService instance = ICloudSyncService();
 
   final MethodChannel _channel;
 

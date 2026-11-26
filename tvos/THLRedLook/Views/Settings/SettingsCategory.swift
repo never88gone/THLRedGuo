@@ -2,6 +2,7 @@ import SwiftUI
 
 public enum SettingsCategory: String, CaseIterable, Identifiable {
     case sources = "sources"
+    case playback = "playback"
     case sync = "sync"
     case cache = "cache"
     case releaseNotes = "releaseNotes"
@@ -14,6 +15,7 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
     public var title: String {
         switch self {
         case .sources: return "站源管理"
+        case .playback: return "视频控制"
         case .sync: return "iCloud 同步"
         case .cache: return "存储与缓存"
         case .releaseNotes: return "更新内容"
@@ -26,6 +28,7 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
     public var subtitle: String {
         switch self {
         case .sources: return "当前活跃影视源"
+        case .playback: return "默认播放速率与控制偏好"
         case .sync: return "多端观看记录与配置同步"
         case .cache: return "沙盒空间占用与清理"
         case .releaseNotes: return "版本演进与功能更新日志"
@@ -38,6 +41,7 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
     public var icon: String {
         switch self {
         case .sources: return "antenna.radiowaves.left.and.right"
+        case .playback: return "slider.horizontal.3"
         case .sync: return "icloud.fill"
         case .cache: return "internaldrive.fill"
         case .releaseNotes: return "sparkles.rectangle.stack.fill"

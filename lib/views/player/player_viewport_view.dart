@@ -96,12 +96,14 @@ class PlayerViewportView extends StatelessWidget {
     this.videoFit = BoxFit.contain,
     this.backgroundAudio = false,
     this.onToggleBackgroundAudio,
+    this.episodeTransition = true,
   });
 
   final double topPadding;
   final PlayerFillStyle? fillStyle;
   final BoxFit videoFit;
   final bool backgroundAudio;
+  final bool episodeTransition;
   final VoidCallback? onToggleBackgroundAudio;
   final VoidCallback? onComments;
   final Future<PlaybackTechnicalDiagnostics?> Function()? onFetchDiagnostics;
@@ -306,6 +308,7 @@ class PlayerViewportView extends StatelessWidget {
                 bottom: 0,
                 child: EpisodeTransitionView(
                   episodeIndex: index,
+                  enabled: episodeTransition,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
