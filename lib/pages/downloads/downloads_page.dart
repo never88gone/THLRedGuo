@@ -6,18 +6,17 @@ import 'package:flutter/services.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
 import 'package:THLRedLook/core/download/download_collections.dart';
+import 'package:THLRedLook/core/download/download_exporter.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/pages/downloads/offline_player_page.dart';
 import 'package:THLRedLook/utils/screen/app_layout.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
 import 'package:THLRedLook/views/common/widgets.dart';
-import 'package:THLRedLook/core/download/download_exporter.dart';
-import 'package:THLRedLook/views/downloads/download_export_dialog.dart';
 import 'package:THLRedLook/views/downloads/download_batch_bar.dart';
 import 'package:THLRedLook/views/downloads/download_collection_card.dart';
+import 'package:THLRedLook/views/downloads/download_export_dialog.dart';
 import 'package:THLRedLook/views/downloads/download_filter_dialog.dart';
-import 'package:THLRedLook/views/downloads/download_job_card.dart';
 import 'package:THLRedLook/views/downloads/download_search_filter_header.dart';
 
 class DownloadsScreen extends StatefulWidget {
@@ -28,11 +27,13 @@ class DownloadsScreen extends StatefulWidget {
     this.embedded = false,
     this.playerBuilder,
   });
+
   final AppRepository repository;
   final LocalStore store;
   final bool embedded;
   @visibleForTesting
   final Widget Function(DramaDetail, int, double)? playerBuilder;
+
   @override
   State<DownloadsScreen> createState() => _DownloadsScreenState();
 }
@@ -45,16 +46,14 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   late final DownloadCollectionUpdater _updater;
   late final int _epoch;
   List<DownloadJob> _jobs = [];
-  bool _loading = true,
-      _refreshing = false,
-      _opening = false,
-      _selecting = false,
-      _busy = false,
-      _stopBatch = false;
+  bool _loading = true, _refreshing = false, _opening = false;
+  bool _selecting = false, _busy = false, _stopBatch = false;
   String? _error, _retryCommand;
   String _filter = 'all', _release = '', _operation = '';
+
   bool get _allowed =>
       widget.store.profileEpoch == _epoch && widget.store.canDownload;
+
   List<DownloadCollection> get _collections {
     final currentSource = widget.store.source;
     final filtered = currentSource.isEmpty
@@ -153,10 +152,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   Future<void> _batch(String command, Iterable<DownloadJob> source) async {
     if (_busy || !_allowed) return;
-    if (command == 'export') {
-      await _export(source);
-      return;
-    }
+    if (command == 'export') return _export(source);
+
     final jobs = source.where((job) => switch (command) {
       'pause' => job.active,
       'resume' => job.resumable,
@@ -165,19 +162,15 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       'remove' => true,
       _ => false,
     }).toList();
-    if (jobs.isEmpty) {
-      _message('没有适合此操作的任务');
-      return;
-    }
+    if (jobs.isEmpty) return _message('没有适合此操作的任务');
+
     if (command == 'remove') {
       final completed = jobs.where((job) => job.completed).length;
       final accepted = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(completed > 0 ? '删除所选视频？' : '取消所选下载？'),
-          content: Text(
-            '共 ${jobs.length} 项${completed > 0 ? '，包含 $completed 个已下载视频' : ''}，文件也会删除。\n需要保留视频时，请选择“清理任务，保留视频”。',
-          ),
+          content: Text('共 ${jobs.length} 项${completed > 0 ? '，包含 $completed 个已下载视频' : ''}，文件也会删除。\n如需保留本地视频请选“清理任务，保留视频”。'),
           actions: [
             TextButton(
               autofocus: AppLayout.isTelevision(context),
@@ -193,11 +186,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       );
       if (accepted != true || !mounted || !_allowed) return;
     }
-    setState(() {
-      _busy = true;
-      _stopBatch = false;
-      _retryCommand = null;
-    });
+
+    setState(() { _busy = true; _stopBatch = false; _retryCommand = null; });
     final failures = <String, String>{};
     var completed = 0;
     try {
@@ -318,7 +308,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       ),
       IconButton(
         tooltip: '退出多选',
-        onPressed: _busy ? null : () => setState(() { _selecting = false; _selected.clear(); _retryCommand = null; }),
+        onPressed: _busy ? null : () => setState(() {
+          _selecting = false;
+          _selected.clear();
+          _retryCommand = null;
+        }),
         icon: const Icon(Icons.close_rounded),
       ),
     ] else ...[
@@ -375,15 +369,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
     final tv = AppLayout.isTelevision(context);
     final collections = _collections;
-    final rows = <Object>[
-      for (final collection in collections) ...[
-        collection,
-        if (_expanded.contains(collection.drama.id) || collections.length == 1 || tv)
-          ...collection.jobs,
-      ],
-    ];
     final title = _selecting ? '已选 ${_selected.length} 项' : '下载任务';
     final actions = _titleActions(collections);
+    final totalBytes = collections.fold<int>(0, (sum, c) => sum + c.bytes);
+
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -404,6 +393,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           onSearchChanged: (_) => setState(() {}),
           collectionsCount: collections.length,
           totalEpisodesCount: collections.fold<int>(0, (sum, c) => sum + c.jobs.length),
+          totalBytes: totalBytes,
           isArchivedFilter: _filter == 'archived',
           isProgressBusy: _updater.busy || _busy,
           progressText: _busy ? _operation : _updater.status,
@@ -415,29 +405,30 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _error != null && _jobs.isEmpty
-              ? StatusPanel(
-                  title: '无法读取下载记录',
-                  message: _error!,
-                  onRetry: _refresh,
-                )
-              : rows.isEmpty
+              ? StatusPanel(title: '无法读取下载记录', message: _error!, onRetry: _refresh)
+              : collections.isEmpty
               ? StatusPanel(
                   title: _jobs.isEmpty ? '还没有下载任务' : '暂无符合条件的任务',
                   message: '在剧集详情选择下载，或调整筛选查看已保留的视频。',
                   icon: Icons.download_outlined,
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
-                  itemCount: rows.length,
-                  itemBuilder: (_, index) => switch (rows[index]) {
-                    DownloadCollection collection => DownloadCollectionCard(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                  itemCount: collections.length,
+                  itemBuilder: (_, index) {
+                    final collection = collections[index];
+                    final expanded = _expanded.contains(collection.drama.id) || collections.length == 1 || tv;
+                    final firstPlayable = collection.firstPlayableJob;
+                    return DownloadCollectionCard(
                       collection: collection,
+                      repository: widget.repository,
                       selectedCount: collection.jobs.where((job) => _selected.contains(job.id)).length,
-                      expanded: _expanded.contains(collection.drama.id),
+                      expanded: expanded,
                       selecting: _selecting,
                       busy: _busy,
                       filter: _filter,
                       updaterBusy: _updater.busy,
+                      selectedJobIds: _selected,
                       onToggleExpand: () => setState(() {
                         if (!_expanded.remove(collection.drama.id)) {
                           _expanded.add(collection.drama.id);
@@ -449,17 +440,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                         'select' => _select(collection.jobs),
                         _ => _batch(cmd, collection.jobs),
                       },
-                    ),
-                    DownloadJob job => DownloadJobCard(
-                      job: job,
-                      selected: _selected.contains(job.id),
-                      selecting: _selecting,
-                      busy: _busy,
-                      onSelect: () => _select([job]),
-                      onPlay: () => _play(job),
-                      onCommand: (cmd) => _batch(cmd, [job]),
-                    ),
-                    _ => const SizedBox.shrink(),
+                      onPlayJob: _play,
+                      onSelectJob: (job) => _select([job]),
+                      onJobCommand: (cmd, job) => _batch(cmd, [job]),
+                      onPlayFirst: firstPlayable != null ? () => _play(firstPlayable) : null,
+                    );
                   },
                 ),
         ),
@@ -476,6 +461,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           ),
       ],
     );
+
     if (widget.embedded) {
       return SafeArea(top: true, bottom: false, child: body);
     }

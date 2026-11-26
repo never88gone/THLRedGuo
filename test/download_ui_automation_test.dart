@@ -17,6 +17,8 @@ class _MockDownloadRepository extends AppRepository {
   @override
   Future<List<DownloadJob>> downloads() async => jobs;
   @override
+  Future<String> cover(Drama drama, {bool force = false}) async => '';
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

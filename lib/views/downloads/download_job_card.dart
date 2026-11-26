@@ -87,10 +87,21 @@ class DownloadJobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tv = AppLayout.isTelevision(context);
     final card = Card(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white10
+              : Colors.black.withValues(alpha: 0.05),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ListTile(
+            dense: true,
             leading: selecting
                 ? Checkbox(
                     value: selected,
@@ -98,10 +109,15 @@ class DownloadJobCard extends StatelessWidget {
                   )
                 : Icon(
                     job.completed
-                        ? Icons.offline_pin_outlined
+                        ? Icons.check_circle_rounded
                         : job.state == 'failed'
-                        ? Icons.error_outline
+                        ? Icons.error_rounded
                         : Icons.downloading_rounded,
+                    color: job.completed
+                        ? Colors.green
+                        : job.state == 'failed'
+                        ? Colors.redAccent
+                        : Theme.of(context).colorScheme.primary,
                   ),
             title: Text(
               '第 ${job.episode.number} 集${job.episode.vip ? ' · VIP' : ''}',

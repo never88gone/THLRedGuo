@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:THLRedLook/pages/settings/storage_page.dart';
+import 'package:THLRedLook/utils/theme/app_colors.dart';
+
 class DownloadSearchFilterHeader extends StatelessWidget {
   const DownloadSearchFilterHeader({
     super.key,
@@ -15,6 +18,7 @@ class DownloadSearchFilterHeader extends StatelessWidget {
     required this.canCancelUpdater,
     this.onCancelUpdater,
     this.errorMessage,
+    this.totalBytes = 0,
   });
 
   final String currentFilter;
@@ -29,13 +33,18 @@ class DownloadSearchFilterHeader extends StatelessWidget {
   final bool canCancelUpdater;
   final VoidCallback? onCancelUpdater;
   final String? errorMessage;
+  final int totalBytes;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // 1. 筛选标签胶囊
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: SingleChildScrollView(
@@ -53,6 +62,12 @@ class DownloadSearchFilterHeader extends StatelessWidget {
                     key: ValueKey('download-filter-$k'),
                     label: Text(label),
                     selected: currentFilter == k,
+                    selectedColor: AppColors.hongguoRed.withValues(alpha: 0.18),
+                    labelStyle: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: currentFilter == k ? FontWeight.w700 : FontWeight.w500,
+                      color: currentFilter == k ? AppColors.hongguoRed : null,
+                    ),
                     onSelected: (selected) {
                       if (selected) onFilterSelected(k);
                     },
@@ -63,39 +78,74 @@ class DownloadSearchFilterHeader extends StatelessWidget {
             ),
           ),
         ),
+
+        // 2. 搜索框
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: TextField(
-            controller: searchController,
-            onChanged: onSearchChanged,
-            decoration: InputDecoration(
-              hintText: '搜索剧名、站源或分类',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: searchController.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: '清空搜索',
-                      onPressed: () {
-                        searchController.clear();
-                        onSearchChanged('');
-                      },
-                      icon: const Icon(Icons.close_rounded),
-                    ),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+          child: SizedBox(
+            height: 42,
+            child: TextField(
+              controller: searchController,
+              onChanged: onSearchChanged,
+              style: const TextStyle(fontSize: 13.5),
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                hintText: '搜索剧名、站源或分类',
+                hintStyle: const TextStyle(fontSize: 13),
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                filled: true,
+                fillColor: isDark
+                    ? AppColors.white.withValues(alpha: 0.06)
+                    : AppColors.black.withValues(alpha: 0.04),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide.none,
+                ),
+                suffixIcon: searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: '清空搜索',
+                        onPressed: () {
+                          searchController.clear();
+                          onSearchChanged('');
+                        },
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                      ),
+              ),
             ),
           ),
         ),
+
+        // 3. 统计小字与空间占用
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-          child: Text(
-            '$collectionsCount 部 · $totalEpisodesCount 集'
-            '${isArchivedFilter ? ' · 已清理任务，视频仍保留' : ''}',
-            style: Theme.of(context).textTheme.bodySmall,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$collectionsCount 部短剧 · $totalEpisodesCount 集'
+                '${isArchivedFilter ? ' · 已清理任务，视频仍保留' : ''}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.grey,
+                ),
+              ),
+              if (totalBytes > 0)
+                Text(
+                  '占用 ${storageSize(totalBytes)}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.hongguoRed,
+                  ),
+                ),
+            ],
           ),
         ),
+
         if (isProgressBusy) const LinearProgressIndicator(minHeight: 2),
         if (isProgressBusy)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
               children: [
                 Expanded(
@@ -103,6 +153,7 @@ class DownloadSearchFilterHeader extends StatelessWidget {
                     progressText,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
                   ),
                 ),
                 if (canCancelUpdater && onCancelUpdater != null)
@@ -116,7 +167,7 @@ class DownloadSearchFilterHeader extends StatelessWidget {
         if (errorMessage != null)
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Text(errorMessage!),
+            child: Text(errorMessage!, style: const TextStyle(color: Colors.redAccent)),
           ),
       ],
     );

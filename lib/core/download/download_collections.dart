@@ -32,6 +32,14 @@ class DownloadCollection {
   int get active => jobs.where((job) => job.active).length;
   int get failed => jobs.where((job) => job.state == 'failed').length;
   int get bytes => jobs.fold(0, (total, job) => total + job.bytes);
+
+  double get progress => jobs.isEmpty ? 0.0 : completed / jobs.length;
+  bool get isAllCompleted => jobs.isNotEmpty && completed == jobs.length;
+  bool get hasActive => active > 0;
+  bool get hasFailed => failed > 0;
+  int get totalCount => jobs.length;
+  DownloadJob? get firstPlayableJob =>
+      jobs.where((job) => job.completed).firstOrNull;
 }
 
 List<DownloadCollection> downloadCollections(
