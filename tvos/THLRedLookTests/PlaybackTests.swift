@@ -1219,6 +1219,44 @@ final class PlaybackTests: XCTestCase {
         print("THL_TV_DISCOVERY_CURSOR scan=true unchangedImport=true recommendations=3 ranking=2 retained=true")
     }
 
+    func testLiveHongguoDownloadAndOfflinePlayback() async throws {
+        try live()
+        await JSSourceService.shared.initialize()
+        let catalog = try await repository.loadCatalog(source: "hongguo", page: 1)
+        let drama = try XCTUnwrap(catalog.items.first)
+        let detail = try await repository.loadDetail(drama: drama)
+        let firstEp = try XCTUnwrap(detail.episodes.first)
+
+        let svc = DownloadService.shared
+        let jobId = "\(detail.drama.id)_\(firstEp.id)"
+        svc.deleteJob(id: jobId)
+        defer { svc.deleteJob(id: jobId) }
+
+        svc.enqueue(drama: detail.drama, episodes: [firstEp])
+
+        let deadline = Date().addingTimeInterval(90)
+        while Date() < deadline {
+            if let job = svc.jobs.first(where: { $0.id == jobId }), job.isCompleted || job.state == "failed" {
+                break
+            }
+            try await Task.sleep(nanoseconds: 500_000_000)
+        }
+
+        let job = try XCTUnwrap(svc.jobs.first(where: { $0.id == jobId }))
+        print("LIVE_DOWNLOAD_JOB state=\(job.state) error=\(job.error) bytes=\(job.bytes) localPath=\(job.localPath ?? "nil")")
+        XCTAssertTrue(job.isCompleted, "Download failed: \(job.error)")
+
+        let localURL = try XCTUnwrap(svc.completedLocalURL(dramaId: detail.drama.id, episodeId: firstEp.id))
+        print("LIVE_DOWNLOAD_LOCAL_URL url=\(localURL.absoluteString)")
+
+        let offlineDetail = DramaDetail(drama: job.drama, episodes: [job.episode], warning: "")
+        let playerModel = try model(offlineDetail)
+        defer { playerModel.onDisappear() }
+        await playerModel.preparePlayback(episodeIndex: job.episode.number)
+        try await ready(playerModel)
+        print("LIVE_OFFLINE_PLAYBACK duration=\(playerModel.duration) currentTime=\(playerModel.currentTime) planURL=\(playerModel.plan?.url ?? "nil")")
+    }
+
 }
 
 @MainActor

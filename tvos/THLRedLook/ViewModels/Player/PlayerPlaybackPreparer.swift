@@ -5,10 +5,16 @@ import AVFoundation
 final class PlayerPlaybackPreparer {
     private let repository: NativeRepository
     private let store: LocalStore
+    private let downloadService: DownloadService
 
-    init(repository: NativeRepository = .shared, store: LocalStore = .shared) {
+    init(
+        repository: NativeRepository = .shared,
+        store: LocalStore = .shared,
+        downloadService: DownloadService = .shared
+    ) {
         self.repository = repository
         self.store = store
+        self.downloadService = downloadService
     }
 
     func prepareEpisode(
@@ -29,6 +35,12 @@ final class PlayerPlaybackPreparer {
         var currentEpisodes = allEpisodes
         var episode = currentEpisodes.first { $0.number == episodeIndex }
 
+        if let localEpisodeId = episode?.id ?? (episodeIndex > 0 ? "\(episodeIndex)" : nil),
+           let localURL = downloadService.completedLocalURL(dramaId: currentDrama.id, episodeId: localEpisodeId) {
+            let localPlan = PlaybackPlan(url: localURL.absoluteString, quality: 1080, qualities: [1080])
+            return PreparedPlaybackResult(plan: localPlan, playerItem: AVPlayerItem(url: localURL), decryptedURL: nil, drama: currentDrama, episodes: currentEpisodes)
+        }
+
         if episode?.raw == nil || HongguoSeriesIdentity.isRounded(currentDrama) {
             let detail = try await repository.loadDetail(drama: currentDrama, store: store)
             currentDrama = detail.drama
@@ -40,7 +52,7 @@ final class PlayerPlaybackPreparer {
             throw NSError(domain: "Player", code: -1, userInfo: [NSLocalizedDescriptionKey: "没有找到当前分集"])
         }
 
-        if let localURL = DownloadService.shared.completedLocalURL(dramaId: currentDrama.id, episodeId: episode.id) {
+        if let localURL = downloadService.completedLocalURL(dramaId: currentDrama.id, episodeId: episode.id) {
             let localPlan = PlaybackPlan(url: localURL.absoluteString, quality: 1080, qualities: [1080])
             return PreparedPlaybackResult(plan: localPlan, playerItem: AVPlayerItem(url: localURL), decryptedURL: nil, drama: currentDrama, episodes: currentEpisodes)
         }

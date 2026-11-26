@@ -325,8 +325,8 @@ public final class PlayerViewModel: ObservableObject {
                 self.currentTime = sec
                 if self.isLoading { self.isLoading = false }
                 let rem = self.duration - sec
-                if sec >= 3 && rem <= 20 && rem > 0 && self.currentEpisodeIndex < self.allEpisodes.count {
-                    self.prefetchCoordinator.prefetchNextEpisode(currentEpisodeIndex: self.currentEpisodeIndex, allEpisodes: self.allEpisodes, drama: self.drama, requestedQuality: self.requestedQuality, generation: generation)
+                if sec >= 3 && rem <= 20 && rem > 0, let nextNumber = self.adjacentEpisodeNumber(offset: 1) {
+                    self.prefetchCoordinator.prefetchNextEpisode(currentEpisodeIndex: nextNumber - 1, allEpisodes: self.allEpisodes, drama: self.drama, requestedQuality: self.requestedQuality, generation: generation)
                 }
                 self.danmakuManager.updateActiveDanmakus(currentTime: self.currentTime, duration: self.duration, plan: self.plan)
             },
@@ -410,13 +410,14 @@ public final class PlayerViewModel: ObservableObject {
         samplePlaybackClock(); requestedQuality = q
         await beginPlayback(episodeIndex: currentEpisodeIndex, seekTo: currentTime, recovering: false, preserveIntent: true)
     }
-    public func nextEpisode() async {
-        guard currentEpisodeIndex < allEpisodes.count else { return }
-        await preparePlayback(episodeIndex: currentEpisodeIndex + 1, seekTo: 0)
-    }
-    public func previousEpisode() async {
-        guard currentEpisodeIndex > 1 else { return }
-        await preparePlayback(episodeIndex: currentEpisodeIndex - 1, seekTo: 0)
+    public func nextEpisode() async { if let n = adjacentEpisodeNumber(offset: 1) { await preparePlayback(episodeIndex: n, seekTo: 0) } }
+    public func previousEpisode() async { if let p = adjacentEpisodeNumber(offset: -1) { await preparePlayback(episodeIndex: p, seekTo: 0) } }
+    private func adjacentEpisodeNumber(offset: Int) -> Int? {
+        if let idx = allEpisodes.firstIndex(where: { $0.number == currentEpisodeIndex }) {
+            let targetIdx = idx + offset
+            return allEpisodes.indices.contains(targetIdx) ? allEpisodes[targetIdx].number : nil
+        }
+        return allEpisodes.first(where: { $0.number == currentEpisodeIndex + offset })?.number
     }
     public func selectEpisode(number: Int) async {
         isEpisodeDrawerVisible = false
@@ -464,7 +465,7 @@ public final class PlayerViewModel: ObservableObject {
         guard !closed, !reachedEnd else { return }
         reachedEnd = true
         currentTime = duration
-        if currentEpisodeIndex < allEpisodes.count {
+        if adjacentEpisodeNumber(offset: 1) != nil {
             isSeamlessTransitioning = true
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 1_500_000_000)

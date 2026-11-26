@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
+import 'package:THLRedLook/core/player/encrypted_playback.dart';
 import 'package:THLRedLook/core/store/local_store.dart';
 import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
@@ -39,7 +40,9 @@ class OfflinePlayerPage extends StatefulWidget {
 }
 
 class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
+  final EncryptedPlayback _encryptedPlayback = EncryptedPlayback();
   late int _currentIndex;
+  int _loadTicket = 0;
   Player? _player;
   VideoController? _video;
   StreamSubscription<bool>? _completedSub;
@@ -82,6 +85,7 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
   Future<void> _initPlayback() async {
     final player = _player;
     if (player == null) return;
+    final ticket = ++_loadTicket;
     final job = _currentJob;
     setState(() {
       _loading = true;
@@ -89,7 +93,10 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
     });
 
     try {
+      await _encryptedPlayback.cancel();
+      if (!mounted || ticket != _loadTicket) return;
       final plan = await widget.repository.localPlayback(widget.drama, job.episode);
+      if (!mounted || ticket != _loadTicket) return;
       if (plan == null || !plan.local || plan.url.isEmpty) {
         if (mounted) {
           setState(() {
@@ -100,13 +107,44 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
         return;
       }
 
+      var resolvedPlan = plan;
+      if (resolvedPlan.decryptionKey.isNotEmpty &&
+          (Platform.isAndroid || Platform.isIOS)) {
+        resolvedPlan = await _encryptedPlayback.prepare(resolvedPlan);
+        if (!mounted || ticket != _loadTicket) return;
+      }
+
+      final platform = player.platform;
+      if (platform is NativePlayer) {
+        await platform.setProperty(
+          'demuxer-lavf-o',
+          [
+            'seg_max_retry=3',
+            'strict=experimental',
+            'allowed_extensions=ALL',
+            'protocol_whitelist=[file,crypto,data]',
+            if (resolvedPlan.decryptionKey.isNotEmpty)
+              'decryption_key=${resolvedPlan.decryptionKey}',
+          ].join(','),
+        );
+      }
+
       final watched = widget.store.watched(widget.drama.id);
       final resumeMs = (watched != null && watched.episode == job.episode.number && !watched.finished)
           ? (watched.position * 1000).toInt()
           : 0;
 
-      await player.open(Media(plan.url));
-      if (resumeMs > 0 && mounted) {
+      await player.open(
+        Media(
+          resolvedPlan.url,
+          extras: {
+            if (resolvedPlan.decryptionKey.isNotEmpty)
+              'decryptionKey': resolvedPlan.decryptionKey,
+          },
+        ),
+      );
+      if (!mounted || ticket != _loadTicket) return;
+      if (resumeMs > 0) {
         await player.seek(Duration(milliseconds: resumeMs));
       }
 
@@ -194,9 +232,11 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
 
   @override
   void dispose() {
+    _loadTicket++;
     _hideControlsTimer?.cancel();
     _completedSub?.cancel();
     _positionSub?.cancel();
+    unawaited(_encryptedPlayback.close());
     if (_isFullScreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }

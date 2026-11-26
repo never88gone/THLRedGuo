@@ -380,8 +380,9 @@ final class DownloadServiceTests: XCTestCase {
         let epA2 = Episode(id: "ea_2", title: "A2", number: 2)
         let epB1 = Episode(id: "eb_1", title: "B1", number: 1)
 
-        // 先加入 dramaA，后加入 dramaB
+        // 先加入 dramaA，等待至少 5ms 后再加入 dramaB，保证毫秒时间戳有先后区分
         service.enqueue(drama: dramaA, episodes: [epA1, epA2])
+        Thread.sleep(forTimeInterval: 0.005)
         service.enqueue(drama: dramaB, episodes: [epB1])
 
         let vm = DownloadsViewModel(downloadService: service)
@@ -431,5 +432,44 @@ final class DownloadServiceTests: XCTestCase {
         vm.deleteDrama("drama_ctrl_a")
         XCTAssertFalse(service.jobs.contains { $0.drama.id == "drama_ctrl_a" })
         XCTAssertTrue(service.jobs.contains { $0.drama.id == "drama_ctrl_b" })
+    }
+
+    // 12. 验证本地已下载完成的分集（即使无 raw 数据且无网络）也应直接命中离线文件
+    func testOfflinePrepareBypassesNetworkDetailAndPlaysLocalFile() async throws {
+        let drama = Drama(id: "hongguo:offline_only_5", source: "hongguo", title: "断网离线测试", cover: "", episodes: 10)
+        let ep5 = Episode(id: "ep_5", title: "第 5 集", number: 5)
+        let jobId = "\(drama.id)_\(ep5.id)"
+
+        let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let downloadsDir = cachesDir.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloadsDir, withIntermediateDirectories: true)
+        let localFile = downloadsDir.appendingPathComponent("\(jobId).mp4")
+        try Data(repeating: 0x20, count: 2048).write(to: localFile)
+        defer { try? FileManager.default.removeItem(at: localFile) }
+
+        let completedJob = DownloadJob(
+            id: jobId,
+            drama: drama,
+            episode: ep5,
+            state: "completed",
+            bytes: 2048,
+            total: 2048,
+            progress: 1.0,
+            localPath: localFile.path
+        )
+        let data = try JSONEncoder().encode([completedJob])
+        UserDefaults.standard.set(data, forKey: "zgj_tv_download_jobs")
+        let svc = DownloadService()
+        let preparer = PlayerPlaybackPreparer(downloadService: svc)
+
+        let prepared = try await preparer.prepareEpisode(
+            drama: drama,
+            allEpisodes: [ep5],
+            episodeIndex: 5,
+            requestedQuality: 1080,
+            avoidURL: ""
+        )
+        XCTAssertEqual(prepared.plan.url, localFile.absoluteString)
+        XCTAssertNil(prepared.decryptedURL)
     }
 }
