@@ -59,6 +59,8 @@ class _TelevisionControlsState extends State<TelevisionControls> {
   final _subscriptions = <StreamSubscription<dynamic>>[];
   Timer? _hideTimer;
   Timer? _seekTimer;
+  Timer? _hudTimer;
+  String? _hudMessage;
   bool _visible = true;
   bool _panelOpen = false;
   bool _seekHint = false;
@@ -86,13 +88,13 @@ class _TelevisionControlsState extends State<TelevisionControls> {
         if (!mounted || !widget.enabled || _panelOpen) return;
         if (playing) {
           _scheduleHide();
-        } else if (widget.showOnPlaybackReady) {
+        } else if (widget.showOnPlaybackReady && _visible) {
           _show();
         }
       }),
     );
     if (widget.enabled) {
-      if (widget.showOnPlaybackReady || !widget.player.state.playing) {
+      if (widget.showOnPlaybackReady) {
         _show();
       } else {
         _visible = false;
@@ -105,7 +107,7 @@ class _TelevisionControlsState extends State<TelevisionControls> {
   void didUpdateWidget(covariant TelevisionControls oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.enabled && !oldWidget.enabled) {
-      if (widget.showOnPlaybackReady || !widget.player.state.playing) {
+      if (widget.showOnPlaybackReady) {
         _show();
       } else {
         setState(() => _visible = false);
@@ -159,6 +161,14 @@ class _TelevisionControlsState extends State<TelevisionControls> {
       if (mounted) setState(() => _seekHint = false);
     });
     _scheduleHide();
+  }
+
+  void _showHud(String message) {
+    _hudTimer?.cancel();
+    setState(() => _hudMessage = message);
+    _hudTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _hudMessage = null);
+    });
   }
 
   Future<void> _openPanel(
@@ -217,13 +227,32 @@ class _TelevisionControlsState extends State<TelevisionControls> {
         key == LogicalKeyboardKey.arrowRight) {
       _seek(10);
     } else if ((!_visible || _surface.hasPrimaryFocus) &&
+        (key == LogicalKeyboardKey.arrowUp ||
+            key == LogicalKeyboardKey.arrowDown)) {
+      if (event is KeyDownEvent) {
+        if (key == LogicalKeyboardKey.arrowUp) {
+          if (widget.onPrevious != null) {
+            widget.onPrevious!();
+            _showHud('上一集');
+          } else {
+            _showHud('已是第一集');
+          }
+        } else {
+          if (widget.onNext != null) {
+            widget.onNext!();
+            _showHud('下一集');
+          } else {
+            _showHud('已是最后一集');
+          }
+        }
+      }
+    } else if ((!_visible || _surface.hasPrimaryFocus) &&
         [
-          LogicalKeyboardKey.arrowUp,
-          LogicalKeyboardKey.arrowDown,
           LogicalKeyboardKey.select,
           LogicalKeyboardKey.enter,
           LogicalKeyboardKey.numpadEnter,
           LogicalKeyboardKey.gameButtonA,
+          LogicalKeyboardKey.contextMenu,
         ].contains(key)) {
       _show();
     } else {
@@ -236,6 +265,7 @@ class _TelevisionControlsState extends State<TelevisionControls> {
   void dispose() {
     _hideTimer?.cancel();
     _seekTimer?.cancel();
+    _hudTimer?.cancel();
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
@@ -263,7 +293,7 @@ class _TelevisionControlsState extends State<TelevisionControls> {
             children: [
               if (state.buffering && widget.enabled)
                 const Center(child: CircularProgressIndicator()),
-              if (_seekHint && !_visible)
+              if ((_seekHint || _hudMessage != null) && !_visible)
                 Center(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -271,10 +301,10 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                       child: Text(
-                        '${formatPosition(position)} / ${formatPosition(duration)}',
-                        style: const TextStyle(fontSize: 26),
+                        _hudMessage ?? '${formatPosition(position)} / ${formatPosition(duration)}',
+                        style: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
@@ -285,12 +315,8 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [
-                        AppColors.playerMaskTop,
-                        AppColors.transparent,
-                        AppColors.playerMaskBottom,
-                      ],
-                      stops: [0.0, 0.4, 1.0],
+                      colors: [AppColors.playerMaskTop, AppColors.transparent, AppColors.playerMaskBottom],
+                      stops: const [0.0, 0.4, 1.0],
                     ),
                   ),
                 ),
@@ -312,10 +338,7 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                           widget.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -338,20 +361,13 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                             Stack(
                               children: [
                                 LinearProgressIndicator(
-                                  value: duration > 0
-                                      ? (state.buffer.inMilliseconds /
-                                                1000 /
-                                                duration)
-                                            .clamp(0, 1)
-                                      : 0,
+                                  value: duration > 0 ? (state.buffer.inMilliseconds / 1000 / duration).clamp(0, 1) : 0,
                                   minHeight: 5,
                                   color: AppColors.playerProgressBuffered,
                                   backgroundColor: AppColors.playerProgressInactive,
                                 ),
                                 LinearProgressIndicator(
-                                  value: duration > 0
-                                      ? (position / duration).clamp(0, 1)
-                                      : 0,
+                                  value: duration > 0 ? (position / duration).clamp(0, 1) : 0,
                                   minHeight: 5,
                                   backgroundColor: AppColors.transparent,
                                 ),
@@ -359,18 +375,9 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                             ),
                             Row(
                               children: [
-                                Text(
-                                  '${formatPosition(position)} / ${formatPosition(duration)}',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
+                                Text('${formatPosition(position)} / ${formatPosition(duration)}', style: const TextStyle(fontSize: 16)),
                                 const Spacer(),
-                                Text(
-                                  '左右快进 · 确认暂停',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.whiteWithAlpha(0.7),
-                                  ),
-                                ),
+                                Text('左右快进 · 确认暂停', style: TextStyle(fontSize: 14, color: AppColors.whiteWithAlpha(0.7))),
                               ],
                             ),
                           ],
@@ -390,9 +397,7 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                             RemoteButton(
                               key: const ValueKey('tv-play-pause'),
                               label: state.playing ? '暂停' : '播放',
-                              icon: state.playing
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
+                              icon: state.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
                               focusNode: _play,
                               onPressed: () {
                                 widget.onTogglePlayback();
@@ -410,8 +415,7 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                               label: '选集',
                               icon: Icons.grid_view_rounded,
                               focusNode: _episodes,
-                              onPressed: () =>
-                                  _openPanel(widget.onEpisodes, _episodes),
+                              onPressed: () => _openPanel(widget.onEpisodes, _episodes),
                             ),
                             RemoteButton(
                               key: const ValueKey('tv-diary'),
@@ -437,16 +441,10 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                                 animation: widget.enhancement!,
                                 builder: (_, _) {
                                   final enhancement = widget.enhancement!;
-                                  if (!enhancement.canCompare) {
-                                    return const SizedBox.shrink();
-                                  }
+                                  if (!enhancement.canCompare) return const SizedBox.shrink();
                                   return RemoteButton(
-                                    key: const ValueKey(
-                                      'tv-enhancement-compare',
-                                    ),
-                                    label: enhancement.comparing
-                                        ? '恢复增强'
-                                        : '原画对比',
+                                    key: const ValueKey('tv-enhancement-compare'),
+                                    label: enhancement.comparing ? '恢复增强' : '原画对比',
                                     icon: Icons.compare_rounded,
                                     onPressed: () {
                                       unawaited(enhancement.toggleCompare());
@@ -461,15 +459,14 @@ class _TelevisionControlsState extends State<TelevisionControls> {
                               label: '播放设置',
                               icon: Icons.tune_rounded,
                               focusNode: _settings,
-                              onPressed: () =>
-                                  _openPanel(widget.onSettings, _settings),
+                              onPressed: () => _openPanel(widget.onSettings, _settings),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '控制条隐藏后：左右快进 10 秒，上下或确认键显示控制条',
+                        '控制条隐藏时：上/下键切集，左/右键快退快进，确认键呼出控制条',
                         style: TextStyle(fontSize: 13, color: AppColors.whiteWithAlpha(0.7)),
                       ),
                     ],

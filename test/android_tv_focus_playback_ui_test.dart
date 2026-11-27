@@ -202,18 +202,37 @@ void main() {
       expect(focusScope.focusedChild?.debugLabel, equals('tv-player-progress'));
     });
 
-    testWidgets('4. 界面沉浸隐藏时，按遥控器方向键或确定键自动唤醒控制栏并归位焦点', (tester) async {
+    testWidgets('4. 界面沉浸隐藏时，按遥控器上下键切集且控制栏保持隐藏，按确定键唤醒控制栏', (tester) async {
       player.updateState(playing: true);
+      var prevCalled = 0;
+      var nextCalled = 0;
 
       await tester.pumpWidget(_buildControls(
         player: player,
         title: '测试剧集',
         showOnPlaybackReady: false,
+        onPrevious: () => prevCalled++,
+        onNext: () => nextCalled++,
       ));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('tv-play-pause')), findsNothing);
 
+      // 上键 -> 触发上一集并显示 HUD，控制栏保持沉浸隐藏
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pump();
+      expect(prevCalled, 1);
+      expect(find.text('上一集'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tv-play-pause')), findsNothing);
+
+      // 下键 -> 触发下一集并显示 HUD，控制栏保持沉浸隐藏
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(nextCalled, 1);
+      expect(find.text('下一集'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tv-play-pause')), findsNothing);
+
+      // 确定键 (Select) -> 呼出控制栏并聚焦播放按钮
       await tester.sendKeyEvent(LogicalKeyboardKey.select);
       await tester.pumpAndSettle();
 
@@ -391,6 +410,47 @@ void main() {
 
       expect(selectedSetting, isNotNull);
       expect(selectedSetting!.speed, equals(1.25));
+    });
+
+    testWidgets('10. 播放设置面板支持切集不弹出控制条（沉浸连播）切换', (tester) async {
+      TelevisionPlaybackSetting? selectedSetting;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                selectedSetting = await showDialog<TelevisionPlaybackSetting>(
+                  context: context,
+                  builder: (_) => TelevisionSettingsDialog(
+                    speed: 1.0,
+                    quality: 1080,
+                    qualities: const [1080],
+                    favorite: false,
+                    onFavorite: () {},
+                    quietEpisodeAdvance: true,
+                  ),
+                );
+              },
+              child: const Text('打开设置'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('打开设置'));
+      await tester.pumpAndSettle();
+
+      final quietBtnFinder = find.byKey(const ValueKey('tv-quiet-advance'));
+      expect(quietBtnFinder, findsOneWidget);
+      expect(find.text('切集控制条：隐藏（沉浸）'), findsOneWidget);
+
+      await tester.tap(quietBtnFinder);
+      await tester.pumpAndSettle();
+
+      expect(selectedSetting, isNotNull);
+      expect(selectedSetting!.quietEpisodeAdvance, isFalse);
     });
   });
 }

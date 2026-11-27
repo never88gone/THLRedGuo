@@ -16,6 +16,7 @@ class TelevisionPlaybackSetting {
     this.preload,
     this.enhancement,
     this.decoderMode,
+    this.quietEpisodeAdvance,
   });
   final double? speed;
   final int? quality;
@@ -24,6 +25,7 @@ class TelevisionPlaybackSetting {
   final bool? preload;
   final VideoEnhancementPreferences? enhancement;
   final PlaybackDecoderMode? decoderMode;
+  final bool? quietEpisodeAdvance;
 }
 
 class TelevisionSettingsDialog extends StatelessWidget {
@@ -45,6 +47,7 @@ class TelevisionSettingsDialog extends StatelessWidget {
     this.enhancement,
     this.onCompareEnhancement,
     this.decoderMode = PlaybackDecoderMode.hardware,
+    this.quietEpisodeAdvance = true,
   });
   final double speed;
   final int quality;
@@ -62,6 +65,7 @@ class TelevisionSettingsDialog extends StatelessWidget {
   final VideoEnhancementController? enhancement;
   final VoidCallback? onCompareEnhancement;
   final PlaybackDecoderMode decoderMode;
+  final bool quietEpisodeAdvance;
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -222,6 +226,15 @@ class TelevisionSettingsDialog extends StatelessWidget {
               onPressed: () => Navigator.pop(
                 context,
                 TelevisionPlaybackSetting(autoAdvance: !autoAdvance),
+              ),
+            ),
+            const SizedBox(height: 16),
+            RemoteButton(
+              key: const ValueKey('tv-quiet-advance'),
+              label: quietEpisodeAdvance ? '切集控制条：隐藏（沉浸）' : '切集控制条：弹出',
+              onPressed: () => Navigator.pop(
+                context,
+                TelevisionPlaybackSetting(quietEpisodeAdvance: !quietEpisodeAdvance),
               ),
             ),
             const SizedBox(height: 16),

@@ -237,6 +237,25 @@ class PlaybackSettingsPage extends StatelessWidget {
                             );
                           },
                         ),
+                        const Divider(height: 1, indent: 56),
+                        SettingsSwitchTile(
+                          key: const ValueKey('settings-quiet-advance-switch'),
+                          leading: const Icon(Icons.fullscreen_rounded),
+                          title: const Text('切集不弹出控制条'),
+                          subtitle: Text(
+                            prefs.quietEpisodeAdvance
+                                ? '上下键切集或自动连播时保持全屏沉浸，不弹出控制条'
+                                : '切换剧集后自动显示播放控制条',
+                          ),
+                          value: prefs.quietEpisodeAdvance,
+                          onChanged: (val) async {
+                            final updated = prefs.copyWith(quietEpisodeAdvance: val);
+                            await saveUserChange(
+                              context,
+                              () => store.setPlaybackPreferences(updated),
+                            );
+                          },
+                        ),
                       ],
                     ],
                   ),

@@ -1280,7 +1280,7 @@ class PlayerScreenState extends State<PlayerScreen>
     PlaybackPlan? recoveryPlan,
     bool playWhenReady = true,
     PlaybackPlan? handoffPlan,
-    bool showControlsOnReady = true,
+    bool? showControlsOnReady,
   }) async {
     await _playbackLease?.ready;
     if (_closed ||
@@ -1340,9 +1340,12 @@ class PlayerScreenState extends State<PlayerScreen>
       }
     }
     _resumePosition = position;
-    _showControlsOnPlaybackReady = showControlsOnReady;
+    final effectiveShowControls = showControlsOnReady ??
+        (!_preferences.quietEpisodeAdvance ||
+            (!_television && !_showFullscreen));
+    _showControlsOnPlaybackReady = effectiveShowControls;
     final isSeamlessAdvance =
-        !showControlsOnReady &&
+        !effectiveShowControls &&
         recoveryAction == null &&
         (index == _index + 1 || warmed != null);
     setState(() {
@@ -2078,6 +2081,7 @@ class PlayerScreenState extends State<PlayerScreen>
         danmakuController: _danmaku,
         preloader: _preloader,
         decoderMode: _preferences.decoderMode,
+        quietEpisodeAdvance: _preferences.quietEpisodeAdvance,
       );
     } finally {
       if (mounted && !_closed) setState(() => _panelOpen = false);
@@ -2093,6 +2097,8 @@ class PlayerScreenState extends State<PlayerScreen>
           preload: selection.preload ?? _preloadEnabled,
           enhancement: selection.enhancement,
           decoderMode: selection.decoderMode,
+          quietEpisodeAdvance:
+              selection.quietEpisodeAdvance ?? _preferences.quietEpisodeAdvance,
         ),
       );
     } catch (e) {
