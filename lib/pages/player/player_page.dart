@@ -1975,6 +1975,7 @@ class PlayerScreenState extends State<PlayerScreen>
     _syncPreload();
     _menuRevision.value++;
     await _interactions.applySpeed();
+    _syncDanmaku();
     if (qualityChanged && _plan?.offline != true) {
       await _retry(quality: nextPreferences.quality);
     } else if (decoderChanged && _plan != null) {
