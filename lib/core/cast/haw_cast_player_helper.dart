@@ -50,6 +50,33 @@ class HawCastPlayerHelper {
     return null;
   }
 
+  static Future<PlaybackPlan?> resolveAirPlayPlan({
+    required Drama drama,
+    required Episode episode,
+    required PlaybackPlan? currentPlan,
+    required EncryptedPlayback encryptedPlayback,
+    required AppRepository repository,
+    int requestedQuality = 0,
+  }) async {
+    final onlinePlan = await resolveCastablePlan(
+      drama: drama,
+      episode: episode,
+      currentPlan: currentPlan,
+      encryptedPlayback: encryptedPlayback,
+      repository: repository,
+      requestedQuality: requestedQuality,
+    );
+    if (onlinePlan != null) {
+      return onlinePlan;
+    }
+    if (currentPlan != null &&
+        currentPlan.local &&
+        currentPlan.decryptionKey.isEmpty) {
+      return currentPlan;
+    }
+    return null;
+  }
+
   static HawCastPlayRequest buildPlayRequest({
     required DramaDetail detail,
     required int episodeIndex,

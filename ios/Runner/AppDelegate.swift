@@ -8,6 +8,7 @@ import CoreMedia
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, AVPictureInPictureControllerDelegate {
   private let encryptedMediaStream = EncryptedMediaStream()
+  private let airPlayCastBridge = AirPlayCastBridge()
   private var pipController: AVPictureInPictureController?
   private var pipPlayer: AVPlayer?
   private var pipPlayerLayer: AVPlayerLayer?
@@ -42,9 +43,11 @@ import CoreMedia
     THLAppLifecycleGuard.markEngineStopping()
     if Thread.isMainThread {
       cleanUpPip()
+      airPlayCastBridge.stop()
     } else {
       DispatchQueue.main.async { [weak self] in
         self?.cleanUpPip()
+        self?.airPlayCastBridge.stop()
       }
     }
   }
@@ -96,6 +99,13 @@ import CoreMedia
       let channel = FlutterMethodChannel(name: "duanju/encrypted_stream", binaryMessenger: registrar.messenger())
       channel.setMethodCallHandler { [weak self] call, result in
         self?.encryptedMediaStream.handle(call, result: result)
+      }
+    }
+    if let registrar = registry.registrar(forPlugin: "AirPlayCastBridge") {
+      let airPlayChannel = FlutterMethodChannel(name: "duanju/airplay_cast", binaryMessenger: registrar.messenger())
+      self.airPlayCastBridge.bind(channel: airPlayChannel)
+      airPlayChannel.setMethodCallHandler { [weak self] call, result in
+        self?.airPlayCastBridge.handle(call, result: result)
       }
     }
     if let registrar = registry.registrar(forPlugin: "DeviceSettings") {

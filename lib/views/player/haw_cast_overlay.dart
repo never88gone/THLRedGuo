@@ -253,7 +253,9 @@ class _HawCastOverlayState extends State<HawCastOverlay> {
                                       const SizedBox(width: 6),
                                       Flexible(
                                         child: Text(
-                                          '${device?.name ?? '接收端'} · ${_stateLabel(status.state)}',
+                                          _service.mode == CastProtocolMode.airplay
+                                              ? 'AirPlay 纯视频 · ${device?.name ?? '接收端'} · ${_stateLabel(status.state)}'
+                                              : '${device?.name ?? '接收端'} · ${_stateLabel(status.state)}',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(

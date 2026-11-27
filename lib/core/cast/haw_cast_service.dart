@@ -1,17 +1,27 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:nsd/nsd.dart' as nsd;
 
+import 'package:THLRedLook/core/cast/airplay_cast_controller.dart';
+import 'package:THLRedLook/core/cast/haw_cast_discovery.dart';
 import 'package:THLRedLook/core/cast/haw_cast_models.dart';
+import 'package:THLRedLook/models/catalog/models.dart';
 import 'package:THLRedLook/utils/diary/diary_service.dart';
 
 class HawCastService extends ChangeNotifier {
-  HawCastService._();
+  HawCastService._() {
+    _airPlay = AirPlayCastController(
+      onActivated: _handleAirPlayActivated,
+      onDeactivated: _handleAirPlayDeactivated,
+      onStatusUpdated: _handleAirPlayStatus,
+      onEnded: (idx) => onExternalCastEnded?.call(idx),
+      onError: (msg) => DiaryService.add('[Cast-AirPlay] 异常: $msg'),
+    );
+  }
 
   static final HawCastService instance = HawCastService._();
 
@@ -22,6 +32,7 @@ class HawCastService extends ChangeNotifier {
   final http.Client _client = http.Client();
   final Map<String, HawCastDevice> _manualDevices = {};
   final Map<String, HawCastDevice> _discoveredDevices = {};
+  late final AirPlayCastController _airPlay;
 
   nsd.Discovery? _discovery;
   Timer? _statusTimer;
@@ -29,6 +40,7 @@ class HawCastService extends ChangeNotifier {
 
   bool _scanning = false;
   String? _scanError;
+  CastProtocolMode _mode = CastProtocolMode.none;
   HawCastDevice? _activeDevice;
   String _activeSessionId = '';
   String _activeTitle = '';
@@ -37,8 +49,14 @@ class HawCastService extends ChangeNotifier {
   HawCastStatus _status = const HawCastStatus();
   bool _casting = false;
 
+  VoidCallback? onExternalCastActivated;
+  void Function(double resumePosition)? onExternalCastStopped;
+  void Function(int episodeIndex)? onExternalCastEnded;
+
   bool get scanning => _scanning;
   String? get scanError => _scanError;
+  CastProtocolMode get mode => _mode;
+  bool get isAirPlaySupported => _airPlay.isAvailable;
   HawCastDevice? get activeDevice => _activeDevice;
   String get activeSessionId => _activeSessionId;
   String get activeTitle => _activeTitle;
@@ -104,150 +122,32 @@ class HawCastService extends ChangeNotifier {
       prev.removeListener(_onServicesChanged);
       await nsd.stopDiscovery(prev).catchError((Object _) {});
     }
-    if (notify) {
-      notifyListeners();
-    }
+    if (notify) notifyListeners();
   }
 
   void _onServicesChanged() {
-    final services = _discovery?.services ?? const <nsd.Service>[];
-    final nextMap = <String, HawCastDevice>{};
-
-    for (final service in services) {
-      final port = service.port ?? defaultPort;
-      if (port <= 0) continue;
-
-      final host = _pickBestHost(service);
-      if (host == null || host.isEmpty) continue;
-
-      final txt = service.txt ?? const {};
-      String readTxt(String key) {
-        final raw = txt[key];
-        if (raw == null || raw.isEmpty) return '';
-        return utf8.decode(raw, allowMalformed: true).trim();
-      }
-
-      final proto = readTxt('proto');
-      if (proto.isNotEmpty && proto != 'haw') continue;
-
-      final rawName = service.name?.trim() ?? '';
-      final name = rawName.isNotEmpty ? rawName : '糖葫芦接收器 ($host)';
-      final model = readTxt('model').isNotEmpty ? readTxt('model') : 'THLPlay';
-      final capsStr = readTxt('caps');
-      final caps = capsStr.isNotEmpty
-          ? capsStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
-          : const ['aes128', 'hls', 'mp4'];
-
-      final id = '$host:$port';
-      nextMap[id] = HawCastDevice(
-        id: id,
-        name: name,
-        host: host,
-        port: port,
-        model: model,
-        caps: caps,
-      );
-    }
-
+    final parsed = HawCastDiscoveryHelper.parseServices(
+      _discovery?.services ?? const <nsd.Service>[],
+      defaultPort: defaultPort,
+    );
     _discoveredDevices
       ..clear()
-      ..addAll(nextMap);
+      ..addAll(parsed);
     notifyListeners();
   }
 
-  String? _pickBestHost(nsd.Service service) {
-    final addrs = service.addresses ?? const <InternetAddress>[];
-    String? linkLocalIpv4;
-    String? otherIpv4;
-    String? fallbackIpv6;
-    for (final addr in addrs) {
-      if (addr.isLoopback) continue;
-      if (addr.type == InternetAddressType.IPv4) {
-        final ip = addr.address;
-        if (ip.startsWith('169.254.')) {
-          linkLocalIpv4 ??= ip;
-        } else if (ip.startsWith('192.168.') ||
-            ip.startsWith('10.') ||
-            _isPrivate172(ip)) {
-          return ip;
-        } else {
-          otherIpv4 ??= ip;
-        }
-      } else if (!addr.isLinkLocal && fallbackIpv6 == null) {
-        fallbackIpv6 = addr.address;
-      }
-    }
-    if (otherIpv4 != null) return otherIpv4;
-    if (linkLocalIpv4 != null) return linkLocalIpv4;
-    if (fallbackIpv6 != null) return fallbackIpv6;
-    final host = service.host?.trim();
-    if (host != null && host.isNotEmpty) {
-      return host.endsWith('.') ? host.substring(0, host.length - 1) : host;
-    }
-    return null;
-  }
-
-  bool _isPrivate172(String ip) {
-    if (!ip.startsWith('172.')) return false;
-    final parts = ip.split('.');
-    if (parts.length < 2) return false;
-    final second = int.tryParse(parts[1]) ?? -1;
-    return second >= 16 && second <= 31;
-  }
-
   Future<HawCastDevice?> probeManualDevice(String input) async {
-    final trimmed = input.trim();
-    if (trimmed.isEmpty) return null;
-
-    var host = trimmed;
-    var port = defaultPort;
-    if (trimmed.startsWith('[')) {
-      final endBracket = trimmed.indexOf(']');
-      if (endBracket > 1) {
-        host = trimmed.substring(1, endBracket);
-        if (endBracket + 1 < trimmed.length && trimmed[endBracket + 1] == ':') {
-          port = int.tryParse(trimmed.substring(endBracket + 2)) ?? defaultPort;
-        }
-      }
-    } else if (trimmed.contains(':') && trimmed.indexOf(':') == trimmed.lastIndexOf(':')) {
-      final parts = trimmed.split(':');
-      host = parts[0].trim();
-      port = int.tryParse(parts[1].trim()) ?? defaultPort;
-    }
-
-    if (host.isEmpty) return null;
-    final formattedHost = host.contains(':') ? '[$host]' : host;
-    final uri = Uri.parse('http://$formattedHost:$port/thl/info');
-
-    try {
-      final response = await _client.get(uri).timeout(_requestTimeout);
-      if (response.statusCode != 200) return null;
-      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      if (decoded is! Map<String, dynamic>) return null;
-
-      final name = decoded['name']?.toString().trim();
-      final model = decoded['model']?.toString().trim();
-      final capsRaw = decoded['caps'];
-      final caps = capsRaw is List
-          ? capsRaw.map((e) => e.toString()).toList()
-          : const ['aes128', 'hls', 'mp4'];
-
-      final device = HawCastDevice(
-        id: '$host:$port',
-        name: (name != null && name.isNotEmpty) ? name : '糖葫芦接收器 ($host)',
-        host: host,
-        port: port,
-        model: (model != null && model.isNotEmpty) ? model : 'THLPlay',
-        caps: caps,
-        manual: true,
-      );
+    final device = await HawCastDiscoveryHelper.probeManualDevice(
+      _client,
+      input,
+      defaultPort: defaultPort,
+      timeout: _requestTimeout,
+    );
+    if (device != null) {
       _manualDevices[device.id] = device;
       notifyListeners();
-      return device;
-    } catch (e) {
-      DiaryService.add('[Cast] 手动探测 $host:$port 失败: $e');
-      return null;
     }
+    return device;
   }
 
   Future<bool> startCasting(
@@ -276,7 +176,11 @@ class HawCastService extends ChangeNotifier {
         return false;
       }
 
+      if (_mode == CastProtocolMode.airplay) {
+        await _airPlay.stop();
+      }
       final sessionId = body['session_id']?.toString() ?? request.sessionId;
+      _mode = CastProtocolMode.haw;
       _activeDevice = device;
       _activeSessionId = sessionId;
       _activeTitle = request.title;
@@ -301,12 +205,121 @@ class HawCastService extends ChangeNotifier {
     }
   }
 
+  Future<bool> startAirPlayCast({
+    required PlaybackPlan plan,
+    required String title,
+    required String dramaTitle,
+    required int episodeIndex,
+    required double startPosition,
+    double rate = 1.0,
+  }) async {
+    if (!_airPlay.isAvailable) return false;
+    if (_mode == CastProtocolMode.haw && _casting) {
+      await stopCasting(notifyRemote: true);
+    }
+    _activeTitle = title;
+    _activeDramaTitle = dramaTitle;
+    _activeEpisodeIndex = episodeIndex;
+    return _airPlay.startPicker(
+      plan: plan,
+      title: title,
+      dramaTitle: dramaTitle,
+      episodeIndex: episodeIndex,
+      position: startPosition,
+      rate: rate,
+    );
+  }
+
+  Future<bool> replaceAirPlayEpisode({
+    required PlaybackPlan plan,
+    required String title,
+    required String dramaTitle,
+    required int episodeIndex,
+    required double startPosition,
+    double rate = 1.0,
+  }) async {
+    if (!_airPlay.isAvailable || _mode != CastProtocolMode.airplay) {
+      return false;
+    }
+    _activeTitle = title;
+    _activeDramaTitle = dramaTitle;
+    _activeEpisodeIndex = episodeIndex;
+    final ok = await _airPlay.replaceItem(
+      plan: plan,
+      title: title,
+      dramaTitle: dramaTitle,
+      episodeIndex: episodeIndex,
+      position: startPosition,
+      rate: rate,
+    );
+    if (ok) notifyListeners();
+    return ok;
+  }
+
+  void _handleAirPlayActivated(String routeName, double position) {
+    _statusTimer?.cancel();
+    _statusTimer = null;
+    _mode = CastProtocolMode.airplay;
+    _casting = true;
+    _activeSessionId = 'airplay';
+    _activeDevice = HawCastDevice(
+      id: 'airplay',
+      name: routeName,
+      host: 'airplay',
+      port: 0,
+      model: 'AirPlay',
+      caps: const ['airplay_video'],
+    );
+    _status = HawCastStatus(
+      sessionId: 'airplay',
+      state: HawCastPlayState.playing,
+      position: position,
+    );
+    notifyListeners();
+    onExternalCastActivated?.call();
+  }
+
+  void _handleAirPlayDeactivated(double lastPosition) {
+    if (_mode != CastProtocolMode.airplay) return;
+    _mode = CastProtocolMode.none;
+    _casting = false;
+    _activeDevice = null;
+    _activeSessionId = '';
+    _status = const HawCastStatus();
+    notifyListeners();
+    onExternalCastStopped?.call(lastPosition);
+  }
+
+  void _handleAirPlayStatus(HawCastStatus nextStatus) {
+    if (_mode != CastProtocolMode.airplay || !_casting) return;
+    _status = nextStatus;
+    notifyListeners();
+  }
+
   Future<bool> sendControl(
     HawCastControlCommand command, {
     double? position,
     double? rate,
     double? volume,
   }) async {
+    if (_mode == CastProtocolMode.airplay && _casting) {
+      final ok = await _airPlay.sendControl(
+        command,
+        position: position,
+        rate: rate,
+        volume: volume,
+      );
+      if (ok) {
+        _applyOptimisticControl(
+          command,
+          position: position,
+          rate: rate,
+          volume: volume,
+        );
+      }
+      return ok;
+    }
+
     final device = _activeDevice;
     if (device == null || !_casting) return false;
 
@@ -335,48 +348,12 @@ class HawCastService extends ChangeNotifier {
       final body = jsonDecode(utf8.decode(response.bodyBytes));
       final ok = body is Map<String, dynamic> && body['code'] == 0;
       if (ok) {
-        if (command == HawCastControlCommand.play) {
-          _status = HawCastStatus(
-            sessionId: _status.sessionId,
-            mediaId: _status.mediaId,
-            state: HawCastPlayState.playing,
-            position: _status.position,
-            duration: _status.duration,
-            volume: _status.volume,
-            rate: _status.rate,
-          );
-        } else if (command == HawCastControlCommand.pause) {
-          _status = HawCastStatus(
-            sessionId: _status.sessionId,
-            mediaId: _status.mediaId,
-            state: HawCastPlayState.paused,
-            position: _status.position,
-            duration: _status.duration,
-            volume: _status.volume,
-            rate: _status.rate,
-          );
-        } else if (command == HawCastControlCommand.seek && position != null) {
-          _status = HawCastStatus(
-            sessionId: _status.sessionId,
-            mediaId: _status.mediaId,
-            state: _status.state,
-            position: position,
-            duration: _status.duration,
-            volume: _status.volume,
-            rate: _status.rate,
-          );
-        } else if (command == HawCastControlCommand.volume && volume != null) {
-          _status = HawCastStatus(
-            sessionId: _status.sessionId,
-            mediaId: _status.mediaId,
-            state: _status.state,
-            position: _status.position,
-            duration: _status.duration,
-            volume: volume,
-            rate: _status.rate,
-          );
-        }
-        notifyListeners();
+        _applyOptimisticControl(
+          command,
+          position: position,
+          rate: rate,
+          volume: volume,
+        );
       }
       return ok;
     } catch (_) {
@@ -384,12 +361,43 @@ class HawCastService extends ChangeNotifier {
     }
   }
 
+  void _applyOptimisticControl(
+    HawCastControlCommand command, {
+    double? position,
+    double? rate,
+    double? volume,
+  }) {
+    _status = HawCastStatus(
+      sessionId: _status.sessionId,
+      mediaId: _status.mediaId,
+      state: switch (command) {
+        HawCastControlCommand.play => HawCastPlayState.playing,
+        HawCastControlCommand.pause => HawCastPlayState.paused,
+        _ => _status.state,
+      },
+      position: (command == HawCastControlCommand.seek && position != null)
+          ? position
+          : _status.position,
+      duration: _status.duration,
+      volume: (command == HawCastControlCommand.volume && volume != null)
+          ? volume
+          : _status.volume,
+      rate: (command == HawCastControlCommand.rate && rate != null)
+          ? rate
+          : _status.rate,
+    );
+    notifyListeners();
+  }
+
   Future<void> stopCasting({bool notifyRemote = true}) async {
     _statusTimer?.cancel();
     _statusTimer = null;
-    if (notifyRemote && _activeDevice != null && _casting) {
+    if (_mode == CastProtocolMode.airplay) {
+      await _airPlay.stop();
+    } else if (notifyRemote && _activeDevice != null && _casting) {
       await sendControl(HawCastControlCommand.stop);
     }
+    _mode = CastProtocolMode.none;
     _casting = false;
     _activeDevice = null;
     _activeSessionId = '';
@@ -406,7 +414,7 @@ class HawCastService extends ChangeNotifier {
 
   Future<void> _pollStatus() async {
     final device = _activeDevice;
-    if (device == null || !_casting) return;
+    if (device == null || !_casting || _mode != CastProtocolMode.haw) return;
     try {
       final uri = Uri.parse('${device.baseUrl}/thl/status');
       final response = await _client.get(uri).timeout(

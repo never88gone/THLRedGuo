@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:THLRedLook/core/cast/haw_cast_models.dart';
 import 'package:THLRedLook/core/cast/haw_cast_service.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/views/player/haw_cast_sheet_cards.dart';
 
 Future<bool> showHawCastSheet(
   BuildContext context, {
   required Future<bool> Function(HawCastDevice device) onCastToDevice,
+  Future<bool> Function()? onStartAirPlay,
   VoidCallback? onDisconnect,
 }) async {
   final result = await showModalBottomSheet<bool>(
@@ -18,6 +20,7 @@ Future<bool> showHawCastSheet(
     backgroundColor: AppColors.transparent,
     builder: (ctx) => _HawCastSheet(
       onCastToDevice: onCastToDevice,
+      onStartAirPlay: onStartAirPlay,
       onDisconnect: onDisconnect,
     ),
   );
@@ -27,10 +30,12 @@ Future<bool> showHawCastSheet(
 class _HawCastSheet extends StatefulWidget {
   const _HawCastSheet({
     required this.onCastToDevice,
+    this.onStartAirPlay,
     this.onDisconnect,
   });
 
   final Future<bool> Function(HawCastDevice device) onCastToDevice;
+  final Future<bool> Function()? onStartAirPlay;
   final VoidCallback? onDisconnect;
 
   @override
@@ -94,6 +99,25 @@ class _HawCastSheetState extends State<_HawCastSheet> {
       return;
     }
     await _connectDevice(device);
+  }
+
+  Future<void> _triggerAirPlay() async {
+    final fn = widget.onStartAirPlay;
+    if (fn == null || _probing || _connectingId != null) return;
+    setState(() {
+      _probing = true;
+      _errorMessage = null;
+    });
+    final ok = await fn();
+    if (!mounted) return;
+    setState(() => _probing = false);
+    if (ok) {
+      Navigator.of(context).pop(false);
+    } else {
+      setState(() {
+        _errorMessage = '无法准备 AirPlay 视频流，请确认当前网络状态后重试';
+      });
+    }
   }
 
   @override
@@ -197,6 +221,14 @@ class _HawCastSheetState extends State<_HawCastSheet> {
                   ),
                 ),
               ),
+              if (_service.isAirPlaySupported && widget.onStartAirPlay != null)
+                HawCastAirPlayCard(
+                  cardBg: cardBg,
+                  borderColor: borderColor,
+                  onTap: (_probing || _connectingId != null)
+                      ? null
+                      : _triggerAirPlay,
+                ),
               if (_errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -260,102 +292,15 @@ class _HawCastSheetState extends State<_HawCastSheet> {
                         separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final device = devices[index];
-                          final isConnected = _service.isCasting && activeId == device.id;
-                          final isBusy = _connectingId == device.id;
-
-                          return Material(
-                            color: cardBg,
-                            borderRadius: BorderRadius.circular(12),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: _connectingId != null
-                                  ? null
-                                  : () => _connectDevice(device),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isConnected
-                                        ? AppColors.hongguoRed
-                                        : borderColor,
-                                    width: isConnected ? 1.4 : 0.8,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: isConnected
-                                            ? AppColors.hongguoRedWithAlpha(0.15)
-                                            : colors.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Icon(
-                                        Icons.tv_rounded,
-                                        color: isConnected
-                                            ? AppColors.hongguoRed
-                                            : colors.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            device.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 14.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: colors.onSurface,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            '${device.address} · ${device.supportsEncrypted ? '支持解密播放' : '在线直连'}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: colors.onSurfaceVariant,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (isBusy)
-                                      const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: AppColors.hongguoRed,
-                                        ),
-                                      )
-                                    else if (isConnected)
-                                      const Text(
-                                        '投屏中',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.hongguoRed,
-                                        ),
-                                      )
-                                    else
-                                      Icon(
-                                        Icons.chevron_right_rounded,
-                                        color: colors.onSurfaceVariant,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          return HawCastDeviceCard(
+                            device: device,
+                            cardBg: cardBg,
+                            borderColor: borderColor,
+                            isConnected: _service.isCasting && activeId == device.id,
+                            isBusy: _connectingId == device.id,
+                            onTap: _connectingId != null
+                                ? null
+                                : () => _connectDevice(device),
                           );
                         },
                       ),

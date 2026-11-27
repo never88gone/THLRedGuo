@@ -1,3 +1,9 @@
+enum CastProtocolMode {
+  none,
+  haw,
+  airplay,
+}
+
 class HawCastDevice {
   const HawCastDevice({
     required this.id,

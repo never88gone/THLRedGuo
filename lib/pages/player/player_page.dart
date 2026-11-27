@@ -54,6 +54,7 @@ import 'package:THLRedLook/views/comment/comment_sheet_view.dart';
 import 'package:THLRedLook/utils/player/player_dialog_helper.dart';
 import 'package:THLRedLook/core/player/playback_lease.dart';
 import 'package:THLRedLook/views/feed/feed_player_overlay.dart';
+import 'package:THLRedLook/core/cast/haw_cast_models.dart';
 import 'package:THLRedLook/core/cast/haw_cast_player_helper.dart';
 import 'package:THLRedLook/core/cast/haw_cast_service.dart';
 import 'package:THLRedLook/views/player/haw_cast_overlay.dart';
@@ -247,7 +248,11 @@ class PlayerScreenState extends State<PlayerScreen>
     _danmaku = DanmakuController(widget.repository)
       ..setEnabled(_danmakuEnabled);
     widget.store.addListener(_accessChanged);
-    HawCastService.instance.addListener(_onCastServiceChanged);
+    final castService = HawCastService.instance;
+    castService.addListener(_onCastServiceChanged);
+    castService.onExternalCastActivated = _handleExternalCastActivated;
+    castService.onExternalCastStopped = _handleExternalCastStopped;
+    castService.onExternalCastEnded = _handleExternalCastEnded;
     _player =
         widget.playerFactory?.call() ??
         ((Platform.isAndroid || Platform.isIOS)
@@ -969,6 +974,29 @@ class PlayerScreenState extends State<PlayerScreen>
     }
   }
 
+  void _handleExternalCastActivated() {
+    if (!mounted || _closed) return;
+    _playIntent = false;
+    unawaited(_player.pause());
+    unawaited(_saveProgress(flush: true));
+    setState(() {});
+  }
+
+  void _handleExternalCastStopped(double resumePos) {
+    if (!mounted || _closed) return;
+    setState(() => _playIntent = true);
+    unawaited(_play(_index, position: resumePos));
+  }
+
+  void _handleExternalCastEnded(int episodeIndex) {
+    if (!mounted || _closed) return;
+    if (_autoAdvance &&
+        episodeIndex == _index &&
+        _index + 1 < _detail.episodes.length) {
+      unawaited(_play(_index + 1));
+    }
+  }
+
   Future<void> _openCast() async {
     if (_panelOpen || _closed || _loading || widget.feed) return;
     _interactions.cancel();
@@ -1003,6 +1031,29 @@ class PlayerScreenState extends State<PlayerScreen>
           }
           return ok;
         },
+        onStartAirPlay: HawCastService.instance.isAirPlaySupported
+            ? () async {
+                final index = _index;
+                final plan = await HawCastPlayerHelper.resolveAirPlayPlan(
+                  drama: _detail.drama,
+                  episode: _detail.episodes[index],
+                  currentPlan: _plan,
+                  encryptedPlayback: _encryptedPlayback,
+                  repository: widget.repository,
+                  requestedQuality: _requestedQuality,
+                );
+                if (plan == null) return false;
+                _plan ??= plan;
+                return HawCastService.instance.startAirPlayCast(
+                  plan: plan,
+                  title: '第 ${_detail.episodes[index].number} 集',
+                  dramaTitle: _detail.drama.title,
+                  episodeIndex: index,
+                  startPosition: _currentPosition,
+                  rate: _speed,
+                );
+              }
+            : null,
         onDisconnect: () {
           unawaited(_stopCast());
         },
@@ -1489,6 +1540,41 @@ class PlayerScreenState extends State<PlayerScreen>
               online: _forceOnline,
             );
       if (prepared == null) {
+        return;
+      }
+      if (_castingActive &&
+          HawCastService.instance.mode == CastProtocolMode.airplay) {
+        final airPlayPlan = await HawCastPlayerHelper.resolveAirPlayPlan(
+          drama: _detail.drama,
+          episode: _detail.episodes[index],
+          currentPlan: prepared,
+          encryptedPlayback: _encryptedPlayback,
+          repository: widget.repository,
+          requestedQuality: _requestedQuality,
+        );
+        if (airPlayPlan == null) {
+          throw AppFailure('当前剧集暂无可用的 AirPlay 投屏地址');
+        }
+        final ok = await HawCastService.instance.replaceAirPlayEpisode(
+          plan: airPlayPlan,
+          title: '第 ${_detail.episodes[index].number} 集',
+          dramaTitle: _detail.drama.title,
+          episodeIndex: index,
+          startPosition: position > 0 ? position : 0.0,
+          rate: _speed,
+        );
+        if (!ok) {
+          throw AppFailure('切换下一集 AirPlay 视频失败');
+        }
+        if (_closed || ticket != _generation) return;
+        _plan = airPlayPlan;
+        _openedIndex = index;
+        if (mounted) {
+          setState(() => _loading = false);
+          _danmaku.setPlan(airPlayPlan);
+          _syncDanmaku();
+          _menuRevision.value++;
+        }
         return;
       }
       if (_castingActive && HawCastService.instance.activeDevice != null) {
@@ -2237,7 +2323,11 @@ class PlayerScreenState extends State<PlayerScreen>
       PipManager.instance.retainPlaybackResource(_encryptedPlayback.close);
     }
     _closed = true;
-    HawCastService.instance.removeListener(_onCastServiceChanged);
+    final castService = HawCastService.instance;
+    castService.removeListener(_onCastServiceChanged);
+    castService.onExternalCastActivated = null;
+    castService.onExternalCastStopped = null;
+    castService.onExternalCastEnded = null;
     _syncNativePictureInPictureConfig(force: true);
     if (_player is LunaExoPlayer) {
       _player.prepareForDispose();
