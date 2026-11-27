@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/models/comment/comment_model.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/emoji/emoji_helper.dart';
 import 'package:THLRedLook/views/comment/comment_item_tile.dart';
 import 'package:THLRedLook/views/comment/expandable_comment_text.dart';
 
@@ -69,11 +70,13 @@ class CommentReplyItemTile extends StatelessWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              reply.userName,
-                              style: const TextStyle(
-                                color: AppColors.white70,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
+                              EmojiHelper.emojify(reply.userName),
+                              style: EmojiHelper.withEmojiFont(
+                                const TextStyle(
+                                  color: AppColors.white70,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -92,10 +95,12 @@ class CommentReplyItemTile extends StatelessWidget {
                             ),
                             Flexible(
                               child: Text(
-                                reply.replyToUserName,
-                                style: const TextStyle(
-                                  color: AppColors.white60,
-                                  fontSize: 12.5,
+                                EmojiHelper.emojify(reply.replyToUserName),
+                                style: EmojiHelper.withEmojiFont(
+                                  const TextStyle(
+                                    color: AppColors.white60,
+                                    fontSize: 13.5,
+                                  ),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -134,8 +139,8 @@ class CommentReplyItemTile extends StatelessWidget {
                   maxLines: 3,
                   style: const TextStyle(
                     color: AppColors.white,
-                    fontSize: 14,
-                    height: 1.4,
+                    fontSize: 15,
+                    height: 1.45,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -143,7 +148,7 @@ class CommentReplyItemTile extends StatelessWidget {
                   CommentItemTile.formatTime(reply.createTime),
                   style: const TextStyle(
                     color: AppColors.white38,
-                    fontSize: 11.5,
+                    fontSize: 12,
                   ),
                 ),
               ],

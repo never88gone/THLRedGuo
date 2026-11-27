@@ -6,21 +6,21 @@ struct TVCommentReplyRowCard: View {
     let isFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 10) {
-                TVCommentAvatarView(url: reply.userAvatar, name: reply.userName, size: 30)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                TVCommentAvatarView(url: reply.userAvatar, name: reply.userName, size: 40)
 
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text(reply.userName)
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundColor(isFocused ? TVColors.white : TVColors.textPrimary)
 
                     if !reply.replyToUserName.isEmpty {
                         Text("▶")
-                            .font(.system(size: 10))
+                            .font(.system(size: 16))
                             .foregroundColor(TVColors.textSecondary)
                         Text(reply.replyToUserName)
-                            .font(.system(size: 14))
+                            .font(.system(size: 22))
                             .foregroundColor(TVColors.textSecondary)
                     }
                 }
@@ -28,28 +28,29 @@ struct TVCommentReplyRowCard: View {
                 Spacer()
 
                 if reply.diggCount > 0 {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Image(systemName: "heart.fill")
-                            .font(.caption2)
+                            .font(.system(size: 19))
                             .foregroundColor(TVColors.activeRed)
                         Text(TVCommentAvatarView.formatNumber(reply.diggCount))
-                            .font(.caption2)
+                            .font(.system(size: 19))
                             .foregroundColor(TVColors.textSecondary)
                     }
                 }
             }
 
             Text(reply.text)
-                .font(.system(size: 14))
+                .font(.system(size: 24))
+                .lineSpacing(4)
                 .foregroundColor(isFocused ? TVColors.white : TVColors.white.opacity(0.90))
-                .lineLimit(4)
+                .lineLimit(5)
                 .multilineTextAlignment(.leading)
 
             Text(TVCommentAvatarView.formatTimestamp(reply.createTime))
-                .font(.caption2)
+                .font(.system(size: 18))
                 .foregroundColor(TVColors.textSecondary)
         }
-        .padding(14)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

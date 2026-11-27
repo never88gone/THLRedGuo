@@ -6,54 +6,55 @@ struct TVCommentRowCard: View {
     let isFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 12) {
-                TVCommentAvatarView(url: comment.userAvatar, name: comment.userName, size: 36)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 14) {
+                TVCommentAvatarView(url: comment.userAvatar, name: comment.userName, size: 46)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(comment.userName)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 24, weight: .bold))
                         .foregroundColor(isFocused ? TVColors.white : TVColors.textPrimary)
                     Text(TVCommentAvatarView.formatTimestamp(comment.createTime))
-                        .font(.caption2)
+                        .font(.system(size: 19))
                         .foregroundColor(TVColors.textSecondary)
                 }
 
                 Spacer()
 
                 if comment.diggCount > 0 {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Image(systemName: "heart.fill")
-                            .font(.caption2)
+                            .font(.system(size: 20))
                             .foregroundColor(TVColors.activeRed)
                         Text(TVCommentAvatarView.formatNumber(comment.diggCount))
-                            .font(.caption2)
+                            .font(.system(size: 20))
                             .foregroundColor(TVColors.textSecondary)
                     }
                 }
             }
 
             Text(comment.text)
-                .font(.system(size: 15))
+                .font(.system(size: 26))
+                .lineSpacing(4)
                 .foregroundColor(isFocused ? TVColors.white : TVColors.white.opacity(0.92))
-                .lineLimit(3)
+                .lineLimit(4)
                 .multilineTextAlignment(.leading)
 
             if comment.replyCount > 0 {
                 HStack {
                     Text("\(comment.replyCount) 条回复 >")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundColor(TVColors.activeRed)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
                         .background(TVColors.activeRed.opacity(0.14))
-                        .cornerRadius(8)
+                        .cornerRadius(10)
                     Spacer()
                 }
                 .padding(.top, 2)
             }
         }
-        .padding(16)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

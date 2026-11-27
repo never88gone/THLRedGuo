@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/models/comment/comment_model.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/emoji/emoji_helper.dart';
 import 'package:THLRedLook/views/comment/expandable_comment_text.dart';
 
 /// 单条一级评论列表卡片
@@ -88,11 +89,13 @@ class CommentItemTile extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          comment.userName,
-                          style: const TextStyle(
-                            color: AppColors.white70,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                          EmojiHelper.emojify(comment.userName),
+                          style: EmojiHelper.withEmojiFont(
+                            const TextStyle(
+                              color: AppColors.white70,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -127,22 +130,24 @@ class CommentItemTile extends StatelessWidget {
                     maxLines: 3,
                     style: const TextStyle(
                       color: AppColors.white,
-                      fontSize: 14.5,
-                      height: 1.4,
+                      fontSize: 15.5,
+                      height: 1.45,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         formatTime(comment.createTime),
                         style: const TextStyle(
                           color: AppColors.white38,
-                          fontSize: 12,
+                          fontSize: 12.5,
                         ),
                       ),
-                      if (comment.replyCount > 0) ...[
-                        const SizedBox(width: 12),
+                      if (comment.replyCount > 0)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -156,12 +161,11 @@ class CommentItemTile extends StatelessWidget {
                             '${comment.replyCount} 条回复 >',
                             style: const TextStyle(
                               color: AppColors.hongguoRed,
-                              fontSize: 11.5,
+                              fontSize: 12.5,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],

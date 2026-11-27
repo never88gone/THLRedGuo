@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/models/comment/comment_model.dart';
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/emoji/emoji_helper.dart';
 import 'package:THLRedLook/views/comment/comment_item_tile.dart';
 import 'package:THLRedLook/views/comment/comment_reply_item_tile.dart';
 import 'package:THLRedLook/views/comment/expandable_comment_text.dart';
@@ -154,11 +155,13 @@ class CommentReplySheetView extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          mainComment.userName,
-                          style: const TextStyle(
-                            color: AppColors.white70,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                          EmojiHelper.emojify(mainComment.userName),
+                          style: EmojiHelper.withEmojiFont(
+                            const TextStyle(
+                              color: AppColors.white70,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 5),
@@ -167,8 +170,8 @@ class CommentReplySheetView extends StatelessWidget {
                           maxLines: 3,
                           style: const TextStyle(
                             color: AppColors.white,
-                            fontSize: 14,
-                            height: 1.4,
+                            fontSize: 15.5,
+                            height: 1.45,
                           ),
                         ),
                         const SizedBox(height: 6),

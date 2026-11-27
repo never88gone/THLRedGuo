@@ -54,7 +54,7 @@ public struct TVCommentDrawer: View {
                         onRetry: { selectComment(mainComment) },
                         onLoadMore: { loadMoreReplies() }
                     )
-                    .frame(width: 620)
+                    .frame(width: 660)
                     .frame(maxHeight: .infinity)
                     .background(TVColors.drawerBackground.opacity(0.98))
                     .overlay(
@@ -67,7 +67,7 @@ public struct TVCommentDrawer: View {
                 }
 
                 commentListPanel()
-                    .frame(width: 680)
+                    .frame(width: 720)
                     .frame(maxHeight: .infinity)
                     .background(TVColors.drawerBackground)
             }
@@ -113,10 +113,10 @@ public struct TVCommentDrawer: View {
                 }
                 Spacer()
                 Text("按 Menu 返回")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 20, weight: .medium))
                     .foregroundColor(TVColors.textSecondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 9)
                     .background(TVColors.white.opacity(0.08))
                     .clipShape(Capsule())
             }

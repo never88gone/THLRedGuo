@@ -37,6 +37,7 @@ dependencies:
   mobile_scanner: ^7.5.0
   gal: ^2.3.3
   flutter_inappwebview: 6.1.5
+  flutter_emoji: ^2.5.1
 
 dev_dependencies:
   flutter_test:

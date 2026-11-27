@@ -17,13 +17,14 @@ struct TVCommentReplyPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Button(action: onClose) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "chevron.right")
+                            .font(.system(size: 20, weight: .bold))
                         Text("收起回复")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.system(size: 22, weight: .bold))
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
                 }
                 .buttonStyle(TvButtonStyle(variant: .plain, cornerRadius: 18, isFocused: focusedTarget == .closeRepliesButton))
                 .focused($focusedTarget, equals: .closeRepliesButton)
@@ -49,36 +50,37 @@ struct TVCommentReplyPanel: View {
             Divider()
                 .background(TVColors.borderSubtle)
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) {
-                    TVCommentAvatarView(url: mainComment.userAvatar, name: mainComment.userName, size: 34)
-                    VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    TVCommentAvatarView(url: mainComment.userAvatar, name: mainComment.userName, size: 44)
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(mainComment.userName)
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.system(size: 23, weight: .bold))
                             .foregroundColor(TVColors.textPrimary)
                         Text(TVCommentAvatarView.formatTimestamp(mainComment.createTime))
-                            .font(.caption2)
+                            .font(.system(size: 19))
                             .foregroundColor(TVColors.textSecondary)
                     }
                     Spacer()
                     if mainComment.diggCount > 0 {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 6) {
                             Image(systemName: "heart.fill")
-                                .font(.caption2)
+                                .font(.system(size: 19))
                                 .foregroundColor(TVColors.activeRed)
                             Text(TVCommentAvatarView.formatNumber(mainComment.diggCount))
-                                .font(.caption2)
+                                .font(.system(size: 19))
                                 .foregroundColor(TVColors.textSecondary)
                         }
                     }
                 }
 
                 Text(mainComment.text)
-                    .font(.system(size: 15))
+                    .font(.system(size: 24))
+                    .lineSpacing(4)
                     .foregroundColor(TVColors.textPrimary)
-                    .lineLimit(3)
+                    .lineLimit(4)
             }
-            .padding(16)
+            .padding(20)
             .background(TVColors.white.opacity(0.06))
             .cornerRadius(12)
             .padding(.horizontal, 24)

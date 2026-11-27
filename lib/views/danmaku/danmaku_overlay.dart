@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/emoji/emoji_helper.dart';
 import 'package:THLRedLook/core/danmaku/danmaku_controller.dart';
 import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
 
@@ -57,7 +58,8 @@ List<DanmakuFlight> planDanmaku(
         maxConcurrent) {
       continue;
     }
-    final runes = item.text.runes;
+    final emojified = EmojiHelper.emojify(item.text);
+    final runes = emojified.runes;
     final text =
         String.fromCharCodes(runes.take(100)) + (runes.length > 100 ? '…' : '');
     final size = measure(text).ceilToDouble() + 8;
@@ -159,18 +161,20 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
           final maxRows = width > 800 ? 5 : 8;
           final rows = ((height * widget.style.displayArea - 8) / rowHeight).floor().clamp(0, maxRows);
           final opacity = widget.style.opacity.clamp(0.1, 1.0);
-          final style = TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-            color: AppColors.white.withValues(alpha: opacity),
-            height: 1.2,
-            shadows: [
-              Shadow(
-                color: AppColors.black.withValues(alpha: opacity * 0.85),
-                blurRadius: width > 800 ? 0 : 2,
-                offset: const Offset(1, 1),
-              ),
-            ],
+          final style = EmojiHelper.withEmojiFont(
+            TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w600,
+              color: AppColors.white.withValues(alpha: opacity),
+              height: 1.2,
+              shadows: [
+                Shadow(
+                  color: AppColors.black.withValues(alpha: opacity * 0.85),
+                  blurRadius: width > 800 ? 0 : 2,
+                  offset: const Offset(1, 1),
+                ),
+              ],
+            ),
           );
           return Center(
             child: SizedBox(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:THLRedLook/utils/theme/app_colors.dart';
+import 'package:THLRedLook/utils/emoji/emoji_helper.dart';
 
 /// 支持超过 maxLines（默认 3 行）折叠与展开收起的多行评论文本组件
 class ExpandableCommentText extends StatefulWidget {
@@ -32,26 +33,29 @@ class _ExpandableCommentTextState extends State<ExpandableCommentText> {
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = widget.style ??
-        const TextStyle(
-          color: AppColors.white,
-          fontSize: 14,
-          height: 1.4,
-        );
+    final textStyle = EmojiHelper.withEmojiFont(
+      widget.style ??
+          const TextStyle(
+            color: AppColors.white,
+            fontSize: 14,
+            height: 1.4,
+          ),
+    );
+    final displayText = EmojiHelper.emojify(widget.text);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
         if (!maxWidth.isFinite || maxWidth <= 0) {
           return Text(
-            widget.text,
+            displayText,
             style: textStyle,
             maxLines: _expanded ? null : widget.maxLines,
             overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
           );
         }
 
-        final span = TextSpan(text: widget.text, style: textStyle);
+        final span = TextSpan(text: displayText, style: textStyle);
         final tp = TextPainter(
           text: span,
           maxLines: widget.maxLines,
@@ -62,7 +66,7 @@ class _ExpandableCommentTextState extends State<ExpandableCommentText> {
 
         if (!isExceeded) {
           return Text(
-            widget.text,
+            displayText,
             style: textStyle,
           );
         }
@@ -72,7 +76,7 @@ class _ExpandableCommentTextState extends State<ExpandableCommentText> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              widget.text,
+              displayText,
               style: textStyle,
               maxLines: _expanded ? null : widget.maxLines,
               overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
