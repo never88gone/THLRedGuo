@@ -1850,14 +1850,23 @@ class PlayerScreenState extends State<PlayerScreen>
     );
   }
 
+  bool get _isTablet {
+    if (!_mobile) return false;
+    if (AppLayout.isPad(context)) return true;
+    final size = MediaQuery.maybeSizeOf(context);
+    return defaultTargetPlatform == TargetPlatform.iOS &&
+        size != null &&
+        size.shortestSide >= 700;
+  }
+
   bool get _showFullscreen =>
       !widget.feed &&
       (_television ||
           _fullscreen ||
           (_mobile &&
               !_automaticFullscreenSuppressed &&
-              _aspectRatio >= 1 &&
-              MediaQuery.orientationOf(context) == Orientation.landscape));
+              MediaQuery.orientationOf(context) == Orientation.landscape &&
+              (_aspectRatio >= 1 || _isTablet)));
 
   Future<void> _rotate() async {
     if (_rotating || _television) {
@@ -1876,7 +1885,7 @@ class PlayerScreenState extends State<PlayerScreen>
       if (Platform.isWindows) {
         await windowManager.setFullScreen(fullscreen);
       } else if (_mobile) {
-        if (!AppDevice.isPadDevice) {
+        if (!AppDevice.isPadDevice && !_isTablet) {
           await (_orientationController?.setPlayback(
                 this,
                 fullscreen: fullscreen,
@@ -2532,6 +2541,7 @@ class PlayerScreenState extends State<PlayerScreen>
                                   currentDramaId: _detail.drama.id,
                                   onSeasonSelected: _switchSeason,
                                   onSelectEpisode: (index) => _play(index),
+                                  onFullscreen: _rotate,
                                 ),
                               ),
                             ],
