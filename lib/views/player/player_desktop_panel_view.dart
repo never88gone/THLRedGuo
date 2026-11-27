@@ -16,6 +16,7 @@ class PlayerDesktopPanelView extends StatelessWidget {
     this.seriesEntries = const [],
     this.currentDramaId,
     this.onSeasonSelected,
+    this.onFullscreen,
   });
 
   final List<Episode> episodes;
@@ -25,6 +26,7 @@ class PlayerDesktopPanelView extends StatelessWidget {
   final List<HongguoSeriesEntry> seriesEntries;
   final String? currentDramaId;
   final ValueChanged<Drama>? onSeasonSelected;
+  final VoidCallback? onFullscreen;
 
   Widget _buildSeriesBar(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -132,6 +134,47 @@ class PlayerDesktopPanelView extends StatelessWidget {
     );
   }
 
+  Widget _buildPanelHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topPadding = MediaQuery.paddingOf(context).top;
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, topPadding > 0 ? topPadding + 4 : 8, 8, 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '剧集列表',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              ),
+            ),
+          ),
+          TextButton.icon(
+            key: const ValueKey('panel-enter-fullscreen'),
+            onPressed: onFullscreen,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.hongguoRed,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: const Size(0, 30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.fullscreen_rounded, size: 18),
+            label: const Text('全屏观看', style: TextStyle(fontSize: 12.5)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
@@ -139,6 +182,7 @@ class PlayerDesktopPanelView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (onFullscreen != null) _buildPanelHeader(context),
           if (seriesEntries.isNotEmpty) _buildSeriesBar(context),
           Expanded(
             child: PlayerEpisodeGrid(

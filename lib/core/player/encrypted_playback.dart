@@ -29,8 +29,21 @@ class EncryptedPlayback {
   final Future<Directory> Function() _temporaryDirectory;
   IosEncryptedStream? _stream;
   PlaybackPlan? _streamOriginal;
+  PlaybackPlan? _lastOnlinePlan;
   String? _streamUrl;
   bool isStreamPlan(PlaybackPlan plan) => _streamUrl == plan.url;
+
+  PlaybackPlan? originalOnlinePlan(PlaybackPlan current) {
+    if (isStreamPlan(current) && _streamOriginal != null) {
+      return _streamOriginal;
+    }
+    if (!current.local &&
+        current.url.startsWith('http') &&
+        !current.url.contains('127.0.0.1')) {
+      return current;
+    }
+    return _lastOnlinePlan;
+  }
 
   HttpClient? _client;
   Directory? _ready;
@@ -54,6 +67,11 @@ class EncryptedPlayback {
     bool forceCache = false,
   }) async {
     if (isStreamPlan(plan) && _streamOriginal != null) plan = _streamOriginal!;
+    _lastOnlinePlan = (!plan.local &&
+            plan.url.startsWith('http') &&
+            !plan.url.contains('127.0.0.1'))
+        ? plan
+        : null;
     final generation = ++_generation;
     final previous = _tail;
     final finished = Completer<void>();

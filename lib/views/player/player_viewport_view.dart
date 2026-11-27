@@ -85,6 +85,9 @@ class PlayerViewportView extends StatelessWidget {
     this.onDanmakuSettings,
     required this.onRetryDanmaku,
     required this.onPushToDevice,
+    this.onCast,
+    this.casting = false,
+    this.castOverlay,
     required this.onEnterPictureInPicture,
     this.onRestorePictureInPicture,
     required this.onTelevisionEpisodes,
@@ -160,6 +163,9 @@ class PlayerViewportView extends StatelessWidget {
   final Future<void> Function()? onDanmakuSettings;
   final Future<void> Function() onRetryDanmaku;
   final Future<void> Function()? onPushToDevice;
+  final Future<void> Function()? onCast;
+  final bool casting;
+  final Widget? castOverlay;
   final Future<void> Function()? onEnterPictureInPicture;
   final Future<void> Function()? onRestorePictureInPicture;
   final Future<void> Function(BuildContext) onTelevisionEpisodes;
@@ -249,6 +255,8 @@ class PlayerViewportView extends StatelessWidget {
                 : null,
             onRetryDanmaku: danmaku.canRetry ? onRetryDanmaku : null,
             onPush: isMediaIdNull ? onPushToDevice : null,
+            onCast: onCast,
+            casting: casting,
             onPictureInPicture: canUsePictureInPicture
                 ? onEnterPictureInPicture
                 : null,
@@ -326,6 +334,12 @@ class PlayerViewportView extends StatelessWidget {
                           fit: videoFit,
                           controls: (_) => layeredControls,
                         ),
+                      if (casting &&
+                          castOverlay != null &&
+                          !hideOverlayForPictureInPicture &&
+                          !loading &&
+                          error == null)
+                        Positioned.fill(child: castOverlay!),
                       if (loading && !hideOverlayForPictureInPicture)
                         PlayerLoadingOverlayView(
                           drama: detail.drama,

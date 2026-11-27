@@ -47,5 +47,10 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>用于局域网设备互联，以及在用户确认后加密接收手机授权的红果登录会话。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_zgj-link._tcp</string>
+		<string>_thl-cast._tcp</string>
+	</array>
 </dict>
 </plist>

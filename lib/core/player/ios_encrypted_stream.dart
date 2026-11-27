@@ -15,13 +15,71 @@ class IosEncryptedStream {
   String? _id;
   String? _url;
   bool _closed = false;
+  bool _allowLan = false;
   Future<void>? _closeFuture;
   int _length = 0;
 
   String? get url => _url;
 
-  Future<PlaybackPlan> open(PlaybackPlan plan) async {
+  static Future<String?> findLanIpv4() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLoopback: false,
+      );
+      String? fallbackPrivate;
+      for (final iface in interfaces) {
+        final name = iface.name.toLowerCase();
+        for (final addr in iface.addresses) {
+          final ip = addr.address;
+          if (!_isPrivateIpv4(ip)) continue;
+          if (name.startsWith('en') || name.startsWith('wlan')) {
+            return ip;
+          }
+          fallbackPrivate ??= ip;
+        }
+      }
+      return fallbackPrivate;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _isPrivateIpv4(String ip) {
+    if (ip.startsWith('192.168.') || ip.startsWith('10.')) return true;
+    if (ip.startsWith('172.')) {
+      final parts = ip.split('.');
+      if (parts.length >= 2) {
+        final second = int.tryParse(parts[1]) ?? -1;
+        return second >= 16 && second <= 31;
+      }
+    }
+    return false;
+  }
+
+  bool _isAllowedRemote(InternetAddress? addr) {
+    if (addr == null) return false;
+    if (addr.isLoopback) return true;
+    if (!_allowLan) return false;
+    return _isPrivateIpv4(addr.address);
+  }
+
+  Future<PlaybackPlan> open(PlaybackPlan plan) => openWithOptions(plan);
+
+  Future<PlaybackPlan> openWithOptions(
+    PlaybackPlan plan, {
+    bool allowLan = false,
+  }) async {
     if (_closed || _id != null) throw StateError('播放通道已关闭');
+    _allowLan = allowLan;
+    String host = '127.0.0.1';
+    if (allowLan) {
+      final lanIp = await findLanIpv4();
+      if (lanIp == null || lanIp.isEmpty) {
+        throw AppFailure('未检测到局域网 Wi-Fi IP，请连接无线网络后重试', code: 'no_lan');
+      }
+      host = lanIp;
+    }
     final random = Random.secure();
     final id = List.generate(
       16,
@@ -38,7 +96,10 @@ class IosEncryptedStream {
       if (_closed) throw AppFailure('已取消播放准备', code: 'cancelled');
       _length = (metadata?['mediaBytes'] as num?)?.toInt() ?? 0;
       if (_length <= 0) throw const FormatException('媒体分段信息无效');
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final bindAddr = allowLan
+          ? InternetAddress.anyIPv4
+          : InternetAddress.loopbackIPv4;
+      final server = await HttpServer.bind(bindAddr, 0);
       if (_closed) {
         await server.close(force: true);
         throw AppFailure('已取消播放准备', code: 'cancelled');
@@ -49,7 +110,7 @@ class IosEncryptedStream {
         (request) => unawaited(_serve(request, id)),
         onError: (Object _) {},
       );
-      _url = 'http://127.0.0.1:${server.port}/$id/media.mp4';
+      _url = 'http://$host:${server.port}/$id/media.mp4';
       return PlaybackPlan(
         url: _url!,
         mediaBytes: _length,
@@ -82,7 +143,7 @@ class IosEncryptedStream {
     try {
       if (_closed ||
           request.uri.path != '/$id/media.mp4' ||
-          request.connectionInfo?.remoteAddress.isLoopback != true) {
+          !_isAllowedRemote(request.connectionInfo?.remoteAddress)) {
         response.statusCode = HttpStatus.notFound;
         await response.close();
         return;

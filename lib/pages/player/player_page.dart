@@ -54,6 +54,11 @@ import 'package:THLRedLook/views/comment/comment_sheet_view.dart';
 import 'package:THLRedLook/utils/player/player_dialog_helper.dart';
 import 'package:THLRedLook/core/player/playback_lease.dart';
 import 'package:THLRedLook/views/feed/feed_player_overlay.dart';
+import 'package:THLRedLook/core/cast/haw_cast_models.dart';
+import 'package:THLRedLook/core/cast/haw_cast_player_helper.dart';
+import 'package:THLRedLook/core/cast/haw_cast_service.dart';
+import 'package:THLRedLook/views/player/haw_cast_overlay.dart';
+import 'package:THLRedLook/views/player/haw_cast_sheet.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
@@ -203,10 +208,17 @@ class PlayerScreenState extends State<PlayerScreen>
   }
 
   String get _session => _plan?.session ?? '';
-  double get _currentPosition =>
-      _openedIndex == _index && _player.state.position.inMilliseconds > 0
-      ? _player.state.position.inMilliseconds / 1000
-      : _resumePosition;
+  bool get _castingActive => HawCastService.instance.isCasting;
+  double get _currentPosition {
+    if (_castingActive &&
+        HawCastService.instance.activeEpisodeIndex == _index &&
+        HawCastService.instance.status.position > 0) {
+      return HawCastService.instance.status.position;
+    }
+    return _openedIndex == _index && _player.state.position.inMilliseconds > 0
+        ? _player.state.position.inMilliseconds / 1000
+        : _resumePosition;
+  }
 
   @override
   void initState() {
@@ -236,6 +248,11 @@ class PlayerScreenState extends State<PlayerScreen>
     _danmaku = DanmakuController(widget.repository)
       ..setEnabled(_danmakuEnabled);
     widget.store.addListener(_accessChanged);
+    final castService = HawCastService.instance;
+    castService.addListener(_onCastServiceChanged);
+    castService.onExternalCastActivated = _handleExternalCastActivated;
+    castService.onExternalCastStopped = _handleExternalCastStopped;
+    castService.onExternalCastEnded = _handleExternalCastEnded;
     _player =
         widget.playerFactory?.call() ??
         ((Platform.isAndroid || Platform.isIOS)
@@ -951,6 +968,111 @@ class PlayerScreenState extends State<PlayerScreen>
     }
   }
 
+  void _onCastServiceChanged() {
+    if (mounted && !_closed) {
+      setState(() {});
+    }
+  }
+
+  void _handleExternalCastActivated() {
+    if (!mounted || _closed) return;
+    _playIntent = false;
+    unawaited(_player.pause());
+    unawaited(_saveProgress(flush: true));
+    setState(() {});
+  }
+
+  void _handleExternalCastStopped(double resumePos) {
+    if (!mounted || _closed) return;
+    setState(() => _playIntent = true);
+    unawaited(_play(_index, position: resumePos));
+  }
+
+  void _handleExternalCastEnded(int episodeIndex) {
+    if (!mounted || _closed) return;
+    if (_autoAdvance &&
+        episodeIndex == _index &&
+        _index + 1 < _detail.episodes.length) {
+      unawaited(_play(_index + 1));
+    }
+  }
+
+  Future<void> _openCast() async {
+    if (_panelOpen || _closed || _loading || widget.feed) return;
+    _interactions.cancel();
+    setState(() => _panelOpen = true);
+    try {
+      await showHawCastSheet(
+        context,
+        onCastToDevice: (device) async {
+          final index = _index;
+          final castPlan = await HawCastPlayerHelper.resolveCastablePlan(
+            drama: _detail.drama,
+            episode: _detail.episodes[index],
+            currentPlan: _plan,
+            encryptedPlayback: _encryptedPlayback,
+            repository: widget.repository,
+            requestedQuality: _requestedQuality,
+          );
+          if (castPlan == null) return false;
+          final req = HawCastPlayerHelper.buildPlayRequest(
+            detail: _detail,
+            episodeIndex: index,
+            plan: castPlan,
+            startPosition: _currentPosition,
+          );
+          final ok = await HawCastService.instance.startCasting(device, req);
+          if (ok && mounted && !_closed) {
+            _plan ??= castPlan;
+            _playIntent = false;
+            await _player.pause();
+            await _saveProgress(flush: true);
+            if (mounted) setState(() {});
+          }
+          return ok;
+        },
+        onStartAirPlay: HawCastService.instance.isAirPlaySupported
+            ? () async {
+                final index = _index;
+                final plan = await HawCastPlayerHelper.resolveAirPlayPlan(
+                  drama: _detail.drama,
+                  episode: _detail.episodes[index],
+                  currentPlan: _plan,
+                  encryptedPlayback: _encryptedPlayback,
+                  repository: widget.repository,
+                  requestedQuality: _requestedQuality,
+                );
+                if (plan == null) return false;
+                _plan ??= plan;
+                return HawCastService.instance.startAirPlayCast(
+                  plan: plan,
+                  title: '第 ${_detail.episodes[index].number} 集',
+                  dramaTitle: _detail.drama.title,
+                  episodeIndex: index,
+                  startPosition: _currentPosition,
+                  rate: _speed,
+                );
+              }
+            : null,
+        onDisconnect: () {
+          unawaited(_stopCast());
+        },
+      );
+    } finally {
+      if (mounted && !_closed) setState(() => _panelOpen = false);
+    }
+  }
+
+  Future<void> _stopCast() async {
+    final resumePos = HawCastService.instance.status.position;
+    await HawCastService.instance.stopCasting();
+    if (!mounted || _closed) return;
+    setState(() {
+      _playIntent = true;
+    });
+    await _play(_index, position: resumePos);
+  }
+
   DateTime _lastPreloadCheck = DateTime.fromMillisecondsSinceEpoch(0);
 
   void _syncPreload() {
@@ -1420,6 +1542,79 @@ class PlayerScreenState extends State<PlayerScreen>
       if (prepared == null) {
         return;
       }
+      if (_castingActive &&
+          HawCastService.instance.mode == CastProtocolMode.airplay) {
+        final airPlayPlan = await HawCastPlayerHelper.resolveAirPlayPlan(
+          drama: _detail.drama,
+          episode: _detail.episodes[index],
+          currentPlan: prepared,
+          encryptedPlayback: _encryptedPlayback,
+          repository: widget.repository,
+          requestedQuality: _requestedQuality,
+        );
+        if (airPlayPlan == null) {
+          throw AppFailure('当前剧集暂无可用的 AirPlay 投屏地址');
+        }
+        final ok = await HawCastService.instance.replaceAirPlayEpisode(
+          plan: airPlayPlan,
+          title: '第 ${_detail.episodes[index].number} 集',
+          dramaTitle: _detail.drama.title,
+          episodeIndex: index,
+          startPosition: position > 0 ? position : 0.0,
+          rate: _speed,
+        );
+        if (!ok) {
+          throw AppFailure('切换下一集 AirPlay 视频失败');
+        }
+        if (_closed || ticket != _generation) return;
+        _plan = airPlayPlan;
+        _openedIndex = index;
+        if (mounted) {
+          setState(() => _loading = false);
+          _danmaku.setPlan(airPlayPlan);
+          _syncDanmaku();
+          _menuRevision.value++;
+        }
+        return;
+      }
+      if (_castingActive && HawCastService.instance.activeDevice != null) {
+        final castPlan = HawCastPlayerHelper.isRemotePlayablePlan(prepared)
+            ? prepared
+            : await HawCastPlayerHelper.resolveCastablePlan(
+                drama: _detail.drama,
+                episode: _detail.episodes[index],
+                currentPlan: prepared,
+                encryptedPlayback: _encryptedPlayback,
+                repository: widget.repository,
+                requestedQuality: _requestedQuality,
+              );
+        if (castPlan == null) {
+          throw AppFailure('当前剧集暂无可用的在线投屏地址');
+        }
+        final req = HawCastPlayerHelper.buildPlayRequest(
+          detail: _detail,
+          episodeIndex: index,
+          plan: castPlan,
+          startPosition: position > 0 ? position : 0.0,
+        );
+        final ok = await HawCastService.instance.startCasting(
+          HawCastService.instance.activeDevice!,
+          req,
+        );
+        if (!ok) {
+          throw AppFailure('推送剧集至投屏设备失败，请检查设备连接');
+        }
+        if (_closed || ticket != _generation) return;
+        _plan = castPlan;
+        _openedIndex = index;
+        if (mounted) {
+          setState(() => _loading = false);
+          _danmaku.setPlan(castPlan);
+          _syncDanmaku();
+          _menuRevision.value++;
+        }
+        return;
+      }
       if (Platform.isAndroid || Platform.isIOS) {
         failureStage = 'prepare';
         prepared = await _encryptedPlayback.prepare(
@@ -1655,14 +1850,23 @@ class PlayerScreenState extends State<PlayerScreen>
     );
   }
 
+  bool get _isTablet {
+    if (!_mobile) return false;
+    if (AppLayout.isPad(context)) return true;
+    final size = MediaQuery.maybeSizeOf(context);
+    return defaultTargetPlatform == TargetPlatform.iOS &&
+        size != null &&
+        size.shortestSide >= 700;
+  }
+
   bool get _showFullscreen =>
       !widget.feed &&
       (_television ||
           _fullscreen ||
           (_mobile &&
               !_automaticFullscreenSuppressed &&
-              _aspectRatio >= 1 &&
-              MediaQuery.orientationOf(context) == Orientation.landscape));
+              MediaQuery.orientationOf(context) == Orientation.landscape &&
+              (_aspectRatio >= 1 || _isTablet)));
 
   Future<void> _rotate() async {
     if (_rotating || _television) {
@@ -1681,7 +1885,7 @@ class PlayerScreenState extends State<PlayerScreen>
       if (Platform.isWindows) {
         await windowManager.setFullScreen(fullscreen);
       } else if (_mobile) {
-        if (!AppDevice.isPadDevice) {
+        if (!AppDevice.isPadDevice && !_isTablet) {
           await (_orientationController?.setPlayback(
                 this,
                 fullscreen: fullscreen,
@@ -2128,6 +2332,11 @@ class PlayerScreenState extends State<PlayerScreen>
       PipManager.instance.retainPlaybackResource(_encryptedPlayback.close);
     }
     _closed = true;
+    final castService = HawCastService.instance;
+    castService.removeListener(_onCastServiceChanged);
+    castService.onExternalCastActivated = null;
+    castService.onExternalCastStopped = null;
+    castService.onExternalCastEnded = null;
     _syncNativePictureInPictureConfig(force: true);
     if (_player is LunaExoPlayer) {
       _player.prepareForDispose();
@@ -2279,6 +2488,18 @@ class PlayerScreenState extends State<PlayerScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                     actions: [
+                      if (!widget.feed)
+                        IconButton(
+                          key: const ValueKey('appbar-cast-button'),
+                          tooltip: _castingActive ? '正在投屏' : '投屏',
+                          onPressed: _openCast,
+                          icon: Icon(
+                            _castingActive
+                                ? Icons.cast_connected_rounded
+                                : Icons.cast_rounded,
+                            color: _castingActive ? AppColors.hongguoRed : null,
+                          ),
+                        ),
                       IconButton(
                         tooltip: '旋转与全屏',
                         onPressed: _rotate,
@@ -2320,6 +2541,7 @@ class PlayerScreenState extends State<PlayerScreen>
                                   currentDramaId: _detail.drama.id,
                                   onSeasonSelected: _switchSeason,
                                   onSelectEpisode: (index) => _play(index),
+                                  onFullscreen: _rotate,
                                 ),
                               ),
                             ],
@@ -2562,6 +2784,24 @@ class PlayerScreenState extends State<PlayerScreen>
       onDanmakuSettings: _openDanmakuSettings,
       onRetryDanmaku: _retryDanmakuFromControls,
       onPushToDevice: _pushToDevice,
+      onCast: widget.feed ? null : _openCast,
+      casting: _castingActive,
+      castOverlay: _castingActive
+          ? HawCastOverlay(
+              title:
+                  '${_detail.drama.title} · 第 ${_detail.episodes[_index].number} 集',
+              fullscreen: _showFullscreen,
+              onBack: _back,
+              onFullscreen: _rotate,
+              onSwitchDevice: _openCast,
+              onStopCast: _stopCast,
+              onEpisodes: () => _openPanel(PlayerMenuSection.episodes),
+              onPrevious: _index > 0 ? () => _play(_index - 1) : null,
+              onNext: _index + 1 < _detail.episodes.length
+                  ? () => _play(_index + 1)
+                  : null,
+            )
+          : null,
       onEnterPictureInPicture: _enterPictureInPicture,
       onRestorePictureInPicture: _restoreFromPictureInPicture,
       onTelevisionEpisodes: _televisionEpisodes,

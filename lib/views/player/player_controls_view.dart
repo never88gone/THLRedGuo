@@ -45,6 +45,8 @@ class PlayerControls extends StatefulWidget {
     this.onDanmakuSettings,
     this.onRetryDanmaku,
     this.onPush,
+    this.onCast,
+    this.casting = false,
     this.onPictureInPicture,
     this.pictureInPictureRequested = false,
     this.playbackRequested,
@@ -82,6 +84,8 @@ class PlayerControls extends StatefulWidget {
   final Future<void> Function()? onDanmakuSettings;
   final Future<void> Function()? onRetryDanmaku;
   final Future<void> Function()? onPush;
+  final Future<void> Function()? onCast;
+  final bool casting;
   final Future<void> Function()? onPictureInPicture;
   final bool pictureInPictureRequested;
   final VideoEnhancementController? enhancement;
@@ -312,6 +316,10 @@ class _PlayerControlsState extends State<PlayerControls> {
                         compact: compact,
                         onBack: widget.onBack,
                         onFullscreen: widget.onFullscreen,
+                        casting: widget.casting,
+                        onCast: widget.onCast != null
+                            ? () => _panel(widget.onCast!)
+                            : null,
                       ),
 
                       // 中央大播放/切集控制
