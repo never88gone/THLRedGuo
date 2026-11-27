@@ -39,6 +39,12 @@ class _TestDanmakuController extends DanmakuController {
     notifyListeners();
   }
 
+  void reportPosition(int value, {bool resync = false}) {
+    positionMs = value;
+    if (resync) motionRevision++;
+    notifyListeners();
+  }
+
   @override
   bool get visible => true;
 
@@ -194,6 +200,43 @@ void main() {
       final textWidget2 = tester.widget<Text>(textFinder);
       expect(textWidget2.style?.fontSize, 30.0);
       expect(textWidget2.style?.color?.a, closeTo(0.6, 0.01));
+    });
+
+    testWidgets('active danmaku ignores ordinary playback position changes',
+        (tester) async {
+      final controller = _TestDanmakuController(_FakeRepository());
+      addTearDown(controller.dispose);
+      controller.setTestState(
+        testItems: const [
+          DanmakuItem(id: 'motion', text: 'Scrolling comment', timeMs: 0),
+        ],
+        testPositionMs: 1000,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DanmakuOverlay(
+            controller: controller,
+            aspectRatio: 4 / 3,
+            style: const DanmakuStyle(),
+          ),
+        ),
+      );
+      final motion = find.byKey(const ValueKey('danmaku-motion-motion'));
+      double x() => tester.widget<Transform>(motion).transform.getTranslation().x;
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      final before = x();
+      controller.reportPosition(1300);
+      await tester.pump();
+      expect(x(), closeTo(before, 0.001));
+
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(x(), lessThan(before));
+
+      controller.reportPosition(1300, resync: true);
+      await tester.pump();
+      expect(x(), greaterThan(before));
     });
 
     test('LocalStore 正常持久化 danmakuStyle 且磁盘重载后状态保持', () async {

@@ -292,8 +292,8 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
   @override
   void didUpdateWidget(_DanmakuMotion oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Position updates admit new comments without restarting active motion.
     if (oldWidget.revision != widget.revision ||
-        oldWidget.positionMs != widget.positionMs ||
         oldWidget.width != widget.width ||
         oldWidget.flight.width != widget.flight.width ||
         oldWidget.flight.item.timeMs != widget.flight.item.timeMs ||
@@ -315,10 +315,10 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
     _motion.value = elapsed / lifetime;
     if (widget.moving && elapsed < lifetime) {
       _motion.animateTo(
-        (elapsed + 750).clamp(0, lifetime) / lifetime,
+        1,
         duration: Duration(
           microseconds:
-              ((lifetime - elapsed).clamp(1, 750) * 1000 / widget.rate)
+              ((lifetime - elapsed) * 1000 / widget.rate)
                   .round()
                   .clamp(1, 86400000000),
         ),
