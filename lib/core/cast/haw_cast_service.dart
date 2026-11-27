@@ -157,22 +157,42 @@ class HawCastService extends ChangeNotifier {
 
   String? _pickBestHost(nsd.Service service) {
     final addrs = service.addresses ?? const <InternetAddress>[];
+    String? linkLocalIpv4;
+    String? otherIpv4;
     String? fallbackIpv6;
     for (final addr in addrs) {
       if (addr.isLoopback) continue;
       if (addr.type == InternetAddressType.IPv4) {
-        return addr.address;
-      }
-      if (!addr.isLinkLocal && fallbackIpv6 == null) {
+        final ip = addr.address;
+        if (ip.startsWith('169.254.')) {
+          linkLocalIpv4 ??= ip;
+        } else if (ip.startsWith('192.168.') ||
+            ip.startsWith('10.') ||
+            _isPrivate172(ip)) {
+          return ip;
+        } else {
+          otherIpv4 ??= ip;
+        }
+      } else if (!addr.isLinkLocal && fallbackIpv6 == null) {
         fallbackIpv6 = addr.address;
       }
     }
+    if (otherIpv4 != null) return otherIpv4;
+    if (linkLocalIpv4 != null) return linkLocalIpv4;
     if (fallbackIpv6 != null) return fallbackIpv6;
     final host = service.host?.trim();
     if (host != null && host.isNotEmpty) {
       return host.endsWith('.') ? host.substring(0, host.length - 1) : host;
     }
     return null;
+  }
+
+  bool _isPrivate172(String ip) {
+    if (!ip.startsWith('172.')) return false;
+    final parts = ip.split('.');
+    if (parts.length < 2) return false;
+    final second = int.tryParse(parts[1]) ?? -1;
+    return second >= 16 && second <= 31;
   }
 
   Future<HawCastDevice?> probeManualDevice(String input) async {

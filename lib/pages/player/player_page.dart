@@ -2389,6 +2389,18 @@ class PlayerScreenState extends State<PlayerScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                     actions: [
+                      if (!widget.feed)
+                        IconButton(
+                          key: const ValueKey('appbar-cast-button'),
+                          tooltip: _castingActive ? '正在投屏' : '投屏',
+                          onPressed: _openCast,
+                          icon: Icon(
+                            _castingActive
+                                ? Icons.cast_connected_rounded
+                                : Icons.cast_rounded,
+                            color: _castingActive ? AppColors.hongguoRed : null,
+                          ),
+                        ),
                       IconButton(
                         tooltip: '旋转与全屏',
                         onPressed: _rotate,
