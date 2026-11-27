@@ -65,11 +65,26 @@ class _AccountScreenState extends State<AccountScreen> {
         service.followingCreators(offset: offset, douyinOffset: douyin),
     keyOf: (row) => row.id,
   );
+  late final reservedComing =
+      HongguoCollectionController<HongguoSubscribeItem>(
+        session: account,
+        request: (offset, _) =>
+            service.subscribedDramas(offset: offset, isOnline: false),
+        keyOf: (row) => '${row.isOnline ? "on" : "pre"}:${row.id}',
+      );
+  late final reservedOnline = HongguoCollectionController<HongguoSubscribeItem>(
+    session: account,
+    request: (offset, _) =>
+        service.subscribedDramas(offset: offset, isOnline: true),
+    keyOf: (row) => '${row.isOnline ? "on" : "pre"}:${row.id}',
+  );
   final lists = <bool, List<WatchEntry>>{};
   final errors = <bool, String>{};
   final loading = <bool>{};
   late bool history = widget.initialHistory;
   late int _accountTab = widget.initialHistory ? 1 : 0;
+  bool _reserveOnlineTab = false;
+  bool _mutatingReserve = false;
   int revision = -1;
   @override
   void initState() {
@@ -153,6 +168,8 @@ class _AccountScreenState extends State<AccountScreen> {
     widget.store.removeListener(_storeChanged);
     liked.dispose();
     anchors.dispose();
+    reservedComing.dispose();
+    reservedOnline.dispose();
     _sharedLibrary?.removeListener(_libraryChanged);
     if (widget.service == null) {
       service.dispose();
@@ -483,6 +500,7 @@ class _AccountScreenState extends State<AccountScreen> {
       if (isLogged) ...[
         (2, '点赞视频'),
         (3, '关注主播'),
+        (4, '我的预约'),
       ],
     ];
 
@@ -505,8 +523,10 @@ class _AccountScreenState extends State<AccountScreen> {
                       : widget.localLibraryBuilder(true);
                 } else if (_accountTab == 2) {
                   content = _likedVideosView();
-                } else {
+                } else if (_accountTab == 3) {
                   content = _followedAnchorsView();
+                } else {
+                  content = _reservationsView();
                 }
 
                 if (!wide) {
@@ -541,6 +561,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                   if (index == 1) _load(true);
                                   if (index == 2) liked.load();
                                   if (index == 3) anchors.load();
+                                  if (index == 4) _loadActiveReservations();
                                 },
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 200),
@@ -567,6 +588,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                   child: Text(
                                     label,
                                     maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: selected ? 12.5 : 12,
                                       fontWeight: selected
@@ -617,6 +639,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                 if (index == 1) _load(true);
                                 if (index == 2) liked.load();
                                 if (index == 3) anchors.load();
+                                if (index == 4) _loadActiveReservations();
                               },
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
@@ -686,6 +709,190 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _loadActiveReservations({bool refresh = false}) {
+    final target = _reserveOnlineTab ? reservedOnline : reservedComing;
+    target.load(refresh: refresh);
+  }
+
+  Future<void> _removeReservation(HongguoSubscribeItem row) async {
+    if (_mutatingReserve) return;
+    final online = _reserveOnlineTab;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(online ? '移除预约记录' : '取消预约'),
+        content: Text(
+          online
+              ? '确认从“已上线预约”列表中移除《${row.title}》吗？'
+              : '确认取消《${row.title}》的新剧预约吗？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('保留'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(online ? '移除' : '取消预约'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _mutatingReserve = true);
+    try {
+      if (!online) {
+        await service.setDramaSubscribed(row.drama, false);
+      } else {
+        await service.deleteSubscribedDramas([row.id], isOnline: true);
+      }
+      if (!mounted) return;
+      _loadActiveReservations(refresh: true);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(online ? '已移除预约记录' : '已取消预约')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('操作失败：$error')));
+    } finally {
+      if (mounted) setState(() => _mutatingReserve = false);
+    }
+  }
+
+  Widget _reservationsView() {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final activeController = _reserveOnlineTab
+        ? reservedOnline
+        : reservedComing;
+
+    Widget filterPill(String label, bool online, Key key) {
+      final selected = _reserveOnlineTab == online;
+      return ChoiceChip(
+        key: key,
+        label: Text(label),
+        selected: selected,
+        onSelected: (value) {
+          if (_reserveOnlineTab == online) return;
+          setState(() => _reserveOnlineTab = online);
+          _loadActiveReservations();
+        },
+        selectedColor: AppColors.hongguoRedWithAlpha(isDark ? 0.25 : 0.16),
+        side: BorderSide(
+          color: selected
+              ? AppColors.hongguoRed
+              : (isDark ? AppColors.darkBorder : scheme.outlineVariant),
+          width: 0.8,
+        ),
+        labelStyle: TextStyle(
+          fontSize: 12.5,
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+          color: selected
+              ? (isDark ? AppColors.white : AppColors.hongguoRed)
+              : scheme.onSurfaceVariant,
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: Row(
+            children: [
+              filterPill(
+                '待上线',
+                false,
+                const ValueKey('reserve-filter-upcoming'),
+              ),
+              const SizedBox(width: 8),
+              filterPill(
+                '已上线',
+                true,
+                const ValueKey('reserve-filter-online'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: HongguoCollectionView<HongguoSubscribeItem>(
+            key: ValueKey(
+              'official-reserved-${_reserveOnlineTab ? "online" : "coming"}',
+            ),
+            controller: activeController,
+            name: _reserveOnlineTab ? 'reserved-online' : 'reserved-coming',
+            title: '红果账号 · 我的预约（${_reserveOnlineTab ? '已上线' : '待上线'}）',
+            emptyMessage: _reserveOnlineTab ? '暂无已上线的预约剧集' : '暂无待上线预约剧集',
+            localItems: const [],
+            itemKey: (row) => '${row.isOnline ? "on" : "pre"}:${row.id}',
+            sliver: (context, rows) => SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) {
+                  return SliverGrid(
+                    gridDelegate: compactDramaGridDelegate(
+                      context,
+                      constraints.crossAxisExtent,
+                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final row = rows[index];
+                      final drama = row.drama;
+                      final rowKey = '${row.isOnline ? "on" : "pre"}:${row.id}';
+                      return Stack(
+                        children: [
+                          GestureDetector(
+                            onLongPress: () => _removeReservation(row),
+                            child: DramaTile(
+                              key: ValueKey('account-reserved-$rowKey'),
+                              heroTag: 'account-reserved-cover-$rowKey',
+                              drama: drama,
+                              repository: widget.repository,
+                              subtitle: row.subtitle.isNotEmpty
+                                  ? row.subtitle
+                                  : (drama.onlineDate.isNotEmpty
+                                        ? '预计 ${drama.onlineDate}'
+                                        : drama.releaseLabel),
+                              compact: true,
+                              onTap: () => widget.onOpen(drama),
+                            ),
+                          ),
+                          Positioned(
+                            top: 6,
+                            right: 6,
+                            child: Material(
+                              color: Colors.black54,
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                key: ValueKey('remove-reserve-$rowKey'),
+                                customBorder: const CircleBorder(),
+                                onTap: () => _removeReservation(row),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(5),
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }, childCount: rows.length),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

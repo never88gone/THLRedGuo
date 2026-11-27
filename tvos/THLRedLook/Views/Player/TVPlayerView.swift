@@ -206,6 +206,8 @@ public struct TVPlayerView: View {
                 isPlaying: viewModel.wantsPlayback,
                 playbackRate: Double(viewModel.playbackRate),
                 videoBackgroundStyle: 0,
+                transitionEpoch: viewModel.transitionEpoch,
+                hasError: viewModel.errorMessage != nil,
                 onPipControllerReady: { pip in
                     viewModel.bindPictureInPictureController(pip)
                 }
@@ -339,7 +341,10 @@ public struct TVPlayerView: View {
             handleQuickSeek(by: 10)
         case .up:
             if let feedActions {
-                if feedActions.canGoPrevious { feedActions.onPrevious() }
+                if feedActions.canGoPrevious {
+                    viewModel.prepareForSeamlessTransition()
+                    feedActions.onPrevious()
+                }
             } else {
                 handlePreviousEpisode()
             }
@@ -355,20 +360,20 @@ public struct TVPlayerView: View {
     }
 
     private func handlePreviousEpisode() {
-        guard viewModel.currentEpisodeIndex > 1 else {
+        guard let previousNumber = viewModel.adjacentEpisodeNumber(offset: -1) else {
             viewModel.showToast("已经是第 1 集")
             return
         }
-        viewModel.showToast("正在切换至第 \(viewModel.currentEpisodeIndex - 1) 集")
+        viewModel.showToast("正在切换至第 \(previousNumber) 集")
         Task { await viewModel.previousEpisode() }
     }
 
     private func handleNextEpisode() {
-        guard viewModel.currentEpisodeIndex < viewModel.allEpisodes.count else {
+        guard let nextNumber = viewModel.adjacentEpisodeNumber(offset: 1) else {
             viewModel.showToast("已经是最后一集")
             return
         }
-        viewModel.showToast("正在切换至第 \(viewModel.currentEpisodeIndex + 1) 集")
+        viewModel.showToast("正在切换至第 \(nextNumber) 集")
         Task { await viewModel.nextEpisode() }
     }
 
@@ -402,12 +407,16 @@ public struct TVPlayerView: View {
 
     private func nextFeedDrama() async -> Bool {
         guard let feedActions, feedActions.canGoNext, !isSwitchingFeed else { return false }
+        viewModel.prepareForSeamlessTransition()
         isSwitchingFeed = true
         let changed = await feedActions.onNext()
         isSwitchingFeed = false
-        if !changed && isPlayerPresented {
-            viewModel.setSceneActive(scenePhase == .active)
-            viewModel.showControls()
+        if !changed {
+            viewModel.cancelPreparedTransition()
+            if isPlayerPresented {
+                viewModel.setSceneActive(scenePhase == .active)
+                viewModel.showControls()
+            }
         }
         return changed
     }

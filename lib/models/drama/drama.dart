@@ -8,6 +8,7 @@ String dramaCategoryLabel(String value) {
       'playlet' => '真人剧',
       'motion_comic' => '漫剧',
       'ai_playlet' => 'AI剧',
+      'subscribe' => '新剧预约',
       _ => '短剧',
     };
   }

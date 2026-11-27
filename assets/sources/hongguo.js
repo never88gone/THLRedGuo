@@ -304,10 +304,17 @@ async function fetchAppDetail(seriesId) {
   if (cached && Date.now() - cached.updated < 15 * 60 * 1000 &&
       Array.isArray(cached.data?.video_list) && cached.data.video_list.length >= Number(cached.data.episode_cnt || 1)) return cached.data;
   const data = await HongguoApp.fetchAppDetailRaw(id);
-  if (!data || !Array.isArray(data.video_list) || !data.video_list.length) {
+  const hasSeriesMeta = Boolean(data && (data.series_title || data.series_name || data.title));
+  const isUpcoming = hasSeriesMeta &&
+    Number(data.episode_cnt || 0) === 0 &&
+    Array.isArray(data.video_list) && data.video_list.length === 0 &&
+    (typeof data.online_subscribed === 'boolean' || Number(data.series_status) === 1 || data.episode_right_text === '全0集');
+  if (!data || (!isUpcoming && (!Array.isArray(data.video_list) || !data.video_list.length))) {
     throw Object.assign(new Error('官方接口暂未返回可用分集，请重试'), { code: 'MISSING_EPISODE' });
   }
-  detailCache.set(id, { data, updated: Date.now() });
+  if (!isUpcoming) {
+    detailCache.set(id, { data, updated: Date.now() });
+  }
   return data;
 }
 
@@ -615,6 +622,12 @@ async function detail(id) {
   let epTotalCount = 0;
   let accessibleCount = 0;
 
+  let isUpcoming = false;
+  let onlineSubscribed = false;
+  let detailTags = [];
+  let detailCategory = "";
+  let detailHeat = "";
+
   // 1. 优先调用官方 App API 获取权威分集数据与精准 vid
   const appData = await fetchAppDetail(cleanId);
   if (appData) {
@@ -623,6 +636,16 @@ async function detail(id) {
     desc = cleanText(appData.series_intro || appData.video_desc || appData.intro || appData.desc);
     epTotalCount = Number(appData.episode_cnt || 0);
     accessibleCount = Number(appData.accessible_episode_cnt || appData.accessible_count || 0);
+    onlineSubscribed = appData.online_subscribed === true;
+    if (typeof appData.category_schema === "string" && appData.category_schema.trim()) {
+      try {
+        const parsedCats = JSON.parse(appData.category_schema);
+        if (Array.isArray(parsedCats)) {
+          detailTags = parsedCats.map(c => cleanText(c && c.name)).filter(Boolean);
+          if (detailTags.length > 0) detailCategory = detailTags[0];
+        }
+      } catch (_) {}
+    }
 
     if (Array.isArray(appData.video_list) && appData.video_list.length > 0) {
       for (let i = 0; i < appData.video_list.length; i++) {
@@ -633,10 +656,13 @@ async function detail(id) {
         }
       }
     }
+    if (epTotalCount === 0 && vidList.length === 0 && (typeof appData.online_subscribed === "boolean" || Number(appData.series_status) === 1 || appData.episode_right_text === "全0集")) {
+      isUpcoming = true;
+    }
   }
 
-  // 2. 若 App 接口未返回分集，回退走网页 Web 路由解析
-  if (vidList.length === 0) {
+  // 2. 若 App 接口未返回分集且非明确待上线剧集，回退走网页 Web 路由解析
+  if (vidList.length === 0 && !isUpcoming) {
     try {
       const url = BASE_URL + "/detail?series_id=" + cleanId;
       const resp = await fetch(url, {
@@ -747,17 +773,19 @@ async function detail(id) {
     for (let i = 0; i < epTotalCount; i++) {
       epUrls.push("第" + (i + 1) + "集$" + cleanId + "_" + (i + 1));
     }
-  } else if (cleanId) {
-    // 关键保底机制：只要具有有效短剧 ID，即便 Web 端网络抖动未解析出分集，至少提供第1集标准播放路由，确保 vod_play_url 恒有效
+  } else if (cleanId && !isUpcoming) {
+    // 关键保底机制：只要具有有效短剧 ID 且非待上线预约剧，至少提供第1集标准播放路由
     epUrls.push("第1集$" + BASE_URL + "/player/" + cleanId + "/" + cleanId);
   }
 
-  if (!title && epUrls.length === 0) {
+  if (!title && epUrls.length === 0 && !isUpcoming) {
     return { list: [] };
   }
 
   let remarks = "";
-  if (epUrls.length > 0) {
+  if (isUpcoming) {
+    remarks = "待上线";
+  } else if (epUrls.length > 0) {
     remarks = "全" + epUrls.length + "集";
   } else if (epTotalCount === 0) {
     remarks = "全0集（暂无可用分集）";
@@ -771,8 +799,13 @@ async function detail(id) {
         vod_pic: cover,
         vod_content: desc,
         vod_remarks: remarks,
-        vod_play_from: "官方直链",
+        vod_episodes: isUpcoming ? 0 : epUrls.length,
+        vod_play_from: isUpcoming ? "" : "官方直链",
         vod_play_url: epUrls.join("#"),
+        vod_release_status: isUpcoming ? "upcoming" : "",
+        vod_category: detailCategory || "短剧",
+        vod_tag: detailTags.join(","),
+        vod_subscribed: onlineSubscribed,
         accessible_count: 0
       }
     ]
@@ -1118,12 +1151,13 @@ function ln(model, videoId, downloadQuality) {
   const r = model, e = videoId, t = downloadQuality, n = entries;
 let i,o=[],a=new Set;for(let c of n)try{let s=c.item.spade_a||c.item.encrypt_info?.spade_a,u=s?no(s):null;for(let f of[c.item.main_url,c.item.backup_url,c.item.backup_url_1,c.item.backup_url_2,c.item.backup_url_3,...Array.isArray(c.item.backup_url_list)?c.item.backup_url_list:[]])if(!(typeof f!="string"||!f))try{let h=r.key_seed?io(f,S.from(r.key_seed,"base64")):/^https:\/\//i.test(cn(f))?cn(f):S.from(f,"base64").toString("utf8"),d=lt(h,["qznovelvod.com","fqnovelvod.com","douyinvod.com"]),x=u?u.toString("hex"):null,y=`${d}:${x||""}`;if(a.has(y))continue;a.add(y),o.push({url:d,contentKey:x,codec:c.codec==="bytevc1"?"hevc":c.codec||"auto",source:"app",vid:e,expiresAt:appModelExpiry(r),userAgent:dt,referer:"https://novelquickapp.com/",mediaBytes:Math.max(0,Number(c.item.size||c.item.video_meta?.size||0)),quality:c.quality,width:c.width,height:c.height})}catch(h){i=h}}catch(s){i=s}if(o.length)return o;throw i?.code==="SECURITY_BLOCKED"?i:Object.assign(new Error("\u672C\u96C6\u7247\u6E90\u5730\u5740\u6216\u5BC6\u94A5\u65E0\u6CD5\u89E3\u6790"),{code:"INVALID_RESPONSE"})}
 var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code:"73932",update_version_code:"73932",pv_player:"73932"},Ae;function ao(){let r=K.randomBytes(16);r[6]=r[6]&15|64,r[8]=r[8]&63|128;let e=r.toString("hex");return[e.slice(0,8),e.slice(8,12),e.slice(12,16),e.slice(16,20),e.slice(20)].join("-")}async function Ot(r=1/0){if(globalThis.__hongguoCachedDevice&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.iid))&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.device_id))){globalThis.__hongguoCachedDevice={...globalThis.__hongguoCachedDevice,...he,iid:fe(globalThis.__hongguoCachedDevice.iid),device_id:fe(globalThis.__hongguoCachedDevice.device_id),cdid:fe(globalThis.__hongguoCachedDevice.cdid)||ao()};return globalThis.__hongguoCachedDevice;}return Ae||(Ae=(async()=>{let e=ao(),t={aid:8662,app_name:"novelread",package:"com.phoenix.read",app_version:he.version_name,version_code:73932,update_version_code:73932,manifest_version_code:73932,sdk_version:"6.18.0",device_platform:"android",os:"Android",os_version:he.os_version,os_api:Number(he.os_api),device_model:he.device_type,device_brand:he.device_brand,device_manufacturer:"Xiaomi",density_dpi:Number(he.dpi),display_density:"mdpi",resolution:he.resolution.replace("*","x"),language:"zh",timezone:8,access:"wifi",channel:he.channel,cdid:e,openudid:K.randomBytes(8).toString("hex")},n=await Pe("https://log.snssdk.com/service/2/device_register/?aid=8662&app_name=novelread",{method:"POST",headers:{"Content-Type":"application/json; charset=utf-8","User-Agent":dt},data:JSON.stringify({magic_tag:"ss_app_log",header:t,_gen_time:Date.now()})},Math.min(Date.now()+12e3,r)),i=fe(n.install_id_str),o=fe(n.device_id_str);if(!/^\d{10,24}$/.test(i)||!/^\d{10,24}$/.test(o))throw Object.assign(new Error("\u65E0\u6CD5\u521D\u59CB\u5316\u5B98\u65B9\u4F1A\u8BDD"),{code:"GUEST_REGISTRATION_FAILED"});let dev={...he,iid:i,device_id:o,cdid:e};globalThis.__hongguoCachedDevice=dev;if(typeof __native_save_device==="function"){try{__native_save_device(JSON.stringify(dev));}catch(_){}}return dev;})().catch(e=>{throw Ae=null,e})),Ae}async function co(r,e={},t=!1){t&&!globalThis.__hongguoAccountActive&&(Ae=null,delete globalThis.__hongguoCachedDevice);let deadline=Math.min(Date.now()+12e3,e.deadline||1/0),n=await Ot(deadline),i={query:r,count:0,offset:e.offset||0,tab_type:e.fallbackToGeneral?11:29,tab_name:e.fallbackToGeneral?"":"feed",search_source:1,use_correct:!1,use_lynx:!1,user_is_login:globalThis.__hongguoAccountActive?1:0,bookshelf_search_plan:4,bookstore_tab:16,is_first_enter_search:!e.offset};e.passback&&(i.passback=e.passback),e.searchId&&(i.search_id=e.searchId);let o=Ht(null,"https://reading.snssdk.com/reading/bookapi/search/tab/v",i,n),a=await Pe(o.url,{headers:{...o.headers,lc:"101"}},deadline);if(Number(a.code)!==0||!Array.isArray(a.search_tabs))throw Object.assign(new Error("\u5B98\u65B9\u641C\u7D22\u672A\u8FD4\u56DE\u6709\u6548\u7ED3\u679C"),{code:"SEARCH_REJECTED",category:"business_reject"});return a}async function so({seriesId:r,videoId:e,startMs:t=0,durationMs:n,cursor:i=""}){if(!/^\d{10,30}$/.test(String(r))||!/^\d{10,30}$/.test(String(e)))throw new Error("\u5F39\u5E55\u5206\u96C6\u7F16\u53F7\u65E0\u6548");let o={comment_source:601,server_channel:1e3,group_id:String(e),group_type:30,comment_type:20,sort:1,business_param:{book_id:String(r),start_offset_time:t,playlet_item_duration:n},count:90,cursor:String(i),aid:8662,compliance_status:0},a=await Ot(),c=Ht(JSON.stringify(o),"https://reading.snssdk.com/novel/commentapi/comment/list/"+e+"/v1/",{},a);return Pe(c.url,{method:"POST",headers:{...c.headers,lc:"101"},data:c.body},Date.now()+5e3)}mn.exports={buildAccountRequest:async function(action="profile",payload={}) {
-  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",creatorWorks:"/novel/commentapi/user/profile/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v",commentList:"/novel/commentapi/comment/list/",commentReplyList:"/novel/commentapi/reply/list/"};
+  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",creatorWorks:"/novel/commentapi/user/profile/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v",commentList:"/novel/commentapi/comment/list/",commentReplyList:"/novel/commentapi/reply/list/",subscribeList:"/reading/user/subscribe/list/v",subscribeAction:"/reading/bookapi/search/uncover_subscribe/v",subscribeDelete:"/reading/user/subscribe/delete/v"};
   if(!Object.prototype.hasOwnProperty.call(routes,action))throw new Error("不支持的账号操作");
   const identity=value=>{const id=String(value||"");if(!/^[1-9]\d{0,29}$/.test(id))throw new Error("账号剧集编号无效");return id;};
   const integer=value=>{const n=Number(value);if(!Number.isSafeInteger(n)||n<0)throw new Error("账号进度参数无效");return n;};
   const params=action==="history"?{book_types:"2",limit:"50"}:{};
   let body=null;
+  let customWireBody=null;
   if(action==="libraryDetails") {
     const ids=String(payload.ids||"").split(",");
     if(!ids.length||ids.length>50)throw new Error("账号剧集编号无效");
@@ -1196,18 +1230,48 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     const serverChannel=payload.serverChannel!==undefined?integer(payload.serverChannel):34;
     body={aid:integer(he.aid),comment_id:commentId,comment_source:commentSource,server_channel:serverChannel,group_id:bookId,group_type:1,comment_type:2,count,cursor,compliance_status:0,business_param:{book_id:bookId,real_level:2}};
   }
+  if(action==="subscribeList") {
+    const offset=integer(payload.offset===undefined?0:payload.offset);
+    const limit=integer(payload.limit===undefined?20:payload.limit);
+    if(limit<1||limit>50)throw new Error("账号列表分页大小无效");
+    const tabType=integer(payload.tabType===undefined?13:payload.tabType);
+    params.offset=String(offset);
+    params.limit=String(limit);
+    params.tab_type=String(tabType);
+    if(payload.isOnline!==undefined&&payload.isOnline!==null&&String(payload.isOnline)!=="") {
+      params.is_online=(payload.isOnline===true||String(payload.isOnline)==="true"||String(payload.isOnline)==="1")?"true":"false";
+    }
+    if(payload.sessionId!==undefined&&payload.sessionId!==null&&String(payload.sessionId)!=="") {
+      params.session_id=String(payload.sessionId);
+    }
+  }
+  if(action==="subscribeAction") {
+    const id=identity(payload.id||payload.itemId);
+    const itemType=payload.itemType!==undefined&&payload.itemType!==null&&String(payload.itemType)!==""?integer(payload.itemType):1;
+    const opType=(String(payload.subscribe)==="0"||String(payload.opType)==="2")?2:1;
+    body={item_type:itemType,op_type:opType};
+    customWireBody='{"item_id":'+id+',"item_type":'+itemType+',"op_type":'+opType+',"item_id_str":"'+id+'","shark_param":{"enter_from":"detail","previous_page":"detail","page_list":"ShortSeriesDetailActivity"}}';
+  }
+  if(action==="subscribeDelete") {
+    const rawIds=Array.isArray(payload.itemIds)?payload.itemIds:String(payload.ids||payload.id||"").split(",");
+    const ids=rawIds.map(v=>String(v||"").trim()).filter(Boolean).map(identity);
+    if(!ids.length||ids.length>50)throw new Error("预约删除编号无效");
+    const isOnline=payload.isOnline===true||String(payload.isOnline)==="true"||String(payload.isOnline)==="1";
+    const tabType=payload.tabType!==undefined&&payload.tabType!==null&&String(payload.tabType)!==""?integer(payload.tabType):13;
+    body={item_id:ids,all_select:false,not_del_item_id:[],is_online:isOnline,tab_type:tabType};
+  }
   let dev;
   if(action==="profile"&&payload.device) {
     let bound;try{bound=JSON.parse(payload.device);}catch(_){throw new Error("账号设备上下文无效");}
     if(!bound||!/^\d{10,24}$/.test(String(bound.iid||""))||!/^\d{10,24}$/.test(String(bound.device_id||""))||typeof bound.cdid!=="string"||bound.cdid.length>80)throw new Error("账号设备上下文无效");
     dev={...he,iid:String(bound.iid),device_id:String(bound.device_id),cdid:bound.cdid};
   } else dev=await Ot();
-  const wireBody=body===null?null:action==="progressGet"?'{"book_ids":{"2":['+identity(payload.id)+']}}':JSON.stringify(body);
-  const origin=["followingCreators","creatorWorks","likedVideos","creatorProfile","commentList","commentReplyList"].includes(action)?"https://reading.snssdk.com":"https://api5-normal-sinfonlinea.fqnovel.com";
+  const wireBody=customWireBody!==null?customWireBody:(body===null?null:action==="progressGet"?'{"book_ids":{"2":['+identity(payload.id)+']}}':JSON.stringify(body));
+  const origin=["followingCreators","creatorWorks","likedVideos","creatorProfile","commentList","commentReplyList","subscribeList"].includes(action)?"https://reading.snssdk.com":"https://api5-normal-sinfonlinea.fqnovel.com";
   const path=action==="followingCreators"||action==="creatorWorks"?routes[action]+identity(payload.userId)+"/v1/":action==="commentList"?routes[action]+identity(payload.bookId||payload.id)+"/v1/":action==="commentReplyList"?routes[action]+identity(payload.commentId)+"/v1/":routes[action];
   const signed=Ht(wireBody,origin+path,params,dev);
-  return {url:signed.url,method:body===null?"GET":"POST",headers:signed.headers,...(body===null?{}:{body:wireBody})};
-},resetGuestSession:function(){Ae=null;appVideoModels.clear();delete globalThis.__hongguoCachedDevice;},fetchAppDetailRaw:async function(id){const dev=await Ot();const signed=Ht(JSON.stringify({series_id:String(id)}),"https://reading.snssdk.com/novel/player/video_detail/v1/",{},dev);const result=await Pe(signed.url,{method:"POST",headers:{...signed.headers,lc:"101"},data:signed.body},Date.now()+12000);if(Number(result.code||0)!==0)throw Object.assign(new Error("官方详情接口暂不可用，请重试"),{code:"DETAIL_REJECTED"});return result.data?.video_data},fetchAppPlayUrl:oo,fetchAppSearchRaw:co,fetchAppDanmakuRaw:so,fetchAppDiscoveryRaw:async function(path,params){if(!["/reading/bookapi/search/cue/v","/reading/bookapi/search/suggest/v","/reading/bookapi/plan/v","/reading/bookapi/bookmall/tab/v","/reading/bookapi/bookmall/cell/change/v"].includes(path))throw Object.assign(new Error("不支持的官方接口"),{code:"SECURITY_BLOCKED"});const device=await Ot();const signed=Ht(null,"https://reading.snssdk.com"+path,params,device);const result=await Pe(signed.url,{headers:{...signed.headers,lc:"101"}},Date.now()+12000);if(!result||String(result.code??result.status_code)!=="0")throw Object.assign(new Error("官方发现接口暂不可用，请重试"),{code:"DISCOVERY_REJECTED"});return result}}});var wn=z((Do,vn)=>{var{fetchAppSearchRaw:bn}=pt();function fo(r){let e=[],t=new Set;let tabs=Array.isArray(r)?r:(r?[r]:[]);for(let m of tabs){for(let n of m.data||[]){let i=Array.isArray(n.video_data)?n.video_data:[];for(let o of i){let a=o.video_detail||{},c=String(a.series_id_str||o.series_id||a.series_id||"");if(!/^\d{10,30}$/.test(c)||t.has(c))continue;let s=String(a.series_title||o.title||"").trim();if(!s)continue;t.add(c);let u=Number(a.episode_cnt||o.episode_cnt||0);e.push({vod_id:c,vod_name:s,vod_pic:cleanCoverUrl(String(a.series_cover||o.cover||"")),vod_remarks:u>0?"全"+u+"集":"",vod_content:String(a.series_intro||""),vod_total:u,content_type:Number(a.content_type||o.content_type||0)})}}}return e}function pickTab(response, general) {
+  return {url:signed.url,method:wireBody===null?"GET":"POST",headers:signed.headers,...(wireBody===null?{}:{body:wireBody})};
+},resetGuestSession:function(){Ae=null;appVideoModels.clear();delete globalThis.__hongguoCachedDevice;},fetchAppDetailRaw:async function(id){const dev=await Ot();const signed=Ht(JSON.stringify({series_id:String(id)}),"https://reading.snssdk.com/novel/player/video_detail/v1/",{},dev);const result=await Pe(signed.url,{method:"POST",headers:{...signed.headers,lc:"101"},data:signed.body},Date.now()+12000);if(Number(result.code||0)!==0)throw Object.assign(new Error("官方详情接口暂不可用，请重试"),{code:"DETAIL_REJECTED"});return result.data?.video_data},fetchAppPlayUrl:oo,fetchAppSearchRaw:co,fetchAppDanmakuRaw:so,fetchAppDiscoveryRaw:async function(path,params){if(!["/reading/bookapi/search/cue/v","/reading/bookapi/search/suggest/v","/reading/bookapi/plan/v","/reading/bookapi/bookmall/tab/v","/reading/bookapi/bookmall/cell/change/v","/reading/user/subscribe/list/v"].includes(path))throw Object.assign(new Error("不支持的官方接口"),{code:"SECURITY_BLOCKED"});const device=await Ot();const signed=Ht(null,"https://reading.snssdk.com"+path,params,device);const result=await Pe(signed.url,{headers:{...signed.headers,lc:"101"}},Date.now()+12000);if(!result||String(result.code??result.status_code)!=="0")throw Object.assign(new Error("官方发现接口暂不可用，请重试"),{code:"DISCOVERY_REJECTED"});return result}}});var wn=z((Do,vn)=>{var{fetchAppSearchRaw:bn}=pt();function fo(r){let e=[],t=new Set;let tabs=Array.isArray(r)?r:(r?[r]:[]);for(let m of tabs){for(let n of m.data||[]){let i=Array.isArray(n.video_data)?n.video_data:[];for(let o of i){let a=o.video_detail||{},c=String(a.series_id_str||o.series_id||a.series_id||"");if(!/^\d{10,30}$/.test(c)||t.has(c))continue;let s=String(a.series_title||o.title||"").trim();if(!s)continue;t.add(c);let u=Number(a.episode_cnt||o.episode_cnt||0);e.push({vod_id:c,vod_name:s,vod_pic:cleanCoverUrl(String(a.series_cover||o.cover||"")),vod_remarks:u>0?"全"+u+"集":"",vod_content:String(a.series_intro||""),vod_total:u,content_type:Number(a.content_type||o.content_type||0)})}}}return e}function pickTab(response, general) {
   const tabs = response.search_tabs || [];
   const type = general ? 11 : 29;
   return tabs.find(tab => Number(tab.tab_type) === type)
@@ -2459,16 +2523,75 @@ spider.danmaku = function (id, startMs, durationMs) {
   spider.home = async function (filter) {
     if (!filter) return legacyHome(false);
     const { choices } = await discoveryTab();
-    return { class: choices.filter(item => discoveryGenres.includes(item.selector_item_id)).map(item => ({
-      type_id: 'app:discover:' + item.selector_item_id, type_name: text(item.show_name)
-    })), filters: {} };
+    return { class: [
+      ...choices.filter(item => discoveryGenres.includes(item.selector_item_id)).map(item => ({
+        type_id: 'app:discover:' + item.selector_item_id, type_name: text(item.show_name)
+      })),
+      { type_id: 'app:discover:subscribe', type_name: '新剧预约' }
+    ], filters: {} };
   };
+
+  function mapSubscribeDiscoveryItem(item) {
+    const sub = item && item.subscribe_data && typeof item.subscribe_data === 'object' ? item.subscribe_data : null;
+    const rawId = sub ? (sub.series_id_str || sub.series_id || item.item_id) : item.item_id;
+    const vid = text(rawId);
+    if (!/^[1-9]\d{9,29}$/.test(vid)) return null;
+    const name = text(sub ? sub.title : item.name);
+    if (!name) return null;
+    const cover = cleanCoverUrl(text(sub ? sub.cover : item.cover));
+    const desc = text(sub ? sub.video_desc : item.item_desc);
+    const episodes = sub ? number(sub.episode_cnt) : 0;
+    const isOnline = item.is_online === true && episodes > 0;
+    const expectedText = text(item.expected_rec_text || item.sub_info);
+    const subtitles = Array.isArray(item.sub_title_list) ? item.sub_title_list.map(x => text(x && x.content)).filter(Boolean) : [];
+    const reserveHeat = subtitles.find(s => s.includes('人预约')) || (expectedText.includes('人预约') ? expectedText : '');
+    const onlineDate = subtitles.find(s => s.includes('上线') || s.includes('开播')) || (expectedText && !expectedText.includes('人预约') ? expectedText : '');
+    const cats = Array.isArray(item.categories) ? item.categories.map(text).filter(Boolean) : [];
+    const category = text(item.category) || cats[0] || '短剧';
+    const tags = [...new Set([category, ...cats, ...subtitles.filter(s => !s.includes('上线') && !s.includes('人预约'))].filter(Boolean))];
+    return {
+      vod_id: vid,
+      vod_name: name,
+      vod_pic: cover,
+      vod_content: desc,
+      vod_episodes: episodes,
+      vod_remarks: isOnline ? (episodes + '集') : (onlineDate || text(item.tag_info && item.tag_info.text) || '待上线'),
+      vod_year: onlineDate,
+      vod_heat: reserveHeat,
+      vod_category: category,
+      vod_tag: tags.join(','),
+      vod_release_status: isOnline ? '' : 'upcoming'
+    };
+  }
 
   spider.category = async function (tid, page, filter, extend) {
     const aliases = { '': 'all', all: 'all', short_play: 'all', 'real-drama': 'playlet',
       'comic-drama': 'motion_comic', comic: 'motion_comic', 'ai-drama': 'ai_playlet',
+      'subscribe': 'subscribe', 'app:discover:subscribe': 'subscribe',
       'app:theater:8': 'all', 'app:theater:38': 'playlet', 'app:theater:32': 'motion_comic' };
     const genre = aliases[text(tid)] || text(tid).replace(/^app:discover:/, '');
+    if (genre === 'subscribe') {
+      const p = Math.max(1, number(page));
+      const limit = 20;
+      const offset = (p - 1) * limit;
+      let response = await api('/reading/user/subscribe/list/v', { offset, limit, tab_type: 8 });
+      let items = Array.isArray(response.data?.subscribe_items) ? response.data.subscribe_items : [];
+      if (p === 1 && !items.length) {
+        response = await api('/reading/user/subscribe/list/v', { offset, limit, tab_type: 2 });
+        items = Array.isArray(response.data?.subscribe_items) ? response.data.subscribe_items : [];
+      }
+      const list = [];
+      const seen = new Set();
+      for (const row of items) {
+        const mapped = mapSubscribeDiscoveryItem(row);
+        if (mapped && !seen.has(mapped.vod_id)) {
+          seen.add(mapped.vod_id);
+          list.push(mapped);
+        }
+      }
+      const hasMore = response.data?.has_more === true && list.length > 0;
+      return { page: p, pagecount: hasMore ? p + 1 : p, hasMore, list, updatedText: '' };
+    }
     if (!discoveryGenres.includes(genre)) {
       if (typeof legacyCategory === 'function') return legacyCategory(tid, page, filter, extend);
       throw failure('分类已更新，请重新选择分类', 'INVALID_CATEGORY');
@@ -2776,7 +2899,7 @@ spider.danmaku = function (id, startMs, durationMs) {
 
 spider.accountRequest = async function (action, payload) {
   payload = payload || {};
-  if (['profile', 'favorites', 'history', 'libraryDetails', 'libraryDetail', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow', 'followingCreators', 'creatorWorks', 'likedVideos', 'creatorProfile', 'commentList', 'commentReplyList'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
+  if (['profile', 'favorites', 'history', 'libraryDetails', 'libraryDetail', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow', 'followingCreators', 'creatorWorks', 'likedVideos', 'creatorProfile', 'commentList', 'commentReplyList', 'subscribeList', 'subscribeAction', 'subscribeDelete'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
   const paths = { qr: '/passport/web/get_qrcode/', poll: '/passport/web/check_qrconnect/', webInfo: '/passport/account/info/v2/', phoneCode: '/passport/web/send_code/', phoneSms: '/passport/web/sms_login_only/' };
   if (!Object.prototype.hasOwnProperty.call(paths, action)) throw new Error('不支持的账号操作');
   const params = { aid: '513755', passport_jssdk_version: '3.4.10', passport_jssdk_type: 'normal',
@@ -3018,7 +3141,8 @@ spider.accountParse = function (action, text) {
       })).filter(item => Number.isSafeInteger(item.number) && item.number > 0);
       const id = identity(video.series_id_str || video.series_id);
       if (!id) throw new Error('账号互动剧集编号无效');
-      return { id, episodes };
+      const isOnline = Number(video.episode_cnt || 0) > 0 || video.video_list.length > 0;
+      return { id, episodes, onlineSubscribed: video.online_subscribed === true, isOnline };
     }
     if (!data || typeof data !== 'object' || !['main_creator_user_list','hot_celebrity_user_list','celebrity_map_list'].some(key => key in data)) throw new Error('创作者列表格式已变化');
     const groups = Array.isArray(data.main_creator_user_list) ? data.main_creator_user_list : [];
@@ -3181,6 +3305,67 @@ spider.accountParse = function (action, text) {
       hasMore: Boolean(common.has_more),
       cursor: String(common.cursor || ''),
       list
+    };
+  }
+  if (action === 'subscribeList') {
+    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    if (!data || typeof data !== 'object') throw new Error('预约列表返回无效数据');
+    const rawList = Array.isArray(data.subscribe_items) ? data.subscribe_items : [];
+    const integer = value => Math.max(0, Math.floor(Number(value) || 0));
+    const plain = value => value == null ? '' : String(value).trim();
+    const list = [];
+    const seen = new Set();
+    for (const item of rawList) {
+      if (!item || typeof item !== 'object') continue;
+      const sub = item.subscribe_data && typeof item.subscribe_data === 'object' ? item.subscribe_data : null;
+      const rawId = sub ? (sub.series_id_str || sub.series_id || item.item_id) : item.item_id;
+      const id = plain(rawId);
+      if (!/^[1-9]\d{0,29}$/.test(id) || seen.has(id)) continue;
+      seen.add(id);
+      const name = plain(sub ? sub.title : item.name);
+      if (!name) continue;
+      const cover = cleanCoverUrl(plain(sub ? sub.cover : item.cover));
+      const description = plain(sub ? sub.video_desc : item.item_desc);
+      const episodes = sub ? integer(sub.episode_cnt) : 0;
+      const isOnline = item.is_online === true || episodes > 0;
+      const expectedText = plain(item.expected_rec_text || item.sub_info);
+      const subtitles = Array.isArray(item.sub_title_list) ? item.sub_title_list.map(x => plain(x && x.content)).filter(Boolean) : [];
+      const heat = subtitles.find(s => s.includes('人预约')) || (expectedText.includes('人预约') ? expectedText : '');
+      const onlineDate = subtitles.find(s => s.includes('上线') || s.includes('开播')) || (expectedText && !expectedText.includes('人预约') ? expectedText : '');
+      const cats = Array.isArray(item.categories) ? item.categories.map(plain).filter(Boolean) : [];
+      const category = plain(item.category) || cats[0] || '短剧';
+      const tags = [...new Set([category, ...cats, ...subtitles.filter(s => !s.includes('上线') && !s.includes('人预约'))].filter(Boolean))];
+      list.push({
+        id,
+        title: name,
+        cover,
+        description,
+        episodes,
+        category,
+        tags,
+        heat,
+        onlineDate,
+        releaseStatus: isOnline ? '' : 'upcoming',
+        isOnline,
+        subscribed: item.has_subscribed !== false && item.is_subscribed !== false,
+        schedulePublishTime: integer(item.schedule_publish_time || item.expected_publish_time)
+      });
+    }
+    return {
+      items: list,
+      hasMore: Boolean(data.has_more),
+      nextOffset: integer(data.next_offset),
+      sessionId: plain(data.session_id),
+      onlineTotalCount: integer(data.online_total_count),
+      offlineTotalCount: integer(data.offline_total_count)
+    };
+  }
+  if (action === 'subscribeAction' || action === 'subscribeDelete') {
+    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    return {
+      valid: true,
+      isOnline: Boolean(data && data.is_online),
+      needPopup: Boolean(data && data.need_popup)
     };
   }
   if (response.message === 'error' && data && data.verify_center_secondary_decision_conf) throw new Error('ACCOUNT_SECONDARY_VERIFICATION_REQUIRED');

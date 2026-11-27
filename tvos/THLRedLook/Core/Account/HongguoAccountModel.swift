@@ -352,6 +352,68 @@ final class HongguoAccountModel: ObservableObject {
         try await socialService.likedVideos(offset: offset, loggedIn: loggedIn, attempt: attempt, account: account)
     }
 
+    func subscribedDramas(offset: Int = 0, isOnline: Bool = false) async throws -> HongguoCollectionPage<HongguoSubscribeItem> {
+        try await socialService.subscribedDramas(offset: offset, isOnline: isOnline, loggedIn: loggedIn, attempt: attempt, account: account)
+    }
+
+    func setDramaSubscribed(_ drama: Drama, subscribed: Bool) async throws {
+        guard loggedIn else { throw HongguoAccountError.invalid }
+        prepareSocialOwner()
+        let revision = vault.snapshot.revision
+        let id = drama.cleanSourceId
+        guard !socialBusy.contains(id) else { return }
+        socialBusy.insert(id)
+        defer { if vault.snapshot.revision == revision { socialBusy.remove(id) } }
+        try await enqueueSocialWrite {
+            try await self.socialService.setDramaSubscribed(
+                drama,
+                subscribed: subscribed,
+                loggedIn: self.loggedIn,
+                owner: self.attempt,
+                attempt: self.attempt,
+                account: self.account
+            )
+            guard self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+            self.socialGeneration[id] = (self.socialGeneration[id] ?? 0) + 1
+            let current = self.socialStates[id]
+            self.socialStates[id] = HongguoSocialSnapshot(
+                episodes: current?.episodes ?? [],
+                creators: current?.creators ?? [],
+                creatorError: current?.creatorError,
+                onlineSubscribed: subscribed,
+                isOnline: current?.isOnline ?? (drama.releaseStatus != "upcoming")
+            )
+        }
+    }
+
+    func deleteSubscribedDramas(_ itemIds: [String], isOnline: Bool = false) async throws {
+        guard loggedIn, !itemIds.isEmpty else { throw HongguoAccountError.invalid }
+        let revision = vault.snapshot.revision
+        try await enqueueSocialWrite {
+            try await self.socialService.deleteSubscribedDramas(
+                itemIds,
+                isOnline: isOnline,
+                loggedIn: self.loggedIn,
+                owner: self.attempt,
+                attempt: self.attempt,
+                account: self.account
+            )
+            guard self.vault.snapshot.revision == revision else { throw HongguoAccountError.cancelled }
+            for itemId in itemIds {
+                if let current = self.socialStates[itemId] {
+                    self.socialGeneration[itemId] = (self.socialGeneration[itemId] ?? 0) + 1
+                    self.socialStates[itemId] = HongguoSocialSnapshot(
+                        episodes: current.episodes,
+                        creators: current.creators,
+                        creatorError: current.creatorError,
+                        onlineSubscribed: false,
+                        isOnline: current.isOnline
+                    )
+                }
+            }
+        }
+    }
+
     func creators(for drama: Drama) async throws -> [HongguoCreator] {
         guard loggedIn else { throw HongguoAccountError.invalid }
         let revision = vault.snapshot.revision
@@ -448,7 +510,9 @@ final class HongguoAccountModel: ObservableObject {
             self.socialStates[id] = HongguoSocialSnapshot(
                 episodes: self.socialStates[id]?.episodes ?? [],
                 creators: rows,
-                creatorError: self.socialStates[id]?.creatorError
+                creatorError: self.socialStates[id]?.creatorError,
+                onlineSubscribed: self.socialStates[id]?.onlineSubscribed ?? false,
+                isOnline: self.socialStates[id]?.isOnline ?? true
             )
         }
     }

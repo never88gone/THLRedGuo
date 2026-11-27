@@ -12,6 +12,8 @@ public struct AVPlayerView: UIViewRepresentable {
     public var playbackRate: Double = 1.0
     public var videoBackgroundStyle: Int = 0
     public var initialProgress: Double = 0.0
+    public var transitionEpoch: Int = 0
+    public var hasError: Bool = false
     public var onVideoEnded: (() -> Void)? = nil
     public var onVideoPlaying: (() -> Void)? = nil
     public var onBufferStuck: (() -> Void)? = nil
@@ -27,6 +29,8 @@ public struct AVPlayerView: UIViewRepresentable {
         playbackRate: Double = 1.0,
         videoBackgroundStyle: Int = 0,
         initialProgress: Double = 0.0,
+        transitionEpoch: Int = 0,
+        hasError: Bool = false,
         onVideoEnded: (() -> Void)? = nil,
         onVideoPlaying: (() -> Void)? = nil,
         onBufferStuck: (() -> Void)? = nil,
@@ -41,6 +45,8 @@ public struct AVPlayerView: UIViewRepresentable {
         self.playbackRate = playbackRate
         self.videoBackgroundStyle = videoBackgroundStyle
         self.initialProgress = initialProgress
+        self.transitionEpoch = transitionEpoch
+        self.hasError = hasError
         self.onVideoEnded = onVideoEnded
         self.onVideoPlaying = onVideoPlaying
         self.onBufferStuck = onBufferStuck
@@ -60,6 +66,13 @@ public struct AVPlayerView: UIViewRepresentable {
 
     private func configure(_ container: AVPlayerContainerView) {
         container.managesPlayback = player == nil
+        container.isPlaying = isPlaying
+
+        if transitionEpoch != container.lastTransitionEpoch {
+            container.lastTransitionEpoch = transitionEpoch
+            container.captureCurrentFrame()
+        }
+
         let targetPlayer: AVPlayer?
         if let directPlayer = player {
             targetPlayer = directPlayer
@@ -71,6 +84,10 @@ public struct AVPlayerView: UIViewRepresentable {
 
         if container.player !== targetPlayer {
             container.player = targetPlayer
+        }
+
+        if hasError {
+            container.clearTransitionSnapshot(animated: false)
         }
 
         if let pip = container.pipController, pip !== container.lastReportedPipController {

@@ -1589,6 +1589,97 @@ final class ContinuousPlaybackTests: XCTestCase {
         XCTAssertEqual(recorder.entries.last?.errorCode, "MEDIA_HTTP_403")
         XCTAssertEqual(recorder.entries.last?.stage, "播放取流 第5集")
     }
+
+    func testSeamlessTransitionCapturesFrameAndPreservesPlayerAcrossSwitch() async throws {
+        let (foreground, _) = try await repository(mode: "normal", long: true)
+        let model = try model(foreground: foreground, preloading: foreground)
+        defer { model.onDisappear() }
+        await model.preparePlayback(episodeIndex: 1)
+        try await wait { model.currentTime > 0.5 && model.isPlaying }
+
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let hostWindow = scene?.windows.first
+        let fallbackWindow = hostWindow == nil ? UIWindow(frame: CGRect(x: 0, y: 0, width: 640, height: 360)) : nil
+        fallbackWindow?.isHidden = false
+        let window = try XCTUnwrap(hostWindow ?? fallbackWindow)
+        let container = AVPlayerContainerView(frame: window.bounds)
+        container.managesPlayback = false
+        window.addSubview(container)
+        container.layoutIfNeeded()
+        defer {
+            container.cleanup()
+            container.removeFromSuperview()
+            fallbackWindow?.isHidden = true
+        }
+        container.player = model.player
+        try await wait { container.playerLayer?.isReadyForDisplay == true }
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        var playerBecameNil = false
+        var itemBecameNilDuringSwitch = false
+        var transitionNotifications = 0
+        var snapshotCapturedSynchronously = false
+        let token = NotificationCenter.default.addObserver(
+            forName: AVPlayerContainerView.willTransitionNotification,
+            object: nil,
+            queue: nil
+        ) { _ in
+            transitionNotifications += 1
+            if container.hasTransitionSnapshot { snapshotCapturedSynchronously = true }
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        let initialItem = model.player?.currentItem
+        let switchTask = Task {
+            await model.selectEpisode(number: 2)
+        }
+        try await wait {
+            if model.player == nil { playerBecameNil = true }
+            if model.player?.currentItem == nil { itemBecameNilDuringSwitch = true }
+            return transitionNotifications >= 1
+        }
+        await switchTask.value
+        try await wait {
+            if model.player == nil { playerBecameNil = true }
+            return model.currentEpisodeIndex == 2 && model.player?.currentItem !== initialItem && model.currentTime > 0.3 && !container.hasTransitionSnapshot
+        }
+        XCTAssertTrue(snapshotCapturedSynchronously)
+        XCTAssertFalse(playerBecameNil)
+        XCTAssertFalse(itemBecameNilDuringSwitch)
+        XCTAssertFalse(model.isSeamlessTransitioning)
+
+        let nextDrama = Drama(id: "synthetic:next", source: "synthetic", sourceId: "next", title: "合成推荐第二部")
+        let nextEpisodes = [Episode(id: "1", title: "第1集", number: 1, raw: try JSONSerialization.data(withJSONObject: ["url": "1"]))]
+        let path = try XCTUnwrap(ProcessInfo.processInfo.environment["THL_SYNTHETIC_VIDEO"])
+        let url = URL(fileURLWithPath: path)
+        VideoCacheManager.shared.preload(asset: AVURLAsset(url: url), for: url.absoluteString, namespace: "feed")
+        let preloadedPlan = PlaybackPlan(url: url.absoluteString, quality: 480, expiresAt: Int64(Date().addingTimeInterval(60).timeIntervalSince1970 * 1000))
+
+        let previousFeedPlayer = try XCTUnwrap(model.player)
+        snapshotCapturedSynchronously = false
+        await model.switchFeedDrama(drama: nextDrama, allEpisodes: nextEpisodes, initialEpisodeIndex: 1, initialPosition: 0, preloadedPlan: preloadedPlan)
+        container.player = model.player
+        XCTAssertTrue(snapshotCapturedSynchronously)
+        XCTAssertNotNil(model.player)
+        XCTAssertTrue(model.player !== previousFeedPlayer)
+        try await wait { !container.hasTransitionSnapshot && model.currentTime > 0.2 && model.isPlaying }
+        XCTAssertFalse(model.isSeamlessTransitioning)
+
+        let (slowRepo, _) = try await repository(mode: "slowSecond", long: true)
+        let slowModel = try self.model(foreground: slowRepo, preloading: slowRepo)
+        defer { slowModel.onDisappear() }
+        await slowModel.preparePlayback(episodeIndex: 1)
+        try await wait { slowModel.currentTime > 0.5 && slowModel.isPlaying }
+        container.player = slowModel.player
+        try await wait { container.playerLayer?.isReadyForDisplay == true }
+        let slowTask = Task { await slowModel.selectEpisode(number: 2) }
+        try await wait { container.hasTransitionSnapshot && slowModel.isSeamlessTransitioning }
+        XCTAssertNotNil(slowModel.player)
+        XCTAssertNotNil(slowModel.player?.currentItem)
+        await slowTask.value
+        try await wait { slowModel.currentEpisodeIndex == 2 && slowModel.currentTime > 0.2 && !container.hasTransitionSnapshot }
+        XCTAssertFalse(slowModel.isSeamlessTransitioning)
+    }
 }
 
 private final class OfficialModelFailureProtocol: URLProtocol {

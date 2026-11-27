@@ -29,6 +29,17 @@ public struct PosterArtworkView: View {
         return nil
     }
 
+    private var displayCategoryText: String {
+        switch drama.category.trimmingCharacters(in: .whitespacesAndNewlines) {
+        case "app:discover:playlet", "real-drama", "real_series": return "真人剧"
+        case "app:discover:motion_comic", "comic-drama", "comic_series", "comic": return "漫剧"
+        case "app:discover:ai_playlet", "ai-drama", "ai_series": return "AI剧"
+        case "app:discover:subscribe": return "新剧预约"
+        case let value where value.hasPrefix("app:") || value.hasPrefix("hongguo-app:"): return "短剧"
+        case let value: return value
+        }
+    }
+
     public init(drama: Drama, cornerRadius: CGFloat = 14) {
         self.drama = drama
         self.cornerRadius = cornerRadius
@@ -97,8 +108,8 @@ public struct PosterArtworkView: View {
                         .font(.system(size: 11, weight: .black))
                         .foregroundColor(TVColors.white.opacity(0.85))
                     Spacer()
-                    if !drama.category.isEmpty {
-                        Text(drama.category)
+                    if !displayCategoryText.isEmpty {
+                        Text(displayCategoryText)
                             .font(.system(size: 10, weight: .bold))
                             .foregroundColor(TVColors.white)
                             .padding(.horizontal, 6)

@@ -57,3 +57,77 @@ class HongguoLikedVideo {
         kind: row['kind'] as String? ?? 'episode',
       );
 }
+
+class HongguoSubscribeItem {
+  const HongguoSubscribeItem({
+    required this.id,
+    required this.title,
+    this.cover = '',
+    this.description = '',
+    this.episodes = 0,
+    this.category = '短剧',
+    this.tags = const [],
+    this.heat = '',
+    this.onlineDate = '',
+    this.releaseStatus = '',
+    this.isOnline = false,
+    this.subscribed = true,
+    this.schedulePublishTime = 0,
+  });
+
+  final String id;
+  final String title;
+  final String cover;
+  final String description;
+  final int episodes;
+  final String category;
+  final List<String> tags;
+  final String heat;
+  final String onlineDate;
+  final String releaseStatus;
+  final bool isOnline;
+  final bool subscribed;
+  final int schedulePublishTime;
+
+  String get subtitle {
+    if (isOnline && episodes > 0) return '已上线 · 全 $episodes 集';
+    if (onlineDate.isNotEmpty) return onlineDate;
+    if (heat.isNotEmpty) return heat;
+    return isOnline ? '已上线' : '待上线';
+  }
+
+  Drama get drama => Drama(
+    id: 'hongguo:$id',
+    source: 'hongguo',
+    sourceId: id,
+    title: title,
+    cover: cover,
+    description: description,
+    episodes: episodes,
+    category: category,
+    tags: tags,
+    heat: heat,
+    onlineDate: onlineDate,
+    releaseStatus: isOnline ? '' : (releaseStatus.isEmpty ? 'upcoming' : releaseStatus),
+  );
+
+  factory HongguoSubscribeItem.fromJson(Map<String, dynamic> row) =>
+      HongguoSubscribeItem(
+        id: row['id']?.toString() ?? '',
+        title: row['title']?.toString() ?? '',
+        cover: row['cover']?.toString() ?? '',
+        description: row['description']?.toString() ?? '',
+        episodes: (row['episodes'] as num?)?.toInt() ?? 0,
+        category: row['category']?.toString() ?? '短剧',
+        tags: (row['tags'] as List? ?? const [])
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
+        heat: row['heat']?.toString() ?? '',
+        onlineDate: row['onlineDate']?.toString() ?? '',
+        releaseStatus: row['releaseStatus']?.toString() ?? '',
+        isOnline: row['isOnline'] == true,
+        subscribed: row['subscribed'] != false,
+        schedulePublishTime: (row['schedulePublishTime'] as num?)?.toInt() ?? 0,
+      );
+}

@@ -175,6 +175,87 @@ final class HongguoAccountSocialService {
         )
     }
 
+    func subscribedDramas(
+        offset: Int = 0,
+        isOnline: Bool = false,
+        loggedIn: Bool,
+        attempt: Int,
+        account: HongguoAccountRecord?
+    ) async throws -> HongguoCollectionPage<HongguoSubscribeItem> {
+        let result = try await readCollection(
+            "subscribeList",
+            payload: [
+                "offset": String(offset),
+                "count": "20",
+                "isOnline": isOnline ? "true" : "false",
+                "tabType": "13"
+            ],
+            loggedIn: loggedIn,
+            attempt: attempt,
+            account: account
+        )
+        guard let rows = result["items"] as? [[String: Any]], let more = result["hasMore"] as? Bool else {
+            throw HongguoAccountError.interactionInvalid
+        }
+        return HongguoCollectionPage(
+            items: rows.compactMap { HongguoSubscribeItem(row: $0, isOnlineTab: isOnline) },
+            hasMore: more,
+            nextOffset: result["nextOffset"] as? Int,
+            unsupportedCount: result["unsupportedCount"] as? Int ?? 0
+        )
+    }
+
+    func setDramaSubscribed(
+        _ drama: Drama,
+        subscribed: Bool,
+        loggedIn: Bool,
+        owner: Int,
+        attempt: Int,
+        account: HongguoAccountRecord?
+    ) async throws {
+        guard loggedIn else { throw HongguoAccountError.invalid }
+        _ = try await transportService.call(
+            "subscribeAction",
+            payload: [
+                "itemId": drama.cleanSourceId,
+                "subscribe": subscribed ? "1" : "0"
+            ],
+            owner: owner,
+            attempt: attempt,
+            existing: true,
+            account: account,
+            cookies: []
+        )
+    }
+
+    func deleteSubscribedDramas(
+        _ itemIds: [String],
+        isOnline: Bool,
+        loggedIn: Bool,
+        owner: Int,
+        attempt: Int,
+        account: HongguoAccountRecord?
+    ) async throws {
+        guard loggedIn, !itemIds.isEmpty else { throw HongguoAccountError.invalid }
+        guard let data = try? JSONSerialization.data(withJSONObject: itemIds),
+              let idsJson = String(data: data, encoding: .utf8) else {
+            throw HongguoAccountError.invalid
+        }
+        _ = try await transportService.call(
+            "subscribeDelete",
+            payload: [
+                "itemIds": idsJson,
+                "isOnline": isOnline ? "true" : "false",
+                "tabType": "13"
+            ],
+            owner: owner,
+            attempt: attempt,
+            existing: true,
+            account: account,
+            cookies: []
+        )
+    }
+
     func readCreators(
         _ drama: Drama,
         owner: Int,
@@ -225,7 +306,9 @@ final class HongguoAccountSocialService {
         return HongguoSocialSnapshot(
             episodes: rows.compactMap(HongguoEpisodeLike.init),
             creators: creators,
-            creatorError: creatorError
+            creatorError: creatorError,
+            onlineSubscribed: result["onlineSubscribed"] as? Bool ?? false,
+            isOnline: result["isOnline"] as? Bool ?? true
         )
     }
 }

@@ -121,7 +121,7 @@ public actor NativeBridge {
         }
         guard let result, context.exception == nil,
               let data = result.toDictionary() as? [String: Any] else {
-            throw ["socialDetail", "creatorList", "likeUpdate", "creatorFollow", "followingCreators", "creatorWorks", "likedVideos", "creatorProfile", "commentList", "commentReplyList"].contains(action) ? HongguoAccountError.interactionInvalid : HongguoAccountError.invalid
+            throw ["socialDetail", "creatorList", "likeUpdate", "creatorFollow", "followingCreators", "creatorWorks", "likedVideos", "creatorProfile", "commentList", "commentReplyList", "subscribeList", "subscribeAction", "subscribeDelete"].contains(action) ? HongguoAccountError.interactionInvalid : HongguoAccountError.invalid
         }
         if data["verification"] != nil { throw HongguoAccountError.challenge }
         return data

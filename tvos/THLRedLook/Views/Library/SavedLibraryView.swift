@@ -56,10 +56,21 @@ public struct SavedLibraryView: View {
                 row.drama.map { VideoRow(id: row.id, drama: $0, subtitle: row.subtitle) }
             }
         }
+        if viewModel.officialAccount && viewModel.selectedTab == .reservations {
+            return viewModel.reservedList.map { row in
+                let sub = !row.subtitle.isEmpty
+                    ? row.subtitle
+                    : (!row.drama.onlineDate.isEmpty ? "预计 \(row.drama.onlineDate)" : row.drama.releaseLabel)
+                return VideoRow(id: row.key, drama: row.drama, subtitle: sub)
+            }
+        }
         return dramas.map { VideoRow(id: $0.id, drama: $0, subtitle: nil) }
     }
     private var listHeader: LibraryFocusTarget {
-        !viewModel.officialAccount && viewModel.selectedTab == .follows ? .followFilter(viewModel.selectedFollowFilter) : .mainTab(viewModel.selectedTab)
+        if viewModel.officialAccount && viewModel.selectedTab == .reservations {
+            return .reservationFilter(viewModel.selectedReserveOnline)
+        }
+        return !viewModel.officialAccount && viewModel.selectedTab == .follows ? .followFilter(viewModel.selectedFollowFilter) : .mainTab(viewModel.selectedTab)
     }
     private var firstCardTarget: LibraryFocusTarget {
         if viewModel.selectedTab == .anchors {
@@ -118,6 +129,32 @@ public struct SavedLibraryView: View {
                         .font(.system(size: 24))
                         .padding(.horizontal, 20)
 
+                        if viewModel.officialAccount && viewModel.selectedTab == .reservations {
+                            HStack(spacing: 16) {
+                                ForEach([false, true], id: \.self) { isOnline in
+                                    TVCapsuleButton(
+                                        title: isOnline ? "已上线" : "待上线",
+                                        isSelected: viewModel.selectedReserveOnline == isOnline,
+                                        isFocused: focusedTarget == .reservationFilter(isOnline),
+                                        isCompact: true,
+                                        onFocused: {
+                                            if viewModel.selectedReserveOnline != isOnline {
+                                                viewModel.switchReserveFilter(isOnline)
+                                            }
+                                        },
+                                        onUpCommand: { focus(.account, with: proxy) },
+                                        onDownCommand: { focus(firstCardTarget, with: proxy) },
+                                        onLeftCommand: !isOnline ? { focus(.mainTab(.reservations), with: proxy) } : nil
+                                    ) {
+                                        viewModel.switchReserveFilter(isOnline)
+                                    }
+                                    .focused($focusedTarget, equals: .reservationFilter(isOnline))
+                                    .accessibilityIdentifier("library.reserveFilter.\(isOnline ? "online" : "upcoming")")
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 20)
+                        }
                         if !viewModel.officialAccount && viewModel.selectedTab == .follows {
                             HStack(spacing: 16) {
                                 ForEach([FollowState.none, .wishlist, .watching, .watched, .updated]) { state in
@@ -189,12 +226,13 @@ public struct SavedLibraryView: View {
                             } else if viewModel.loadingTabs.contains(viewModel.selectedTab) && videoRows.isEmpty {
                                 ProgressView("正在获取列表内容...").frame(maxWidth: .infinity, minHeight: 300)
                             } else if videoRows.isEmpty {
+                                let requiresLogin = !viewModel.officialAccount && (viewModel.selectedTab == .liked || viewModel.selectedTab == .reservations)
                                 VStack(spacing: 24) {
                                     Text(emptyMessage).font(.system(size: 29, weight: .medium))
-                                    TVButton(title: (!viewModel.officialAccount && viewModel.selectedTab == .liked) ? "登录红果账号" : (viewModel.officialAccount ? "刷新列表" : "去探索短剧"),
-                                        icon: (!viewModel.officialAccount && viewModel.selectedTab == .liked) ? "person.crop.circle.badge.plus" : (viewModel.officialAccount ? "arrow.clockwise" : "sparkles.tv"),
+                                    TVButton(title: requiresLogin ? "登录红果账号" : (viewModel.officialAccount ? "刷新列表" : "去探索短剧"),
+                                        icon: requiresLogin ? "person.crop.circle.badge.plus" : (viewModel.officialAccount ? "arrow.clockwise" : "sparkles.tv"),
                                         isFocused: focusedTarget == .emptyAction, onUpCommand: { focus(.account, with: proxy) }) {
-                                        if !viewModel.officialAccount && viewModel.selectedTab == .liked {
+                                        if requiresLogin {
                                             showingLogin = true
                                         } else if viewModel.officialAccount {
                                             Task { await viewModel.loadAccount(viewModel.selectedTab, refresh: true) }
@@ -211,17 +249,24 @@ public struct SavedLibraryView: View {
                                         let entry = viewModel.selectedTab == .history ? entries.first { $0.drama.id == drama.id } : nil
                                         DramaCardView(drama: drama, isFocused: focusedTarget == .card(row.id),
                                             watchProgress: entry?.progressPercent, progressText: row.subtitle ?? entry?.progressLabel,
-                                            onUpCommand: index < columns.count ? { focus(.account, with: proxy) } : nil,
+                                            onUpCommand: index < columns.count ? { focus(viewModel.selectedTab == .reservations ? listHeader : .account, with: proxy) } : nil,
                                             onLeftCommand: index % columns.count == 0 ? { focus(.mainTab(viewModel.selectedTab), with: proxy) } : nil,
                                             onDownCommand: index / columns.count == (videoRows.count - 1) / columns.count && viewModel.accountErrors[viewModel.selectedTab] != nil ? { focus(.loadMore, with: proxy) } : nil) {
                                             lastOpenedID = row.id; selectedDrama = drama
                                         }.focused($focusedTarget, equals: .card(row.id))
                                         .accessibilityIdentifier("library.card.\(row.id)")
-                                        .accessibilityValue(row.subtitle ?? entry?.progressLabel ?? (viewModel.selectedTab == .liked ? "点赞视频" : (viewModel.officialAccount ? "点赞剧集" : "本地收藏")))
+                                        .accessibilityValue(row.subtitle ?? entry?.progressLabel ?? (viewModel.selectedTab == .liked ? "点赞视频" : (viewModel.selectedTab == .reservations ? "我的预约" : (viewModel.officialAccount ? "点赞剧集" : "本地收藏"))))
                                         .id(LibraryFocusTarget.card(row.id))
                                         .onAppear { Task { await viewModel.loadMoreIfNeeded(viewModel.selectedTab, index: index, count: videoRows.count) } }
                                         .contextMenu {
-                                            if !viewModel.officialAccount {
+                                            if viewModel.officialAccount && viewModel.selectedTab == .reservations,
+                                               let subItem = viewModel.reservedList.first(where: { $0.key == row.id }) {
+                                                Button(role: .destructive) {
+                                                    Task { try? await viewModel.removeReservation(subItem) }
+                                                } label: {
+                                                    Label(subItem.isOnline ? "移除预约记录" : "取消预约", systemImage: "bell.slash")
+                                                }
+                                            } else if !viewModel.officialAccount {
                                                 Button(role: .destructive) {
                                                     if viewModel.selectedTab == .follows { viewModel.removeFollow(dramaId: drama.id) }
                                                     else { viewModel.removeHistory(dramaId: drama.id) }
@@ -318,6 +363,11 @@ public struct SavedLibraryView: View {
                         viewModel.selectedFollowFilter = state
                     }
                 }
+                if case .reservationFilter(let online) = target {
+                    if viewModel.selectedReserveOnline != online {
+                        viewModel.switchReserveFilter(online)
+                    }
+                }
             }
             .onChange(of: focusCategoryTrigger) { _, _ in
                 focus(.mainTab(viewModel.selectedTab), with: proxy)
@@ -357,6 +407,9 @@ public struct SavedLibraryView: View {
         }
         if viewModel.selectedTab == .liked { return "暂无点赞视频" }
         if viewModel.selectedTab == .anchors { return "暂无关注的主播" }
+        if viewModel.selectedTab == .reservations {
+            return viewModel.officialAccount ? (viewModel.selectedReserveOnline ? "暂无已上线预约剧集" : "暂无待上线预约剧集") : "登录后查看我的预约"
+        }
         return viewModel.selectedTab == .history ? "暂无观看记录" : "暂无点赞剧集"
     }
     private var avatar: some View {

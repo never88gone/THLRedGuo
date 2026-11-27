@@ -1,5 +1,7 @@
 import '../../views/account/hongguo_social_dialog.dart';
+import '../../core/account/hongguo_account_session.dart';
 import '../../core/account/hongguo_account_social.dart';
+import '../account/login_page.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -69,6 +71,7 @@ class _DetailScreenState extends State<DetailScreen> {
   bool _initialActionHandled = false;
   late final int _profileEpoch;
   List<HongguoSeriesEntry>? _seriesEntries;
+  bool _reserving = false;
   Widget? get _sourceDiagnostics => widget.repository.supportsSourceManagement
       ? SourceDiagnosticsButton(
           repository: widget.repository,
@@ -82,6 +85,7 @@ class _DetailScreenState extends State<DetailScreen> {
     super.initState();
     _profileEpoch = widget.store.profileEpoch;
     widget.store.addListener(_onStoreChanged);
+    HongguoAccountSocial.shared.addListener(_onStoreChanged);
     _seriesEntries = widget.initialSeriesEntries;
     if (HongguoAccountSocial.shared.active) {
       unawaited(
@@ -112,6 +116,7 @@ class _DetailScreenState extends State<DetailScreen> {
     _detailScroll.dispose();
     _seriesScroll.dispose();
     widget.store.removeListener(_onStoreChanged);
+    HongguoAccountSocial.shared.removeListener(_onStoreChanged);
     _generation++;
     super.dispose();
   }
@@ -152,7 +157,7 @@ class _DetailScreenState extends State<DetailScreen> {
           .merge(detail.drama);
       final finalEpisodes = detail.episodes.isNotEmpty
           ? detail.episodes
-          : (merged.episodes > 0
+          : (merged.releaseStatus != 'upcoming' && merged.episodes > 0
                 ? List.generate(
                     merged.episodes,
                     (index) => Episode({
@@ -251,6 +256,74 @@ class _DetailScreenState extends State<DetailScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  bool _isUpcoming(Drama drama, List<Episode> episodes) =>
+      episodes.isEmpty &&
+      (drama.releaseStatus == 'upcoming' || drama.onlineDate.isNotEmpty);
+
+  Future<void> _toggleReserve(Drama drama) async {
+    if (_reserving) return;
+    if (!HongguoAccountSession.shared.loggedIn) {
+      final goLogin = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('需要登录红果账号'),
+          content: const Text('登录后即可预约新剧，并同步至「我的预约」列表。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('去登录'),
+            ),
+          ],
+        ),
+      );
+      if (goLogin != true || !mounted) return;
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const HongguoLoginScreen()),
+      );
+      if (!mounted || !HongguoAccountSession.shared.loggedIn) return;
+      try {
+        await HongguoAccountSocial.shared.load(drama);
+      } catch (_) {}
+      if (!mounted) return;
+      if (HongguoAccountSocial.shared.snapshot(drama)?.onlineSubscribed == true) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('该剧已在您的预约列表中')));
+        return;
+      }
+    }
+    final nextSubscribed =
+        !(HongguoAccountSocial.shared.snapshot(drama)?.onlineSubscribed ??
+            false);
+    setState(() => _reserving = true);
+    try {
+      await HongguoAccountSocial.shared.subscribe(drama, nextSubscribed);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nextSubscribed ? '预约成功，可在个人中心「我的预约」查看' : '已取消预约',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${nextSubscribed ? '预约' : '取消预约'}失败：$error',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _reserving = false);
+    }
   }
 
   Future<void> _download() async {
@@ -441,7 +514,7 @@ class _DetailScreenState extends State<DetailScreen> {
           .merge(detail.drama);
       final finalEpisodes = detail.episodes.isNotEmpty
           ? detail.episodes
-          : (merged.episodes > 0
+          : (merged.releaseStatus != 'upcoming' && merged.episodes > 0
                 ? List.generate(
                     merged.episodes,
                     (index) => Episode({
@@ -656,7 +729,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                             _loading ||
                                                 _error != null ||
                                                 episodes.isEmpty
-                                            ? _episodeStatus()
+                                            ? _episodeStatus(drama, episodes)
                                             : EpisodeBrowser(
                                                 key: const ValueKey(
                                                   'episode-browser',
@@ -699,7 +772,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                 (!_loading && episodes.isEmpty))
                               SliverFillRemaining(
                                 hasScrollBody: false,
-                                child: _episodeStatus(),
+                                child: _episodeStatus(drama, episodes),
                               )
                             else if (_loading && episodes.isEmpty)
                               SliverToBoxAdapter(
@@ -812,86 +885,168 @@ class _DetailScreenState extends State<DetailScreen> {
                 constraints: const BoxConstraints(maxWidth: 1000),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                  child: Row(
-                    children: [
-                      if (widget.repository.supportsDownloads &&
-                          widget.store.canDownload) ...[
-                        IconButton.filledTonal(
-                          tooltip: '下载选集',
-                          onPressed: allowed && !_loading && episodes.isNotEmpty
-                              ? _download
-                              : null,
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(52, 52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          icon: const Icon(Icons.download_rounded),
-                        ),
-                        const SizedBox(width: 12),
-                      ],
-                      Expanded(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 240),
-                          curve: Curves.easeOutCubic,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(28),
-                            boxShadow:
-                                allowed && !_loading && episodes.isNotEmpty
-                                ? AppShadows.primaryGlow
-                                : null,
-                          ),
-                          child: FilledButton.icon(
-                            key: const ValueKey('start-play'),
-                            autofocus: television,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.hongguoRed,
-                              foregroundColor: AppColors.white,
-                              disabledBackgroundColor: AppColors.hongguoRed
-                                  .withValues(alpha: 0.65),
-                              disabledForegroundColor: AppColors.whiteWithAlpha(
-                                0.85,
-                              ),
-                              shape: const StadiumBorder(),
-                              minimumSize: const Size(0, 52),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 12,
-                              ),
-                            ),
-                            onPressed: !allowed || _loading || episodes.isEmpty
-                                ? null
-                                : () => _play(resumeIndex, resume: true),
-                            icon: const Icon(
-                              Icons.play_arrow_rounded,
-                              size: 28,
-                            ),
-                            label: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: Text(
-                                _loading
-                                    ? (watched != null
-                                          ? '继续播放 · 第 ${watched.episode} 集'
-                                          : '立即播放')
-                                    : (watched != null && episodes.isNotEmpty
-                                          ? '继续播放 · 第 ${episodes[resumeIndex].number} 集'
-                                          : '立即播放'),
-                                key: ValueKey(
-                                  'play-label-${_loading ? "loading" : "ready"}-${watched?.episode}',
+                  child: Builder(
+                    builder: (context) {
+                      final upcoming =
+                          !_loading &&
+                          _error == null &&
+                          _isUpcoming(drama, episodes);
+                      final subscribed =
+                          HongguoAccountSocial.shared.active &&
+                          (HongguoAccountSocial.shared
+                                  .snapshot(drama)
+                                  ?.onlineSubscribed ??
+                              false);
+                      if (upcoming) {
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 240),
+                                curve: Curves.easeOutCubic,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(28),
+                                  boxShadow: !subscribed
+                                      ? AppShadows.primaryGlow
+                                      : null,
                                 ),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
+                                child: FilledButton.icon(
+                                  key: const ValueKey('reserve-drama-button'),
+                                  autofocus: television,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: subscribed
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.surfaceContainerHighest
+                                        : AppColors.hongguoRed,
+                                    foregroundColor: subscribed
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface
+                                        : AppColors.white,
+                                    shape: const StadiumBorder(),
+                                    minimumSize: const Size(0, 52),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  onPressed: (!allowed || _reserving)
+                                      ? null
+                                      : () => _toggleReserve(drama),
+                                  icon: _reserving
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.2,
+                                          ),
+                                        )
+                                      : Icon(
+                                          subscribed
+                                              ? Icons.notifications_active_rounded
+                                              : Icons.notifications_none_rounded,
+                                          size: 24,
+                                        ),
+                                  label: Text(
+                                    subscribed ? '已预约（点击取消）' : '立即预约',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          if (widget.repository.supportsDownloads &&
+                              widget.store.canDownload) ...[
+                            IconButton.filledTonal(
+                              tooltip: '下载选集',
+                              onPressed:
+                                  allowed && !_loading && episodes.isNotEmpty
+                                  ? _download
+                                  : null,
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size(52, 52),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: const Icon(Icons.download_rounded),
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          Expanded(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 240),
+                              curve: Curves.easeOutCubic,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(28),
+                                boxShadow:
+                                    allowed && !_loading && episodes.isNotEmpty
+                                    ? AppShadows.primaryGlow
+                                    : null,
+                              ),
+                              child: FilledButton.icon(
+                                key: const ValueKey('start-play'),
+                                autofocus: television,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.hongguoRed,
+                                  foregroundColor: AppColors.white,
+                                  disabledBackgroundColor: AppColors.hongguoRed
+                                      .withValues(alpha: 0.65),
+                                  disabledForegroundColor:
+                                      AppColors.whiteWithAlpha(0.85),
+                                  shape: const StadiumBorder(),
+                                  minimumSize: const Size(0, 52),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                onPressed:
+                                    !allowed || _loading || episodes.isEmpty
+                                    ? null
+                                    : () => _play(resumeIndex, resume: true),
+                                icon: const Icon(
+                                  Icons.play_arrow_rounded,
+                                  size: 28,
+                                ),
+                                label: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: Text(
+                                    _loading
+                                        ? (watched != null
+                                              ? '继续播放 · 第 ${watched.episode} 集'
+                                              : '立即播放')
+                                        : (watched != null &&
+                                                  episodes.isNotEmpty
+                                              ? '继续播放 · 第 ${episodes[resumeIndex].number} 集'
+                                              : '立即播放'),
+                                    key: ValueKey(
+                                      'play-label-${_loading ? "loading" : "ready"}-${watched?.episode}',
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -951,7 +1106,7 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _episodeStatus() {
+  Widget _episodeStatus(Drama drama, List<Episode> episodes) {
     if (_loading) {
       return Center(
         child: Padding(
@@ -982,6 +1137,106 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      );
+    }
+    if (_error == null && _isUpcoming(drama, episodes)) {
+      final colors = Theme.of(context).colorScheme;
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final subscribed =
+          HongguoAccountSocial.shared.active &&
+          (HongguoAccountSocial.shared.snapshot(drama)?.onlineSubscribed ??
+              false);
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            key: const ValueKey('upcoming-status-card'),
+            width: double.infinity,
+            constraints: const BoxConstraints(maxWidth: 480),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.darkSurfaceElevated
+                  : colors.surfaceContainer,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppColors.hongguoRedWithAlpha(isDark ? 0.35 : 0.25),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  subscribed
+                      ? Icons.notifications_active_rounded
+                      : Icons.event_available_rounded,
+                  size: 40,
+                  color: AppColors.hongguoRed,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '待上线 · 敬请期待',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (drama.onlineDate.isNotEmpty || drama.heat.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      if (drama.onlineDate.isNotEmpty)
+                        Chip(
+                          avatar: const Icon(Icons.schedule_rounded, size: 16),
+                          label: Text('预计上线：${drama.onlineDate}'),
+                        ),
+                      if (drama.heat.isNotEmpty)
+                        Chip(
+                          avatar: const Icon(
+                            Icons.local_fire_department_rounded,
+                            size: 16,
+                          ),
+                          label: Text('预约热度：${drama.heat}'),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Text(
+                  '当前剧集尚未正式上线，暂无可播放正片。\n立即预约后可在「我的 -> 我的预约」随时查看上线动态。',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _reserving ? null : () => _toggleReserve(drama),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: subscribed
+                        ? colors.surfaceContainerHighest
+                        : AppColors.hongguoRed,
+                    foregroundColor: subscribed
+                        ? colors.onSurface
+                        : AppColors.white,
+                  ),
+                  icon: Icon(
+                    subscribed
+                        ? Icons.notifications_active_rounded
+                        : Icons.notifications_none_rounded,
+                    size: 20,
+                  ),
+                  label: Text(subscribed ? '已预约（点击取消）' : '立即预约'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -1561,7 +1816,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                   padding: const EdgeInsets.only(right: 8),
                                 child: InkWell(
                                   key: ValueKey('series-${entry.drama.id}'),
-                                  onTap: isCurrent || !entry.playable
+                                  onTap: isCurrent
                                       ? null
                                       : () => _openSeriesDrama(entry.drama),
                                   borderRadius: BorderRadius.circular(14),

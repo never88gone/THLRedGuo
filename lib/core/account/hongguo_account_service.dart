@@ -1240,7 +1240,94 @@ class HongguoAccountService {
       error = issue.message;
     }
     _check(revision);
-    return HongguoSocialSnapshot(episodes, people, creatorError: error);
+    return HongguoSocialSnapshot(
+      episodes,
+      people,
+      creatorError: error,
+      onlineSubscribed: result['onlineSubscribed'] == true,
+      isOnline: result['isOnline'] != false,
+    );
+  }
+
+  Future<HongguoCollectionPage<HongguoSubscribeItem>> subscribedDramas({
+    int offset = 0,
+    bool isOnline = false,
+    int tabType = 13,
+    String sessionId = '',
+  }) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    final result = await _call(
+      'subscribeList',
+      {
+        'offset': offset,
+        'limit': 20,
+        'tabType': tabType,
+        'isOnline': isOnline ? 'true' : 'false',
+        if (sessionId.isNotEmpty) 'sessionId': sessionId,
+      },
+      null,
+      revision,
+    );
+    _check(revision);
+    final rows = result['items'];
+    final hasMore = result['hasMore'];
+    if (rows is! List || hasMore is! bool) {
+      throw const HongguoAccountFailure('官方预约列表格式已变化');
+    }
+    return HongguoCollectionPage<HongguoSubscribeItem>(
+      rows
+          .map(
+            (row) => HongguoSubscribeItem.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
+          .where((item) => item.id.isNotEmpty)
+          .toList(),
+      hasMore: hasMore,
+      nextOffset: (result['nextOffset'] as num?)?.toInt(),
+    );
+  }
+
+  Future<void> setDramaSubscribed(Drama drama, bool subscribe) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final revision = session.revision;
+    await _call(
+      'subscribeAction',
+      {
+        'id': drama.cleanSourceId,
+        'itemType': 1,
+        'subscribe': subscribe ? '1' : '0',
+      },
+      null,
+      revision,
+    );
+    _check(revision);
+  }
+
+  Future<void> deleteSubscribedDramas(
+    List<String> ids, {
+    bool isOnline = false,
+    int tabType = 13,
+  }) async {
+    if (!session.loggedIn) throw const HongguoAccountFailure('请先登录红果账号');
+    final cleanIds = ids
+        .map((e) => e.replaceFirst('hongguo:', '').trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (cleanIds.isEmpty) return;
+    final revision = session.revision;
+    await _call(
+      'subscribeDelete',
+      {
+        'itemIds': cleanIds,
+        'isOnline': isOnline ? 'true' : 'false',
+        'tabType': tabType,
+      },
+      null,
+      revision,
+    );
+    _check(revision);
   }
 
   Future<HongguoSocialSnapshot> setLiked(

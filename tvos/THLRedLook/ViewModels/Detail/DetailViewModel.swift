@@ -11,6 +11,9 @@ public final class DetailViewModel: ObservableObject {
     @Published public var errorMessage: String?
     @Published public var relatedSeasons: [Drama] = []
     @Published public var seasonItems: [SeasonItem] = []
+    @Published public var isReserving = false
+    @Published public var reserveMessage: String?
+    @Published public var needsLoginForReserve = false
 
     @Published public var drama: Drama
     private let repository: NativeRepository
@@ -32,9 +35,13 @@ public final class DetailViewModel: ObservableObject {
         self.followState = store.followState(for: drama.id)
         self.lastWatchEntry = store.getWatchEntry(dramaId: drama.id)
         if drama.id.starts(with: "test_") {
-            let total = max(20, drama.episodes)
-            let episodes = (1...total).map { Episode(id: "\(drama.id)_\($0)", title: "第 \($0) 集", number: $0) }
-            self.detail = DramaDetail(drama: drama, episodes: episodes, warning: "")
+            if drama.releaseStatus == "upcoming" {
+                self.detail = DramaDetail(drama: drama, episodes: [], warning: "")
+            } else {
+                let total = max(20, drama.episodes)
+                let episodes = (1...total).map { Episode(id: "\(drama.id)_\($0)", title: "第 \($0) 集", number: $0) }
+                self.detail = DramaDetail(drama: drama, episodes: episodes, warning: "")
+            }
         }
     }
 
@@ -45,7 +52,6 @@ public final class DetailViewModel: ObservableObject {
 
     public func switchToDrama(_ newDrama: Drama) async {
         guard newDrama.id != drama.id else { return }
-        guard !seasonItems.contains(where: { $0.drama.id == newDrama.id && !$0.playable }) else { return }
         self.drama = newDrama
         self.followState = store.followState(for: newDrama.id)
         self.lastWatchEntry = store.getWatchEntry(dramaId: newDrama.id)
@@ -94,6 +100,10 @@ public final class DetailViewModel: ObservableObject {
                 }
             }
             await loadSeasons(generation: generation)
+            if HongguoAccountModel.shared.loggedIn {
+                let target = loaded.drama
+                Task { try? await HongguoAccountModel.shared.loadSocial(target) }
+            }
         } catch {
             guard generation == loadGeneration, !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
@@ -271,6 +281,36 @@ public final class DetailViewModel: ObservableObject {
             self.relatedSeasons = items.filter { !$0.isCurrent }.map { $0.drama }
         } catch {
             NSLog("🎬 [DetailVM] 加载相关季数失败: %@", error.localizedDescription)
+        }
+    }
+
+    public var isUpcoming: Bool {
+        guard let detail = detail else { return drama.releaseStatus == "upcoming" || !drama.onlineDate.isEmpty }
+        return detail.episodes.isEmpty && (detail.drama.releaseStatus == "upcoming" || !detail.drama.onlineDate.isEmpty)
+    }
+
+    public var isSubscribed: Bool {
+        HongguoAccountModel.shared.socialState(drama)?.onlineSubscribed ?? false
+    }
+
+    public func toggleReserve() {
+        guard !isReserving else { return }
+        guard HongguoAccountModel.shared.loggedIn else {
+            needsLoginForReserve = true
+            return
+        }
+        let next = !isSubscribed
+        isReserving = true
+        reserveMessage = nil
+        let target = drama
+        Task {
+            defer { isReserving = false }
+            do {
+                try await HongguoAccountModel.shared.setDramaSubscribed(target, subscribed: next)
+                reserveMessage = next ? "预约成功，可在「我的 -> 我的预约」查看" : "已取消预约"
+            } catch {
+                reserveMessage = "\(next ? "预约" : "取消预约")失败：\(error.localizedDescription)"
+            }
         }
     }
 

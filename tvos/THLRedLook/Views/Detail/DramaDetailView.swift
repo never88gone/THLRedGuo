@@ -123,7 +123,7 @@ public struct DramaDetailView: View {
                                                 isExternalFocused: focusedTarget == .season(index),
                                                 onUpCommand: {
 
-                                                    focus(.play, with: scrollProxy)
+                                                    focus(viewModel.isUpcoming ? .reserve : .play, with: scrollProxy)
                                                 },
                                                 onDownCommand: {
 
@@ -134,7 +134,7 @@ public struct DramaDetailView: View {
                                                     }
                                                 }
                                             ) {
-                                                if !item.isCurrent && item.playable {
+                                                if !item.isCurrent {
                                                     Task {
                                                         focus(.season(index), with: scrollProxy)
                                                         await viewModel.switchToDrama(item.drama)
@@ -159,6 +159,52 @@ public struct DramaDetailView: View {
                             Divider()
                                 .padding(.vertical, 4)
 
+                            if detail.episodes.isEmpty && (detail.drama.releaseStatus == "upcoming" || !detail.drama.onlineDate.isEmpty) {
+                                let subscribed = accountLibrary.socialState(detail.drama)?.onlineSubscribed ?? false
+                                VStack(alignment: .leading, spacing: 18) {
+                                    HStack(spacing: 16) {
+                                        Image(systemName: subscribed ? "bell.badge.fill" : "calendar.badge.clock")
+                                            .font(.system(size: 36))
+                                            .foregroundColor(TVColors.primary)
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text("待上线 · 敬请期待")
+                                                .font(.title2.bold())
+                                                .foregroundColor(TVColors.white)
+                                            Text("当前剧集尚未正式上线，暂无可播放正片。点击上方「\(subscribed ? "已预约" : "立即预约")」关注开播动态。")
+                                                .font(.callout)
+                                                .foregroundColor(TVColors.secondary)
+                                        }
+                                    }
+                                    HStack(spacing: 24) {
+                                        if !detail.drama.onlineDate.isEmpty {
+                                            Label("预计上线：\(detail.drama.onlineDate)", systemImage: "clock")
+                                                .font(.callout)
+                                                .foregroundColor(TVColors.white.opacity(0.9))
+                                        }
+                                        if !detail.drama.heat.isEmpty {
+                                            Label("预约热度：\(detail.drama.formattedHeat)", systemImage: "flame.fill")
+                                                .font(.callout)
+                                                .foregroundColor(TVColors.orange)
+                                        }
+                                        if accountLibrary.loggedIn {
+                                            Label(subscribed ? "状态：已预约" : "状态：未预约", systemImage: subscribed ? "checkmark.circle.fill" : "bell")
+                                                .font(.callout)
+                                                .foregroundColor(subscribed ? TVColors.green : TVColors.secondary)
+                                        }
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(28)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .fill(TVColors.detailCardBg.opacity(0.65))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .stroke(TVColors.white.opacity(0.12), lineWidth: 1)
+                                        )
+                                )
+                                .accessibilityIdentifier("detail.upcomingCard")
+                            } else {
                             // 选集区
                             VStack(alignment: .leading, spacing: 24) {
                                 Text("选集播放")
@@ -231,6 +277,7 @@ public struct DramaDetailView: View {
                                     )
                                 }
                             }
+                            }
                         } else if viewModel.isLoading {
                             VStack(alignment: .leading, spacing: 20) {
                                 Text("选集播放")
@@ -269,7 +316,7 @@ public struct DramaDetailView: View {
                     if hasDetail {
                         withAnimation(.easeInOut(duration: 0.35)) {}
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            focus(.play, with: scrollProxy)
+                            focus(viewModel.isUpcoming ? .reserve : .play, with: scrollProxy)
                         }
                     }
                 }
@@ -284,7 +331,7 @@ public struct DramaDetailView: View {
                         selectedEpisodeNumber = entry.episode
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        focus(.play, with: scrollProxy)
+                        focus(viewModel.isUpcoming ? .reserve : .play, with: scrollProxy)
                     }
                 }
             }
@@ -389,7 +436,39 @@ public struct DramaDetailView: View {
                         }
                     }
                 }
+            } else if let reserveMsg = viewModel.reserveMessage {
+                HStack(spacing: 12) {
+                    Image(systemName: reserveMsg.contains("失败") ? "exclamationmark.triangle.fill" : "bell.badge.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(reserveMsg.contains("失败") ? TVColors.orange : TVColors.green)
+                    Text(reserveMsg)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(TVColors.white)
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 18)
+                .background(
+                    Capsule()
+                        .fill(TVColors.detailCardBg.opacity(0.95))
+                        .shadow(color: TVColors.black.opacity(0.5), radius: 10, y: 5)
+                )
+                .padding(.bottom, 60)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        withAnimation(.easeOut) {
+                            viewModel.reserveMessage = nil
+                        }
+                    }
+                }
             }
+        }
+        .fullScreenCover(isPresented: $viewModel.needsLoginForReserve, onDismiss: {
+            if accountLibrary.loggedIn {
+                Task { try? await accountLibrary.loadSocial(currentDrama) }
+            }
+        }) {
+            TVLoginOptionsView()
         }
         .fullScreenCover(isPresented: $showingAnchorDetail) {
             if let anchor = currentAnchor {
@@ -410,6 +489,7 @@ public struct DramaDetailView: View {
         let identifier: String
         switch target {
         case .play: identifier = "detail_play"
+        case .reserve: identifier = "detail_reserve"
         case .favorite: identifier = "detail_favorite"
         case .anchor: identifier = "detail_anchor"
         case .followState: identifier = "detail_follow_state"

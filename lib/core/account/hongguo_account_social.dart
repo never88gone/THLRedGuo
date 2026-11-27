@@ -87,8 +87,27 @@ class HongguoAccountSocial extends ChangeNotifier {
           creator,
           followed,
         );
-        return HongguoSocialSnapshot(snapshot(drama)?.episodes ?? [], rows);
+        final prev = snapshot(drama);
+        return HongguoSocialSnapshot(
+          prev?.episodes ?? [],
+          rows,
+          creatorError: prev?.creatorError,
+          onlineSubscribed: prev?.onlineSubscribed ?? false,
+          isOnline: prev?.isOnline ?? (drama.releaseStatus != 'upcoming'),
+        );
       });
+
+  Future<void> subscribe(Drama drama, bool subscribed) => _write(drama, () async {
+    await service.setDramaSubscribed(drama, subscribed);
+    final prev = snapshot(drama);
+    return HongguoSocialSnapshot(
+      prev?.episodes ?? const [],
+      prev?.creators ?? const [],
+      creatorError: prev?.creatorError,
+      onlineSubscribed: subscribed,
+      isOnline: prev?.isOnline ?? (drama.releaseStatus != 'upcoming'),
+    );
+  });
   @override
   void dispose() {
     service.session.removeListener(_changed);

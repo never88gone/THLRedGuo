@@ -5,6 +5,7 @@ public enum LibraryTab: String, CaseIterable, Identifiable {
     case follows = "follows"
     case liked = "liked"
     case anchors = "anchors"
+    case reservations = "reservations"
 
     public var id: String { rawValue }
     public var label: String {
@@ -13,6 +14,7 @@ public enum LibraryTab: String, CaseIterable, Identifiable {
         case .follows: return "点赞剧集"
         case .liked: return "点赞视频"
         case .anchors: return "关注主播"
+        case .reservations: return "我的预约"
         }
     }
 }

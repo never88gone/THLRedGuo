@@ -39,10 +39,14 @@ class HongguoSocialSnapshot {
     this.episodes,
     this.creators, {
     this.creatorError,
+    this.onlineSubscribed = false,
+    this.isOnline = true,
   });
   final List<HongguoEpisodeLike> episodes;
   final List<HongguoCreator> creators;
   final String? creatorError;
+  final bool onlineSubscribed;
+  final bool isOnline;
   HongguoEpisodeLike? episode(int number) =>
       episodes.where((value) => value.number == number).firstOrNull;
 }

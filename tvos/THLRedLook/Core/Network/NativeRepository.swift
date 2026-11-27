@@ -94,7 +94,8 @@ public final class NativeRepository: DramaSourceProviderProtocol, PlaybackStream
             episodes.append(Episode(id: id, title: title, number: num, vip: vip, raw: raw))
         }
 
-        guard !episodes.isEmpty else {
+        let isUpcoming = freshDrama.releaseStatus == "upcoming" || !freshDrama.onlineDate.isEmpty
+        guard !episodes.isEmpty || isUpcoming else {
             throw NSError(domain: "THLRedLook.Detail", code: -1, userInfo: [NSLocalizedDescriptionKey: "站源未返回可播放的分集，请重试"])
         }
 

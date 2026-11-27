@@ -41,29 +41,27 @@ final class PlayerPrefetchCoordinator {
     }
 
     func prefetchNextEpisode(
-        currentEpisodeIndex: Int,
+        nextEpisodeNumber: Int,
         allEpisodes: [Episode],
         drama: Drama,
         requestedQuality: Int,
         generation: Int
     ) {
-        let nextIndex = currentEpisodeIndex + 1
-        guard nextIndex <= allEpisodes.count else { return }
-        let identity = "\(drama.id):\(nextIndex):\(requestedQuality):\(generation)"
+        let identity = "\(drama.id):\(nextEpisodeNumber):\(requestedQuality):\(generation)"
         if targetIdentity != identity {
             cancel()
             targetIdentity = identity
             prefetchAttempts = 0
             prefetchRetryAt = .distantPast
         }
-        guard preloadedEpisode?.episodeIndex != nextIndex, prefetchTask == nil,
+        guard preloadedEpisode?.episodeIndex != nextEpisodeNumber, prefetchTask == nil,
               prefetchAttempts < 2, Date() >= prefetchRetryAt else { return }
 
         prefetchAttempts += 1
         prefetchRetryAt = Date().addingTimeInterval(10)
         prefetchSequence += 1
         let sequence = prefetchSequence
-        let targetEpisode = allEpisodes.indices.contains(nextIndex - 1) ? allEpisodes[nextIndex - 1] : nil
+        let targetEpisode = allEpisodes.first { $0.number == nextEpisodeNumber }
         let targetDrama = drama
         let preloadRepo = self.preloadingRepository
 
@@ -75,7 +73,7 @@ final class PlayerPrefetchCoordinator {
                 let resolvedPlan = try await preloadRepo.resolvePlayback(
                     drama: targetDrama,
                     episode: targetEpisode,
-                    episodeIndex: nextIndex,
+                    episodeIndex: nextEpisodeNumber,
                     quality: requestedQuality
                 )
                 guard !Task.isCancelled else { return }
@@ -105,16 +103,16 @@ final class PlayerPrefetchCoordinator {
                         CENCMP4Decryptor.shared.removePlaybackCache(at: oldDec)
                     }
                     self.preloadedEpisode = PreloadedEpisode(
-                        episodeIndex: nextIndex,
+                        episodeIndex: nextEpisodeNumber,
                         plan: resolvedPlan,
                         playerItem: item,
                         decryptedURL: decryptedTempURL
                     )
-                    NSLog("🎬 [PlayerPrefetch] 成功提前加载并解密第%d集", nextIndex)
+                    NSLog("🎬 [PlayerPrefetch] 成功提前加载并解密第%d集", nextEpisodeNumber)
                 }
             } catch {
                 guard !Task.isCancelled, self?.prefetchSequence == sequence else { return }
-                NSLog("[PlayerPrefetch] prefetch failed episode=%d attempt=%d code=%@", nextIndex, self?.prefetchAttempts ?? 0, (error as NSError).userInfo["diagnosticCode"] as? String ?? "PREFETCH_FAILED")
+                NSLog("[PlayerPrefetch] prefetch failed episode=%d attempt=%d code=%@", nextEpisodeNumber, self?.prefetchAttempts ?? 0, (error as NSError).userInfo["diagnosticCode"] as? String ?? "PREFETCH_FAILED")
             }
         }
     }

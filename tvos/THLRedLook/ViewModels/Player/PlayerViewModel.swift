@@ -20,10 +20,7 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var selectedQuality: Int = 0
     @Published public private(set) var requestedQuality: Int = 0
     @Published public var playbackRate: Float = 1.0
-    public var isControlsVisible: Bool {
-        get { visibilityCoordinator.isControlsVisible }
-        set { visibilityCoordinator.isControlsVisible = newValue }
-    }
+    public var isControlsVisible: Bool { get { visibilityCoordinator.isControlsVisible } set { visibilityCoordinator.isControlsVisible = newValue } }
     @Published public var isEpisodeDrawerVisible: Bool = false
     @Published public var isCommentDrawerVisible: Bool = false
     @Published public var isDanmakuSettingsVisible: Bool = false
@@ -32,10 +29,8 @@ public final class PlayerViewModel: ObservableObject {
     @Published public var isLoading: Bool = true
     @Published public var isSeamlessTransitioning: Bool = false
     @Published public var errorMessage: String?
-    public var toastMessage: String? {
-        get { visibilityCoordinator.toastMessage }
-        set { visibilityCoordinator.toastMessage = newValue }
-    }
+    public var transitionEpoch: Int { visibilityCoordinator.transitionEpoch }
+    public var toastMessage: String? { get { visibilityCoordinator.toastMessage } set { visibilityCoordinator.toastMessage = newValue } }
     @Published public var nextEpisodeCountdown: Int?
     @Published public var relatedSeasons: [Drama] = []
     @Published public var switchSeasonDrama: Drama?
@@ -84,10 +79,7 @@ public final class PlayerViewModel: ObservableObject {
     private var reachedEnd = false
     private var isVisible = false
     private var closed = false
-    private var playIntent: Bool {
-        get { wantsPlayback }
-        set { wantsPlayback = newValue }
-    }
+    private var playIntent: Bool { get { wantsPlayback } set { wantsPlayback = newValue } }
     private var decryptedURL: URL?
     private let initialPreloadedPlan: PlaybackPlan?
     private let isFeedMode: Bool
@@ -193,6 +185,7 @@ public final class PlayerViewModel: ObservableObject {
 
     private func beginPlayback(episodeIndex: Int, seekTo: Double, recovering: Bool, preserveIntent: Bool = false) async {
         guard !closed, episodeIndex > 0, seekTo.isFinite else { return }
+        prepareForSeamlessTransition()
         saveCurrentProgress(force: true)
         playbackGeneration += 1
         let generation = playbackGeneration
@@ -240,18 +233,19 @@ public final class PlayerViewModel: ObservableObject {
 
     public func switchFeedDrama(drama: Drama, allEpisodes: [Episode]? = nil, initialEpisodeIndex: Int = 1, initialPosition: Double = 0, preloadedPlan: PlaybackPlan? = nil) async {
         guard !closed else { return }
+        prepareForSeamlessTransition()
         saveCurrentProgress(force: true)
         playbackGeneration += 1; preparationTask?.cancel(); preparationTask = nil
         recoveryCoordinator.reset()
         prefetchCoordinator.clearPreloaded(currentDecryptedURL: decryptedURL)
         observerManager.release()
-        player?.pause(); player?.replaceCurrentItem(with: nil)
+        player?.pause()
         if let old = decryptedURL { CENCMP4Decryptor.shared.removePlaybackCache(at: old); decryptedURL = nil }
         danmakuManager.reset(); seekCoordinator.cancel()
         self.drama = drama; self.allEpisodes = allEpisodes ?? []
         currentEpisodeIndex = initialEpisodeIndex; currentTime = max(0, initialPosition); duration = 0
         errorMessage = nil; plan = nil; isPlaying = false; isBuffering = false; isLoading = true
-        isSeamlessTransitioning = false; reachedEnd = false; playIntent = isSceneActive
+        reachedEnd = false; playIntent = isSceneActive
         if let plan = preloadedPlan, plan.isReusable(), !self.allEpisodes.isEmpty,
            let cached = VideoCacheManager.shared.takePlayer(for: plan.url, namespace: "feed") {
             self.plan = plan; selectedQuality = plan.quality
@@ -271,7 +265,7 @@ public final class PlayerViewModel: ObservableObject {
                 await self.beginPlayback(episodeIndex: ep, seekTo: pos, recovering: true)
             },
             onExceeded: { [weak self] msg in
-                self?.playIntent = false; self?.observerManager.release(); self?.player?.pause(); self?.isPlaying = false; self?.isBuffering = false; self?.isLoading = false; self?.errorMessage = msg
+                self?.playIntent = false; self?.observerManager.release(); self?.player?.pause(); self?.isPlaying = false; self?.isBuffering = false; self?.isLoading = false; self?.isSeamlessTransitioning = false; self?.visibilityCoordinator.cancelSeamlessTimeout(); self?.errorMessage = msg
             }
         )
     }
@@ -313,6 +307,7 @@ public final class PlayerViewModel: ObservableObject {
                 guard let self else { return }
                 self.errorMessage = nil; self.duration = dur
                 if quality > 0 { self.selectedQuality = quality }
+                self.visibilityCoordinator.cancelSeamlessTimeout()
                 self.isLoading = false; self.isSeamlessTransitioning = false
                 if self.playIntent && self.isSceneActive {
                     av.playImmediately(atRate: self.playbackRate); av.play()
@@ -325,8 +320,8 @@ public final class PlayerViewModel: ObservableObject {
                 self.currentTime = sec
                 if self.isLoading { self.isLoading = false }
                 let rem = self.duration - sec
-                if sec >= 3 && rem <= 20 && rem > 0, let nextNumber = self.adjacentEpisodeNumber(offset: 1) {
-                    self.prefetchCoordinator.prefetchNextEpisode(currentEpisodeIndex: nextNumber - 1, allEpisodes: self.allEpisodes, drama: self.drama, requestedQuality: self.requestedQuality, generation: generation)
+                if ((sec >= 3 && rem <= 20) || sec >= 6) && rem > 0, let nextNumber = self.adjacentEpisodeNumber(offset: 1) {
+                    self.prefetchCoordinator.prefetchNextEpisode(nextEpisodeNumber: nextNumber, allEpisodes: self.allEpisodes, drama: self.drama, requestedQuality: self.requestedQuality, generation: generation)
                 }
                 self.danmakuManager.updateActiveDanmakus(currentTime: self.currentTime, duration: self.duration, plan: self.plan)
             },
@@ -412,12 +407,28 @@ public final class PlayerViewModel: ObservableObject {
     }
     public func nextEpisode() async { if let n = adjacentEpisodeNumber(offset: 1) { await preparePlayback(episodeIndex: n, seekTo: 0) } }
     public func previousEpisode() async { if let p = adjacentEpisodeNumber(offset: -1) { await preparePlayback(episodeIndex: p, seekTo: 0) } }
-    private func adjacentEpisodeNumber(offset: Int) -> Int? {
+    public func adjacentEpisodeNumber(offset: Int) -> Int? {
         if let idx = allEpisodes.firstIndex(where: { $0.number == currentEpisodeIndex }) {
             let targetIdx = idx + offset
             return allEpisodes.indices.contains(targetIdx) ? allEpisodes[targetIdx].number : nil
         }
         return allEpisodes.first(where: { $0.number == currentEpisodeIndex + offset })?.number
+    }
+
+    public func prepareForSeamlessTransition() {
+        guard let currentPlayer = player, currentPlayer.currentItem != nil else { return }
+        NotificationCenter.default.post(name: AVPlayerContainerView.willTransitionNotification, object: currentPlayer)
+        visibilityCoordinator.advanceTransitionEpoch()
+        isSeamlessTransitioning = true
+        visibilityCoordinator.scheduleSeamlessTimeout { [weak self] in
+            if let self, !self.closed { self.isSeamlessTransitioning = false }
+        }
+    }
+
+    public func cancelPreparedTransition() {
+        visibilityCoordinator.cancelSeamlessTimeout()
+        isSeamlessTransitioning = false
+        NotificationCenter.default.post(name: AVPlayerContainerView.didCancelTransitionNotification, object: player)
     }
     public func selectEpisode(number: Int) async {
         isEpisodeDrawerVisible = false
@@ -449,29 +460,15 @@ public final class PlayerViewModel: ObservableObject {
         currentTime = max(0, sec)
     }
 
-    public func showControls() {
-        visibilityCoordinator.showControls(keepControlsVisible: keepControlsVisible) { [weak self] in self?.isPlaying == true }
-    }
-
-    public func hideControls() {
-        visibilityCoordinator.hideControls()
-    }
-
-    private func resetControlsHideTimer() {
-        visibilityCoordinator.resetControlsHideTimer(keepControlsVisible: keepControlsVisible) { [weak self] in self?.isPlaying == true }
-    }
+    public func showControls() { visibilityCoordinator.showControls(keepControlsVisible: keepControlsVisible) { [weak self] in self?.isPlaying == true } }
+    public func hideControls() { visibilityCoordinator.hideControls() }
+    private func resetControlsHideTimer() { visibilityCoordinator.resetControlsHideTimer(keepControlsVisible: keepControlsVisible) { [weak self] in self?.isPlaying == true } }
 
     private func handlePlayEnded() async {
         guard !closed, !reachedEnd else { return }
         reachedEnd = true
         currentTime = duration
         if adjacentEpisodeNumber(offset: 1) != nil {
-            isSeamlessTransitioning = true
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                guard let self, !self.closed, self.isSeamlessTransitioning else { return }
-                self.isSeamlessTransitioning = false
-            }
             await nextEpisode()
         } else if isFeedMode, let onFeedEndReached {
             onFeedEndReached()

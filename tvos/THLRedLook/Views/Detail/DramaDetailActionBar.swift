@@ -17,47 +17,68 @@ public struct DramaDetailActionBar: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             if let detail = detail {
+                let isUpcoming = detail.episodes.isEmpty && (detail.drama.releaseStatus == "upcoming" || !detail.drama.onlineDate.isEmpty)
                 HStack(spacing: 32) {
-                    let resumeEp = viewModel.lastWatchEntry?.episode ?? selectedEpisodeNumber
-                    let resumePos = viewModel.lastWatchEntry?.position ?? 0
-                    let playTitle = viewModel.lastWatchEntry != nil ? "继续播放 第 \(resumeEp) 集" : "立即播放"
-
-                    TVButton(
-                        title: playTitle,
-                        icon: "play.fill",
-                        isProminent: true,
-                        isExternalFocused: focusedTarget == .play,
-                        onDownCommand: {
-                            if viewModel.seasonItems.count > 1 {
-                                onFocus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0))
-                            } else if detail.episodeChunks.count > 1 {
-                                onFocus(.chunk(viewModel.selectedChunkIndex))
-                            } else if let first = detail.episodes.first {
-                                onFocus(.episode(first.number))
-                            }
-                        }
-                    ) {
-                        selectedEpisodeNumber = resumeEp
-                        resumePosition = resumePos
-                        playingEpisodeIndex = resumeEp
-                    }
-                    .focused($focusedTarget, equals: .play)
-                    .id("detail_play")
-                    .accessibilityIdentifier("detail.play")
-
-                    if accountLibrary.loggedIn {
-                        let isLiked = viewModel.followState != .none
+                    if isUpcoming {
+                        let subscribed = accountLibrary.socialState(detail.drama)?.onlineSubscribed ?? false
                         TVButton(
-                            title: isLiked ? "已点赞" : "点赞",
-                            icon: isLiked ? "heart.fill" : "heart",
-                            isExternalFocused: focusedTarget == .favorite
+                            title: viewModel.isReserving ? "处理中..." : (subscribed ? "已预约（点击取消）" : "立即预约"),
+                            icon: subscribed ? "bell.fill" : "bell",
+                            isProminent: !subscribed,
+                            isExternalFocused: focusedTarget == .reserve,
+                            onDownCommand: {
+                                if viewModel.seasonItems.count > 1 {
+                                    onFocus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0))
+                                }
+                            }
                         ) {
-                            viewModel.toggleFavorite()
+                            viewModel.toggleReserve()
                         }
-                        .focused($focusedTarget, equals: .favorite)
-                        .id("detail_favorite")
-                        .accessibilityIdentifier("detail.favorite")
-                        .accessibilityLabel(isLiked ? "已点赞" : "点赞")
+                        .focused($focusedTarget, equals: .reserve)
+                        .id("detail_reserve")
+                        .accessibilityIdentifier("detail.reserve")
+                    } else {
+                        let resumeEp = viewModel.lastWatchEntry?.episode ?? selectedEpisodeNumber
+                        let resumePos = viewModel.lastWatchEntry?.position ?? 0
+                        let playTitle = viewModel.lastWatchEntry != nil ? "继续播放 第 \(resumeEp) 集" : "立即播放"
+
+                        TVButton(
+                            title: playTitle,
+                            icon: "play.fill",
+                            isProminent: true,
+                            isExternalFocused: focusedTarget == .play,
+                            onDownCommand: {
+                                if viewModel.seasonItems.count > 1 {
+                                    onFocus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0))
+                                } else if detail.episodeChunks.count > 1 {
+                                    onFocus(.chunk(viewModel.selectedChunkIndex))
+                                } else if let first = detail.episodes.first {
+                                    onFocus(.episode(first.number))
+                                }
+                            }
+                        ) {
+                            selectedEpisodeNumber = resumeEp
+                            resumePosition = resumePos
+                            playingEpisodeIndex = resumeEp
+                        }
+                        .focused($focusedTarget, equals: .play)
+                        .id("detail_play")
+                        .accessibilityIdentifier("detail.play")
+
+                        if accountLibrary.loggedIn {
+                            let isLiked = viewModel.followState != .none
+                            TVButton(
+                                title: isLiked ? "已点赞" : "点赞",
+                                icon: isLiked ? "heart.fill" : "heart",
+                                isExternalFocused: focusedTarget == .favorite
+                            ) {
+                                viewModel.toggleFavorite()
+                            }
+                            .focused($focusedTarget, equals: .favorite)
+                            .id("detail_favorite")
+                            .accessibilityIdentifier("detail.favorite")
+                            .accessibilityLabel(isLiked ? "已点赞" : "点赞")
+                        }
                     }
 
                     TVButton(
@@ -80,28 +101,30 @@ public struct DramaDetailActionBar: View {
                     .id("detail_anchor")
                     .accessibilityIdentifier("detail.anchor")
 
-                    TVButton(
-                        title: "缓存全剧",
-                        icon: "arrow.down.circle",
-                        isExternalFocused: focusedTarget == .download,
-                        onDownCommand: {
-                            if viewModel.seasonItems.count > 1 {
-                                onFocus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0))
-                            } else if detail.episodeChunks.count > 1 {
-                                onFocus(.chunk(viewModel.selectedChunkIndex))
-                            } else if let firstEp = detail.episodes.first {
-                                onFocus(.episode(firstEp.number))
+                    if !isUpcoming {
+                        TVButton(
+                            title: "缓存全剧",
+                            icon: "arrow.down.circle",
+                            isExternalFocused: focusedTarget == .download,
+                            onDownCommand: {
+                                if viewModel.seasonItems.count > 1 {
+                                    onFocus(.season(viewModel.seasonItems.firstIndex(where: { $0.isCurrent }) ?? 0))
+                                } else if detail.episodeChunks.count > 1 {
+                                    onFocus(.chunk(viewModel.selectedChunkIndex))
+                                } else if let firstEp = detail.episodes.first {
+                                    onFocus(.episode(firstEp.number))
+                                }
+                            }
+                        ) {
+                            viewModel.downloadAllEpisodes()
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                showingDownloadSuccess = true
                             }
                         }
-                    ) {
-                        viewModel.downloadAllEpisodes()
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            showingDownloadSuccess = true
-                        }
+                        .focused($focusedTarget, equals: .download)
+                        .id("detail_download")
+                        .accessibilityIdentifier("detail.download")
                     }
-                    .focused($focusedTarget, equals: .download)
-                    .id("detail_download")
-                    .accessibilityIdentifier("detail.download")
                 }
                 .padding(.top, 16)
                 .padding(.leading, 6)

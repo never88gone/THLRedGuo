@@ -88,6 +88,28 @@ final class TVLaunchCoordinator {
             selectedTab.wrappedValue = .catalog
             catalogInitialCategory.wrappedValue = "app:discover:motion_comic"
             columnVisibility.wrappedValue = .all
+        case "catalog_subscribe":
+            selectedTab.wrappedValue = .catalog
+            catalogInitialCategory.wrappedValue = "app:discover:subscribe"
+            columnVisibility.wrappedValue = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedNavTab.wrappedValue = .catalog
+            }
+        case "detail_upcoming":
+            directDetailDrama.wrappedValue = Drama(
+                id: "test_upcoming_drama",
+                source: "hongguo",
+                sourceId: "7600680161347898430",
+                title: "女相师2（待上线预约测试）",
+                description: "前作原班人马重磅回归，高能权谋反转不断，敬请期待。",
+                cover: "",
+                episodes: 0,
+                category: "新剧预约",
+                heat: "1285000",
+                onlineDate: "2026-12-01",
+                tags: ["古装", "权谋", "大女主"],
+                releaseStatus: "upcoming"
+            )
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 focusedNavTab.wrappedValue = .catalog
             }

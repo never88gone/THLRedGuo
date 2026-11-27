@@ -689,6 +689,8 @@ class DartCoreEngine {
       'episodes': (vod['vod_episodes'] as num?)?.toInt() ?? episodes,
       'heat': vod['vod_heat']?.toString() ?? '',
       'views': vod['vod_views']?.toString() ?? '',
+      'onlineDate':
+          vod['vod_year']?.toString() ?? vod['onlineDate']?.toString() ?? '',
       'category': dramaCategoryLabel(
         vod['vod_category']?.toString() ?? category,
       ),
@@ -933,11 +935,30 @@ class DartCoreEngine {
       if ((spiderVod['vod_content']?.toString() ?? '').isNotEmpty) {
         fullDrama['description'] = spiderVod['vod_content'].toString();
       }
+      final vodStatus = spiderVod['vod_release_status']?.toString() ?? '';
+      if (vodStatus.isNotEmpty) {
+        fullDrama['releaseStatus'] = vodStatus;
+      }
+      final vodCategory = spiderVod['vod_category']?.toString() ?? '';
+      if (vodCategory.isNotEmpty &&
+          (fullDrama['category']?.toString().isEmpty ?? true)) {
+        fullDrama['category'] = dramaCategoryLabel(vodCategory);
+      }
+      final rawVodTag = spiderVod['vod_tag']?.toString() ?? '';
+      if (rawVodTag.isNotEmpty &&
+          ((fullDrama['tags'] as List?)?.isEmpty ?? true)) {
+        fullDrama['tags'] = rawVodTag
+            .split(RegExp(r'[,，/·\s]+'))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
       final playUrlRaw = spiderVod['vod_play_url']?.toString() ?? '';
       chapters.addAll(_parseChaptersFromVodPlayUrl(playUrlRaw));
     }
 
-    if (chapters.isEmpty) {
+    final isUpcoming = fullDrama['releaseStatus']?.toString() == 'upcoming';
+    if (chapters.isEmpty && !isUpcoming) {
       throw CatPawSourceFailure.playback('MISSING_EPISODE');
     }
 

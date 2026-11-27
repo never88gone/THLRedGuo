@@ -288,6 +288,12 @@ class CatPawJsRuntime {
             'BUSINESS_103012',
           );
         }
+        if (action == 'subscribeAction' && code == '101144') {
+          throw const HongguoAccountFailure(
+            '红果预约安全校验未通过（101144），请稍后重试',
+            'BUSINESS_101144',
+          );
+        }
         throw HongguoAccountFailure('官方账号请求失败（错误码 $code）', 'BUSINESS_$code');
       }
       if (const {
@@ -301,6 +307,9 @@ class CatPawJsRuntime {
         'creatorProfile',
         'commentList',
         'commentReplyList',
+        'subscribeList',
+        'subscribeAction',
+        'subscribeDelete',
       }.contains(action)) {
         throw const HongguoAccountFailure(
           '官方互动数据暂不可用，请刷新后重试',
