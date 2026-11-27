@@ -289,7 +289,22 @@ class LunaExoPlayer implements Player {
   }
 
   Future<void> waitForVideoFrame() async {
-    await _streamVideo?.waitUntilFirstFrameRendered;
+    if (_streamVideo != null) {
+      await _streamVideo?.waitUntilFirstFrameRendered;
+      return;
+    }
+    final c = _controller;
+    if (c != null && c.value.isInitialized) {
+      final completer = Completer<void>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!completer.isCompleted) completer.complete();
+      });
+      WidgetsBinding.instance.scheduleFrame();
+      await completer.future.timeout(
+        const Duration(milliseconds: 80),
+        onTimeout: () {},
+      );
+    }
   }
 
   Future<int> audioTrackCount() async {
@@ -539,25 +554,6 @@ class LunaExoPlayer implements Player {
     if (_disposed || requestGen != _openGeneration) return;
 
     final myGen = requestGen;
-    _pendingSeekSequence = 0;
-    _seekOperations = Future<void>.value();
-    _positionPollTimer?.cancel();
-    _watchdogTimer?.cancel();
-
-    final old = _controller;
-    _controller = null;
-    if (old != null) {
-      final listener = _valueListener;
-      _valueListener = null;
-      await _disposeControllerSafely(old, listener: listener);
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-    }
-
-    if (_disposed || myGen != _openGeneration) return;
-    revision.value++;
-
-    state = state.copyWith(completed: false);
-    _safeAdd(stream.completedController, false);
 
     final Map<String, String> headers = <String, String>{};
     try {
@@ -591,6 +587,7 @@ class LunaExoPlayer implements Player {
             uri.host == '::1') &&
         uri.path.endsWith('.mp4');
 
+    // 先完成耗时且不占用硬件解码器的 HTTP 流嗅探，避免在等待探测期间拆毁旧画面引发黑屏
     if (isLoopbackStream) {
       confirmedMp4 = true;
       isHls = false;
@@ -632,6 +629,30 @@ class LunaExoPlayer implements Player {
         client.close(force: true);
       }
     }
+
+    if (_disposed || myGen != _openGeneration) return;
+
+    _pendingSeekSequence = 0;
+    _seekOperations = Future<void>.value();
+    _positionPollTimer?.cancel();
+    _watchdogTimer?.cancel();
+
+    final old = _controller;
+    _controller = null;
+    if (old != null) {
+      final listener = _valueListener;
+      _valueListener = null;
+      await _disposeControllerSafely(old, listener: listener);
+      if (Platform.isAndroid) {
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+      }
+    }
+
+    if (_disposed || myGen != _openGeneration) return;
+    revision.value++;
+
+    state = state.copyWith(completed: false);
+    _safeAdd(stream.completedController, false);
 
     VideoFormat? formatHint = isHls ? VideoFormat.hls : null;
 
@@ -1349,6 +1370,7 @@ class LunaExoVideoView extends StatelessWidget {
                 key: ObjectKey(nativeVideo),
                 controller: nativeVideo,
                 fit: fit,
+                fill: AppColors.transparent,
                 controls: kit.NoVideoControls,
               )
             else if (hasVideo)
@@ -1359,7 +1381,7 @@ class LunaExoVideoView extends StatelessWidget {
                 ),
               )
             else
-              const ColoredBox(color: AppColors.black),
+              const SizedBox.shrink(),
             if (controls != null) controls!(context),
           ],
         );

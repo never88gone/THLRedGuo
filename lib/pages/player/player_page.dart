@@ -1,11 +1,14 @@
 import 'dart:async';
-import 'player_pip_coordinator.dart';
-import '../../core/account/hongguo_account_session.dart';
 import 'dart:io';
+import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+
+import '../../core/account/hongguo_account_session.dart';
+import 'player_pip_coordinator.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
@@ -173,6 +176,14 @@ class PlayerScreenState extends State<PlayerScreen>
   Timer? _saveWarningTimer;
   bool _saveWarningDismissed = false;
   PlaybackPlan? _plan;
+  final GlobalKey _videoCaptureKey = GlobalKey();
+  ui.Image? _transitionSnapshot;
+  bool _transitionSnapshotVisible = false;
+  int _transitionDirection = 1;
+  bool _switchingEpisode = false;
+  bool _switchingSlowHint = false;
+  Timer? _switchingHintTimer;
+  Timer? _snapshotFadeTimer;
   double _speed = 1;
   double _aspectRatio = 9 / 16;
   double _resumePosition = 0;
@@ -267,6 +278,12 @@ class PlayerScreenState extends State<PlayerScreen>
               ));
     if (_player is LunaExoPlayer) {
       _player.setDecoderMode(preferences.decoderMode);
+    } else if (_player.platform is NativePlayer) {
+      unawaited(
+        (_player.platform as NativePlayer)
+            .setProperty('keep-open', 'yes')
+            .catchError((Object _) {}),
+      );
     }
     unawaited(_player.setVolume(preferences.volume));
     _video = widget.videoBuilder == null && _player is! LunaExoPlayer
@@ -1395,6 +1412,139 @@ class PlayerScreenState extends State<PlayerScreen>
     return next;
   }
 
+  Future<void> _captureTransitionSnapshot(int nextIndex) async {
+    if (_closed || !mounted || widget.videoBuilder != null || _openedIndex < 0) {
+      return;
+    }
+    try {
+      final boundary =
+          _videoCaptureKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null || !boundary.hasSize) return;
+      final dpr = (MediaQuery.maybeDevicePixelRatioOf(context) ?? 1.0).clamp(
+        1.0,
+        2.0,
+      );
+      final image = await boundary
+          .toImage(pixelRatio: dpr)
+          .timeout(const Duration(milliseconds: 120));
+      if (_closed || !mounted) {
+        image.dispose();
+        return;
+      }
+      _snapshotFadeTimer?.cancel();
+      final previous = _transitionSnapshot;
+      setState(() {
+        _transitionSnapshot = image;
+        _transitionSnapshotVisible = true;
+        _transitionDirection = nextIndex >= _index ? 1 : -1;
+      });
+      previous?.dispose();
+    } catch (_) {}
+  }
+
+  void _dismissTransitionSnapshot({bool immediate = false}) {
+    _switchingHintTimer?.cancel();
+    _snapshotFadeTimer?.cancel();
+    final current = _transitionSnapshot;
+    if (current == null) {
+      if (_transitionSnapshotVisible || _switchingSlowHint) {
+        setState(() {
+          _transitionSnapshotVisible = false;
+          _switchingSlowHint = false;
+        });
+      }
+      return;
+    }
+    if (immediate || !mounted || _closed) {
+      _transitionSnapshot = null;
+      _transitionSnapshotVisible = false;
+      _switchingSlowHint = false;
+      current.dispose();
+      if (mounted && !_closed) setState(() {});
+      return;
+    }
+    setState(() {
+      _transitionSnapshotVisible = false;
+      _switchingSlowHint = false;
+    });
+    _snapshotFadeTimer = Timer(const Duration(milliseconds: 260), () {
+      if (_transitionSnapshot == current) {
+        if (mounted && !_closed) {
+          setState(() => _transitionSnapshot = null);
+        } else {
+          _transitionSnapshot = null;
+        }
+        current.dispose();
+      }
+    });
+  }
+
+  void _finishEpisodeSwitchLoading() {
+    _switchingHintTimer?.cancel();
+    if (!mounted || _closed) return;
+    setState(() {
+      _loading = false;
+      _switchingEpisode = false;
+      _switchingSlowHint = false;
+    });
+    _dismissTransitionSnapshot();
+  }
+
+  Future<void> _waitForNextFrameReady(int ticket) async {
+    if (_closed || !mounted || ticket != _generation || widget.videoBuilder != null) {
+      return;
+    }
+    if (_video != null) {
+      try {
+        await _video.waitUntilFirstFrameRendered.timeout(
+          const Duration(milliseconds: 450),
+        );
+      } catch (_) {}
+      if (!_closed &&
+          mounted &&
+          ticket == _generation &&
+          _playIntent &&
+          (_player.state.buffering || (_player.state.width ?? 0) <= 0)) {
+        final ready = Completer<void>();
+        late final StreamSubscription<bool> bufSub;
+        late final StreamSubscription<VideoParams> paramSub;
+        void check() {
+          if (ready.isCompleted) return;
+          if (!_player.state.buffering && (_player.state.width ?? 0) > 0) {
+            ready.complete();
+          }
+        }
+        bufSub = _player.stream.buffering.listen((_) => check());
+        paramSub = _player.stream.videoParams.listen((_) => check());
+        check();
+        await ready.future.timeout(
+          const Duration(milliseconds: 450),
+          onTimeout: () {},
+        );
+        await bufSub.cancel();
+        await paramSub.cancel();
+      }
+    } else if (_player is LunaExoPlayer) {
+      try {
+        await _player.waitForVideoFrame().timeout(
+          const Duration(milliseconds: 450),
+        );
+      } catch (_) {}
+    }
+    if (!_closed && mounted && ticket == _generation) {
+      final frame = Completer<void>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!frame.isCompleted) frame.complete();
+      });
+      WidgetsBinding.instance.scheduleFrame();
+      await frame.future.timeout(
+        const Duration(milliseconds: 100),
+        onTimeout: () {},
+      );
+    }
+  }
+
   Future<void> _play(
     int index, {
     double position = 0,
@@ -1444,7 +1594,16 @@ class PlayerScreenState extends State<PlayerScreen>
               )
             : null);
     _preloader.clear();
+    final isEpisodeSwitch =
+        recoveryAction == null && (_openedIndex >= 0 || _plan != null);
+    final previousOpenedIndex = _openedIndex;
     final ticket = ++_generation;
+    if (isEpisodeSwitch && previousOpenedIndex >= 0) {
+      await _captureTransitionSnapshot(index);
+      if (_closed || widget.store.profileEpoch != _profileEpoch || ticket != _generation) {
+        return;
+      }
+    }
     _enhancement.suspend();
     _seekSequence++;
     _danmaku.setPlan(null);
@@ -1452,6 +1611,7 @@ class PlayerScreenState extends State<PlayerScreen>
     _pendingError = false;
     _requireRecovery = false;
     _errorTimer?.cancel();
+    _switchingHintTimer?.cancel();
     _health.reset();
     if (recoveryAction == null) {
       _recovery.reset();
@@ -1470,9 +1630,14 @@ class PlayerScreenState extends State<PlayerScreen>
         !effectiveShowControls &&
         recoveryAction == null &&
         (index == _index + 1 || warmed != null);
+    if (!isEpisodeSwitch) {
+      _dismissTransitionSnapshot(immediate: true);
+    }
     setState(() {
       _index = index;
-      _loading = !isSeamlessAdvance && warmed == null;
+      _loading = !isEpisodeSwitch && !isSeamlessAdvance && warmed == null;
+      _switchingEpisode = isEpisodeSwitch;
+      _switchingSlowHint = false;
       _error = null;
       _localFailure = false;
       _loadingMessage = switch (recoveryAction) {
@@ -1483,6 +1648,16 @@ class PlayerScreenState extends State<PlayerScreen>
         _ => '正在准备播放',
       };
     });
+    if (isEpisodeSwitch) {
+      _switchingHintTimer = Timer(const Duration(milliseconds: 650), () {
+        if (mounted &&
+            !_closed &&
+            ticket == _generation &&
+            _switchingEpisode) {
+          setState(() => _switchingSlowHint = true);
+        }
+      });
+    }
     LanController.current?.detachPlayback(_lanIdentity);
     _lanIdentity = Object();
     _attachLanPlayback();
@@ -1500,7 +1675,9 @@ class PlayerScreenState extends State<PlayerScreen>
         await _enhancement.beforeMedia();
         if (_closed || ticket != _generation) return;
         _openedIndex = -1;
-        if (!isSeamlessAdvance || _player is LunaExoPlayer) {
+        if (isEpisodeSwitch) {
+          await _player.pause();
+        } else if (!isSeamlessAdvance || _player is LunaExoPlayer) {
           await _player.stop();
         }
         await _encryptedPlayback.cancel();
@@ -1570,7 +1747,7 @@ class PlayerScreenState extends State<PlayerScreen>
         _plan = airPlayPlan;
         _openedIndex = index;
         if (mounted) {
-          setState(() => _loading = false);
+          _finishEpisodeSwitchLoading();
           _danmaku.setPlan(airPlayPlan);
           _syncDanmaku();
           _menuRevision.value++;
@@ -1608,7 +1785,7 @@ class PlayerScreenState extends State<PlayerScreen>
         _plan = castPlan;
         _openedIndex = index;
         if (mounted) {
-          setState(() => _loading = false);
+          _finishEpisodeSwitchLoading();
           _danmaku.setPlan(castPlan);
           _syncDanmaku();
           _menuRevision.value++;
@@ -1698,6 +1875,7 @@ class PlayerScreenState extends State<PlayerScreen>
             ].join(','),
           );
           await platform.setProperty('network-timeout', '20');
+          await platform.setProperty('keep-open', 'yes');
         }
         _plan = plan;
         installed = true;
@@ -1738,10 +1916,9 @@ class PlayerScreenState extends State<PlayerScreen>
         _attachLanPlayback();
         _health.reset();
         await _interactions.applySpeed();
+        await _waitForNextFrameReady(ticket);
         if (mounted && !_closed && ticket == _generation) {
-          setState(() {
-            _loading = false;
-          });
+          _finishEpisodeSwitchLoading();
           _danmaku.setPlan(plan);
           _syncDanmaku();
           _acknowledgeHandoff();
@@ -1795,8 +1972,12 @@ class PlayerScreenState extends State<PlayerScreen>
             }
           }
           if (mounted && !_closed && ticket == _generation) {
+            _switchingHintTimer?.cancel();
+            _dismissTransitionSnapshot(immediate: true);
             setState(() {
               _loading = false;
+              _switchingEpisode = false;
+              _switchingSlowHint = false;
               _localFailure =
                   (error is AppFailure && error.code == 'local_media') ||
                   (widget.localOnly && !_forceOnline);
@@ -2366,6 +2547,10 @@ class PlayerScreenState extends State<PlayerScreen>
         widget.store.setPlaybackPreferences(pref.copyWith(volume: latestVolume)),
       );
     }
+    _switchingHintTimer?.cancel();
+    _snapshotFadeTimer?.cancel();
+    _transitionSnapshot?.dispose();
+    _transitionSnapshot = null;
     _interactions.dispose();
     _playerFocus.dispose();
     _menuRevision.dispose();
@@ -2756,6 +2941,11 @@ class PlayerScreenState extends State<PlayerScreen>
       backgroundAudio: widget.store.playbackPreferences.backgroundAudio,
       onToggleBackgroundAudio: _toggleBackgroundAudio,
       episodeTransition: widget.store.playbackPreferences.episodeTransition,
+      videoCaptureKey: _videoCaptureKey,
+      transitionSnapshot: _transitionSnapshot,
+      transitionSnapshotVisible: _transitionSnapshotVisible,
+      transitionDirection: _transitionDirection,
+      switchingSlowHint: _switchingSlowHint,
       allowOnlineFallback: widget.allowOnlineFallback,
       localOnly: widget.localOnly,
       isMediaIdNull: widget.mediaId == null,
