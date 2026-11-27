@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
@@ -25,7 +27,6 @@ import 'package:THLRedLook/views/player/player_controls_view.dart';
 import 'package:THLRedLook/views/player/player_loading_overlay_view.dart';
 import 'package:THLRedLook/views/player/player_pip_placeholder_view.dart';
 import 'package:THLRedLook/views/player/player_save_warning_banner.dart';
-import 'package:THLRedLook/views/player/episode_transition_view.dart';
 import 'package:THLRedLook/models/danmaku/danmaku_models.dart';
 import 'package:THLRedLook/core/player/playback_preferences.dart';
 
@@ -100,6 +101,11 @@ class PlayerViewportView extends StatelessWidget {
     this.backgroundAudio = false,
     this.onToggleBackgroundAudio,
     this.episodeTransition = true,
+    this.videoCaptureKey,
+    this.transitionSnapshot,
+    this.transitionSnapshotVisible = false,
+    this.transitionDirection = 1,
+    this.switchingSlowHint = false,
   });
 
   final double topPadding;
@@ -107,6 +113,11 @@ class PlayerViewportView extends StatelessWidget {
   final BoxFit videoFit;
   final bool backgroundAudio;
   final bool episodeTransition;
+  final GlobalKey? videoCaptureKey;
+  final ui.Image? transitionSnapshot;
+  final bool transitionSnapshotVisible;
+  final int transitionDirection;
+  final bool switchingSlowHint;
   final VoidCallback? onToggleBackgroundAudio;
   final VoidCallback? onComments;
   final Future<PlaybackTechnicalDiagnostics?> Function()? onFetchDiagnostics;
@@ -314,81 +325,150 @@ class PlayerViewportView extends StatelessWidget {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: EpisodeTransitionView(
-                  episodeIndex: index,
-                  enabled: episodeTransition,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (videoBuilder != null)
-                        videoBuilder!(layeredControls)
-                      else if (player is LunaExoPlayer)
-                        LunaExoVideoView(
-                          player: player as LunaExoPlayer,
-                          fit: videoFit,
-                          controls: (_) => layeredControls,
-                        )
-                      else if (videoController != null)
-                        Video(
-                          controller: videoController!,
-                          fit: videoFit,
-                          controls: (_) => layeredControls,
-                        ),
-                      if (casting &&
-                          castOverlay != null &&
-                          !hideOverlayForPictureInPicture &&
-                          !loading &&
-                          error == null)
-                        Positioned.fill(child: castOverlay!),
-                      if (loading && !hideOverlayForPictureInPicture)
-                        PlayerLoadingOverlayView(
-                          drama: detail.drama,
-                          repository: repository,
-                          loadingMessage: loadingMessage,
-                        ),
-                      if (error != null && !hideOverlayForPictureInPicture)
-                        ColoredBox(
-                          color: AppColors.blackWithAlpha(0.9),
-                          child: StatusPanel(
-                            title: '暂时无法播放',
-                            message: error!,
-                            onRetry: onRetry,
-                            action: localFailure ? '重试本地播放' : '重试播放',
-                            secondaryAction: Wrap(
-                              spacing: 12,
-                              runSpacing: 10,
-                              alignment: WrapAlignment.center,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                FilledButton.tonalIcon(
-                                  onPressed: () => DiaryService.showDiaryDialog(
-                                    context,
-                                    fetchDiagnostics: onFetchDiagnostics,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (videoBuilder != null)
+                      videoBuilder!(layeredControls)
+                    else
+                      RepaintBoundary(
+                        key: videoCaptureKey,
+                        child: player is LunaExoPlayer
+                            ? LunaExoVideoView(
+                                player: player as LunaExoPlayer,
+                                fit: videoFit,
+                              )
+                            : videoController != null
+                            ? Video(
+                                controller: videoController!,
+                                fit: videoFit,
+                                fill: AppColors.transparent,
+                                controls: null,
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    if (transitionSnapshot != null &&
+                        !hideOverlayForPictureInPicture)
+                      IgnorePointer(
+                        child: AnimatedOpacity(
+                          opacity: transitionSnapshotVisible ? 1.0 : 0.0,
+                          duration: Duration(
+                            milliseconds: episodeTransition ? 220 : 120,
+                          ),
+                          curve: Curves.easeOutCubic,
+                          child: AnimatedSlide(
+                            offset: !episodeTransition || transitionSnapshotVisible
+                                ? Offset.zero
+                                : Offset(
+                                    0,
+                                    transitionDirection >= 0 ? -0.04 : 0.04,
                                   ),
-                                  icon: const Icon(Icons.receipt_long_rounded),
-                                  label: const Text('查看播放日记'),
-                                ),
-                                if (localFailure && allowOnlineFallback)
-                                  TextButton.icon(
-                                    onPressed: onSwitchOnline,
-                                    icon: const Icon(Icons.cloud_outlined),
-                                    label: const Text('改为在线播放'),
-                                  )
-                                else if (!localFailure &&
-                                    !localOnly &&
-                                    repository.supportsSourceManagement)
-                                  SourceDiagnosticsButton(
-                                    repository: repository,
-                                    store: store,
-                                    drama: detail.drama,
-                                  ),
-                              ],
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            child: RawImage(
+                              image: transitionSnapshot,
+                              fit: videoFit,
+                              width: double.infinity,
+                              height: double.infinity,
                             ),
-                            icon: Icons.play_disabled_rounded,
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                    if (switchingSlowHint &&
+                        !loading &&
+                        !hideOverlayForPictureInPicture &&
+                        error == null)
+                      IgnorePointer(
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.blackWithAlpha(0.55),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 15,
+                                  height: 15,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.white,
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  '正在切换下一集…',
+                                  style: TextStyle(
+                                    color: AppColors.white,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (videoBuilder == null) layeredControls,
+                    if (casting &&
+                        castOverlay != null &&
+                        !hideOverlayForPictureInPicture &&
+                        !loading &&
+                        error == null)
+                      Positioned.fill(child: castOverlay!),
+                    if (loading && !hideOverlayForPictureInPicture)
+                      PlayerLoadingOverlayView(
+                        drama: detail.drama,
+                        repository: repository,
+                        loadingMessage: loadingMessage,
+                      ),
+                    if (error != null && !hideOverlayForPictureInPicture)
+                      ColoredBox(
+                        color: AppColors.blackWithAlpha(0.9),
+                        child: StatusPanel(
+                          title: '暂时无法播放',
+                          message: error!,
+                          onRetry: onRetry,
+                          action: localFailure ? '重试本地播放' : '重试播放',
+                          secondaryAction: Wrap(
+                            spacing: 12,
+                            runSpacing: 10,
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              FilledButton.tonalIcon(
+                                onPressed: () => DiaryService.showDiaryDialog(
+                                  context,
+                                  fetchDiagnostics: onFetchDiagnostics,
+                                ),
+                                icon: const Icon(Icons.receipt_long_rounded),
+                                label: const Text('查看播放日记'),
+                              ),
+                              if (localFailure && allowOnlineFallback)
+                                TextButton.icon(
+                                  onPressed: onSwitchOnline,
+                                  icon: const Icon(Icons.cloud_outlined),
+                                  label: const Text('改为在线播放'),
+                                )
+                              else if (!localFailure &&
+                                  !localOnly &&
+                                  repository.supportsSourceManagement)
+                                SourceDiagnosticsButton(
+                                  repository: repository,
+                                  store: store,
+                                  drama: detail.drama,
+                                ),
+                            ],
+                          ),
+                          icon: Icons.play_disabled_rounded,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               if ((loading || error != null) &&

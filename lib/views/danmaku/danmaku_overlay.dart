@@ -29,13 +29,21 @@ int calculateDanmakuLifetimeMs(DanmakuItem item) {
   return (8000 + offset).clamp(6500, 9800);
 }
 
+String _formatDanmakuText(String raw) {
+  final emojified = EmojiHelper.emojify(raw);
+  final runes = emojified.runes;
+  return String.fromCharCodes(runes.take(100)) + (runes.length > 100 ? '…' : '');
+}
+
 List<DanmakuFlight> planDanmaku(
   List<DanmakuItem> items, {
   required double width,
   required int rows,
   required double Function(String) measure,
+  double speed = 1.0,
 }) {
   if (!width.isFinite || width <= 0 || rows < 1) return const [];
+  final effectiveSpeed = speed.isFinite && speed > 0 ? speed : 1.0;
   final laneCount = rows.clamp(1, 8);
   final lanes = List<DanmakuFlight?>.filled(laneCount, null);
   final sorted = items.toList()..sort((a, b) => a.timeMs.compareTo(b.timeMs));
@@ -52,16 +60,15 @@ List<DanmakuFlight> planDanmaku(
     }
     if (flights.reversed
             .takeWhile(
-              (flight) => item.timeMs - flight.item.timeMs < flight.durationMs,
+              (flight) =>
+                  ((item.timeMs - flight.item.timeMs) / effectiveSpeed) <
+                  flight.durationMs,
             )
             .length >=
         maxConcurrent) {
       continue;
     }
-    final emojified = EmojiHelper.emojify(item.text);
-    final runes = emojified.runes;
-    final text =
-        String.fromCharCodes(runes.take(100)) + (runes.length > 100 ? '…' : '');
+    final text = _formatDanmakuText(item.text);
     final size = measure(text).ceilToDouble() + 8;
     final durationMs = calculateDanmakuLifetimeMs(item);
 
@@ -74,32 +81,21 @@ List<DanmakuFlight> planDanmaku(
         bestLane = l;
         break;
       }
-      final gap = item.timeMs - prev.item.timeMs;
+      final gap = ((item.timeMs - prev.item.timeMs) / effectiveSpeed).round();
       if (gap >= prev.durationMs) {
         bestLane = l;
         break;
       }
-
-      // 条件 1: 入场碰撞检查（后弹幕入场时，前弹幕尾部已完全进入且拉开至少 28px）
-      final prevSpeed = (width + prev.width) / prev.durationMs;
-      final prevMovedAtEntry = prevSpeed * gap;
-      final entryClearance = prevMovedAtEntry - prev.width;
-      if (entryClearance < 28) {
-        continue;
-      }
-
-      // 条件 2: 出场追尾检查（在前弹幕出屏幕前，后弹幕不能追上前弹幕尾部）
-      final currSpeed = (width + size) / durationMs;
-      final remainingTime = prev.durationMs - gap;
-      final currMovedAtPrevExit = currSpeed * remainingTime;
-      final exitClearance = width - currMovedAtPrevExit;
-      if (exitClearance < 28) {
-        continue;
-      }
-
-      final safetyMargin = math.min(entryClearance, exitClearance);
-      if (safetyMargin > maxSafetyMargin) {
-        maxSafetyMargin = safetyMargin;
+      final margin = _laneSafetyMargin(
+        width: width,
+        prevWidth: prev.width,
+        prevDurationMs: prev.durationMs,
+        currWidth: size,
+        currDurationMs: durationMs,
+        gapMs: gap,
+      );
+      if (margin != null && margin > maxSafetyMargin) {
+        maxSafetyMargin = margin;
         bestLane = l;
       }
     }
@@ -111,6 +107,35 @@ List<DanmakuFlight> planDanmaku(
     flights.add(flight);
   }
   return flights;
+}
+
+double? _laneSafetyMargin({
+  required double width,
+  required double prevWidth,
+  required int prevDurationMs,
+  required double currWidth,
+  required int currDurationMs,
+  required int gapMs,
+}) {
+  if (gapMs <= 0) return null;
+  // 条件 1: 入场碰撞检查（后弹幕入场时，前弹幕尾部已完全进入且拉开至少 28px）
+  final prevSpeed = (width + prevWidth) / prevDurationMs;
+  final prevMovedAtEntry = prevSpeed * gapMs;
+  final entryClearance = prevMovedAtEntry - prevWidth;
+  if (entryClearance < 28) {
+    return null;
+  }
+
+  // 条件 2: 出场追尾检查（在前弹幕出屏幕前，后弹幕不能追上前弹幕尾部）
+  final currSpeed = (width + currWidth) / currDurationMs;
+  final remainingTime = prevDurationMs - gapMs;
+  final currMovedAtPrevExit = currSpeed * remainingTime;
+  final exitClearance = width - currMovedAtPrevExit;
+  if (exitClearance < 28) {
+    return null;
+  }
+
+  return math.min(entryClearance, exitClearance);
 }
 
 class DanmakuOverlay extends StatefulWidget {
@@ -128,9 +153,154 @@ class DanmakuOverlay extends StatefulWidget {
   State<DanmakuOverlay> createState() => _DanmakuOverlayState();
 }
 
+class _ActiveFlight {
+  const _ActiveFlight({required this.flight, required this.spawnScreenMs});
+
+  final DanmakuFlight flight;
+  final int spawnScreenMs;
+}
+
 class _DanmakuOverlayState extends State<DanmakuOverlay> {
-  Object? _layout;
-  List<DanmakuFlight> _schedule = const [];
+  DanmakuController? _controller;
+  int _timelineRevision = -1;
+  int _lastPositionMs = -1;
+  double _lastWidth = -1;
+  int _lastRows = -1;
+  double _lastFontSize = -1;
+  TextScaler? _lastScaler;
+  final Map<String, _ActiveFlight> _active = {};
+  final Set<String> _retiredIds = {};
+
+  void _resetSchedule() {
+    _active.clear();
+    _retiredIds.clear();
+  }
+
+  double _measureText(String text, TextStyle style, TextScaler scaler) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final measured = painter.width;
+    painter.dispose();
+    return measured;
+  }
+
+  void _syncActiveFlights({
+    required DanmakuController controller,
+    required double width,
+    required int rows,
+    required double fontSize,
+    required TextStyle style,
+    required TextScaler scaler,
+  }) {
+    if (!identical(_controller, controller) ||
+        _timelineRevision != controller.timelineRevision ||
+        controller.positionMs < _lastPositionMs ||
+        _lastWidth != width ||
+        _lastRows != rows ||
+        _lastFontSize != fontSize ||
+        _lastScaler != scaler) {
+      _controller = controller;
+      _timelineRevision = controller.timelineRevision;
+      _lastWidth = width;
+      _lastRows = rows;
+      _lastFontSize = fontSize;
+      _lastScaler = scaler;
+      _resetSchedule();
+    }
+    _lastPositionMs = controller.positionMs;
+
+    final screenMs = controller.effectiveScreenMs;
+    _active.removeWhere((id, entry) {
+      if (screenMs >= entry.spawnScreenMs + entry.flight.durationMs) {
+        _retiredIds.add(id);
+        return true;
+      }
+      return false;
+    });
+
+    final validIds = controller.items.map((item) => item.id).toSet();
+    _retiredIds.removeWhere((id) => !validIds.contains(id));
+
+    final speed = controller.rate.isFinite && controller.rate > 0
+        ? controller.rate
+        : 1.0;
+    final laneCount = rows.clamp(1, 8);
+    final maxConcurrent = width > 800 ? 18 : 30;
+
+    for (final item in controller.items) {
+      if (item.id.isEmpty ||
+          item.text.trim().isEmpty ||
+          item.timeMs < 0 ||
+          item.timeMs > controller.positionMs ||
+          _active.containsKey(item.id) ||
+          _retiredIds.contains(item.id)) {
+        continue;
+      }
+
+      final elapsedOffsetMs = ((controller.positionMs - item.timeMs) / speed)
+          .round();
+      final durationMs = calculateDanmakuLifetimeMs(item);
+      if (elapsedOffsetMs >= durationMs || _active.length >= maxConcurrent) {
+        _retiredIds.add(item.id);
+        continue;
+      }
+
+      final text = _formatDanmakuText(item.text);
+      final size = _measureText(text, style, scaler).ceilToDouble() + 8;
+      final spawnScreenMs = screenMs - elapsedOffsetMs;
+
+      final laneLatest = List<_ActiveFlight?>.filled(laneCount, null);
+      for (final active in _active.values) {
+        final lane = active.flight.lane;
+        if (lane < 0 || lane >= laneCount) continue;
+        final current = laneLatest[lane];
+        if (current == null || active.spawnScreenMs > current.spawnScreenMs) {
+          laneLatest[lane] = active;
+        }
+      }
+
+      int bestLane = -1;
+      double maxSafetyMargin = -1;
+      for (int l = 0; l < laneCount; l++) {
+        final prev = laneLatest[l];
+        if (prev == null) {
+          bestLane = l;
+          break;
+        }
+        final gapMs = spawnScreenMs - prev.spawnScreenMs;
+        if (gapMs >= prev.flight.durationMs) {
+          bestLane = l;
+          break;
+        }
+        final margin = _laneSafetyMargin(
+          width: width,
+          prevWidth: prev.flight.width,
+          prevDurationMs: prev.flight.durationMs,
+          currWidth: size,
+          currDurationMs: durationMs,
+          gapMs: gapMs,
+        );
+        if (margin != null && margin > maxSafetyMargin) {
+          maxSafetyMargin = margin;
+          bestLane = l;
+        }
+      }
+
+      if (bestLane < 0) {
+        _retiredIds.add(item.id);
+        continue;
+      }
+
+      _active[item.id] = _ActiveFlight(
+        flight: DanmakuFlight(item, text, bestLane, size, durationMs),
+        spawnScreenMs: spawnScreenMs,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) => IgnorePointer(
@@ -141,6 +311,7 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
               !constraints.hasBoundedHeight ||
               constraints.maxWidth <= 0 ||
               constraints.maxHeight <= 0) {
+            _resetSchedule();
             return const SizedBox.shrink();
           }
           final aspect = widget.aspectRatio.isFinite && widget.aspectRatio > 0
@@ -159,7 +330,9 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
           final scaler = MediaQuery.textScalerOf(context);
           final rowHeight = scaler.scale(fontSize) * 1.5;
           final maxRows = width > 800 ? 5 : 8;
-          final rows = ((height * widget.style.displayArea - 8) / rowHeight).floor().clamp(0, maxRows);
+          final rows = ((height * widget.style.displayArea - 8) / rowHeight)
+              .floor()
+              .clamp(0, maxRows);
           final opacity = widget.style.opacity.clamp(0.1, 1.0);
           final style = EmojiHelper.withEmojiFont(
             TextStyle(
@@ -186,62 +359,39 @@ class _DanmakuOverlayState extends State<DanmakuOverlay> {
                   builder: (context, _) {
                     final controller = widget.controller;
                     if (!controller.visible || rows == 0) {
+                      _resetSchedule();
                       return const SizedBox.shrink();
                     }
-                    final layout = (
-                      controller,
-                      controller.dataRevision,
-                      width,
-                      rows,
-                      fontSize,
-                      scaler,
-                      widget.style.fontSizeScale,
-                      widget.style.opacity,
-                      widget.style.displayArea,
+                    _syncActiveFlights(
+                      controller: controller,
+                      width: width,
+                      rows: rows,
+                      fontSize: fontSize,
+                      style: style,
+                      scaler: scaler,
                     );
-                    if (_layout != layout) {
-                      _layout = layout;
-                      _schedule = planDanmaku(
-                        controller.items,
-                        width: width,
-                        rows: rows,
-                        measure: (text) {
-                          final painter = TextPainter(
-                            text: TextSpan(text: text, style: style),
-                            textDirection: TextDirection.ltr,
-                            textScaler: scaler,
-                            maxLines: 1,
-                          )..layout();
-                          final measured = painter.width;
-                          painter.dispose();
-                          return measured;
-                        },
-                      );
-                    }
+                    final screenMs = controller.effectiveScreenMs;
                     return Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        for (final flight in _schedule)
-                          if (controller.positionMs >= flight.item.timeMs &&
-                              controller.positionMs <
-                                  flight.item.timeMs + flight.durationMs)
-                            Positioned(
-                              key: ValueKey('danmaku-item-${flight.item.id}'),
-                              left: 0,
-                              top: 8 + flight.lane * rowHeight,
-                              width: flight.width,
-                              height: rowHeight,
-                              child: _DanmakuMotion(
-                                flight: flight,
-                                width: width,
-                                positionMs: controller.positionMs,
-                                moving: controller.moving,
-                                rate: controller.rate,
-                                revision: controller.motionRevision,
-                                style: style,
-                                scaler: scaler,
-                              ),
+                        for (final active in _active.values)
+                          Positioned(
+                            key: ValueKey('danmaku-item-${active.flight.item.id}'),
+                            left: 0,
+                            top: 8 + active.flight.lane * rowHeight,
+                            width: active.flight.width,
+                            height: rowHeight,
+                            child: _DanmakuMotion(
+                              flight: active.flight,
+                              width: width,
+                              screenMs: screenMs,
+                              spawnScreenMs: active.spawnScreenMs,
+                              moving: controller.moving,
+                              revision: controller.motionRevision,
+                              style: style,
+                              scaler: scaler,
                             ),
+                          ),
                       ],
                     );
                   },
@@ -259,18 +409,18 @@ class _DanmakuMotion extends StatefulWidget {
   const _DanmakuMotion({
     required this.flight,
     required this.width,
-    required this.positionMs,
+    required this.screenMs,
+    required this.spawnScreenMs,
     required this.moving,
-    required this.rate,
     required this.revision,
     required this.style,
     required this.scaler,
   });
   final DanmakuFlight flight;
   final double width;
-  final int positionMs;
+  final int screenMs;
+  final int spawnScreenMs;
   final bool moving;
-  final double rate;
   final int revision;
   final TextStyle style;
   final TextScaler scaler;
@@ -294,6 +444,8 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
     super.didUpdateWidget(oldWidget);
     // Position updates admit new comments without restarting active motion.
     if (oldWidget.revision != widget.revision ||
+        oldWidget.spawnScreenMs != widget.spawnScreenMs ||
+        oldWidget.moving != widget.moving ||
         oldWidget.width != widget.width ||
         oldWidget.flight.width != widget.flight.width ||
         oldWidget.flight.item.timeMs != widget.flight.item.timeMs ||
@@ -308,7 +460,7 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
   void _sync() {
     _motion.stop();
     final lifetime = widget.flight.durationMs;
-    final elapsed = (widget.positionMs - widget.flight.item.timeMs).clamp(
+    final elapsed = (widget.screenMs - widget.spawnScreenMs).clamp(
       0,
       lifetime,
     );
@@ -316,12 +468,7 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
     if (widget.moving && elapsed < lifetime) {
       _motion.animateTo(
         1,
-        duration: Duration(
-          microseconds:
-              ((lifetime - elapsed) * 1000 / widget.rate)
-                  .round()
-                  .clamp(1, 86400000000),
-        ),
+        duration: Duration(milliseconds: lifetime - elapsed),
         curve: Curves.linear,
       );
     }

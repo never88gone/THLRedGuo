@@ -25,15 +25,21 @@ class DanmakuController extends ChangeNotifier {
   bool _buffering = false;
   bool _seeking = false;
   int positionMs = 0;
+  int screenMs = 0;
   int durationMs = 0;
   double rate = 1;
   int motionRevision = 0;
   int dataRevision = 0;
+  int timelineRevision = 0;
   List<DanmakuItem> items = const [];
   DateTime? _anchorTime;
   int _anchorPosition = 0;
   double _anchorRate = 1;
   bool _anchorMoving = false;
+  bool _hasSyncedScreenClock = false;
+  double _screenMsExact = 0;
+
+  int get effectiveScreenMs => _hasSyncedScreenClock ? screenMs : positionMs;
 
   bool get supported =>
       _plan != null &&
@@ -74,6 +80,7 @@ class DanmakuController extends ChangeNotifier {
     _seeking = false;
     _available = false;
     positionMs = durationMs = 0;
+    _resetScreenClock(0, invalidateTimeline: true);
     _resetMotion();
     notifyListeners();
   }
@@ -83,6 +90,7 @@ class DanmakuController extends ChangeNotifier {
     _enabled = enabled;
     _cancel();
     if (enabled) _failures.clear();
+    _resetScreenClock(positionMs, invalidateTimeline: true);
     _resetMotion();
     notifyListeners();
     _ensureWindow();
@@ -101,6 +109,7 @@ class DanmakuController extends ChangeNotifier {
     if (_closed) return;
     final wasVisible = visible, wasMoving = moving;
     final previousRate = rate;
+    final previousPositionMs = positionMs;
     final nextPosition = position.inMilliseconds.clamp(0, danmakuMaxDurationMs);
     final nextDuration = duration.inMilliseconds;
     final elapsed = _anchorTime == null
@@ -126,7 +135,16 @@ class DanmakuController extends ChangeNotifier {
     } else if (jumped) {
       _cancel();
     }
-    if (!_seeking) positionMs = nextPosition;
+    if (!_seeking) {
+      positionMs = nextPosition;
+      if (durationChanged || jumped || !_hasSyncedScreenClock) {
+        _resetScreenClock(nextPosition, invalidateTimeline: true);
+      } else if (nextPosition > previousPositionMs) {
+        final advanceRate = previousRate > 0 ? previousRate : 1.0;
+        _screenMsExact += (nextPosition - previousPositionMs) / advanceRate;
+        screenMs = _screenMsExact.round();
+      }
+    }
     durationMs = nextDuration > 0 && nextDuration <= danmakuMaxDurationMs
         ? nextDuration
         : 0;
@@ -135,13 +153,15 @@ class DanmakuController extends ChangeNotifier {
     _buffering = buffering;
     _foreground = foreground;
     _available = available;
-    if (wasVisible && !visible) _cancel();
+    if (wasVisible && !visible) {
+      _cancel();
+      timelineRevision++;
+    }
     if (drift ||
         jumped ||
         durationChanged ||
         wasVisible != visible ||
-        wasMoving != moving ||
-        previousRate != rate) {
+        wasMoving != moving) {
       _resetMotion();
     }
     notifyListeners();
@@ -152,6 +172,7 @@ class DanmakuController extends ChangeNotifier {
     if (_closed) return;
     _cancel();
     _seeking = true;
+    timelineRevision++;
     _resetMotion();
     notifyListeners();
   }
@@ -160,6 +181,7 @@ class DanmakuController extends ChangeNotifier {
     if (_closed) return;
     _seeking = false;
     positionMs = position.inMilliseconds.clamp(0, danmakuMaxDurationMs);
+    _resetScreenClock(positionMs, invalidateTimeline: true);
     _resetMotion();
     notifyListeners();
     _ensureWindow();
@@ -170,6 +192,15 @@ class DanmakuController extends ChangeNotifier {
     _failures.clear();
     _ensureWindow();
     notifyListeners();
+  }
+
+  void _resetScreenClock(int baseMs, {bool invalidateTimeline = false}) {
+    _hasSyncedScreenClock = true;
+    _screenMsExact = baseMs.toDouble();
+    screenMs = baseMs;
+    if (invalidateTimeline) {
+      timelineRevision++;
+    }
   }
 
   void _resetMotion() {
