@@ -54,6 +54,7 @@
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_zgj-link._tcp</string>
+		<string>_thl-cast._tcp</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>

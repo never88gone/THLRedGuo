@@ -11,6 +11,8 @@ class PlayerTopBarView extends StatelessWidget {
     required this.compact,
     required this.onBack,
     required this.onFullscreen,
+    this.onCast,
+    this.casting = false,
   });
 
   final String title;
@@ -18,20 +20,28 @@ class PlayerTopBarView extends StatelessWidget {
   final bool compact;
   final VoidCallback onBack;
   final VoidCallback onFullscreen;
+  final VoidCallback? onCast;
+  final bool casting;
 
   Widget _iconButton({
+    Key? key,
     required String tooltip,
     required VoidCallback onPressed,
     required IconData icon,
+    bool highlighted = false,
   }) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 2),
     child: DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.black35,
+        color: highlighted ? AppColors.hongguoRed : AppColors.black35,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.white15, width: 0.8),
+        border: Border.all(
+          color: highlighted ? AppColors.hongguoRed : AppColors.white15,
+          width: 0.8,
+        ),
       ),
       child: IconButton(
+        key: key,
         tooltip: tooltip,
         constraints: const BoxConstraints.tightFor(width: 42, height: 42),
         padding: EdgeInsets.zero,
@@ -79,6 +89,16 @@ class PlayerTopBarView extends StatelessWidget {
                 ),
               ),
             ),
+            if (onCast != null)
+              _iconButton(
+                key: const ValueKey('player-cast-button'),
+                tooltip: casting ? '正在投屏' : '投屏',
+                onPressed: onCast!,
+                highlighted: casting,
+                icon: casting
+                    ? Icons.cast_connected_rounded
+                    : Icons.cast_rounded,
+              ),
             const SizedBox(width: 8),
           ],
         ),
