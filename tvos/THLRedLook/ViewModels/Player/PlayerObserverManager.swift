@@ -112,7 +112,7 @@ final class PlayerObserverManager {
             Task { @MainActor in
                 guard current(), ready, !ended else { return }
                 guard shouldPlay() else { lastAdvance = Date(); return }
-                if Date().timeIntervalSince(lastAdvance) >= 15 {
+                if Date().timeIntervalSince(lastAdvance) >= 10 {
                     lastAdvance = Date()
                     onError(NSError(domain: "Player", code: -1001, userInfo: [NSLocalizedDescriptionKey: "视频持续缓冲，正在恢复"]))
                 }

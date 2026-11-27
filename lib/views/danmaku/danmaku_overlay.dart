@@ -442,14 +442,18 @@ class _DanmakuMotionState extends State<_DanmakuMotion>
   @override
   void didUpdateWidget(_DanmakuMotion oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.revision != widget.revision ||
-        oldWidget.screenMs != widget.screenMs ||
-        oldWidget.spawnScreenMs != widget.spawnScreenMs ||
+    final elapsedNow = (widget.screenMs - widget.spawnScreenMs).clamp(0, widget.flight.durationMs);
+    final elapsedAnimated = (_motion.value * widget.flight.durationMs).round();
+    final needResync = oldWidget.revision != widget.revision ||
         oldWidget.moving != widget.moving ||
         oldWidget.width != widget.width ||
+        oldWidget.spawnScreenMs != widget.spawnScreenMs ||
         oldWidget.flight.width != widget.flight.width ||
         oldWidget.flight.item.timeMs != widget.flight.item.timeMs ||
-        oldWidget.flight.durationMs != widget.flight.durationMs) {
+        oldWidget.flight.durationMs != widget.flight.durationMs ||
+        (!_motion.isAnimating && widget.moving) ||
+        (elapsedNow - elapsedAnimated).abs() > 450;
+    if (needResync) {
       _sync();
     }
     if (oldWidget.style != widget.style || oldWidget.scaler != widget.scaler) {

@@ -333,7 +333,7 @@ public class AVPlayerContainerView: UIView {
             self?.clearTransitionSnapshot(animated: true)
         }
         transitionFallbackWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
     }
 
     private func evaluateTransitionCompletion() {

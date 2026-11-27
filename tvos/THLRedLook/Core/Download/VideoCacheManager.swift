@@ -34,7 +34,7 @@ public final class VideoCacheManager {
         let key = "\(namespace)_\(urlString)"
         guard players[key] == nil else { return }
         let item = AVPlayerItem(asset: asset)
-        item.preferredForwardBufferDuration = 3
+        item.preferredForwardBufferDuration = 12
         let player = AVPlayer(playerItem: item)
         player.isMuted = true
         player.automaticallyWaitsToMinimizeStalling = true

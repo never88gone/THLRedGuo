@@ -278,12 +278,6 @@ class PlayerScreenState extends State<PlayerScreen>
               ));
     if (_player is LunaExoPlayer) {
       _player.setDecoderMode(preferences.decoderMode);
-    } else if (_player.platform is NativePlayer) {
-      unawaited(
-        (_player.platform as NativePlayer)
-            .setProperty('keep-open', 'yes')
-            .catchError((Object _) {}),
-      );
     }
     unawaited(_player.setVolume(preferences.volume));
     _video = widget.videoBuilder == null && _player is! LunaExoPlayer
@@ -1491,46 +1485,69 @@ class PlayerScreenState extends State<PlayerScreen>
     _dismissTransitionSnapshot();
   }
 
-  Future<void> _waitForNextFrameReady(int ticket) async {
+  Future<void> _waitForNextFrameReady(
+    int ticket, {
+    bool startPlaybackAfterReady = false,
+  }) async {
     if (_closed || !mounted || ticket != _generation || widget.videoBuilder != null) {
+      if (startPlaybackAfterReady && !_closed && mounted && ticket == _generation) {
+        await _player.play();
+      }
       return;
     }
-    if (_video != null) {
-      try {
-        await _video.waitUntilFirstFrameRendered.timeout(
-          const Duration(milliseconds: 450),
-        );
-      } catch (_) {}
-      if (!_closed &&
-          mounted &&
-          ticket == _generation &&
-          _playIntent &&
-          (_player.state.buffering || (_player.state.width ?? 0) <= 0)) {
-        final ready = Completer<void>();
-        late final StreamSubscription<bool> bufSub;
-        late final StreamSubscription<VideoParams> paramSub;
-        void check() {
-          if (ready.isCompleted) return;
-          if (!_player.state.buffering && (_player.state.width ?? 0) > 0) {
-            ready.complete();
-          }
-        }
-        bufSub = _player.stream.buffering.listen((_) => check());
-        paramSub = _player.stream.videoParams.listen((_) => check());
-        check();
-        await ready.future.timeout(
-          const Duration(milliseconds: 450),
-          onTimeout: () {},
-        );
-        await bufSub.cancel();
-        await paramSub.cancel();
-      }
-    } else if (_player is LunaExoPlayer) {
+    if (_player is LunaExoPlayer) {
       try {
         await _player.waitForVideoFrame().timeout(
-          const Duration(milliseconds: 450),
+          const Duration(milliseconds: 600),
         );
       } catch (_) {}
+      if (startPlaybackAfterReady && !_closed && mounted && ticket == _generation) {
+        await _player.play();
+      }
+    } else if (_video != null) {
+      final ready = Completer<void>();
+      late final StreamSubscription<bool> bufSub;
+      late final StreamSubscription<VideoParams> paramSub;
+      void check() {
+        if (ready.isCompleted) return;
+        if (!_player.state.buffering &&
+            (_player.state.width ?? 0) > 0 &&
+            _player.state.duration > Duration.zero) {
+          ready.complete();
+        }
+      }
+      bufSub = _player.stream.buffering.listen((_) => check());
+      paramSub = _player.stream.videoParams.listen((_) => check());
+      check();
+      await ready.future.timeout(
+        const Duration(milliseconds: 700),
+        onTimeout: () {},
+      );
+      await bufSub.cancel();
+      await paramSub.cancel();
+
+      if (startPlaybackAfterReady && !_closed && mounted && ticket == _generation) {
+        final initialPos = _player.state.position;
+        final advanced = Completer<void>();
+        late final StreamSubscription<Duration> posSub;
+        posSub = _player.stream.position.listen((pos) {
+          if (!advanced.isCompleted && pos != initialPos) {
+            advanced.complete();
+          }
+        });
+        await _player.play();
+        await advanced.future.timeout(
+          const Duration(milliseconds: 350),
+          onTimeout: () {},
+        );
+        await posSub.cancel();
+      } else {
+        try {
+          await _video.waitUntilFirstFrameRendered.timeout(
+            const Duration(milliseconds: 300),
+          );
+        } catch (_) {}
+      }
     }
     if (!_closed && mounted && ticket == _generation) {
       final frame = Completer<void>();
@@ -1867,6 +1884,12 @@ class PlayerScreenState extends State<PlayerScreen>
               'seg_max_retry=3',
               'strict=experimental',
               'allowed_extensions=ALL',
+              if (!plan.local) ...[
+                'reconnect=1',
+                'reconnect_streamed=1',
+                'reconnect_delay_max=2',
+                'rw_timeout=6000000',
+              ],
               plan.local
                   ? 'protocol_whitelist=[file,crypto,data]'
                   : 'protocol_whitelist=[http,https,tcp,tls,crypto,data,file]',
@@ -1874,8 +1897,7 @@ class PlayerScreenState extends State<PlayerScreen>
                 'decryption_key=${plan.decryptionKey}',
             ].join(','),
           );
-          await platform.setProperty('network-timeout', '20');
-          await platform.setProperty('keep-open', 'yes');
+          await platform.setProperty('network-timeout', '8');
         }
         _plan = plan;
         installed = true;
@@ -1883,6 +1905,11 @@ class PlayerScreenState extends State<PlayerScreen>
         DiaryService.add(
           '[Play] 打开媒体: 剧=${_detail.drama.cleanSourceId}, 集=${_detail.episodes[index].number}, local=${plan.local}, encrypted=${plan.decryptionKey.isNotEmpty}, host=${Uri.tryParse(plan.url)?.host}',
         );
+        final shouldStartPlay = _foreground && _playIntent;
+        final deferPlayForFrame =
+            shouldStartPlay &&
+            widget.videoBuilder == null &&
+            _player is! LunaExoPlayer;
         await _player.open(
           Media(
             plan.url,
@@ -1892,7 +1919,7 @@ class PlayerScreenState extends State<PlayerScreen>
                 ? Duration(milliseconds: (position * 1000).round())
                 : null,
           ),
-          play: _foreground && _playIntent,
+          play: deferPlayForFrame ? false : shouldStartPlay,
         );
         if (_closed || ticket != _generation) {
           return;
@@ -1916,7 +1943,10 @@ class PlayerScreenState extends State<PlayerScreen>
         _attachLanPlayback();
         _health.reset();
         await _interactions.applySpeed();
-        await _waitForNextFrameReady(ticket);
+        await _waitForNextFrameReady(
+          ticket,
+          startPlaybackAfterReady: deferPlayForFrame,
+        );
         if (mounted && !_closed && ticket == _generation) {
           _finishEpisodeSwitchLoading();
           _danmaku.setPlan(plan);

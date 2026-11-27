@@ -71,7 +71,7 @@ final class PlayerPlaybackPreparer {
 
         let prepared = try await PlaybackAssetFactory.prepare(resolved)
         let item = AVPlayerItem(asset: prepared.asset)
-        item.preferredForwardBufferDuration = 3
+        item.preferredForwardBufferDuration = 12
         return PreparedPlaybackResult(plan: resolved, playerItem: item, decryptedURL: prepared.decryptedURL, drama: currentDrama, episodes: currentEpisodes)
     }
 }

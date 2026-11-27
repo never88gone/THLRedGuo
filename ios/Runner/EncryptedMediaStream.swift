@@ -39,11 +39,11 @@ private final class CENCRangeLoader: NSObject, URLSessionDataDelegate {
         configuration.httpShouldSetCookies = false
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.timeoutIntervalForRequest = 15
-        configuration.timeoutIntervalForResource = 30
+        configuration.timeoutIntervalForRequest = 6
+        configuration.timeoutIntervalForResource = 15
         configuration.httpMaximumConnectionsPerHost = 4
         let queue = OperationQueue()
-        queue.maxConcurrentOperationCount = 1
+        queue.maxConcurrentOperationCount = 4
         session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
     }
 
@@ -56,7 +56,7 @@ private final class CENCRangeLoader: NSObject, URLSessionDataDelegate {
             } catch {
                 try checkOpen()
                 guard attempt < 2, Self.retryable(error) else { throw error }
-                let delay = attempt == 0 ? 500_000_000 : 1_500_000_000
+                let delay = attempt == 0 ? 250_000_000 : 600_000_000
                 NSLog("[Stream] range retry offset=%lld attempt=%d delayMs=%d domain=%@ code=%ld", offset, attempt + 1, delay / 1_000_000, (error as NSError).domain, (error as NSError).code)
                 try await Task.sleep(nanoseconds: UInt64(delay))
             }
@@ -177,6 +177,7 @@ actor CENCStreamSession {
     private var blocks = [Int64: Data]()
     private var order = [Int64]()
     private var pending = [Int64: Task<Data, Error>]()
+    private var prefetchTasks = [Int64: Task<Void, Never>]()
     private var hits: Int64 = 0
 
     init(url: URL, headers: [String: String], key: [UInt8], configuration: URLSessionConfiguration = .ephemeral) {
@@ -249,6 +250,7 @@ actor CENCStreamSession {
                 continue
             }
             let blockStart = cursor / Int64(blockSize) * Int64(blockSize)
+            scheduleReadAhead(after: blockStart)
             let data = try await block(blockStart)
             try check()
             let local = Int(cursor - blockStart)
@@ -287,7 +289,7 @@ actor CENCStreamSession {
             try check()
             blocks[offset] = data
             touch(offset)
-            while order.count > 12 {
+            while order.count > 32 {
                 let oldest = order.removeFirst()
                 blocks.removeValue(forKey: oldest)
             }
@@ -296,6 +298,26 @@ actor CENCStreamSession {
             pending.removeValue(forKey: offset)
             throw error
         }
+    }
+
+    private func scheduleReadAhead(after offset: Int64) {
+        guard !closed else { return }
+        for step in 1...2 {
+            let nextOffset = offset + Int64(step * blockSize)
+            guard nextOffset < length,
+                  blocks[nextOffset] == nil,
+                  pending[nextOffset] == nil,
+                  prefetchTasks[nextOffset] == nil else { continue }
+            prefetchTasks[nextOffset] = Task { [weak self] in
+                guard let self else { return }
+                _ = try? await self.block(nextOffset)
+                await self.clearPrefetchTask(for: nextOffset)
+            }
+        }
+    }
+
+    private func clearPrefetchTask(for offset: Int64) {
+        prefetchTasks.removeValue(forKey: offset)
     }
 
     private func touch(_ offset: Int64) {
@@ -318,6 +340,8 @@ actor CENCStreamSession {
 
     func close() {
         closed = true
+        prefetchTasks.values.forEach { $0.cancel() }
+        prefetchTasks.removeAll()
         pending.values.forEach { $0.cancel() }
         pending.removeAll()
         blocks.removeAll()

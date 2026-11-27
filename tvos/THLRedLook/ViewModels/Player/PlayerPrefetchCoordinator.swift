@@ -82,7 +82,8 @@ final class PlayerPrefetchCoordinator {
                 let prepared = try await PlaybackAssetFactory.prepare(resolvedPlan)
                 let decryptedTempURL = prepared.decryptedURL
                 let asset = prepared.asset
-                guard try await asset.load(.isPlayable) else {
+                let (isPlayable, _, _) = try await asset.load(.isPlayable, .tracks, .duration)
+                guard isPlayable else {
                     throw NSError(domain: "PlaybackPrefetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "下一集预加载尚未就绪"])
                 }
                 guard !Task.isCancelled else {
@@ -90,7 +91,7 @@ final class PlayerPrefetchCoordinator {
                     return
                 }
                 let item = AVPlayerItem(asset: asset)
-                item.preferredForwardBufferDuration = 3
+                item.preferredForwardBufferDuration = 12
 
                 await MainActor.run {
                     guard let self, sequence == self.prefetchSequence, !Task.isCancelled else {

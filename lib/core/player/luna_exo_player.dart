@@ -289,19 +289,55 @@ class LunaExoPlayer implements Player {
   }
 
   Future<void> waitForVideoFrame() async {
-    if (_streamVideo != null) {
-      await _streamVideo?.waitUntilFirstFrameRendered;
+    final native = _streamPlayer;
+    if (native != null && _streamVideo != null) {
+      if (native.state.buffering || (native.state.width ?? 0) <= 0) {
+        final ready = Completer<void>();
+        late final StreamSubscription<bool> bufSub;
+        late final StreamSubscription<VideoParams> paramSub;
+        void check() {
+          if (ready.isCompleted) return;
+          if (!native.state.buffering && (native.state.width ?? 0) > 0) {
+            ready.complete();
+          }
+        }
+        bufSub = native.stream.buffering.listen((_) => check());
+        paramSub = native.stream.videoParams.listen((_) => check());
+        check();
+        await ready.future.timeout(
+          const Duration(milliseconds: 450),
+          onTimeout: () {},
+        );
+        await bufSub.cancel();
+        await paramSub.cancel();
+      }
+      await WidgetsBinding.instance.endOfFrame.timeout(
+        const Duration(milliseconds: 120),
+        onTimeout: () {},
+      );
       return;
     }
     final c = _controller;
     if (c != null && c.value.isInitialized) {
-      final completer = Completer<void>();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!completer.isCompleted) completer.complete();
-      });
-      WidgetsBinding.instance.scheduleFrame();
-      await completer.future.timeout(
-        const Duration(milliseconds: 80),
+      if (c.value.size.width <= 0 || c.value.size.height <= 0) {
+        final ready = Completer<void>();
+        void listener() {
+          if (!ready.isCompleted &&
+              c.value.isInitialized &&
+              c.value.size.width > 0 &&
+              c.value.size.height > 0) {
+            ready.complete();
+          }
+        }
+        c.addListener(listener);
+        await ready.future.timeout(
+          const Duration(milliseconds: 400),
+          onTimeout: () {},
+        );
+        c.removeListener(listener);
+      }
+      await WidgetsBinding.instance.endOfFrame.timeout(
+        const Duration(milliseconds: 140),
         onTimeout: () {},
       );
     }
@@ -446,10 +482,22 @@ class LunaExoPlayer implements Player {
     mirror(native.stream.rate, stream.rateController);
     try {
       final backend = native.platform as NativePlayer;
-      if (key != null && key.isNotEmpty) {
-        await backend.setProperty('demuxer-lavf-o', 'decryption_key=$key');
+      final isLocalMedia =
+          media.uri.startsWith('/') || media.uri.startsWith('file://');
+      final lavfOptions = <String>[
+        if (!isLocalMedia) ...[
+          'reconnect=1',
+          'reconnect_streamed=1',
+          'reconnect_on_http_error=4xx,5xx',
+          'reconnect_delay_max=2',
+          'rw_timeout=6000000',
+        ],
+        if (key != null && key.isNotEmpty) 'decryption_key=$key',
+      ];
+      if (lavfOptions.isNotEmpty) {
+        await backend.setProperty('demuxer-lavf-o', lavfOptions.join(','));
       }
-      await backend.setProperty('network-timeout', '20');
+      await backend.setProperty('network-timeout', '8');
       if (Platform.isIOS || Platform.isMacOS) {
         await backend.setProperty('audio-channels', 'stereo');
         await backend.setProperty('audio-format', 'float');
@@ -488,9 +536,33 @@ class LunaExoPlayer implements Player {
         await _disposeNativePlayerSafely(native);
         return;
       }
-      await native.open(media, play: play);
+      await native.open(media, play: false);
+      if (_disposed || generation != _openGeneration) return;
+      revision.value++;
+      await WidgetsBinding.instance.endOfFrame.timeout(
+        const Duration(milliseconds: 120),
+        onTimeout: () {},
+      );
       if (!_disposed && generation == _openGeneration) {
-        revision.value++;
+        if (play) {
+          final ready = Completer<void>();
+          late final StreamSubscription<VideoParams> paramSub;
+          void check() {
+            if (!ready.isCompleted && (native.state.width ?? 0) > 0) {
+              ready.complete();
+            }
+          }
+          paramSub = native.stream.videoParams.listen((_) => check());
+          check();
+          await ready.future.timeout(
+            const Duration(milliseconds: 450),
+            onTimeout: () {},
+          );
+          await paramSub.cancel();
+          if (!_disposed && generation == _openGeneration) {
+            await native.play();
+          }
+        }
         _startMediaKitWatchdog(
           native,
           media,
@@ -595,34 +667,31 @@ class LunaExoPlayer implements Player {
         uri != null &&
         (uri.scheme == 'http' || uri.scheme == 'https')) {
       final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 3);
+        ..connectionTimeout = const Duration(milliseconds: 1500);
       try {
-        final req = await client
-            .getUrl(uri)
-            .timeout(const Duration(seconds: 3));
-        headers.forEach((k, v) => req.headers.set(k, v));
-        req.headers.set('Range', 'bytes=0-512');
-        final resp = await req.close().timeout(const Duration(seconds: 3));
-        final cType = resp.headers.contentType?.toString().toLowerCase() ?? '';
-        final chunks = await resp
-            .take(1)
-            .timeout(const Duration(seconds: 3))
-            .toList();
-        final firstChunk = chunks.isNotEmpty
-            ? String.fromCharCodes(chunks.first)
-            : '';
-        confirmedMp4 =
-            cType.contains('video/mp4') ||
-            firstChunk.length >= 8 && firstChunk.substring(4, 8) == 'ftyp';
-        DiaryService.add(
-          '[Sniff] 探测结果: status=${resp.statusCode}, contentType=$cType, prefix=${firstChunk.length > 20 ? firstChunk.substring(0, 20) : firstChunk}',
-        );
-        if (cType.contains('mpegurl') || firstChunk.contains('#EXTM3U')) {
-          isHls = true;
+        await (() async {
+          final req = await client.getUrl(uri);
+          headers.forEach((k, v) => req.headers.set(k, v));
+          req.headers.set('Range', 'bytes=0-512');
+          final resp = await req.close();
+          final cType = resp.headers.contentType?.toString().toLowerCase() ?? '';
+          final chunks = await resp.take(1).toList();
+          final firstChunk = chunks.isNotEmpty
+              ? String.fromCharCodes(chunks.first)
+              : '';
+          confirmedMp4 =
+              cType.contains('video/mp4') ||
+              firstChunk.length >= 8 && firstChunk.substring(4, 8) == 'ftyp';
           DiaryService.add(
-            '[Sniff] 自动识别为 HLS 流，注入 formatHint: VideoFormat.hls',
+            '[Sniff] 探测结果: status=${resp.statusCode}, contentType=$cType, prefix=${firstChunk.length > 20 ? firstChunk.substring(0, 20) : firstChunk}',
           );
-        }
+          if (cType.contains('mpegurl') || firstChunk.contains('#EXTM3U')) {
+            isHls = true;
+            DiaryService.add(
+              '[Sniff] 自动识别为 HLS 流，注入 formatHint: VideoFormat.hls',
+            );
+          }
+        })().timeout(const Duration(milliseconds: 1800));
       } catch (e) {
         DiaryService.add('[Sniff] 探测警告 (非致命): $e');
       } finally {
@@ -758,7 +827,7 @@ class LunaExoPlayer implements Player {
     state = state.copyWith(
       duration: dur,
       position: Duration.zero,
-      playing: play,
+      playing: false,
       buffering: c.value.isBuffering,
       width: w > 0 ? w : 1920,
       height: h > 0 ? h : 1080,
@@ -767,7 +836,7 @@ class LunaExoPlayer implements Player {
 
     _safeAdd(stream.durationController, dur);
     _safeAdd(stream.positionController, Duration.zero);
-    _safeAdd(stream.playingController, play);
+    _safeAdd(stream.playingController, false);
     _safeAdd(stream.bufferingController, c.value.isBuffering);
     _safeAdd(stream.videoParamsController, videoParams);
 
@@ -788,12 +857,19 @@ class LunaExoPlayer implements Player {
       } catch (_) {}
     }
 
+    // 先触发视图树挂载新 VideoPlayer 纹理并完成首帧合成，再统一开声播放，杜绝先出声后出画
+    revision.value++;
+    await WidgetsBinding.instance.endOfFrame.timeout(
+      const Duration(milliseconds: 140),
+      onTimeout: () {},
+    );
+    if (_disposed || myGen != _openGeneration || _controller != c) return;
+
     if (play) {
       try {
         await c.play();
       } catch (_) {}
     }
-    revision.value++;
   }
 
   void _startPositionPolling() {

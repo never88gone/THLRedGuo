@@ -226,8 +226,7 @@ public final class PlayerViewModel: ObservableObject {
                 handlePlaybackError(error: error)
             }
         }
-        preparationTask = task
-        await task.value
+        preparationTask = task; await task.value
         if generation == playbackGeneration { preparationTask = nil }
     }
 
@@ -310,8 +309,16 @@ public final class PlayerViewModel: ObservableObject {
                 self.visibilityCoordinator.cancelSeamlessTimeout()
                 self.isLoading = false; self.isSeamlessTransitioning = false
                 if self.playIntent && self.isSceneActive {
-                    av.playImmediately(atRate: self.playbackRate); av.play()
-                    if self.playbackRate > 0 { av.rate = self.playbackRate }
+                    let startPlay = {
+                        av.playImmediately(atRate: self.playbackRate); av.play()
+                        if self.playbackRate > 0 { av.rate = self.playbackRate }
+                    }
+                    if av.status == .readyToPlay && av.rate == 0 && self.playbackRate > 0 {
+                        av.preroll(atRate: self.playbackRate) { [weak self, weak av] _ in Task { @MainActor in
+                            guard let self, let av, !self.closed, self.player === av, self.playIntent, self.isSceneActive, generation == self.playbackGeneration else { return }
+                            startPlay()
+                        } }
+                    } else { startPlay() }
                 }
             },
             onTimeUpdated: { [weak self] sec in
