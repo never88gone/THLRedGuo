@@ -392,22 +392,61 @@ class DownloadManager {
   }
 
   Future<Map<String, dynamic>> storage() async {
-    await Directory(_directory).create(recursive: true);
+    final rootDir = Directory(_directory);
+    await rootDir.create(recursive: true);
+
+    var usedBytes = 0;
+    var mediaFiles = 0;
+    await for (final entity in rootDir.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      if (entity is! File) continue;
+      final name = p.basename(entity.path);
+      if (p.equals(entity.parent.path, rootDir.path) &&
+          (name == 'jobs.json' || name == 'jobs.json.tmp')) {
+        continue;
+      }
+      final length = await entity.length();
+      usedBytes += length;
+      if (length > 0 && !name.endsWith('.part') && !name.endsWith('.tmp')) {
+        mediaFiles++;
+      }
+    }
+
+    final freeBytes = await availableDiskBytesAsync(_directory);
     return {
       'directory': _directory,
-      'usedBytes': await directoryBytes(Directory(_directory)),
-      'freeBytes': availableDiskBytes(_directory),
+      'bytes': usedBytes,
+      'usedBytes': usedBytes,
+      'free': freeBytes,
+      'freeBytes': freeBytes,
+      'files': mediaFiles,
     };
   }
 
-  Future<void> moveDownloads(String targetDir) async {
-    if (targetDir.trim().isEmpty || targetDir == _directory) return;
+  Future<String> moveDownloads(String targetDir) async {
+    final trimmed = targetDir.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('目标下载目录不能为空');
+    }
+    final normalized = p.normalize(trimmed);
+    if (p.equals(normalized, p.normalize(_directory))) {
+      return _directory;
+    }
+
     await control('pauseAll');
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while (_runningJobIds.isNotEmpty && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
 
-    await DownloadStorageMigrator.moveDirectoryContents(_directory, targetDir);
+    await DownloadStorageMigrator.moveDirectoryContents(_directory, normalized);
 
-    _directory = targetDir;
+    _directory = normalized;
+    await Directory(_directory).create(recursive: true);
     await _loadJobs();
+    return _directory;
   }
 
   String _cleanDramaDir(String id) {

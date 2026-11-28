@@ -164,8 +164,47 @@ void main() {
     },
   );
 
+  test(
+    'storage counts downloaded videos excluding jobs.json and moveDownloads persists new directory',
+    () async {
+      final dlDir = Directory(p.join(sandbox.path, 'pure_core', 'downloads', 'syn_drama'));
+      await dlDir.create(recursive: true);
+      final epFile = File(p.join(dlDir.path, 'ep_1.mp4'));
+      await epFile.writeAsBytes(List.filled(4096, 7));
+      final jobsFile = File(p.join(sandbox.path, 'pure_core', 'downloads', 'jobs.json'));
+      await jobsFile.writeAsString('[{"id":"syn_drama_1","state":"completed"}]');
+
+      final info = await engine.dispatch({'action': 'storage'});
+      expect(info['ok'], true);
+      expect(info['data']['bytes'], 4096);
+      expect(info['data']['usedBytes'], 4096);
+      expect(info['data']['files'], 1);
+      if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+        expect(info['data']['free'], greaterThan(0));
+        expect(info['data']['freeBytes'], greaterThan(0));
+      }
+
+      final newDir = Directory(p.join(sandbox.path, 'moved_location'));
+      final moveRes = await engine.dispatch({
+        'action': 'moveDownloads',
+        'directory': newDir.path,
+      });
+      expect(moveRes['ok'], true);
+      final actualDir = moveRes['data']['directory'] as String;
+      expect(await File(p.join(actualDir, 'syn_drama', 'ep_1.mp4')).length(), 4096);
+      expect(await epFile.exists(), false);
+
+      // 重新初始化引擎后应继续保留迁移后的目录与空间占用
+      await engine.dispatch({'action': 'initialize', 'directory': sandbox.path});
+      final afterReinit = await engine.dispatch({'action': 'storage'});
+      expect(afterReinit['ok'], true);
+      expect(afterReinit['data']['directory'], actualDir);
+      expect(afterReinit['data']['bytes'], 4096);
+      expect(afterReinit['data']['files'], 1);
+    },
+  );
+
   for (final action in [
-    'moveDownloads',
     'lan',
     'saveResourceSettings',
     'updateSystemProxy',

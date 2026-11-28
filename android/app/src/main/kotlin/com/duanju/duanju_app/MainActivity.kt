@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.BatteryManager
 import android.os.PowerManager
 import android.os.Process
+import android.os.StatFs
 import android.os.SystemClock
 import android.content.Context
 import android.content.Intent
@@ -211,6 +212,14 @@ class MainActivity : FlutterActivity() {
                         "deviceInfo" -> {
                             val version = packageManager.getPackageInfo(packageName, 0).versionName
                             result.success(mapOf("television" to isTelevisionDevice(), "version" to version))
+                        }
+                        "availableStorageBytes" -> {
+                            val path = call.argument<String>("path").orEmpty()
+                            val available = runCatching {
+                                val target = if (path.isNotBlank()) path else filesDir.absolutePath
+                                StatFs(target).availableBytes
+                            }.getOrNull()
+                            result.success(available)
                         }
                         "setTelevisionMode" -> {
                             val enabled = call.argument<Boolean>("enabled")

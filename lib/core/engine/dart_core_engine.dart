@@ -47,6 +47,51 @@ class DartCoreEngine {
   final Map<String, Map<String, dynamic>> _catalogCache = {};
   int _accountRevision = -1;
 
+  File get _downloadDirectoryConfigFile =>
+      File(p.join(_baseDir, 'download_directory.txt'));
+
+  Future<String> _resolveDownloadsDirectory() async {
+    try {
+      final configFile = _downloadDirectoryConfigFile;
+      if (await configFile.exists()) {
+        final configured = (await configFile.readAsString()).trim();
+        if (configured.isNotEmpty) {
+          return configured;
+        }
+      }
+    } catch (_) {}
+    return p.join(_baseDir, 'downloads');
+  }
+
+  Future<String> _prepareMoveTargetDirectory(String requestedDir) async {
+    final trimmed = requestedDir.trim();
+    if (trimmed.isEmpty) {
+      throw const FormatException('目标下载目录不能为空');
+    }
+    final requested = Directory(p.normalize(trimmed));
+    final baseName = p.basename(requested.path);
+    if (baseName == 'downloads' || baseName == 'THLRedLookDownloads') {
+      return requested.path;
+    }
+    if (!await requested.exists()) {
+      return requested.path;
+    }
+    final hasJobsFile = await File(
+      p.join(requested.path, 'jobs.json'),
+    ).exists();
+    if (hasJobsFile) {
+      return requested.path;
+    }
+    final hasOtherEntries = await requested
+        .list(recursive: false, followLinks: false)
+        .isEmpty
+        .then((empty) => !empty);
+    if (hasOtherEntries) {
+      return p.join(requested.path, 'THLRedLookDownloads');
+    }
+    return requested.path;
+  }
+
   Future<void> _ensureDirectories() async {
     if (_baseDir.isEmpty) {
       try {
@@ -60,7 +105,7 @@ class DartCoreEngine {
     }
     _sourcesDir = p.join(_baseDir, 'sources');
     _coversDir = p.join(_baseDir, 'covers');
-    _downloadsDir = p.join(_baseDir, 'downloads');
+    _downloadsDir = await _resolveDownloadsDirectory();
     _storageDir = p.join(_baseDir, 'source_storage');
 
     await Directory(_sourcesDir).create(recursive: true);
@@ -418,7 +463,16 @@ class DartCoreEngine {
         await _ensureDirectories();
         return await _downloadManager.storage();
       case 'moveDownloads':
-        throw UnsupportedError('当前版本尚未实现下载目录迁移');
+        await _ensureDirectories();
+        final requested = input['directory'] as String? ?? '';
+        final resolvedTarget = await _prepareMoveTargetDirectory(requested);
+        final actualDir = await _downloadManager.moveDownloads(resolvedTarget);
+        _downloadsDir = actualDir;
+        await _downloadDirectoryConfigFile.writeAsString(
+          actualDir,
+          flush: true,
+        );
+        return {'directory': actualDir};
       case 'localPlayback':
         await _ensureDirectories();
         final drama = Map<String, dynamic>.from(input['drama'] as Map? ?? {});

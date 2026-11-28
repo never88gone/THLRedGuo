@@ -8,29 +8,42 @@ abstract final class DownloadStorageMigrator {
     String sourceDir,
     String targetDir,
   ) async {
+    final currentDir = Directory(sourceDir);
     final newDir = Directory(targetDir);
     await newDir.create(recursive: true);
+    if (!await currentDir.exists()) return;
 
-    final currentDir = Directory(sourceDir);
-    if (await currentDir.exists()) {
-      await for (final entity in currentDir.list(recursive: false)) {
-        final dest = p.join(targetDir, p.basename(entity.path));
-        if (entity is File) {
-          await entity.copy(dest);
-          await entity.delete();
-        } else if (entity is Directory) {
-          final targetSubDir = Directory(dest);
-          await targetSubDir.create(recursive: true);
-          await for (final subEntity in entity.list(recursive: false)) {
-            if (subEntity is File) {
-              await subEntity.copy(
-                p.join(targetSubDir.path, p.basename(subEntity.path)),
-              );
-              await subEntity.delete();
-            }
-          }
-          await entity.delete(recursive: true);
+    final srcReal = await currentDir.resolveSymbolicLinks();
+    final dstReal = await newDir.resolveSymbolicLinks();
+    if (p.equals(srcReal, dstReal)) return;
+    if (p.isWithin(srcReal, dstReal)) {
+      throw ArgumentError('不能将下载目录迁移到当前目录的子目录中');
+    }
+
+    await _copyRecursive(currentDir, newDir);
+    await for (final entity in currentDir.list(
+      recursive: false,
+      followLinks: false,
+    )) {
+      await entity.delete(recursive: true);
+    }
+  }
+
+  static Future<void> _copyRecursive(Directory source, Directory target) async {
+    await target.create(recursive: true);
+    await for (final entity in source.list(
+      recursive: false,
+      followLinks: false,
+    )) {
+      final destPath = p.join(target.path, p.basename(entity.path));
+      if (entity is File) {
+        final expectedLength = await entity.length();
+        final copied = await entity.copy(destPath);
+        if (await copied.length() != expectedLength) {
+          throw FileSystemException('迁移校验失败，文件大小不一致', destPath);
         }
+      } else if (entity is Directory) {
+        await _copyRecursive(entity, Directory(destPath));
       }
     }
   }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:THLRedLook/core/bridge/core_bridge.dart';
@@ -144,17 +145,19 @@ class _StorageScreenState extends State<StorageScreen> {
     String? parent;
     if (Platform.isAndroid || Platform.isIOS) {
       final support = await getApplicationCacheDirectory();
-      final directories = <String, String>{support.path: '应用内部存储'};
+      final defaultDownloads = p.join(support.path, 'pure_core', 'downloads');
+      final directories = <String, String>{defaultDownloads: '应用内部存储'};
       if (Platform.isAndroid) {
         final external = await getExternalStorageDirectories() ?? [];
         for (var i = 0; i < external.length; i++) {
-          directories[external[i].path] = i == 0
+          directories[p.join(external[i].path, 'THLRedLookDownloads')] = i == 0
               ? '设备共享存储（应用目录）'
               : 'SD 卡 ${i + 1}（应用目录）';
         }
       } else {
         final documents = await getApplicationDocumentsDirectory();
-        directories[documents.path] = '文件 App 可见目录';
+        directories[p.join(documents.path, 'THLRedLookDownloads')] =
+            '文件 App 可见目录';
       }
       if (!mounted) return;
       parent = await showDialog<String>(
@@ -174,6 +177,16 @@ class _StorageScreenState extends State<StorageScreen> {
       parent = await FilePicker.getDirectoryPath(dialogTitle: '选择下载保存位置');
     }
     if (parent == null || !mounted) return;
+    final currentDir = _info?['directory'] as String? ?? '';
+    if (currentDir.isNotEmpty && p.equals(p.normalize(parent), p.normalize(currentDir))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('当前下载目录已在该位置，无需迁移'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     final yes = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -201,6 +214,14 @@ class _StorageScreenState extends State<StorageScreen> {
     try {
       await widget.repository.moveDownloads(parent);
       await _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('下载目录与离线内容迁移完成'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -279,14 +300,14 @@ class _StorageScreenState extends State<StorageScreen> {
                         children: [
                           if (_info != null) ...[
                             Text(
-                              '离线短剧已占用 ${storageSize((_info!['bytes'] as num?)?.toInt() ?? 0)}',
+                              '离线短剧已占用 ${storageSize(((_info!['bytes'] ?? _info!['usedBytes']) as num?)?.toInt() ?? 0)}',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              '设备剩余空间：${storageSize((_info!['free'] as num?)?.toInt() ?? -1)} · 已下载 ${_info!['files'] ?? 0} 个短剧分集',
+                              '设备剩余空间：${storageSize(((_info!['free'] ?? _info!['freeBytes']) as num?)?.toInt() ?? -1)} · 已下载 ${_info!['files'] ?? 0} 个短剧分集',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.textTheme.bodySmall?.color,
                               ),

@@ -166,6 +166,21 @@ import CoreMedia
           self.exportDiagnostics(call.arguments, result: result)
           return
         }
+        if call.method == "availableStorageBytes" {
+          let args = call.arguments as? [String: Any]
+          let rawPath = args?["path"] as? String
+          let targetPath = (rawPath != nil && !rawPath!.isEmpty) ? rawPath! : NSHomeDirectory()
+          let url = URL(fileURLWithPath: targetPath)
+          let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey])
+          if let bytes = values?.volumeAvailableCapacityForImportantUsage {
+            result(bytes)
+          } else if let bytes = values?.volumeAvailableCapacity {
+            result(Int64(bytes))
+          } else {
+            result(nil)
+          }
+          return
+        }
         if call.method == "isPad" {
           result(UIDevice.current.userInterfaceIdiom == .pad)
           return
