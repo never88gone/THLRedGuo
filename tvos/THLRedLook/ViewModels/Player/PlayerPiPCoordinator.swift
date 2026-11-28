@@ -42,17 +42,27 @@ final class PlayerPiPCoordinator {
         }
     }
 
-    func checkRestorePiP(dramaId: String) -> (player: AVPlayer, episode: Int, position: Double, plan: PlaybackPlan?)? {
-        guard isPiPActive,
+    func checkRestorePiP(dramaId: String) -> (player: AVPlayer, episode: Int, position: Double, plan: PlaybackPlan?, hasRestoreHandler: Bool)? {
+        guard (isPiPActive || isStartingPiP),
               let activePipPlayer = TVPictureInPictureCoordinator.shared.activePlayer,
               let session = TVPictureInPictureCoordinator.shared.currentSession,
               session.drama.id == dramaId else { return nil }
 
         let currentSeconds = CMTimeGetSeconds(activePipPlayer.currentTime())
         let position = (currentSeconds.isFinite && currentSeconds >= 0) ? currentSeconds : session.currentPosition
-        TVPictureInPictureCoordinator.shared.stopPictureInPicture()
-        TVPictureInPictureCoordinator.shared.completeRestore(success: true)
-        return (activePipPlayer, session.episodeIndex, position, session.playbackPlan)
+        let hasHandler = TVPictureInPictureCoordinator.shared.hasRestoreCompletionHandler
+        TVPictureInPictureCoordinator.shared.beginRestoreTransfer()
+        if !hasHandler {
+            TVPictureInPictureCoordinator.shared.stopPictureInPicture(preservePlayerForRestore: true)
+        }
+        return (activePipPlayer, session.episodeIndex, position, session.playbackPlan, hasHandler)
+    }
+
+    func stopCompetingPiPIfNeeded(forDramaId dramaId: String, activePlayerCandidate: AVPlayer? = nil) {
+        TVPictureInPictureCoordinator.shared.stopIfActiveForDifferentPlayback(
+            dramaId: dramaId,
+            activePlayerCandidate: activePlayerCandidate
+        )
     }
 
     func unregister() {

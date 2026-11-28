@@ -6,6 +6,7 @@ import Combine
 @MainActor
 public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AVPictureInPictureControllerDelegate {
     public static let shared = TVPictureInPictureCoordinator()
+    public static let didFinishRestoreNotification = Notification.Name("THLRedLook.PiPDidFinishRestore")
 
     /// 设备是否支持系统画中画
     public var isPictureInPictureSupported: Bool {
@@ -30,10 +31,11 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
     /// 当前绑定的控制器与播放器
     public private(set) weak var activeController: AVPictureInPictureController?
     public private(set) var activePlayer: AVPlayer?
+    public var hasRestoreCompletionHandler: Bool { restoreCompletionHandler != nil }
 
     private var restoreCompletionHandler: ((Bool) -> Void)?
     private var progressSaveTimer: Timer?
-    private var isRestoring: Bool = false
+    @Published public private(set) var isRestoring: Bool = false
     private var isSwitchingNextEpisodeInPiP: Bool = false
 
     public override init() {
@@ -72,7 +74,13 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         initialPosition: Double = 0,
         playbackPlan: PlaybackPlan? = nil
     ) {
-        let targetController = controller ?? globalHostView?.pipController
+        if (isPictureInPictureActive || isStartingPiP || isRestoring),
+           let active = self.activePlayer,
+           active !== player {
+            return
+        }
+
+        let targetController = globalHostView?.pipController ?? controller ?? activeController
 
         // 关键防抖：如果画中画未处于激活状态，且播放的剧集、集数、播放源与控制器均未改变，直接复用既有会话，
         // 严禁在此高频重复给 @Published currentSession 赋值，彻底杜绝引发 SwiftUI 根视图 AttributeGraph 无限重绘死循环
@@ -141,6 +149,9 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         }
 
         if let p = player, let d = drama, let ep = currentEpisodeIndex, let eps = allEpisodes {
+            if (isPictureInPictureActive || isStartingPiP), let existing = activePlayer, existing !== p {
+                stopPictureInPicture()
+            }
             register(
                 player: p,
                 drama: d,
@@ -175,18 +186,39 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
         NSLog("🎬 [TVPiPCoordinator] 通过局部控制器启动系统画中画")
     }
 
-    public func stopPictureInPicture() {
+    public func stopIfActiveForDifferentPlayback(dramaId: String, activePlayerCandidate: AVPlayer? = nil) {
+        guard isPictureInPictureActive || isStartingPiP else { return }
+        if isRestoring {
+            if let currentId = currentSession?.drama.id, currentId == dramaId { return }
+            if let candidate = activePlayerCandidate, candidate === activePlayer { return }
+        }
+        stopPictureInPicture(preservePlayerForRestore: false)
+    }
+
+    public func beginRestoreTransfer() {
+        isRestoring = true
+    }
+
+    public func stopPictureInPicture(preservePlayerForRestore: Bool = false) {
+        if preservePlayerForRestore {
+            isRestoring = true
+        }
+        let restoring = preservePlayerForRestore || isRestoring
         globalHostView?.pipController?.stopPictureInPicture()
-        activeController?.stopPictureInPicture()
+        if activeController !== globalHostView?.pipController {
+            activeController?.stopPictureInPicture()
+        }
         isPictureInPictureActive = false
         isStartingPiP = false
 
-        if !isRestoring {
+        if !restoring {
             // 主动停止且非全屏恢复时，立即停止音频与播放器，消除残留声音
+            stopPeriodicProgressSaving()
             activePlayer?.pause()
             activePlayer?.replaceCurrentItem(with: nil)
             globalHostView?.detachPlayer()
             activePlayer = nil
+            activeController = nil
             currentSession = nil
         }
     }
@@ -208,7 +240,10 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
             completion(success)
             restoreCompletionHandler = nil
         }
-        isRestoring = false
+        // 仅当恢复失败时立即重置 isRestoring；成功时保留到 didStopPictureInPicture 回调，防止系统结束小窗时误停新挂载的播放器
+        if !success {
+            isRestoring = false
+        }
     }
 
     // MARK: - 画中画模式下的自动连续播放功能
@@ -294,18 +329,26 @@ public final class TVPictureInPictureCoordinator: NSObject, ObservableObject, AV
 
     public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         NSLog("🎬 [TVPiPCoordinator] 画中画已退出 (isRestoring=%@)", String(describing: isRestoring))
+        let wasRestoring = isRestoring
         isPictureInPictureActive = false
         isStartingPiP = false
+        isRestoring = false
+        shouldRestoreFullScreen = false
+        stopPeriodicProgressSaving()
+        globalHostView?.detachPlayer()
 
-        if !isRestoring {
+        let restoredPlayer = activePlayer
+        if !wasRestoring {
             // 用户从小窗直接点击关闭或者系统停止小窗，保存历史记录并彻底暂停清理播放器，杜绝声音残留
             saveCurrentProgressToStore()
             activePlayer?.pause()
             activePlayer?.replaceCurrentItem(with: nil)
-            globalHostView?.detachPlayer()
-            activePlayer = nil
-            activeController = nil
-            currentSession = nil
+        }
+        activePlayer = nil
+        activeController = nil
+        currentSession = nil
+        if wasRestoring, let restoredPlayer {
+            NotificationCenter.default.post(name: Self.didFinishRestoreNotification, object: restoredPlayer)
         }
     }
 

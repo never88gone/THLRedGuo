@@ -127,6 +127,29 @@ public final class PlayerViewModel: ObservableObject {
         pipCoordinator.register(player: player, drama: drama, currentEpisodeIndex: currentEpisodeIndex, allEpisodes: allEpisodes, currentTime: currentTime, plan: plan)
     }
 
+    @discardableResult
+    public func restoreFromPictureInPictureIfActive() -> Bool {
+        guard pipCoordinator.isPiPActive || pipCoordinator.isStartingPiP else { return false }
+        guard let restored = pipCoordinator.checkRestorePiP(dramaId: drama.id) else { return false }
+        currentTime = restored.position
+        currentEpisodeIndex = restored.episode
+        if let p = restored.plan { plan = p; selectedQuality = p.quality }
+        playIntent = true
+        isLoading = false; isSeamlessTransitioning = false; errorMessage = nil
+        startPlaybackWithPlayer(restored.player, seekTo: 0, alreadyPrerolled: true)
+        isPlaying = (restored.player.timeControlStatus == .playing)
+        if restored.player.timeControlStatus == .paused {
+            resumePlayerImmediately(restored.player)
+        }
+        if restored.hasRestoreHandler {
+            Task { @MainActor in
+                await Task.yield()
+                TVPictureInPictureCoordinator.shared.completeRestore(success: true)
+            }
+        }
+        return true
+    }
+
     public func onAppear() {
         guard !isVisible else { return }
         isVisible = true; closed = false
@@ -137,13 +160,11 @@ public final class PlayerViewModel: ObservableObject {
         )
         progressTracker.startTimer { [weak self] in self?.saveCurrentProgress() }
 
-        if let restored = pipCoordinator.checkRestorePiP(dramaId: drama.id) {
-            currentTime = restored.position; currentEpisodeIndex = restored.episode
-            if let p = restored.plan { plan = p; selectedQuality = p.quality }
-            startPlaybackWithPlayer(restored.player, seekTo: 0)
-            isLoading = false; isPlaying = (restored.player.timeControlStatus == .playing)
+        if restoreFromPictureInPictureIfActive() {
             return
         }
+
+        pipCoordinator.stopCompetingPiPIfNeeded(forDramaId: drama.id)
 
         if let preloaded = initialPreloadedPlan, preloaded.isReusable(), !allEpisodes.isEmpty,
            let poolPlayer = VideoCacheManager.shared.takePlayer(for: preloaded.url, namespace: "feed") {
@@ -188,6 +209,7 @@ public final class PlayerViewModel: ObservableObject {
 
     private func beginPlayback(episodeIndex: Int, seekTo: Double, recovering: Bool, preserveIntent: Bool = false) async {
         guard !closed, episodeIndex > 0, seekTo.isFinite else { return }
+        pipCoordinator.stopCompetingPiPIfNeeded(forDramaId: drama.id, activePlayerCandidate: player)
         prepareForSeamlessTransition()
         saveCurrentProgress(force: true)
         playbackGeneration += 1
@@ -258,6 +280,7 @@ public final class PlayerViewModel: ObservableObject {
 
     public func switchFeedDrama(drama: Drama, allEpisodes: [Episode]? = nil, initialEpisodeIndex: Int = 1, initialPosition: Double = 0, preloadedPlan: PlaybackPlan? = nil) async {
         guard !closed else { return }
+        pipCoordinator.stopCompetingPiPIfNeeded(forDramaId: drama.id)
         prepareForSeamlessTransition()
         saveCurrentProgress(force: true)
         playbackGeneration += 1; preparationTask?.cancel(); preparationTask = nil
@@ -369,7 +392,8 @@ public final class PlayerViewModel: ObservableObject {
                 self.currentTime = sec
                 if self.isLoading { self.isLoading = false }
                 let rem = self.duration - sec
-                if sec >= 1.5 && rem > 0, let nextNumber = self.adjacentEpisodeNumber(offset: 1) {
+                if !self.pipCoordinator.isPiPActive && !self.pipCoordinator.isStartingPiP,
+                   sec >= 1.5 && rem > 0, let nextNumber = self.adjacentEpisodeNumber(offset: 1) {
                     self.prefetchCoordinator.prefetchNextEpisode(
                         nextEpisodeNumber: nextNumber,
                         allEpisodes: self.allEpisodes,
@@ -555,6 +579,10 @@ public final class PlayerViewModel: ObservableObject {
 
     private func handlePlayEnded() async {
         guard !closed, !reachedEnd else { return }
+        if pipCoordinator.isPiPActive || pipCoordinator.isStartingPiP {
+            reachedEnd = true
+            return
+        }
         reachedEnd = true
         currentTime = duration
         if adjacentEpisodeNumber(offset: 1) != nil {

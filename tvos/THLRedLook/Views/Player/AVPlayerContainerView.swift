@@ -175,6 +175,17 @@ public class AVPlayerContainerView: UIView {
         center.addObserver(self, selector: #selector(handleAppDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         center.addObserver(self, selector: #selector(handleWillTransitionNotification), name: Self.willTransitionNotification, object: nil)
         center.addObserver(self, selector: #selector(handleDidCancelTransitionNotification), name: Self.didCancelTransitionNotification, object: nil)
+        center.addObserver(self, selector: #selector(handlePiPDidFinishRestore), name: TVPictureInPictureCoordinator.didFinishRestoreNotification, object: nil)
+    }
+
+    @objc private func handlePiPDidFinishRestore(_ notification: Notification) {
+        guard let target = notification.object as? AVPlayer, target === player else { return }
+        if playerLayer?.player !== target || playerLayer?.isReadyForDisplay == false {
+            playerLayer?.player = nil
+            playerLayer?.player = target
+            bgPlayerLayer?.player = nil
+            bgPlayerLayer?.player = target
+        }
     }
 
     @objc private func handleWillTransitionNotification(_ notification: Notification) {

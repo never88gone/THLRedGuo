@@ -3,6 +3,7 @@ import AVKit
 
 public struct TVPlayerView: View {
     @ObservedObject private var accountLibrary = HongguoAccountModel.shared
+    @ObservedObject private var pipCoordinator = TVPictureInPictureCoordinator.shared
     @StateObject private var viewModel: PlayerViewModel
     @Environment(\.presentationMode) var presentationMode
     @Environment(\.scenePhase) private var scenePhase
@@ -97,7 +98,7 @@ public struct TVPlayerView: View {
             toastOverlayView
             quickSeekOverlayView
 
-            if isInteractive && !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && viewModel.errorMessage == nil {
+            if isInteractive && !isShowingThisDramaInPiP && !viewModel.isControlsVisible && !viewModel.isEpisodeDrawerVisible && viewModel.errorMessage == nil {
                 TVPlayerWakeAreaView(
                     playbackAccessibilityValue: playbackAccessibilityValue,
                     onQuickSeek: { delta in handleQuickSeek(by: delta) },
@@ -192,6 +193,23 @@ public struct TVPlayerView: View {
                 )
             }
         }
+        .onChange(of: pipCoordinator.isPictureInPictureActive) { _, active in
+            guard active, isPlayerPresented, feedActions == nil,
+                  pipCoordinator.currentSession?.drama.id == drama.id else { return }
+            handleExit()
+        }
+        .onReceive(pipCoordinator.$shouldRestoreFullScreen) { shouldRestore in
+            guard shouldRestore, isPlayerPresented,
+                  pipCoordinator.currentSession?.drama.id == drama.id else { return }
+            pipCoordinator.markRestoreHandled()
+            viewModel.restoreFromPictureInPictureIfActive()
+        }
+    }
+
+    private var isShowingThisDramaInPiP: Bool {
+        (pipCoordinator.isPictureInPictureActive || pipCoordinator.isStartingPiP) &&
+            !pipCoordinator.isRestoring &&
+            pipCoordinator.currentSession?.drama.id == drama.id
     }
 
     // MARK: - 子视图组件拆解
@@ -200,7 +218,22 @@ public struct TVPlayerView: View {
     private var videoSurfaceView: some View {
         TVTheme.backgroundGradient.ignoresSafeArea()
 
-        if let player = viewModel.player {
+        if isShowingThisDramaInPiP {
+            ZStack {
+                TVColors.black.ignoresSafeArea()
+                VStack(spacing: 20) {
+                    Image(systemName: "pip")
+                        .font(.system(size: 56, weight: .semibold))
+                        .foregroundColor(TVColors.white.opacity(0.85))
+                    Text("画中画悬浮播放中")
+                        .font(.system(size: 26, weight: .medium))
+                        .foregroundColor(TVColors.white.opacity(0.85))
+                    TVButton(title: "恢复全屏播放", icon: "pip.exit", isProminent: true) {
+                        viewModel.restoreFromPictureInPictureIfActive()
+                    }
+                }
+            }
+        } else if let player = viewModel.player {
             AVPlayerView(
                 player: player,
                 isPlaying: viewModel.wantsPlayback,
@@ -228,7 +261,7 @@ public struct TVPlayerView: View {
 
     @ViewBuilder
     private var danmakuOverlayView: some View {
-        if viewModel.danmakuEnabled {
+        if viewModel.danmakuEnabled && !isShowingThisDramaInPiP {
             TVDanmakuView(
                 danmakus: viewModel.activeDanmakus,
                 position: viewModel.currentTime,
@@ -287,7 +320,7 @@ public struct TVPlayerView: View {
 
     @ViewBuilder
     private var controlsOverlayView: some View {
-        if viewModel.isControlsVisible && (viewModel.errorMessage == nil || viewModel.keepControlsVisible) && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible && !viewModel.isQualitySheetVisible {
+        if !isShowingThisDramaInPiP && viewModel.isControlsVisible && (viewModel.errorMessage == nil || viewModel.keepControlsVisible) && !viewModel.isEpisodeDrawerVisible && !viewModel.isDanmakuSettingsVisible && !viewModel.isSpeedSheetVisible && !viewModel.isQualitySheetVisible {
             TVPlayerControlsOverlay(viewModel: viewModel, forceFocusPlayButton: viewModel.keepControlsVisible, feedActions: playerFeedActions) {
                 handleExit()
             }
