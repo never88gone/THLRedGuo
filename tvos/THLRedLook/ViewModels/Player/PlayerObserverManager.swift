@@ -63,6 +63,8 @@ final class PlayerObserverManager {
                         await av.seek(to: CMTime(seconds: position, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                         guard current() else { return }
                     }
+                    await Self.waitForAudioVideoSyncBuffer(item: observed, player: av, isCurrent: current)
+                    guard current(), observed.status == .readyToPlay else { return }
                     lastPosition = av.currentTime().seconds
                     lastAdvance = Date()
                     ready = true
@@ -131,5 +133,21 @@ final class PlayerObserverManager {
         if let token = timeObserverToken { player?.removeTimeObserver(token) }
         timeObserverToken = nil
         player = nil
+    }
+
+    private static func waitForAudioVideoSyncBuffer(
+        item: AVPlayerItem,
+        player av: AVPlayer,
+        isCurrent: @escaping () -> Bool
+    ) async {
+        let isLocal = (item.asset as? AVURLAsset)?.url.isFileURL ?? false
+        guard !isLocal else { return }
+        let deadline = Date().addingTimeInterval(2.0)
+        while isCurrent() && item.status == .readyToPlay && Date() < deadline {
+            if item.isPlaybackLikelyToKeepUp || item.isPlaybackBufferFull || item.bufferedSecondsAhead(from: av.currentTime()) >= 1.2 {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
     }
 }

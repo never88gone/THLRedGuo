@@ -2036,3 +2036,178 @@ final class PauseResumePlaybackTests: XCTestCase {
         XCTAssertFalse(coordinator.isAudioSessionConfigured)
     }
 }
+
+// MARK: - 下一集提前预缓冲与零 Loading 无缝连播测试
+@MainActor
+final class PrefetchSeamlessPlaybackTests: XCTestCase {
+    private var tempDirs: [URL] = []
+
+    override func tearDown() {
+        tempDirs.forEach { try? FileManager.default.removeItem(at: $0) }
+        tempDirs = []
+        super.tearDown()
+    }
+
+    private func writeSyntheticMP4(durationSeconds: Double = 2.0) async throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("PrefetchTest_\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        tempDirs.append(dir)
+        let outputURL = dir.appendingPathComponent("clip.mp4")
+
+        let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+        let width = 64
+        let height = 64
+        let settings: [String: Any] = [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height
+        ]
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: input,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height
+            ]
+        )
+        writer.add(input)
+        writer.startWriting()
+        writer.startSession(atSourceTime: .zero)
+
+        let fps: Int32 = 15
+        let totalFrames = Int(durationSeconds * Double(fps))
+        var frameIndex = 0
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let queue = DispatchQueue(label: "PrefetchTest.VideoWriter")
+            input.requestMediaDataWhenReady(on: queue) {
+                while input.isReadyForMoreMediaData {
+                    if frameIndex >= totalFrames {
+                        input.markAsFinished()
+                        continuation.resume()
+                        return
+                    }
+                    var pb: CVPixelBuffer?
+                    CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, nil, &pb)
+                    if let pb {
+                        adaptor.append(pb, withPresentationTime: CMTime(value: CMTimeValue(frameIndex), timescale: fps))
+                    }
+                    frameIndex += 1
+                }
+            }
+        }
+        await writer.finishWriting()
+        XCTAssertEqual(writer.status, .completed)
+        return outputURL
+    }
+
+    func testPrefetchWarmsSilentPlayerAndAutoAdvanceNextEpisodeHasNoLoading() async throws {
+        let ep1URL = try await writeSyntheticMP4(durationSeconds: 2.4)
+        let ep2URL = try await writeSyntheticMP4(durationSeconds: 2.0)
+
+        let bridgeDir = FileManager.default.temporaryDirectory.appendingPathComponent("PrefetchBridge_\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: bridgeDir, withIntermediateDirectories: true)
+        tempDirs.append(bridgeDir)
+
+        let encoded1 = String(decoding: try JSONSerialization.data(withJSONObject: ep1URL.absoluteString, options: .fragmentsAllowed), as: UTF8.self)
+        let encoded2 = String(decoding: try JSONSerialization.data(withJSONObject: ep2URL.absoluteString, options: .fragmentsAllowed), as: UTF8.self)
+        let script = """
+        const meta={id:'prefetch_synth',name:'PrefetchSynth',version:'1.0.0'};
+        const spider={
+          play:async function(flag,id){
+            return {url:(id==='2'?\(encoded2):\(encoded1)),quality:720,expiresAt:Date.now()+60000};
+          }
+        };
+        """
+        let bridge = NativeBridge(baseDirectory: bridgeDir, diagnosticContext: "预缓冲无缝连播测试", persistentDeviceSession: false)
+        _ = try await bridge.request(action: "jsSource.saveAndLoad", payload: ["fileName": "prefetch_synth.js", "script": script])
+        let repo = NativeRepository(bridge: bridge, playbackBridge: bridge)
+
+        let suiteName = "PrefetchSeamlessTests_\(UUID().uuidString)"
+        let testDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { testDefaults.removePersistentDomain(forName: suiteName) }
+        let store = LocalStore(defaults: testDefaults, cloudUpload: { _ in })
+
+        let drama = Drama(id: "prefetch_synth:d1", source: "prefetch_synth", sourceId: "d1", title: "预加载测试剧", episodes: 2)
+        let raw1 = try JSONSerialization.data(withJSONObject: ["url": "1"])
+        let raw2 = try JSONSerialization.data(withJSONObject: ["url": "2"])
+        let episodes = [
+            Episode(id: "1", title: "第1集", number: 1, raw: raw1),
+            Episode(id: "2", title: "第2集", number: 2, raw: raw2)
+        ]
+
+        let vm = PlayerViewModel(
+            drama: drama,
+            allEpisodes: episodes,
+            initialEpisodeIndex: 1,
+            repository: repo,
+            preloadingRepository: repo,
+            store: store
+        )
+        defer { vm.onDisappear() }
+
+        await vm.preparePlayback(episodeIndex: 1)
+
+        // 等待第1集起播并播放过1.5秒，且自动完成第2集衔接切换（中间不得因为第2集消费预热而进入 isLoading=true）
+        let deadline1 = Date().addingTimeInterval(12)
+        var switchedToEp2 = false
+        var observedLoadingDuringEp2Switch = false
+        while Date() < deadline1 {
+            if vm.currentEpisodeIndex == 2 {
+                switchedToEp2 = true
+                if vm.isLoading { observedLoadingDuringEp2Switch = true }
+                if vm.isPlaying && vm.currentTime > 0.15 {
+                    break
+                }
+            }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        XCTAssertTrue(switchedToEp2, "第1集播完后应自动连播第2集")
+        XCTAssertFalse(observedLoadingDuringEp2Switch, "消费提前预热的下一集播放器时不应弹出 isLoading 遮罩")
+        XCTAssertFalse(vm.isLoading)
+        XCTAssertEqual(vm.currentEpisodeIndex, 2)
+        let activePlayer = try XCTUnwrap(vm.player)
+        XCTAssertFalse(activePlayer.isMuted, "切入第2集后预热播放器必须取消静音")
+        XCTAssertEqual(activePlayer.volume, 1.0, accuracy: 0.01)
+    }
+
+    func testPrefetchCoordinatorClearsUnusedWarmPlayerResources() async throws {
+        let epURL = try await writeSyntheticMP4(durationSeconds: 1.0)
+        let bridgeDir = FileManager.default.temporaryDirectory.appendingPathComponent("PrefetchClear_\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: bridgeDir, withIntermediateDirectories: true)
+        tempDirs.append(bridgeDir)
+        let encoded = String(decoding: try JSONSerialization.data(withJSONObject: epURL.absoluteString, options: .fragmentsAllowed), as: UTF8.self)
+        let script = """
+        const meta={id:'prefetch_clear',name:'PrefetchClear',version:'1.0.0'};
+        const spider={play:async function(){return {url:\(encoded),quality:480,expiresAt:Date.now()+60000};}};
+        """
+        let bridge = NativeBridge(baseDirectory: bridgeDir, diagnosticContext: "预加载清理测试", persistentDeviceSession: false)
+        _ = try await bridge.request(action: "jsSource.saveAndLoad", payload: ["fileName": "prefetch_clear.js", "script": script])
+        let repo = NativeRepository(bridge: bridge, playbackBridge: bridge)
+
+        let coordinator = PlayerPrefetchCoordinator(preloadingRepository: repo)
+        let drama = Drama(id: "prefetch_clear:d1", source: "prefetch_clear", sourceId: "d1", title: "清理测试剧", episodes: 2)
+        let ep2 = Episode(id: "2", title: "第2集", number: 2, raw: try JSONSerialization.data(withJSONObject: ["url": "2"]))
+
+        coordinator.prefetchNextEpisode(nextEpisodeNumber: 2, allEpisodes: [ep2], drama: drama, requestedQuality: 0, playbackRate: 1.0, generation: 1)
+
+        let deadline = Date().addingTimeInterval(6)
+        while coordinator.preloadedEpisode == nil && Date() < deadline {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        let preloaded = try XCTUnwrap(coordinator.preloadedEpisode)
+        let warmPlayer = try XCTUnwrap(preloaded.player)
+        XCTAssertTrue(warmPlayer.isMuted)
+        XCTAssertEqual(warmPlayer.volume, 0.0, accuracy: 0.001)
+        XCTAssertNotNil(warmPlayer.currentItem)
+
+        // 清晰度不匹配不可消费
+        XCTAssertNil(coordinator.consumePreloaded(for: 2, dramaId: drama.id, requestedQuality: 1080, currentDecryptedURL: nil))
+
+        // 清理必须同步卸载 warmPlayer 上的 currentItem
+        coordinator.clearPreloaded(currentDecryptedURL: nil)
+        XCTAssertNil(coordinator.preloadedEpisode)
+        XCTAssertNil(warmPlayer.currentItem)
+    }
+}

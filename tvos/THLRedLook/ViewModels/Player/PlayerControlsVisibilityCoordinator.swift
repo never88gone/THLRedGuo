@@ -57,7 +57,7 @@ final class PlayerControlsVisibilityCoordinator: ObservableObject {
         transitionEpoch &+= 1
     }
 
-    func scheduleSeamlessTimeout(durationNs: UInt64 = 1_200_000_000, onTimeout: @escaping () -> Void) {
+    func scheduleSeamlessTimeout(durationNs: UInt64 = 3_000_000_000, onTimeout: @escaping () -> Void) {
         seamlessTimeoutTask?.cancel()
         seamlessTimeoutTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: durationNs)
