@@ -151,6 +151,8 @@ class PlayerDesktopPanelView extends StatelessWidget {
           Expanded(
             child: Text(
               '剧集列表',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,

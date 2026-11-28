@@ -53,14 +53,17 @@ class PlayerTopBarView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = fullscreen ? MediaQuery.paddingOf(context).top : 0.0;
+    final mediaPadding = fullscreen ? MediaQuery.paddingOf(context) : EdgeInsets.zero;
+    final topPadding = mediaPadding.top;
     final double extraTop = topPadding > 0
         ? (topPadding + (compact ? 4.0 : 8.0))
         : (compact ? 8.0 : 8.0);
+    final double leftPadding = mediaPadding.left + 8.0;
+    final double rightPadding = mediaPadding.right + 8.0;
     return Align(
       alignment: Alignment.topCenter,
       child: Padding(
-        padding: EdgeInsets.only(top: extraTop, left: 8, right: 8),
+        padding: EdgeInsets.only(top: extraTop, left: leftPadding, right: rightPadding),
         child: Row(
           children: [
             _iconButton(

@@ -1715,11 +1715,24 @@ class _DetailScreenState extends State<DetailScreen> {
       _didEnsureCurrentSeasonVisible = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final ctx = _currentSeasonKey.currentContext;
-        if (mounted && ctx != null) {
-          Scrollable.ensureVisible(
-            ctx,
-            alignment: 0.3,
+        if (!mounted || ctx == null || !_seriesScroll.hasClients) return;
+        final render = ctx.findRenderObject();
+        final scrollBox = _seriesScroll.position.context.storageContext
+            .findRenderObject();
+        if (render is! RenderBox ||
+            scrollBox is! RenderBox ||
+            !render.hasSize ||
+            !scrollBox.hasSize) {
+          return;
+        }
+        final dx = render.localToGlobal(Offset.zero, ancestor: scrollBox).dx;
+        final target = (_seriesScroll.offset + dx - scrollBox.size.width * 0.3)
+            .clamp(0.0, _seriesScroll.position.maxScrollExtent);
+        if ((target - _seriesScroll.offset).abs() > 1) {
+          _seriesScroll.animateTo(
+            target,
             duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOut,
           );
         }
       });

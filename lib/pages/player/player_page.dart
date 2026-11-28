@@ -2751,6 +2751,7 @@ class PlayerScreenState extends State<PlayerScreen>
                               SizedBox(
                                 width: desktop ? 340 : 220,
                                 child: PlayerDesktopPanelView(
+                                  compact: !desktop,
                                   episodes: _detail.episodes,
                                   currentIndex: _index,
                                   seriesEntries: _currentSeriesEntries,

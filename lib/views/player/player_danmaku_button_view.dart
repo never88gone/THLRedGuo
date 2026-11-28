@@ -34,7 +34,9 @@ class PlayerDanmakuButtonView extends StatelessWidget {
           ? const Alignment(1.0, -0.42)
           : Alignment.centerRight,
       child: Padding(
-        padding: EdgeInsets.only(right: swipeEnabled ? 8 : 4),
+        padding: EdgeInsets.only(
+          right: (swipeEnabled ? 8 : 4) + MediaQuery.paddingOf(context).right,
+        ),
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.playerOverlayButton,

@@ -424,8 +424,8 @@ class PlayerBottomBarView extends StatelessWidget {
       alignment: Alignment.bottomCenter,
       child: SafeArea(
         top: false,
-        left: false,
-        right: false,
+        left: fullscreen,
+        right: fullscreen,
         bottom: true,
         minimum: EdgeInsets.only(bottom: fullscreen ? 14.0 : 4.0),
         child: content,
