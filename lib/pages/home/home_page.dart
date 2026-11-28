@@ -1441,30 +1441,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _catalog({required bool selectionInBody}) {
     final items = _visible;
     final television = AppLayout.isTelevision(context);
-    final sourceChip =
-        (widget.store.isZhenguojianActivated || widget.store.sources.length > 1)
-        ? Padding(
-            key: const ValueKey('catalog-source-chip'),
-            padding: const EdgeInsets.only(right: 8),
-            child: ActionChip(
-              avatar: const Icon(Icons.swap_horiz_rounded, size: 16),
-              label: Text(_group.name),
-              tooltip: '切换数据源（当前：${_group.name}）',
-              shape: const StadiumBorder(),
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              labelStyle: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-              side: BorderSide(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.3),
-              ),
-              onPressed: _openSourceSwitcher,
-            ),
-          )
-        : null;
     return Column(
       children: [
         if (_searchVisible && !television)
@@ -1485,7 +1461,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         CatalogFilters(
           key: ValueKey('filters-${_group.id}'),
-          leading: sourceChip,
           categories: _displayCategories,
           category: _displayCategory,
           error: _categoriesError,
