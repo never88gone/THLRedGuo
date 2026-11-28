@@ -74,6 +74,8 @@ public final class PlayerViewModel: ObservableObject {
     public var isSeeking: Bool { seekCoordinator.isSeeking }
     private var playbackGeneration = 0
     private var preparationTask: Task<Void, Never>?
+    private var bufferingDebounceTask: Task<Void, Never>?
+    private var rawBuffering = false
     private var isSceneActive = true
     private var resumeAfterInterruption = false
     private var reachedEnd = false
@@ -173,6 +175,7 @@ public final class PlayerViewModel: ObservableObject {
     }
 
     private func releasePlayer() {
+        bufferingDebounceTask?.cancel(); bufferingDebounceTask = nil; rawBuffering = false
         remoteCoordinator.teardown(); danmakuManager.reset(); observerManager.release()
         seekCoordinator.cancel(); player?.pause(); player?.replaceCurrentItem(with: nil)
         player = nil; isPlaying = false; isBuffering = false
@@ -190,6 +193,7 @@ public final class PlayerViewModel: ObservableObject {
         playbackGeneration += 1
         let generation = playbackGeneration
         preparationTask?.cancel(); recoveryCoordinator.cancel()
+        bufferingDebounceTask?.cancel(); bufferingDebounceTask = nil; rawBuffering = false
         if !recovering { recoveryCoordinator.reset() }
         if !recovering && !preserveIntent { playIntent = isSceneActive; resumeAfterInterruption = !isSceneActive }
         prefetchCoordinator.cancel(); reachedEnd = false
@@ -207,7 +211,7 @@ public final class PlayerViewModel: ObservableObject {
         prefetchCoordinator.clearPreloaded(currentDecryptedURL: decryptedURL)
         let task = Task { [weak self] in
             guard let self else { return }
-            await remoteCoordinator.configureAudioSession()
+            await remoteCoordinator.configureAudioSession(force: true)
             guard !closed, generation == playbackGeneration, !Task.isCancelled else { return }
             do {
                 let result = try await playbackPreparer.prepareEpisode(drama: drama, allEpisodes: allEpisodes, episodeIndex: episodeIndex, requestedQuality: requestedQuality, avoidURL: recoveryCoordinator.failedURL)
@@ -235,6 +239,7 @@ public final class PlayerViewModel: ObservableObject {
         prepareForSeamlessTransition()
         saveCurrentProgress(force: true)
         playbackGeneration += 1; preparationTask?.cancel(); preparationTask = nil
+        bufferingDebounceTask?.cancel(); bufferingDebounceTask = nil; rawBuffering = false
         recoveryCoordinator.reset()
         prefetchCoordinator.clearPreloaded(currentDecryptedURL: decryptedURL)
         observerManager.release()
@@ -264,7 +269,7 @@ public final class PlayerViewModel: ObservableObject {
                 await self.beginPlayback(episodeIndex: ep, seekTo: pos, recovering: true)
             },
             onExceeded: { [weak self] msg in
-                self?.playIntent = false; self?.observerManager.release(); self?.player?.pause(); self?.isPlaying = false; self?.isBuffering = false; self?.isLoading = false; self?.isSeamlessTransitioning = false; self?.visibilityCoordinator.cancelSeamlessTimeout(); self?.errorMessage = msg
+                self?.playIntent = false; self?.rawBuffering = false; self?.bufferingDebounceTask?.cancel(); self?.bufferingDebounceTask = nil; self?.observerManager.release(); self?.player?.pause(); self?.isPlaying = false; self?.isBuffering = false; self?.isLoading = false; self?.isSeamlessTransitioning = false; self?.visibilityCoordinator.cancelSeamlessTimeout(); self?.errorMessage = msg
             }
         )
     }
@@ -294,13 +299,20 @@ public final class PlayerViewModel: ObservableObject {
             onPlayingChanged: { [weak self] playing in
                 guard let self else { return }
                 self.isPlaying = playing && self.playIntent && self.isSceneActive
-                if self.isPlaying { self.isLoading = false; self.isSeamlessTransitioning = false }
+                if self.isPlaying {
+                    self.isLoading = false
+                    self.isSeamlessTransitioning = false
+                    self.rawBuffering = false
+                    self.bufferingDebounceTask?.cancel()
+                    self.bufferingDebounceTask = nil
+                    self.isBuffering = false
+                }
                 self.samplePlaybackClock()
                 self.danmakuManager.updateActiveDanmakus(currentTime: self.currentTime, duration: self.duration, plan: self.plan)
             },
             onBufferingChanged: { [weak self] buffering in
                 guard let self else { return }
-                self.isBuffering = buffering && self.playIntent && self.isSceneActive && !self.isSeamlessTransitioning
+                self.applyObservedBuffering(buffering)
             },
             onReadyToPlay: { [weak self] dur, quality in
                 guard let self else { return }
@@ -310,8 +322,7 @@ public final class PlayerViewModel: ObservableObject {
                 self.isLoading = false; self.isSeamlessTransitioning = false
                 if self.playIntent && self.isSceneActive {
                     let startPlay = {
-                        av.playImmediately(atRate: self.playbackRate); av.play()
-                        if self.playbackRate > 0 { av.rate = self.playbackRate }
+                        self.resumePlayerImmediately(av)
                     }
                     if av.status == .readyToPlay && av.rate == 0 && self.playbackRate > 0 {
                         av.preroll(atRate: self.playbackRate) { [weak self, weak av] _ in Task { @MainActor in
@@ -341,25 +352,57 @@ public final class PlayerViewModel: ObservableObject {
         resetControlsHideTimer()
     }
 
+    private func resumePlayerImmediately(_ av: AVPlayer) {
+        let targetRate: Float = playbackRate > 0 ? playbackRate : 1.0
+        av.playImmediately(atRate: targetRate)
+    }
+
+    func applyObservedBuffering(_ buffering: Bool, debounceNanoseconds: UInt64 = 450_000_000) {
+        rawBuffering = buffering
+        let active = buffering && playIntent && isSceneActive && !isSeamlessTransitioning && !isLoading
+        guard active else {
+            bufferingDebounceTask?.cancel()
+            bufferingDebounceTask = nil
+            if isBuffering { isBuffering = false }
+            return
+        }
+        guard !isBuffering, bufferingDebounceTask == nil else { return }
+        let generation = playbackGeneration
+        bufferingDebounceTask = Task { [weak self] in
+            if debounceNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: debounceNanoseconds)
+            }
+            guard let self else { return }
+            self.bufferingDebounceTask = nil
+            guard !Task.isCancelled, !self.closed,
+                  generation == self.playbackGeneration,
+                  self.rawBuffering, self.playIntent, self.isSceneActive,
+                  !self.isSeamlessTransitioning, !self.isLoading else { return }
+            self.isBuffering = true
+        }
+    }
+
     public func togglePlayPause() {
         let now = Date()
         guard now.timeIntervalSince(lastTogglePlayPauseTime) > 0.3 else { return }
         lastTogglePlayPauseTime = now
         guard let p = player else { return }
         if playIntent {
-            playIntent = false; p.pause(); p.rate = 0; isPlaying = false; isBuffering = false
+            playIntent = false; rawBuffering = false; bufferingDebounceTask?.cancel(); bufferingDebounceTask = nil
+            p.pause(); isPlaying = false; isBuffering = false
         } else {
             isSceneActive = true; playIntent = true
+            rawBuffering = false; bufferingDebounceTask?.cancel(); bufferingDebounceTask = nil; isBuffering = false
             if reachedEnd { reachedEnd = false; seek(to: 0) }
-            p.playImmediately(atRate: playbackRate); p.play()
-            if playbackRate > 0 { p.rate = playbackRate }
-            let generation = playbackGeneration
-            Task { [weak self, weak p] in
-                guard let self, let p else { return }
-                await self.remoteCoordinator.configureAudioSession()
-                guard !self.closed, self.playIntent, self.player === p, self.isSceneActive, generation == self.playbackGeneration else { return }
-                p.playImmediately(atRate: self.playbackRate); p.play()
-                if self.playbackRate > 0 { p.rate = self.playbackRate }
+            resumePlayerImmediately(p)
+            if !remoteCoordinator.isAudioSessionConfigured {
+                let generation = playbackGeneration
+                Task { [weak self, weak p] in
+                    guard let self, let p else { return }
+                    await self.remoteCoordinator.configureAudioSession()
+                    guard !self.closed, self.playIntent, self.player === p, self.isSceneActive, generation == self.playbackGeneration else { return }
+                    self.resumePlayerImmediately(p)
+                }
             }
         }
         samplePlaybackClock()
@@ -447,14 +490,15 @@ public final class PlayerViewModel: ObservableObject {
         guard active != isSceneActive, !closed else { return }
         isSceneActive = active
         if active {
-            Task { await remoteCoordinator.configureAudioSession() }
+            Task { await remoteCoordinator.configureAudioSession(force: true) }
             if resumeAfterInterruption {
                 resumeAfterInterruption = false; playIntent = true
-                player?.playImmediately(atRate: playbackRate); player?.play()
-                if playbackRate > 0 { player?.rate = playbackRate }
+                rawBuffering = false; bufferingDebounceTask?.cancel(); bufferingDebounceTask = nil; isBuffering = false
+                if let p = player { resumePlayerImmediately(p) }
             }
         } else {
             resumeAfterInterruption = playIntent; playIntent = false
+            rawBuffering = false; bufferingDebounceTask?.cancel(); bufferingDebounceTask = nil
             player?.pause(); isPlaying = false; isBuffering = false
             saveCurrentProgress(force: true)
         }

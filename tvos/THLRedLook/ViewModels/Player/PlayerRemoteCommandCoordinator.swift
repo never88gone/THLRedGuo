@@ -6,6 +6,7 @@ import AVFoundation
 final class PlayerRemoteCommandCoordinator {
     private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
     private static let audioSessionQueue = DispatchQueue(label: "THLRedLook.AudioSession")
+    private(set) var isAudioSessionConfigured = false
 
     func setup(
         onPlay: @escaping () -> Void,
@@ -44,9 +45,11 @@ final class PlayerRemoteCommandCoordinator {
     func teardown() {
         for (command, target) in remoteCommandTargets { command.removeTarget(target) }
         remoteCommandTargets.removeAll()
+        isAudioSessionConfigured = false
     }
 
-    func configureAudioSession() async {
+    func configureAudioSession(force: Bool = false) async {
+        guard force || !isAudioSessionConfigured else { return }
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             Self.audioSessionQueue.async {
                 do {
@@ -57,5 +60,6 @@ final class PlayerRemoteCommandCoordinator {
                 continuation.resume()
             }
         }
+        isAudioSessionConfigured = true
     }
 }

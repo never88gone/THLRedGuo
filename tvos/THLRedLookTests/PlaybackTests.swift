@@ -1944,3 +1944,95 @@ final class PlaybackRateSettingsTests: XCTestCase {
         }
     }
 }
+
+// MARK: - 暂停后秒控恢复与缓冲防抖测试
+@MainActor
+final class PauseResumePlaybackTests: XCTestCase {
+    private final class SpyAVPlayer: AVPlayer {
+        var playCalls = 0
+        var pauseCalls = 0
+        var playImmediatelyRates: [Float] = []
+
+        override func play() {
+            playCalls += 1
+            super.play()
+        }
+
+        override func pause() {
+            pauseCalls += 1
+            super.pause()
+        }
+
+        override func playImmediately(atRate rate: Float) {
+            playImmediatelyRates.append(rate)
+            super.playImmediately(atRate: rate)
+        }
+    }
+
+    func testTogglePlayPauseUsesPlayImmediatelyAndDebouncesTransientBuffering() async throws {
+        let suiteName = "PauseResumePlaybackTests_\(UUID().uuidString)"
+        let testDefaults = UserDefaults(suiteName: suiteName)!
+        defer { testDefaults.removePersistentDomain(forName: suiteName) }
+
+        let store = LocalStore(defaults: testDefaults, cloudUpload: { _ in })
+        store.setDefaultPlaybackRate(1.5)
+        let drama = Drama(id: "pause_resume_test", source: "hongguo", title: "秒控恢复测试剧", cover: "", episodes: 2)
+        let episodes = (1...2).map { Episode(id: "ep_\($0)", title: "第\($0)集", number: $0) }
+
+        let vm = PlayerViewModel(drama: drama, allEpisodes: episodes, initialEpisodeIndex: 1, store: store)
+        defer { vm.onDisappear() }
+
+        let spy = SpyAVPlayer()
+        vm.player = spy
+        vm.isLoading = false
+        XCTAssertTrue(vm.wantsPlayback)
+
+        // 暂停：应当调用 pause，且清空缓冲状态
+        vm.togglePlayPause()
+        XCTAssertFalse(vm.wantsPlayback)
+        XCTAssertEqual(spy.pauseCalls, 1)
+        XCTAssertFalse(vm.isBuffering)
+
+        // 暂停期间即使上报缓冲状态，也不应弹出缓冲提示
+        vm.applyObservedBuffering(true, debounceNanoseconds: 40_000_000)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertFalse(vm.isBuffering)
+
+        // 超过防抖节流间隔后立即恢复播放：仅走 playImmediately，绝不再调 play()
+        try await Task.sleep(nanoseconds: 320_000_000)
+        vm.togglePlayPause()
+        XCTAssertTrue(vm.wantsPlayback)
+        XCTAssertEqual(spy.playCalls, 0, "恢复播放只能使用 playImmediately，不可紧跟 play() 重置等待队列")
+        XCTAssertEqual(spy.playImmediatelyRates, [1.5])
+
+        // 恢复瞬间的短暂缓冲窗口内不闪烁“正在缓冲”
+        vm.applyObservedBuffering(true, debounceNanoseconds: 120_000_000)
+        XCTAssertFalse(vm.isBuffering)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertFalse(vm.isBuffering)
+
+        // 若在防抖窗口内完成同步恢复，后续不会补发缓冲遮罩
+        vm.applyObservedBuffering(false, debounceNanoseconds: 120_000_000)
+        try await Task.sleep(nanoseconds: 140_000_000)
+        XCTAssertFalse(vm.isBuffering)
+
+        // 若确实持续缓冲超过防抖阈值，则正常展示；暂停后立刻清除
+        vm.applyObservedBuffering(true, debounceNanoseconds: 60_000_000)
+        try await Task.sleep(nanoseconds: 120_000_000)
+        XCTAssertTrue(vm.isBuffering)
+
+        try await Task.sleep(nanoseconds: 250_000_000)
+        vm.togglePlayPause()
+        XCTAssertFalse(vm.wantsPlayback)
+        XCTAssertFalse(vm.isBuffering)
+    }
+
+    func testRemoteCoordinatorCachesAudioSessionConfiguration() async {
+        let coordinator = PlayerRemoteCommandCoordinator()
+        XCTAssertFalse(coordinator.isAudioSessionConfigured)
+        await coordinator.configureAudioSession()
+        XCTAssertTrue(coordinator.isAudioSessionConfigured)
+        coordinator.teardown()
+        XCTAssertFalse(coordinator.isAudioSessionConfigured)
+    }
+}
